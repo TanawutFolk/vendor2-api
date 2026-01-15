@@ -75,6 +75,7 @@ import YieldRateGoStraightRateTotalForSctRoutes from './routes/yield-rate/YieldR
 import ClearTimeProcessForSctRoutes from './routes/_ClearTimeSystem/ClearTimeProcessForSctRoutes'
 import ClearTimeTotalForSctRoutes from './routes/_ClearTimeSystem/ClearTimeTotalForSctRoutes'
 import addVendorRoutes from './routes/_add-vendor/AddVendorRoutes'
+import findVendorRoutes from './routes/_find-vendor/FindVendorRoute'
 
 const Routers = Router()
 
@@ -165,5 +166,8 @@ Routers.use('/clear-time-total-for-sct', ClearTimeTotalForSctRoutes)
 
 // ? Add Vendor Routes
 Routers.use('/add-vendor', addVendorRoutes)
+
+// ? Find Vendor Routes
+Routers.use('/find-vendor', findVendorRoutes)
 
 export default Routers
