@@ -1,0 +1,18 @@
+import { BoiNameForMaterialConsumableController } from '@src/_workspace/controllers/boi/BoiNameForMaterialConsumableController'
+import { Router } from 'express'
+
+const BoiNameForMaterialConsumableRoutes = Router()
+
+BoiNameForMaterialConsumableRoutes.get('/search', BoiNameForMaterialConsumableController.search)
+BoiNameForMaterialConsumableRoutes.post('/search', BoiNameForMaterialConsumableController.search)
+
+BoiNameForMaterialConsumableRoutes.post('/create', BoiNameForMaterialConsumableController.create)
+BoiNameForMaterialConsumableRoutes.delete('/delete', BoiNameForMaterialConsumableController.delete)
+BoiNameForMaterialConsumableRoutes.patch('/update', BoiNameForMaterialConsumableController.update)
+BoiNameForMaterialConsumableRoutes.get('/getByLikeBoiGroupNoAndInuse', BoiNameForMaterialConsumableController.getByLikeBoiGroupNoAndInuse)
+BoiNameForMaterialConsumableRoutes.get('/getBoiGroupNoByBoiGroupNoAndProjectId', BoiNameForMaterialConsumableController.SearchWorkFlowStepBoiGroupNoForFetch)
+BoiNameForMaterialConsumableRoutes.get(
+  '/getBoiDescriptionMainNameByDescriptionManNameBoiGroupNoAndProjectId',
+  BoiNameForMaterialConsumableController.SearchWorkFlowStepDescriptionMainNameForFetch
+)
+export default BoiNameForMaterialConsumableRoutes
