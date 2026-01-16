@@ -3,9 +3,9 @@ export const FindVendorSQL = {
     search: async (dataItem: any, sqlWhere: string = '') => {
         let sqlList: any = []
 
-        // Count query
+        // Count query - นับทุก rows (รวม products ของแต่ละ vendor)
         let sqlCount = `
-            SELECT COUNT(DISTINCT v.vendor_id) AS TOTAL_COUNT
+            SELECT COUNT(*) AS TOTAL_COUNT
             FROM
                 vendors v
             LEFT JOIN
@@ -168,7 +168,7 @@ export const FindVendorSQL = {
     updateVendorProduct: async (dataItem: any) => {
         const sql = `
             UPDATE vendor_products SET
-                group_name = '${dataItem.group_name || ''}',
+                product_group_id = ${Number(dataItem.product_group_id) || 1},
                 maker_name = '${dataItem.maker_name || ''}',
                 product_name = '${dataItem.product_name || ''}',
                 model_list = '${dataItem.model_list || ''}',
