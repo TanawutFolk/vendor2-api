@@ -136,7 +136,7 @@ export const FindVendorSQL = {
         const sql = `
             UPDATE vendors SET
                 company_name = '${dataItem.company_name || ''}',
-                vendor_type_id = ${dataItem.vendor_type_id || 'NULL'},
+                vendor_type_id = ${dataItem.vendor_type_id},
                 province = '${dataItem.province || ''}',
                 postal_code = '${dataItem.postal_code || ''}',
                 website = '${dataItem.website || ''}',
