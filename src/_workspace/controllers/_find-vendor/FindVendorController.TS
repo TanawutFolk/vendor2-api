@@ -83,7 +83,7 @@ export const FindVendorController = {
             sqlWhere += ` AND v.vendor_type_id = ${vendorTypeId}`
         }
         if (status) sqlWhere += ` AND v.fft_status = '${status}'`
-        if (groupName) sqlWhere += ` AND mpg.group_name = '${groupName}'`
+        if (groupName) sqlWhere += ` AND vp.product_group_id = ${groupName}`
         if (productName) sqlWhere += ` AND vp.product_name LIKE '%${productName}%'`
         if (makerName) sqlWhere += ` AND vp.maker_name LIKE '%${makerName}%'`
         if (modelList) sqlWhere += ` AND vp.model_list LIKE '%${modelList}%'`
