@@ -227,5 +227,59 @@ export const FindVendorSQL = {
                 group_name ASC
         `
         return sql
+    },
+
+    // Search all vendors for export (no pagination limit)
+    searchAllForExport: async (dataItem: any, sqlWhere: string = '') => {
+        let sqlData = `
+            SELECT
+                v.vendor_id,
+                v.fft_vendor_code,
+                v.fft_status,
+                vp.vendor_product_id,
+                vc.vendor_contact_id,
+                v.company_name,
+                vt.name AS vendor_type_name,
+                v.province,
+                v.postal_code,
+                v.website,
+                v.address,
+                v.tel_center,
+                mpg.group_name,
+                vp.maker_name,
+                vp.product_name,
+                vp.model_list,
+                vc.seller_name,
+                vc.tel_phone,
+                vc.email,
+                vc.position,
+                vc.CREATE_BY,
+                vc.UPDATE_BY,
+                vc.CREATE_DATE,
+                vc.UPDATE_DATE,
+                v.INUSE
+            FROM
+                vendors v
+            LEFT JOIN
+                master_vendor_types vt ON v.vendor_type_id = vt.vendor_type_id
+            LEFT JOIN
+                vendor_contacts vc ON v.vendor_id = vc.vendor_id AND vc.INUSE = 1
+            LEFT JOIN
+                vendor_products vp ON v.vendor_id = vp.vendor_id AND vp.INUSE = 1
+            LEFT JOIN
+                master_product_groups mpg ON vp.product_group_id = mpg.product_group_id
+            WHERE
+                v.INUSE = 1
+                dataItem.sqlWhere
+                sqlWhereColumnFilter
+            ORDER BY dataItem.Order
+        `
+
+        // Replace placeholders
+        sqlData = sqlData.replaceAll('dataItem.sqlWhere', sqlWhere)
+        sqlData = sqlData.replaceAll('sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
+        sqlData = sqlData.replaceAll('dataItem.Order', dataItem['Order'] || 'v.company_name ASC')
+
+        return sqlData
     }
 }

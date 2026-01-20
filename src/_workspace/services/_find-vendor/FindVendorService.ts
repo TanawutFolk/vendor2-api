@@ -174,5 +174,17 @@ export const FindVendorService = {
                 Message: error?.message || 'Failed to get product groups'
             }
         }
+    },
+
+    // Search all vendors for export (no pagination)
+    searchAllForExport: async (dataItem: any, sqlWhere: string = '') => {
+        try {
+            const sql = await FindVendorSQL.searchAllForExport(dataItem, sqlWhere)
+            const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
+            return resultData
+        } catch (error: any) {
+            console.error('searchAllForExport error:', error)
+            return []
+        }
     }
 }

@@ -12,6 +12,9 @@ findVendorRoutes.post('/getById', FindVendorController.getById)
 // Update vendor
 findVendorRoutes.post('/update', FindVendorController.update)
 
+// Export to Excel
+findVendorRoutes.post('/downloadFileForExport', FindVendorController.downloadFileForExport)
+
 // Dropdowns
 findVendorRoutes.post('/dropdown/vendor-types', FindVendorController.getVendorTypes)
 findVendorRoutes.post('/dropdown/provinces', FindVendorController.getProvinces)
