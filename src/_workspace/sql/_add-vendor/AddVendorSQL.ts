@@ -10,9 +10,9 @@ export const AddVendorSQL = {
             FROM
                 vendors
             WHERE
-                company_name = 'dataItem.company_name'
-                AND province = 'dataItem.province'
-                AND postal_code = 'dataItem.postal_code'
+                LOWER(TRIM(company_name)) = LOWER(TRIM('dataItem.company_name'))
+                AND LOWER(TRIM(province)) = LOWER(TRIM('dataItem.province'))
+                AND TRIM(postal_code) = TRIM('dataItem.postal_code')
                 AND INUSE = 1
         `
 
