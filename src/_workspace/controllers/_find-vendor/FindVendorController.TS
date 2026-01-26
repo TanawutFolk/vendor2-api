@@ -61,6 +61,27 @@ export const FindVendorController = {
             }
         }
 
+        // --- Global Search Logic ---
+        const globalSearchFilter = dataItem.SearchFilters?.find((item: any) => item.id === 'global_search')
+        if (globalSearchFilter && globalSearchFilter.value) {
+            const keyword = globalSearchFilter.value
+            // Construct OR clause for multiple fields
+            const globalSearchSql = `
+                AND (
+                    v.company_name LIKE '%${keyword}%'
+                    OR v.fft_vendor_code LIKE '%${keyword}%'
+                    OR v.province LIKE '%${keyword}%'
+                    OR v.website LIKE '%${keyword}%'
+                    OR v.address LIKE '%${keyword}%'
+                    OR vc.email LIKE '%${keyword}%'
+                    OR vc.seller_name LIKE '%${keyword}%'
+                    OR vp.product_name LIKE '%${keyword}%'
+                )
+            `
+            sqlWhere += globalSearchSql
+        }
+        // ---------------------------
+
         // แปลง ColumnFilters เป็น SQL WHERE
         let sqlWhereColumnFilter = ''
         if (dataItem?.ColumnFilters?.length > 0) {
@@ -260,6 +281,27 @@ export const FindVendorController = {
                     sqlWhere = ` AND ${sqlWhere}`
                 }
             }
+
+            // --- Global Search Logic ---
+            const globalSearchFilter = query.SearchFilters?.find((item: any) => item.id === 'global_search')
+            if (globalSearchFilter && globalSearchFilter.value) {
+                const keyword = globalSearchFilter.value
+                // Construct OR clause for multiple fields
+                const globalSearchSql = `
+                AND (
+                    v.company_name LIKE '%${keyword}%'
+                    OR v.fft_vendor_code LIKE '%${keyword}%'
+                    OR v.province LIKE '%${keyword}%'
+                    OR v.website LIKE '%${keyword}%'
+                    OR v.address LIKE '%${keyword}%'
+                    OR vc.email LIKE '%${keyword}%'
+                    OR vc.seller_name LIKE '%${keyword}%'
+                    OR vp.product_name LIKE '%${keyword}%'
+                )
+            `
+                sqlWhere += globalSearchSql
+            }
+            // ---------------------------
 
             // orderBy ถูกจัดการโดย helper function แล้วใน query.Order
 
