@@ -1,13 +1,9 @@
 import { FindVendorModel } from '@src/_workspace/models/_find-vendor/FindVendorModel'
 import { getSqlWhereByColumnFilters_elysia } from '@src/helpers/getSqlWhereByFilterColumn'
+import getSqlWhere_elysia from '@src/helpers/getSqlWhere_elysia'
 import { ResponseI } from '@src/types/ResponseI'
 import { Request, Response } from 'express'
 const xl = require('excel4node')
-
-// Helper function to get value from SearchFilters array
-const getFilterValue = (searchFilters: any[], id: string) => {
-    return searchFilters?.find((f: any) => f.id === id)?.value ?? ''
-}
 
 export const FindVendorController = {
     // Search vendors
@@ -20,76 +16,58 @@ export const FindVendorController = {
             dataItem = req.body
         }
 
-        // Table mapping for ColumnFilters
+        // Table mapping for ColumnFilters and SearchFilters
         const tableIds = [
-            { table: 'v', id: 'company_name' },
-            { table: 'v', id: 'fft_vendor_code' },
-            { table: 'v', id: 'fft_status' },
-            { table: 'v', id: 'province' },
-            { table: 'v', id: 'website' },
-            { table: 'v', id: 'address' },
-            { table: 'v', id: 'tel_center' },
-            { table: 'vt', id: 'vendor_type_name', alias: 'name' },
-            { table: 'mpg', id: 'group_name' },
-            { table: 'vp', id: 'maker_name' },
-            { table: 'vp', id: 'product_name' },
-            { table: 'vp', id: 'model_list' },
-            { table: 'vc', id: 'seller_name' },
-            { table: 'vc', id: 'tel_phone' },
-            { table: 'vc', id: 'email' },
-            { table: 'vc', id: 'CREATE_BY' },
-            { table: 'vc', id: 'UPDATE_BY' },
-            { table: 'vc', id: 'CREATE_DATE' },
-            { table: 'vc', id: 'UPDATE_DATE' },
+            { table: 'v', id: 'company_name', Fns: 'LIKE' },
+            { table: 'v', id: 'fft_vendor_code', Fns: 'LIKE' },
+            { table: 'v', id: 'fft_status', Fns: '=' },
+            { table: 'v', id: 'province', Fns: 'LIKE' },
+            { table: 'v', id: 'website', Fns: 'LIKE' },
+            { table: 'v', id: 'address', Fns: 'LIKE' },
+            { table: 'v', id: 'tel_center', Fns: 'LIKE' },
+            { table: 'v', id: 'vendor_type_id', Fns: '=' },
+            { table: 'vt', id: 'vendor_type_name', alias: 'name', Fns: 'LIKE' },
+            { table: 'mpg', id: 'group_name', Fns: 'LIKE' },
+            { table: 'vp', id: 'product_group_id', Fns: '=' },
+            { table: 'vp', id: 'maker_name', Fns: 'LIKE' },
+            { table: 'vp', id: 'product_name', Fns: 'LIKE' },
+            { table: 'vp', id: 'model_list', Fns: 'LIKE' },
+            { table: 'vc', id: 'seller_name', Fns: 'LIKE' },
+            { table: 'vc', id: 'tel_phone', Fns: 'LIKE' },
+            { table: 'vc', id: 'email', Fns: 'LIKE' },
+            { table: 'vc', id: 'CREATE_BY', Fns: 'LIKE' },
+            { table: 'vc', id: 'UPDATE_BY', Fns: 'LIKE' },
+            { table: 'vc', id: 'CREATE_DATE', Fns: '=' },
+            { table: 'vc', id: 'UPDATE_DATE', Fns: '=' },
+            { table: 'v', id: 'status', Fns: '=' },
         ]
 
-        // 1. แปลง Start สำหรับ pagination (Start * Limit = Offset)
-        dataItem['Offset'] = Number(dataItem['Start'] || 0) * Number(dataItem['Limit'] || 20)
-
-        // 2. แปลง Order array เป็น SQL string
-        let orderBy = ''
-        if (!dataItem['Order'] || dataItem['Order'].length <= 0) {
-            orderBy = 'v.company_name ASC'
-        } else {
-            for (let i = 0; i < dataItem['Order'].length; i++) {
-                const word = dataItem['Order'][i]
-                orderBy += word['id'] + (word['desc'] ? ' DESC' : ' ASC') + ','
-            }
-            orderBy = orderBy.slice(0, -1) // ตัด comma ตัวสุดท้าย
+        // Filter out null/empty values from SearchFilters before passing to helper
+        if (dataItem.SearchFilters && Array.isArray(dataItem.SearchFilters)) {
+            dataItem.SearchFilters = dataItem.SearchFilters.filter((item: any) =>
+                item.value !== null && item.value !== undefined && item.value !== ''
+            )
         }
-        dataItem['Order'] = orderBy
 
-        // 3. แปลง ColumnFilters เป็น SQL WHERE
+        // ใช้ helper function เพื่อสร้าง SQL WHERE อย่างปลอดภัย
+        getSqlWhere_elysia(dataItem, tableIds, 'company_name')
+
+        // แปลงค่า sqlWhere จาก WHERE ... เป็น AND ...
+        let sqlWhere = ''
+        if (dataItem.sqlWhere) {
+            sqlWhere = dataItem.sqlWhere.replace(/^WHERE\s+/i, '')
+            if (sqlWhere) {
+                sqlWhere = ` AND ${sqlWhere}`
+            }
+        }
+
+        // แปลง ColumnFilters เป็น SQL WHERE
         let sqlWhereColumnFilter = ''
         if (dataItem?.ColumnFilters?.length > 0) {
             sqlWhereColumnFilter = getSqlWhereByColumnFilters_elysia(dataItem.ColumnFilters, tableIds)
         }
         dataItem['sqlWhereColumnFilter'] = sqlWhereColumnFilter
-
-        // 4. สร้าง sqlWhere จาก SearchFilters
-        const searchFilters = dataItem.SearchFilters || []
-        const companyName = getFilterValue(searchFilters, 'company_name')
-        const province = getFilterValue(searchFilters, 'province')
-        const vendorTypeId = getFilterValue(searchFilters, 'vendor_type_id')
-        const status = getFilterValue(searchFilters, 'status')
-        const groupName = getFilterValue(searchFilters, 'group_name')
-        const productName = getFilterValue(searchFilters, 'product_name')
-        const makerName = getFilterValue(searchFilters, 'maker_name')
-        const modelList = getFilterValue(searchFilters, 'model_list')
-
-        let sqlWhere = ''
-        if (companyName) sqlWhere += ` AND v.company_name LIKE '%${companyName}%'`
-        if (province) sqlWhere += ` AND v.province LIKE '%${province}%'`
-        if (vendorTypeId && vendorTypeId !== '' && vendorTypeId !== -1) {
-            sqlWhere += ` AND v.vendor_type_id = ${vendorTypeId}`
-        }
-        if (status) sqlWhere += ` AND v.fft_status = '${status}'`
-        if (groupName) sqlWhere += ` AND vp.product_group_id = ${groupName}`
-        if (productName) sqlWhere += ` AND vp.product_name LIKE '%${productName}%'`
-        if (makerName) sqlWhere += ` AND vp.maker_name LIKE '%${makerName}%'`
-        if (modelList) sqlWhere += ` AND vp.model_list LIKE '%${modelList}%'`
-
-        dataItem['sqlWhere'] = sqlWhere
+        dataItem['Offset'] = Number(dataItem['Start'] || 0) * Number(dataItem['Limit'] || 20)
 
         console.log('dataItem:', dataItem)
 
@@ -239,34 +217,51 @@ export const FindVendorController = {
             const query = dataItem.DataForFetch || {}
             const exportType = dataItem.TYPE || 'AllPage' // 'currentPage' or 'AllPage'
 
-            // Build search where clause from SearchFilters
-            const searchFilters = query.SearchFilters || []
-            const companyName = getFilterValue(searchFilters, 'company_name')
-            const province = getFilterValue(searchFilters, 'province')
-            const vendorTypeId = getFilterValue(searchFilters, 'vendor_type_id')
-            const status = getFilterValue(searchFilters, 'status')
-            const groupName = getFilterValue(searchFilters, 'group_name')
-            const productName = getFilterValue(searchFilters, 'product_name')
-            const makerName = getFilterValue(searchFilters, 'maker_name')
-            const modelList = getFilterValue(searchFilters, 'model_list')
+            // Table mapping (same as search function)
+            const tableIds = [
+                { table: 'v', id: 'company_name', Fns: 'LIKE' },
+                { table: 'v', id: 'fft_vendor_code', Fns: 'LIKE' },
+                { table: 'v', id: 'fft_status', Fns: '=' },
+                { table: 'v', id: 'province', Fns: 'LIKE' },
+                { table: 'v', id: 'website', Fns: 'LIKE' },
+                { table: 'v', id: 'address', Fns: 'LIKE' },
+                { table: 'v', id: 'tel_center', Fns: 'LIKE' },
+                { table: 'v', id: 'vendor_type_id', Fns: '=' },
+                { table: 'vt', id: 'vendor_type_name', alias: 'name', Fns: 'LIKE' },
+                { table: 'mpg', id: 'group_name', Fns: 'LIKE' },
+                { table: 'vp', id: 'product_group_id', Fns: '=' },
+                { table: 'vp', id: 'maker_name', Fns: 'LIKE' },
+                { table: 'vp', id: 'product_name', Fns: 'LIKE' },
+                { table: 'vp', id: 'model_list', Fns: 'LIKE' },
+                { table: 'vc', id: 'seller_name', Fns: 'LIKE' },
+                { table: 'vc', id: 'tel_phone', Fns: 'LIKE' },
+                { table: 'vc', id: 'email', Fns: 'LIKE' },
+                { table: 'vc', id: 'CREATE_BY', Fns: 'LIKE' },
+                { table: 'vc', id: 'UPDATE_BY', Fns: 'LIKE' },
+                { table: 'vc', id: 'CREATE_DATE', Fns: '=' },
+                { table: 'vc', id: 'UPDATE_DATE', Fns: '=' },
+            ]
 
+            // Filter out null/empty values from SearchFilters before passing to helper
+            if (query.SearchFilters && Array.isArray(query.SearchFilters)) {
+                query.SearchFilters = query.SearchFilters.filter((item: any) =>
+                    item.value !== null && item.value !== undefined && item.value !== ''
+                )
+            }
+
+            // ใช้ helper function เพื่อสร้าง SQL WHERE อย่างปลอดภัย
+            getSqlWhere_elysia(query, tableIds, 'company_name')
+
+            // แปลงค่า sqlWhere จาก WHERE ... เป็น AND ...
             let sqlWhere = ''
-            if (companyName) sqlWhere += ` AND v.company_name LIKE '%${companyName}%'`
-            if (province) sqlWhere += ` AND v.province LIKE '%${province}%'`
-            if (vendorTypeId && vendorTypeId !== '' && vendorTypeId !== -1) {
-                sqlWhere += ` AND v.vendor_type_id = ${vendorTypeId}`
+            if (query.sqlWhere) {
+                sqlWhere = query.sqlWhere.replace(/^WHERE\s+/i, '')
+                if (sqlWhere) {
+                    sqlWhere = ` AND ${sqlWhere}`
+                }
             }
-            if (status) sqlWhere += ` AND v.fft_status = '${status}'`
-            if (groupName) sqlWhere += ` AND vp.product_group_id = ${groupName}`
-            if (productName) sqlWhere += ` AND vp.product_name LIKE '%${productName}%'`
-            if (makerName) sqlWhere += ` AND vp.maker_name LIKE '%${makerName}%'`
-            if (modelList) sqlWhere += ` AND vp.model_list LIKE '%${modelList}%'`
 
-            // Set order
-            let orderBy = 'v.company_name ASC'
-            if (query.Order && query.Order.length > 0) {
-                orderBy = query.Order.map((o: any) => `${o.id} ${o.desc ? 'DESC' : 'ASC'}`).join(', ')
-            }
+            // orderBy ถูกจัดการโดย helper function แล้วใน query.Order
 
             let data: any[] = []
 
@@ -278,7 +273,7 @@ export const FindVendorController = {
 
                 const searchQuery = {
                     ...query,
-                    Order: orderBy,
+                    Order: query.Order || 'v.company_name ASC',
                     Limit: limit,
                     Offset: offset,
                     sqlWhereColumnFilter: ''
@@ -291,7 +286,7 @@ export const FindVendorController = {
                 // Export all data - no pagination
                 const searchQuery = {
                     ...query,
-                    Order: orderBy,
+                    Order: query.Order || 'v.company_name ASC',
                     sqlWhereColumnFilter: ''
                 }
 

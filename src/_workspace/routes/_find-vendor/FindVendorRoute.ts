@@ -1,21 +1,18 @@
 import { FindVendorController } from '@src/_workspace/controllers/_find-vendor/FindVendorController'
+import { validateData } from '@src/middlewares/validationMiddleware'
+import { 
+    SearchVendorSchema, 
+    GetVendorByIdSchema, 
+    UpdateVendorSchema, 
+    ExportVendorSchema 
+} from './validateSchema'
 import { Router } from 'express'
 
 const findVendorRoutes = Router()
 
-// Search vendors
-findVendorRoutes.post('/search', FindVendorController.search)
-
-// Get vendor by ID
-findVendorRoutes.post('/getById', FindVendorController.getById)
-
-// Update vendor
-findVendorRoutes.post('/update', FindVendorController.update)
-
-// Export to Excel
-findVendorRoutes.post('/downloadFileForExport', FindVendorController.downloadFileForExport)
-
-// Dropdowns
+findVendorRoutes.post('/search', validateData(SearchVendorSchema), FindVendorController.search)
+findVendorRoutes.post('/getById', validateData(GetVendorByIdSchema), FindVendorController.getById)
+findVendorRoutes.post('/update', validateData(UpdateVendorSchema), FindVendorController.update)
 findVendorRoutes.post('/dropdown/vendor-types', FindVendorController.getVendorTypes)
 findVendorRoutes.post('/dropdown/provinces', FindVendorController.getProvinces)
 findVendorRoutes.post('/dropdown/product-groups', FindVendorController.getProductGroups)

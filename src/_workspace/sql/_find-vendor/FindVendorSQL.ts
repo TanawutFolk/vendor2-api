@@ -19,7 +19,7 @@ export const FindVendorSQL = {
             WHERE
                 v.INUSE = 1
                 dataItem.sqlWhere
-                sqlWhereColumnFilter
+                dataItem.sqlWhereColumnFilter
         `
 
         // Data query
@@ -63,23 +63,29 @@ export const FindVendorSQL = {
             WHERE
                 v.INUSE = 1
                 dataItem.sqlWhere
-                sqlWhereColumnFilter
+                dataItem.sqlWhereColumnFilter
             ORDER BY dataItem.Order
             LIMIT dataItem.Limit OFFSET dataItem.Offset
         `
 
         // Replace placeholders
+        sqlCount = sqlCount.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
         sqlCount = sqlCount.replaceAll('dataItem.sqlWhere', sqlWhere)
-        sqlCount = sqlCount.replaceAll('sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
 
+        sqlData = sqlData.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
         sqlData = sqlData.replaceAll('dataItem.sqlWhere', sqlWhere)
-        sqlData = sqlData.replaceAll('sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
         sqlData = sqlData.replaceAll('dataItem.Order', dataItem['Order'] || 'v.company_name ASC')
         sqlData = sqlData.replaceAll('dataItem.Limit', String(dataItem['Limit'] || 20))
         sqlData = sqlData.replaceAll('dataItem.Offset', String(dataItem['Offset'] || 0))
 
         sqlList.push(sqlCount)
         sqlList.push(sqlData)
+
+        console.log('--- FindVendorSQL Debug ---')
+        console.log('sqlWhere param:', sqlWhere)
+        console.log('sqlWhereColumnFilter:', dataItem['sqlWhereColumnFilter'])
+        console.log('Generated SQL Data:', sqlData)
+        console.log('---------------------------')
 
         return sqlList
     },
@@ -199,16 +205,16 @@ export const FindVendorSQL = {
     getProvinces: async () => {
         const sql = `
             SELECT DISTINCT
-            province AS value,
-            province AS label
+                province AS value,
+                province AS label
             FROM
-            vendors
+                vendors
             WHERE
-            INUSE = 1
-            AND province IS NOT NULL
-            AND province != ''
+                INUSE = 1
+                AND province IS NOT NULL
+                AND province != ''
             ORDER BY
-            province ASC
+                province ASC
         `
         return sql
     },
@@ -271,13 +277,13 @@ export const FindVendorSQL = {
             WHERE
                 v.INUSE = 1
                 dataItem.sqlWhere
-                sqlWhereColumnFilter
+                dataItem.sqlWhereColumnFilter
             ORDER BY dataItem.Order
         `
 
         // Replace placeholders
+        sqlData = sqlData.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
         sqlData = sqlData.replaceAll('dataItem.sqlWhere', sqlWhere)
-        sqlData = sqlData.replaceAll('sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
         sqlData = sqlData.replaceAll('dataItem.Order', dataItem['Order'] || 'v.company_name ASC')
 
         return sqlData
