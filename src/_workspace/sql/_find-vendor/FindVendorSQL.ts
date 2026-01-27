@@ -45,11 +45,21 @@ export const FindVendorSQL = {
                 vc.tel_phone,
                 vc.email,
                 vc.position,
-                vc.CREATE_BY,
-                vc.UPDATE_BY,
-                vc.CREATE_DATE,
-                vc.UPDATE_DATE,
-                v.INUSE
+                v.CREATE_BY,
+                v.UPDATE_BY,
+                v.CREATE_DATE,
+                v.UPDATE_DATE,
+                v.INUSE,
+                
+                -- Contact Audit
+                vc.CREATE_BY AS contact_create_by,
+                vc.UPDATE_BY AS contact_update_by,
+                vc.CREATE_DATE AS contact_create_date,
+                vc.UPDATE_DATE AS contact_update_date,
+                
+                -- Product Audit
+                vp.UPDATE_BY AS product_update_by,
+                vp.UPDATE_DATE AS product_update_date
             FROM
                 vendors v
             LEFT JOIN
@@ -115,11 +125,21 @@ export const FindVendorSQL = {
                 vc.tel_phone,
                 vc.email,
                 vc.position,
-                vc.CREATE_BY,
-                vc.UPDATE_BY,
-                vc.CREATE_DATE,
-                vc.UPDATE_DATE,
-                v.INUSE
+                v.CREATE_BY,
+                v.UPDATE_BY,
+                v.CREATE_DATE,
+                v.UPDATE_DATE,
+                v.INUSE,
+
+                -- Contact Audit
+                vc.CREATE_BY AS contact_create_by,
+                vc.UPDATE_BY AS contact_update_by,
+                vc.CREATE_DATE AS contact_create_date,
+                vc.UPDATE_DATE AS contact_update_date,
+                
+                -- Product Audit
+                vp.UPDATE_BY AS product_update_by,
+                vp.UPDATE_DATE AS product_update_date
             FROM
                 vendors v
             LEFT JOIN
@@ -259,10 +279,20 @@ export const FindVendorSQL = {
                 vc.tel_phone,
                 vc.email,
                 vc.position,
-                vc.CREATE_BY,
-                vc.UPDATE_BY,
-                vc.CREATE_DATE,
-                vc.UPDATE_DATE,
+                v.CREATE_BY,
+                v.UPDATE_BY,
+                v.CREATE_DATE,
+                v.UPDATE_DATE,
+                
+                -- Contact Audit
+                vc.CREATE_BY AS contact_create_by,
+                vc.UPDATE_BY AS contact_update_by,
+                vc.CREATE_DATE AS contact_create_date,
+                vc.UPDATE_DATE AS contact_update_date,
+                
+                -- Product Audit
+                vp.UPDATE_BY AS product_update_by,
+                vp.UPDATE_DATE AS product_update_date,
                 v.INUSE
             FROM
                 vendors v
@@ -287,5 +317,25 @@ export const FindVendorSQL = {
         sqlData = sqlData.replaceAll('dataItem.Order', dataItem['Order'] || 'v.company_name ASC')
 
         return sqlData
+    },
+
+    // Generate Global Search SQL //Dont delete comment 1/27/2026
+    generateGlobalSearchSql: (keyword: string) => {
+        // Remove special characters that might break BOOLEAN MODE, keep spaces
+        keyword = keyword.replace(/[+\-><()~*"]/g, ' ')
+        // Add wildcard * to each word for "starts with" behavior
+        const booleanKeyword = keyword.split(/\s+/).filter((w: any) => w.length > 0).map((w: any) => `+${w}*`).join(' ')
+
+        if (booleanKeyword) {
+            return `
+                AND (
+                    MATCH(v.company_name, v.fft_vendor_code, v.province, v.website) AGAINST('${booleanKeyword}' IN BOOLEAN MODE)
+                    OR MATCH(vc.email, vc.seller_name, vc.tel_phone) AGAINST('${booleanKeyword}' IN BOOLEAN MODE)
+                    OR MATCH(vp.product_name, vp.maker_name, vp.model_list) AGAINST('${booleanKeyword}' IN BOOLEAN MODE)
+                    OR MATCH(mpg.group_name) AGAINST('${booleanKeyword}' IN BOOLEAN MODE)
+                )
+            `
+        }
+        return ''
     }
 }

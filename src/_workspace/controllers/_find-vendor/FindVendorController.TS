@@ -61,25 +61,8 @@ export const FindVendorController = {
             }
         }
 
-        // --- Global Search Logic ---
-        const globalSearchFilter = dataItem.SearchFilters?.find((item: any) => item.id === 'global_search')
-        if (globalSearchFilter && globalSearchFilter.value) {
-            const keyword = globalSearchFilter.value
-            // Construct OR clause for multiple fields
-            const globalSearchSql = `
-                AND (
-                    v.company_name LIKE '%${keyword}%'
-                    OR v.fft_vendor_code LIKE '%${keyword}%'
-                    OR v.province LIKE '%${keyword}%'
-                    OR v.website LIKE '%${keyword}%'
-                    OR v.address LIKE '%${keyword}%'
-                    OR vc.email LIKE '%${keyword}%'
-                    OR vc.seller_name LIKE '%${keyword}%'
-                    OR vp.product_name LIKE '%${keyword}%'
-                )
-            `
-            sqlWhere += globalSearchSql
-        }
+        // --- Global Search Logic (Full-Text Search) ---
+        // Removed: Logic moved to FindVendorService.ts to support reuse and separation of concerns.
         // ---------------------------
 
         // แปลง ColumnFilters เป็น SQL WHERE
@@ -93,8 +76,14 @@ export const FindVendorController = {
         console.log('dataItem:', dataItem)
 
         try {
-            const result = await FindVendorModel.searchVendors(dataItem, sqlWhere)
-            return res.status(200).json(result as ResponseI)
+            const { resultData, totalCount } = await FindVendorModel.searchVendors(dataItem, sqlWhere)
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: resultData,
+                TotalCountOnDb: totalCount,
+                MethodOnDb: 'Search Vendors',
+                Message: 'Search Data Success'
+            } as ResponseI)
         } catch (error: any) {
             return res.status(500).json({
                 Status: false,
@@ -122,15 +111,31 @@ export const FindVendorController = {
             if (!vendor_id || isNaN(vendor_id)) {
                 return res.status(400).json({
                     Status: false,
-                    ResultOnDb: {},
+                    ResultOnDb: [],
                     TotalCountOnDb: 0,
                     MethodOnDb: 'Get Vendor By ID',
                     Message: 'Invalid vendor ID'
                 } as ResponseI)
             }
 
-            const result = await FindVendorModel.getById(vendor_id)
-            return res.status(200).json(result as ResponseI)
+            const resultData = await FindVendorModel.getById(vendor_id)
+            if (resultData && resultData.length > 0) {
+                return res.status(200).json({
+                    Status: true,
+                    ResultOnDb: resultData[0],
+                    TotalCountOnDb: 1,
+                    MethodOnDb: 'Get Vendor By ID',
+                    Message: 'Get Data Success'
+                } as ResponseI)
+            } else {
+                return res.status(404).json({
+                    Status: false,
+                    ResultOnDb: [],
+                    TotalCountOnDb: 0,
+                    MethodOnDb: 'Get Vendor By ID',
+                    Message: 'Vendor not found'
+                } as ResponseI)
+            }
         } catch (error: any) {
             return res.status(500).json({
                 Status: false,
@@ -171,7 +176,13 @@ export const FindVendorController = {
             }
 
             const result = await FindVendorModel.updateVendor(updateData)
-            return res.status(200).json(result as ResponseI)
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: result,
+                TotalCountOnDb: 1,
+                MethodOnDb: 'Update Vendor',
+                Message: 'Update Data Success'
+            } as ResponseI)
         } catch (error: any) {
             return res.status(500).json({
                 Status: false,
@@ -187,7 +198,13 @@ export const FindVendorController = {
     getVendorTypes: async (req: Request, res: Response) => {
         try {
             const result = await FindVendorModel.getVendorTypes()
-            return res.status(200).json(result as ResponseI)
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: result,
+                TotalCountOnDb: result.length,
+                MethodOnDb: 'Get Vendor Types',
+                Message: 'Get Data Success'
+            } as ResponseI)
         } catch (error: any) {
             return res.status(500).json({
                 Status: false,
@@ -203,7 +220,13 @@ export const FindVendorController = {
     getProvinces: async (req: Request, res: Response) => {
         try {
             const result = await FindVendorModel.getProvinces()
-            return res.status(200).json(result as ResponseI)
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: result,
+                TotalCountOnDb: result.length,
+                MethodOnDb: 'Get Provinces',
+                Message: 'Get Data Success'
+            } as ResponseI)
         } catch (error: any) {
             return res.status(500).json({
                 Status: false,
@@ -219,7 +242,13 @@ export const FindVendorController = {
     getProductGroups: async (req: Request, res: Response) => {
         try {
             const result = await FindVendorModel.getProductGroups()
-            return res.status(200).json(result as ResponseI)
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: result,
+                TotalCountOnDb: result.length,
+                MethodOnDb: 'Get Product Groups',
+                Message: 'Get Data Success'
+            } as ResponseI)
         } catch (error: any) {
             return res.status(500).json({
                 Status: false,
@@ -282,27 +311,6 @@ export const FindVendorController = {
                 }
             }
 
-            // --- Global Search Logic ---
-            const globalSearchFilter = query.SearchFilters?.find((item: any) => item.id === 'global_search')
-            if (globalSearchFilter && globalSearchFilter.value) {
-                const keyword = globalSearchFilter.value
-                // Construct OR clause for multiple fields
-                const globalSearchSql = `
-                AND (
-                    v.company_name LIKE '%${keyword}%'
-                    OR v.fft_vendor_code LIKE '%${keyword}%'
-                    OR v.province LIKE '%${keyword}%'
-                    OR v.website LIKE '%${keyword}%'
-                    OR v.address LIKE '%${keyword}%'
-                    OR vc.email LIKE '%${keyword}%'
-                    OR vc.seller_name LIKE '%${keyword}%'
-                    OR vp.product_name LIKE '%${keyword}%'
-                )
-            `
-                sqlWhere += globalSearchSql
-            }
-            // ---------------------------
-
             // orderBy ถูกจัดการโดย helper function แล้วใน query.Order
 
             let data: any[] = []
@@ -323,7 +331,7 @@ export const FindVendorController = {
 
                 // Use the search function which has pagination
                 const result = await FindVendorModel.searchVendors(searchQuery, sqlWhere)
-                data = result.ResultOnDb || []
+                data = result.resultData || []
             } else {
                 // Export all data - no pagination
                 const searchQuery = {
