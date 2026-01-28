@@ -28,6 +28,14 @@ import mysql, { Pool, PoolConnection, PoolOptions } from 'mysql2/promise'
 import oracledb from 'oracledb'
 
 
+try {
+  oracledb.initOracleClient()
+} catch (err) {
+  console.error('Whoops! You need to have the Oracle Instant Client installed for this to work.')
+  console.error(err)
+  throw err
+}
+
 const oraclePools = new Map<string, oracledb.Pool>()
 
 const connectionOracle = async (configDb: string = ''): Promise<oracledb.Connection> => {

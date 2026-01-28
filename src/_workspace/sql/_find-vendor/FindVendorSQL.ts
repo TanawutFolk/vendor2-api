@@ -443,9 +443,10 @@ export const FindVendorSQL = {
             WHERE  
                 I_DL_CD LIKE '20030CA%'
         `
-        console.log(sql)
+        // console.log(sql)
         return sql
-    }
+    },
+
 
 
 
