@@ -36,22 +36,37 @@ export const FindVendorService = {
 
     // Update vendor
     updateVendor: async (dataItem: any) => {
+        // Map seller_name to contact_name (frontend sends seller_name, backend uses contact_name)
+        if (dataItem.seller_name !== undefined) {
+            dataItem.contact_name = dataItem.seller_name
+        }
+
         // Update vendor ONLY if company_name is provided (means vendor update)
         if (dataItem.company_name !== undefined) {
             const vendorSql = await FindVendorSQL.updateVendor(dataItem)
             await MySQLExecute.execute(vendorSql)
         }
 
-        // Update vendor contact if vendor_contact_id is provided
+        // Contact Logic
         if (dataItem.vendor_contact_id) {
+            // Update Existing Contact
             const contactSql = await FindVendorSQL.updateVendorContact(dataItem)
             await MySQLExecute.execute(contactSql)
+        } else if (dataItem.vendor_id && (dataItem.contact_name !== undefined || dataItem.email !== undefined)) {
+            // Create New Contact
+            const contactCreateSql = await FindVendorSQL.createVendorContact(dataItem)
+            await MySQLExecute.execute(contactCreateSql)
         }
 
-        // Update vendor product if vendor_product_id is provided
+        // Product Logic
         if (dataItem.vendor_product_id) {
+            // Update Existing Product
             const productSql = await FindVendorSQL.updateVendorProduct(dataItem)
             await MySQLExecute.execute(productSql)
+        } else if (dataItem.vendor_id && (dataItem.product_name !== undefined || dataItem.maker_name !== undefined)) {
+            // Create New Product
+            const productCreateSql = await FindVendorSQL.createVendorProduct(dataItem)
+            await MySQLExecute.execute(productCreateSql)
         }
 
         return dataItem

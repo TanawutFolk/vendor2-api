@@ -29,6 +29,7 @@ export const FindVendorSQL = {
                 v.fft_vendor_code,
                 v.fft_status,
                 vp.vendor_product_id,
+                vp.product_group_id,
                 vc.vendor_contact_id,
                 v.company_name,
                 vt.name AS vendor_type_name,
@@ -41,7 +42,7 @@ export const FindVendorSQL = {
                 vp.maker_name,
                 vp.product_name,
                 vp.model_list,
-                vc.seller_name,
+                vc.contact_name,
                 vc.tel_phone,
                 vc.email,
                 vc.position,
@@ -121,7 +122,7 @@ export const FindVendorSQL = {
                 vp.product_name,
                 vp.model_list,
                 vc.vendor_contact_id,
-                vc.seller_name,
+                vc.contact_name,
                 vc.tel_phone,
                 vc.email,
                 vc.position,
@@ -179,7 +180,7 @@ export const FindVendorSQL = {
     updateVendorContact: async (dataItem: any) => {
         const sql = `
             UPDATE vendor_contacts SET
-                seller_name = '${dataItem.seller_name || ''}',
+                contact_name = '${dataItem.contact_name || ''}',
                 tel_phone = '${dataItem.tel_phone || ''}',
                 email = '${dataItem.email || ''}',
                 position = '${dataItem.position || ''}',
@@ -187,6 +188,43 @@ export const FindVendorSQL = {
                 UPDATE_DATE = NOW()
             WHERE vendor_contact_id = ${dataItem.vendor_contact_id}
         `
+        return sql
+    },
+
+    // Create vendor contact
+    createVendorContact: async (dataItem: any) => {
+        let sql = `
+            INSERT INTO vendor_contacts (
+                vendor_id,
+                contact_name,
+                tel_phone,
+                email,
+                position,
+                CREATE_BY,
+                CREATE_DATE,
+                UPDATE_BY,
+                UPDATE_DATE,
+                INUSE
+            ) VALUES (
+                dataItem.vendor_id,
+                'dataItem.contact_name',
+                'dataItem.tel_phone',
+                'dataItem.email',
+                'dataItem.position',
+                'dataItem.UPDATE_BY',
+                NOW(),
+                'dataItem.UPDATE_BY',
+                NOW(),
+                1
+            )
+        `
+        sql = sql.replaceAll('dataItem.vendor_id', String(dataItem.vendor_id))
+        sql = sql.replaceAll('dataItem.contact_name', dataItem.contact_name || '')
+        sql = sql.replaceAll('dataItem.tel_phone', dataItem.tel_phone || '')
+        sql = sql.replaceAll('dataItem.email', dataItem.email || '')
+        sql = sql.replaceAll('dataItem.position', dataItem.position || '')
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY || '')
+
         return sql
     },
 
@@ -202,6 +240,43 @@ export const FindVendorSQL = {
                 UPDATE_DATE = NOW()
             WHERE vendor_product_id = ${dataItem.vendor_product_id}
         `
+        return sql
+    },
+
+    // Create vendor product
+    createVendorProduct: async (dataItem: any) => {
+        let sql = `
+            INSERT INTO vendor_products (
+                vendor_id,
+                product_group_id,
+                maker_name,
+                product_name,
+                model_list,
+                CREATE_BY,
+                CREATE_DATE,
+                UPDATE_BY,
+                UPDATE_DATE,
+                INUSE
+            ) VALUES (
+                dataItem.vendor_id,
+                dataItem.product_group_id,
+                'dataItem.maker_name',
+                'dataItem.product_name',
+                'dataItem.model_list',
+                'dataItem.UPDATE_BY',
+                NOW(),
+                'dataItem.UPDATE_BY',
+                NOW(),
+                1
+            )
+        `
+        sql = sql.replaceAll('dataItem.vendor_id', String(dataItem.vendor_id))
+        sql = sql.replaceAll('dataItem.product_group_id', String(Number(dataItem.product_group_id) || 1))
+        sql = sql.replaceAll('dataItem.maker_name', dataItem.maker_name || '')
+        sql = sql.replaceAll('dataItem.product_name', dataItem.product_name || '')
+        sql = sql.replaceAll('dataItem.model_list', dataItem.model_list || '')
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY || '')
+
         return sql
     },
 
@@ -275,7 +350,7 @@ export const FindVendorSQL = {
                 vp.maker_name,
                 vp.product_name,
                 vp.model_list,
-                vc.seller_name,
+                vc.contact_name,
                 vc.tel_phone,
                 vc.email,
                 vc.position,
@@ -311,7 +386,6 @@ export const FindVendorSQL = {
             ORDER BY dataItem.Order
         `
 
-        // Replace placeholders
         sqlData = sqlData.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
         sqlData = sqlData.replaceAll('dataItem.sqlWhere', sqlWhere)
         sqlData = sqlData.replaceAll('dataItem.Order', dataItem['Order'] || 'v.company_name ASC')
@@ -327,14 +401,26 @@ export const FindVendorSQL = {
         const booleanKeyword = keyword.split(/\s+/).filter((w: any) => w.length > 0).map((w: any) => `+${w}*`).join(' ')
 
         if (booleanKeyword) {
-            return `
+            // Old Code
+            // return `
+            //     AND (
+            //         MATCH(v.company_name, v.fft_vendor_code, v.province, v.website) AGAINST('${booleanKeyword}' IN BOOLEAN MODE)
+            //         OR MATCH(vc.email, vc.contact_name, vc.tel_phone) AGAINST('${booleanKeyword}' IN BOOLEAN MODE)
+            //         OR MATCH(vp.product_name, vp.maker_name, vp.model_list) AGAINST('${booleanKeyword}' IN BOOLEAN MODE)
+            //         OR MATCH(mpg.group_name) AGAINST('${booleanKeyword}' IN BOOLEAN MODE)
+            //     )
+            // `
+
+            let sql = `
                 AND (
-                    MATCH(v.company_name, v.fft_vendor_code, v.province, v.website) AGAINST('${booleanKeyword}' IN BOOLEAN MODE)
-                    OR MATCH(vc.email, vc.seller_name, vc.tel_phone) AGAINST('${booleanKeyword}' IN BOOLEAN MODE)
-                    OR MATCH(vp.product_name, vp.maker_name, vp.model_list) AGAINST('${booleanKeyword}' IN BOOLEAN MODE)
-                    OR MATCH(mpg.group_name) AGAINST('${booleanKeyword}' IN BOOLEAN MODE)
+                    MATCH(v.company_name, v.fft_vendor_code, v.province, v.website) AGAINST('booleanKeyword' IN BOOLEAN MODE)
+                    OR MATCH(vc.email, vc.contact_name, vc.tel_phone) AGAINST('booleanKeyword' IN BOOLEAN MODE)
+                    OR MATCH(vp.product_name, vp.maker_name, vp.model_list) AGAINST('booleanKeyword' IN BOOLEAN MODE)
+                    OR MATCH(mpg.group_name) AGAINST('booleanKeyword' IN BOOLEAN MODE)
                 )
             `
+            sql = sql.replaceAll('booleanKeyword', booleanKeyword)
+            return sql
         }
         return ''
     }

@@ -23,7 +23,7 @@ const OrderSchema = z.object({
 // --- Search Schema ---
 export const SearchVendorSchema = z.object({
     Start: z.number().int().min(0).optional().default(0),
-    Limit: z.number().int().min(1).max(1000).optional().default(20),
+    Limit: z.number().int().min(1).max(1000000).optional().default(20),
     Order: z.array(OrderSchema).optional().default([]),
     SearchFilters: z.array(SearchFilterSchema).optional().default([]),
     ColumnFilters: z.array(ColumnFilterSchema).optional().default([])
@@ -78,7 +78,7 @@ export const ExportVendorSchema = z.object({
     }).optional().default('AllPage'),
     DataForFetch: z.object({
         Start: z.number().int().min(0).optional().default(0),
-        Limit: z.number().int().min(1).max(1000).optional().default(20),
+        Limit: z.number().int().min(1).max(1000000).optional().default(20),
         Order: z.array(OrderSchema).optional().default([]),
         SearchFilters: z.array(SearchFilterSchema).optional().default([]),
         ColumnFilters: z.array(ColumnFilterSchema).optional().default([])

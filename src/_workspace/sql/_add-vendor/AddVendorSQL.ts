@@ -72,7 +72,7 @@ export const AddVendorSQL = {
         let sql = `
             INSERT INTO vendor_contacts (
                 vendor_id,
-                seller_name,
+                contact_name,
                 tel_phone,
                 email,
                 position,
@@ -82,7 +82,7 @@ export const AddVendorSQL = {
             )
             VALUES (
                 dataItem.vendor_id,
-                'dataItem.seller_name',
+                'dataItem.contact_name',
                 'dataItem.tel_phone',
                 'dataItem.email',
                 'dataItem.position',
@@ -93,7 +93,7 @@ export const AddVendorSQL = {
         `
 
         sql = sql.replaceAll('dataItem.vendor_id', String(Number(dataItem['vendor_id']) || 0))
-        sql = sql.replaceAll('dataItem.seller_name', dataItem['seller_name'] || '')
+        sql = sql.replaceAll('dataItem.contact_name', dataItem['contact_name'] || '')
         sql = sql.replaceAll('dataItem.tel_phone', dataItem['tel_phone'] || '')
         sql = sql.replaceAll('dataItem.email', dataItem['email'] || '')
         sql = sql.replaceAll('dataItem.position', dataItem['position'] || '')
