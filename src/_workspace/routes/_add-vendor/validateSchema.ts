@@ -11,7 +11,7 @@ export const CheckDuplicateSchema = z.object({
 
 // Contact Schema
 const ContactSchema = z.object({
-    seller_name: z.string().min(1, 'Seller Name is required'),
+    contact_name: z.string().min(1, 'Contact Name is required'),
     tel_phone: z.string().max(30).optional().or(z.literal('')),
     email: z.string().email().optional().or(z.literal('')),
     position: z.string().max(50).optional().or(z.literal(''))

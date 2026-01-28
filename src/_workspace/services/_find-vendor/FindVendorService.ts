@@ -36,11 +36,6 @@ export const FindVendorService = {
 
     // Update vendor
     updateVendor: async (dataItem: any) => {
-        // Map seller_name to contact_name (frontend sends seller_name, backend uses contact_name)
-        if (dataItem.seller_name !== undefined) {
-            dataItem.contact_name = dataItem.seller_name
-        }
-
         // Update vendor ONLY if company_name is provided (means vendor update)
         if (dataItem.company_name !== undefined) {
             const vendorSql = await FindVendorSQL.updateVendor(dataItem)

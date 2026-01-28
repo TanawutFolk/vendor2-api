@@ -32,7 +32,7 @@ export const FindVendorController = {
             { table: 'vp', id: 'maker_name', Fns: 'LIKE' },
             { table: 'vp', id: 'product_name', Fns: 'LIKE' },
             { table: 'vp', id: 'model_list', Fns: 'LIKE' },
-            { table: 'vc', id: 'seller_name', Fns: 'LIKE' },
+            { table: 'vc', id: 'contact_name', Fns: 'LIKE' },
             { table: 'vc', id: 'tel_phone', Fns: 'LIKE' },
             { table: 'vc', id: 'email', Fns: 'LIKE' },
             { table: 'vc', id: 'CREATE_BY', Fns: 'LIKE' },
@@ -49,10 +49,10 @@ export const FindVendorController = {
             )
         }
 
-        // ใช้ helper function เพื่อสร้าง SQL WHERE อย่างปลอดภัย
+        // Create SQL WHERE and ORDER BY
         getSqlWhere_elysia(dataItem, tableIds, 'company_name')
 
-        // แปลงค่า sqlWhere จาก WHERE ... เป็น AND ...
+        // Extract sqlWhere from dataItem (it now contains both SearchFilters and ColumnFilters)
         let sqlWhere = ''
         if (dataItem.sqlWhere) {
             sqlWhere = dataItem.sqlWhere.replace(/^WHERE\s+/i, '')
@@ -61,16 +61,7 @@ export const FindVendorController = {
             }
         }
 
-        // --- Global Search Logic (Full-Text Search) ---
-        // Removed: Logic moved to FindVendorService.ts to support reuse and separation of concerns.
-        // ---------------------------
-
-        // แปลง ColumnFilters เป็น SQL WHERE
-        let sqlWhereColumnFilter = ''
-        if (dataItem?.ColumnFilters?.length > 0) {
-            sqlWhereColumnFilter = getSqlWhereByColumnFilters_elysia(dataItem.ColumnFilters, tableIds)
-        }
-        dataItem['sqlWhereColumnFilter'] = sqlWhereColumnFilter
+        dataItem['sqlWhereColumnFilter'] = '' // No longer needed as it's merged into sqlWhere
         dataItem['Offset'] = Number(dataItem['Start'] || 0) * Number(dataItem['Limit'] || 20)
 
         console.log('dataItem:', dataItem)
@@ -283,7 +274,7 @@ export const FindVendorController = {
                 { table: 'vp', id: 'maker_name', Fns: 'LIKE' },
                 { table: 'vp', id: 'product_name', Fns: 'LIKE' },
                 { table: 'vp', id: 'model_list', Fns: 'LIKE' },
-                { table: 'vc', id: 'seller_name', Fns: 'LIKE' },
+                { table: 'vc', id: 'contact_name', Fns: 'LIKE' },
                 { table: 'vc', id: 'tel_phone', Fns: 'LIKE' },
                 { table: 'vc', id: 'email', Fns: 'LIKE' },
                 { table: 'vc', id: 'CREATE_BY', Fns: 'LIKE' },
@@ -361,7 +352,7 @@ export const FindVendorController = {
                 maker_name: 'Maker Name',
                 product_name: 'Product Name',
                 model_list: 'Model List',
-                seller_name: 'Contact Name',
+                contact_name: 'Contact Name',
                 tel_phone: 'Tel Contact',
                 email: 'Email Contact',
                 CREATE_BY: 'Created By',

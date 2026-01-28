@@ -55,7 +55,7 @@ export const UpdateVendorSchema = z.object({
 
     // Vendor Contact fields (optional)
     vendor_contact_id: z.number().int().positive().optional(),
-    seller_name: z.string().optional(),
+    contact_name: z.string().optional(),
     tel_phone: z.string().max(30).optional(),
     email: z.string().email('Invalid email format').optional().or(z.literal('')),
     position: z.string().max(50).optional(),

@@ -77,7 +77,7 @@ export const AddVendorService = {
                 for (const contact of dataItem.contacts) {
                     const contactData = {
                         vendor_id: vendorId,
-                        seller_name: contact.seller_name,
+                        contact_name: contact.contact_name,
                         tel_phone: contact.tel_phone || '',
                         email: contact.email || '',
                         position: contact.position || '',
@@ -161,7 +161,7 @@ export const AddVendorService = {
             if (resultData.insertId) {
                 return {
                     Status: true,
-                    Message: 'บันทึกข้อมูลเรียบร้อยแล้ว Data has been saved successfully',
+                    Message: 'Data has been saved successfully',
                     ResultOnDb: { product_group_id: resultData.insertId },
                     MethodOnDb: 'Create Product Group Success',
                     TotalCountOnDb: 1,
