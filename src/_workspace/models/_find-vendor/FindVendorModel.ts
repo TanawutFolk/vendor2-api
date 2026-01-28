@@ -7,6 +7,6 @@ export const FindVendorModel = {
     getVendorTypes: async () => FindVendorService.getVendorTypes(),
     getProvinces: async () => FindVendorService.getProvinces(),
     getProductGroups: async () => FindVendorService.getProductGroups(),
-    searchAllForExport: async (dataItem: any, sqlWhere: string = '') => FindVendorService.searchAllForExport(dataItem, sqlWhere)
+    searchAllForExport: async (dataItem: any, sqlWhere: string = '') => FindVendorService.searchAllForExport(dataItem, sqlWhere),
+    getPronesData: async (dataItem: any) => FindVendorService.getPronesData(dataItem)
 }
-

@@ -25,6 +25,30 @@
 
 // db.ts
 import mysql, { Pool, PoolConnection, PoolOptions } from 'mysql2/promise'
+import oracledb from 'oracledb'
+
+
+const oraclePools = new Map<string, oracledb.Pool>()
+
+const connectionOracle = async (configDb: string = ''): Promise<oracledb.Connection> => {
+  const key = configDb || 'DEFAULT'
+
+  if (!oraclePools.has(key)) {
+    const dbConfig = {
+      user: process.env[`${configDb ? `${configDb}_` : ''}USER_NAME`],
+      password: process.env[`${configDb ? `${configDb}_` : ''}PASSWORD`],
+      connectString: process.env[`${configDb ? `${configDb}_` : ''}HOST`],
+      poolMin: 1,
+      poolMax: 10,
+      poolIncrement: 1
+    }
+
+    const pool = await oracledb.createPool(dbConfig)
+    oraclePools.set(key, pool)
+  }
+
+  return oraclePools.get(key)!.getConnection()
+}
 
 const pools = new Map<string, Pool>()
 
@@ -55,4 +79,4 @@ const connection = async (configDb: string = ''): Promise<PoolConnection> => {
   return pools.get(key)!.getConnection()
 }
 
-export { connection }
+export { connection, connectionOracle }

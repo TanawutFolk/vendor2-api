@@ -429,23 +429,23 @@ export const FindVendorSQL = {
 
 
     // //prones
-    // getPronesData: (dataItem: any) => {
-    //     let sql =
-    //         `
-    //         SELECT 
-    //                 RTRIM(I_DL_CD) Customer_code, 
-    //                 RTRIM(I_DL_ARG_DESC) Customer_name,  
-    //                 RTRIM(I_ADDRESS1) Customer_Address1, 
-    //                 RTRIM(I_ADDRESS2) Customer_Address2,  
-    //                 RTRIM(I_ADDRESS3) Customer_Address3, 
-    //                 RTRIM(I_TEL) Customer_tel    
-    //         FROM FFT.T_TRADE_MS
-    //         WHERE  
-    //             I_DL_CD LIKE '20030CA%'
-
-    //     `
-    //     return sql
-    // }
+    getPronesData: (dataItem: any) => {
+        let sql =
+            `
+            SELECT 
+                    RTRIM(I_DL_CD) Customer_code, 
+                    RTRIM(I_DL_ARG_DESC) Customer_name,  
+                    RTRIM(I_ADDRESS1) Customer_Address1, 
+                    RTRIM(I_ADDRESS2) Customer_Address2,  
+                    RTRIM(I_ADDRESS3) Customer_Address3, 
+                    RTRIM(I_TEL) Customer_tel    
+            FROM FFT.T_TRADE_MS
+            WHERE  
+                I_DL_CD LIKE '20030CA%'
+        `
+        console.log(sql)
+        return sql
+    }
 
 
 

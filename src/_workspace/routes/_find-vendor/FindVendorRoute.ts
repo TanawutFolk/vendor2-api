@@ -1,10 +1,10 @@
 import { FindVendorController } from '@src/_workspace/controllers/_find-vendor/FindVendorController'
 import { validateData } from '@src/middlewares/validationMiddleware'
-import { 
-    SearchVendorSchema, 
-    GetVendorByIdSchema, 
-    UpdateVendorSchema, 
-    ExportVendorSchema 
+import {
+    SearchVendorSchema,
+    GetVendorByIdSchema,
+    UpdateVendorSchema,
+    ExportVendorSchema
 } from './validateSchema'
 import { Router } from 'express'
 
@@ -16,5 +16,6 @@ findVendorRoutes.post('/update', validateData(UpdateVendorSchema), FindVendorCon
 findVendorRoutes.post('/dropdown/vendor-types', FindVendorController.getVendorTypes)
 findVendorRoutes.post('/dropdown/provinces', FindVendorController.getProvinces)
 findVendorRoutes.post('/dropdown/product-groups', FindVendorController.getProductGroups)
+findVendorRoutes.post('/dropdown/prones-data', FindVendorController.getPronesData)
 
 export default findVendorRoutes

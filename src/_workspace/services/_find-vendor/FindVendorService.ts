@@ -1,4 +1,4 @@
-import { MySQLExecute } from '@businessData/dbExecute'
+import { MySQLExecute, OracleExecute } from '@businessData/dbExecute'
 import { FindVendorSQL } from '../../sql/_find-vendor/FindVendorSQL'
 import { RowDataPacket } from 'mysql2'
 
@@ -98,6 +98,13 @@ export const FindVendorService = {
 
         const sql = await FindVendorSQL.searchAllForExport(dataItem, sqlWhere)
         const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
+        return resultData
+    },
+
+    // Get prones data
+    getPronesData: async (dataItem: any) => {
+        const sql = await FindVendorSQL.getPronesData(dataItem)
+        const resultData = (await OracleExecute.searchOracle(sql)) as RowDataPacket[]
         return resultData
     }
 }

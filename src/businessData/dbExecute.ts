@@ -201,7 +201,9 @@
 // }
 
 // MySQLExecute.ts
-import { connection } from './db'
+import oracledb from 'oracledb'
+import { connection, connectionOracle } from './db'
+
 
 export const MySQLExecute = {
   // SELECT
@@ -303,4 +305,49 @@ export const MySQLExecute = {
       if (conn) conn.release()
     }
   },
+
+}
+
+export const OracleExecute = {
+  searchOracle: async (query: string, configDb: string = '') => {
+    let conn: oracledb.Connection | null = null
+    try {
+      conn = await connectionOracle(configDb)
+      const binds = {}
+      const options = {
+        outFormat: oracledb.OUT_FORMAT_OBJECT
+      }
+      const result = await conn.execute(query, binds, options)
+
+      return result
+    } catch (error: any) {
+      throw new Error(error.message)
+    } finally {
+      if (conn) await conn.close()
+    }
+  },
+
+  searchListOracle: async (queryList: string[], configDb: string = '') => {
+    let conn: oracledb.Connection | null = null
+    const listDataItem: any[] = []
+    try {
+      conn = await connectionOracle(configDb)
+      const binds = {}
+      const options = {
+        outFormat: oracledb.OUT_FORMAT_OBJECT
+      }
+
+      for (let i = 0; i < queryList.length; i++) {
+        const query = queryList[i]
+        const result = await conn.execute(query, binds, options)
+        listDataItem.push(result.rows)
+      }
+
+      return listDataItem
+    } catch (error: any) {
+      throw new Error(error.message)
+    } finally {
+      if (conn) await conn.close()
+    }
+  }
 }

@@ -454,5 +454,17 @@ export const FindVendorController = {
             console.error('downloadFileForExport error:', error)
             return res.status(500).json({ error: 'Export failed', message: error?.message })
         }
+    },
+
+    // Get prones data
+    getPronesData: async (req: Request, res: Response) => {
+        try {
+            const dataItem = req.body
+            const resultData = await FindVendorModel.getPronesData(dataItem)
+            return res.status(200).json({ resultData })
+        } catch (error: any) {
+            console.error('getPronesData error:', error)
+            return res.status(500).json({ error: 'Failed to get prones data', message: error?.message })
+        }
     }
-}
+}   
