@@ -1,6 +1,6 @@
 export const FindVendorSQL = {
     // Search vendors with contacts
-    search: async (dataItem: any, sqlWhere: string = '') => {
+    search: (dataItem: any, sqlWhere: string = '') => {
         let sqlList: any = []
 
         // Count query - นับทุก rows (รวม products ของแต่ละ vendor)
@@ -102,7 +102,7 @@ export const FindVendorSQL = {
     },
 
     // Get vendor by ID
-    getById: async (vendor_id: number) => {
+    getById: (vendor_id: number) => {
         const sql = `
             SELECT
                 v.vendor_id,
@@ -159,7 +159,7 @@ export const FindVendorSQL = {
     },
 
     // Update vendor
-    updateVendor: async (dataItem: any) => {
+    updateVendor: (dataItem: any) => {
         const sql = `
             UPDATE vendors SET
                 company_name = '${dataItem.company_name || ''}',
@@ -177,7 +177,7 @@ export const FindVendorSQL = {
     },
 
     // Update vendor contact
-    updateVendorContact: async (dataItem: any) => {
+    updateVendorContact: (dataItem: any) => {
         const sql = `
             UPDATE vendor_contacts SET
                 contact_name = '${dataItem.contact_name || ''}',
@@ -192,7 +192,7 @@ export const FindVendorSQL = {
     },
 
     // Create vendor contact
-    createVendorContact: async (dataItem: any) => {
+    createVendorContact: (dataItem: any) => {
         let sql = `
             INSERT INTO vendor_contacts (
                 vendor_id,
@@ -229,7 +229,7 @@ export const FindVendorSQL = {
     },
 
     // Update vendor product
-    updateVendorProduct: async (dataItem: any) => {
+    updateVendorProduct: (dataItem: any) => {
         const sql = `
             UPDATE vendor_products SET
                 product_group_id = ${Number(dataItem.product_group_id) || 1},
@@ -244,7 +244,7 @@ export const FindVendorSQL = {
     },
 
     // Create vendor product
-    createVendorProduct: async (dataItem: any) => {
+    createVendorProduct: (dataItem: any) => {
         let sql = `
             INSERT INTO vendor_products (
                 vendor_id,
@@ -281,7 +281,7 @@ export const FindVendorSQL = {
     },
 
     // Get vendor types for dropdown
-    getVendorTypes: async () => {
+    getVendorTypes: () => {
         const sql = `
             SELECT
                 vendor_type_id AS value,
@@ -297,7 +297,7 @@ export const FindVendorSQL = {
     },
 
     // Get provinces for dropdown
-    getProvinces: async () => {
+    getProvinces: () => {
         const sql = `
             SELECT DISTINCT
                 province AS value,
@@ -315,7 +315,7 @@ export const FindVendorSQL = {
     },
 
     // Get product groups for dropdown
-    getProductGroups: async () => {
+    getProductGroups: () => {
         const sql = `
             SELECT
                 product_group_id AS value,
@@ -331,7 +331,7 @@ export const FindVendorSQL = {
     },
 
     // Search all vendors for export (no pagination limit)
-    searchAllForExport: async (dataItem: any, sqlWhere: string = '') => {
+    searchAllForExport: (dataItem: any, sqlWhere: string = '') => {
         let sqlData = `
             SELECT
                 v.vendor_id,
@@ -423,5 +423,30 @@ export const FindVendorSQL = {
             return sql
         }
         return ''
-    }
+    },
+
+
+
+
+    // //prones
+    // getPronesData: (dataItem: any) => {
+    //     let sql =
+    //         `
+    //         SELECT 
+    //                 RTRIM(I_DL_CD) Customer_code, 
+    //                 RTRIM(I_DL_ARG_DESC) Customer_name,  
+    //                 RTRIM(I_ADDRESS1) Customer_Address1, 
+    //                 RTRIM(I_ADDRESS2) Customer_Address2,  
+    //                 RTRIM(I_ADDRESS3) Customer_Address3, 
+    //                 RTRIM(I_TEL) Customer_tel    
+    //         FROM FFT.T_TRADE_MS
+    //         WHERE  
+    //             I_DL_CD LIKE '20030CA%'
+
+    //     `
+    //     return sql
+    // }
+
+
+
 }
