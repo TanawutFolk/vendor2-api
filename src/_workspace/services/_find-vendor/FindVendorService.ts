@@ -1,4 +1,5 @@
 import { MySQLExecute, OracleExecute } from '@businessData/dbExecute'
+import { connection } from '@businessData/db'
 import { FindVendorSQL } from '../../sql/_find-vendor/FindVendorSQL'
 import { RowDataPacket } from 'mysql2'
 
@@ -99,6 +100,26 @@ export const FindVendorService = {
         const sql = await FindVendorSQL.searchAllForExport(dataItem, sqlWhere)
         const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
         return resultData
+    },
+
+    // Stream all vendors for export
+    streamAllForExport: async (dataItem: any, sqlWhere: string = '') => {
+        // Check for Global Search
+        const globalSearchFilter = dataItem.SearchFilters?.find((item: any) => item.id === 'global_search')
+        if (globalSearchFilter?.value) {
+            sqlWhere += FindVendorSQL.generateGlobalSearchSql(globalSearchFilter.value)
+        }
+
+        const sql = await FindVendorSQL.searchAllForExport(dataItem, sqlWhere)
+
+        const conn = await connection()
+        // Access the underlying raw connection from the promise wrapper
+        const rawConn = (conn as any).connection
+
+        return {
+            stream: rawConn.query(sql).stream(),
+            connection: conn
+        }
     },
 
 

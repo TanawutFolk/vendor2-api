@@ -18,5 +18,6 @@ findVendorRoutes.post('/dropdown/provinces', FindVendorController.getProvinces)
 findVendorRoutes.post('/dropdown/product-groups', FindVendorController.getProductGroups)
 findVendorRoutes.post('/dropdown/prones-Check', FindVendorController.getPronesData)
 findVendorRoutes.post('/dropdown/vendor-names', FindVendorController.getAllVendorNames)
+findVendorRoutes.post('/downloadFileForExport', FindVendorController.downloadFileForExport)
 // findVendorRoutes.post('/dropdown/prones-data-all', FindVendorController.getPronesDataAll)
 export default findVendorRoutes

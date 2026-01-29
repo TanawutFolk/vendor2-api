@@ -3,7 +3,7 @@ import { getSqlWhereByColumnFilters_elysia } from '@src/helpers/getSqlWhereByFil
 import getSqlWhere_elysia from '@src/helpers/getSqlWhere_elysia'
 import { ResponseI } from '@src/types/ResponseI'
 import { Request, Response } from 'express'
-const xl = require('excel4node')
+import excel from 'exceljs'
 
 export const FindVendorController = {
     // Search vendors
@@ -68,79 +68,12 @@ export const FindVendorController = {
         console.log('dataItem:', dataItem)
 
         try {
-            // ดึงข้อมูล vendors และ prones data พร้อมกัน
-            const [{ resultData, totalCount }, pronesResponse] = await Promise.all([
-                FindVendorModel.searchVendors(dataItem, sqlWhere),
-                FindVendorModel.getPronesData({})
-            ]);
+            const { resultData, totalCount } = await FindVendorModel.searchVendors(dataItem, sqlWhere);
 
-            // ดึงเฉพาะ Rows จาก Prones (จัดการโครงสร้าง Oracle)
-            const pronesRows = (pronesResponse as any)?.rows || [];
-
-            // สร้าง Index สำหรับ Prones data เพื่อ lookup เร็ว O(1)
-            const pronesTelMap = new Map();
-            const pronesNameMap = new Map();
-
-            pronesRows.forEach((p: any) => {
-                const pTel = cleanTel(p.CUSTOMER_TEL);
-                const pName = cleanName(p.CUSTOMER_NAME);
-                if (pTel) pronesTelMap.set(pTel, p);
-                if (pName) pronesNameMap.set(pName, p);
-            });
-
-            // Merge status_check เข้ากับ resultData
-            const resultWithStatus = resultData.map((vendor: any) => {
-                const mTel = cleanTel(vendor.tel_center);
-                const mName = cleanName(vendor.company_name);
-                const mAddress = vendor.address || '';
-
-                let status_check = 'Not Registered';
-                let pronesRef = null;
-
-                // Step 1: เช็คจากเบอร์โทร (แม่นยำสุด)
-                if (mTel && pronesTelMap.has(mTel)) {
-                    status_check = 'Registered';
-                    pronesRef = pronesTelMap.get(mTel);
-                }
-                // Step 2: เช็คจากชื่อบริษัท
-                else if (mName && pronesNameMap.has(mName)) {
-                    status_check = 'Registered';
-                    pronesRef = pronesNameMap.get(mName);
-                }
-                // Step 3: เช็คจากความคล้ายของที่อยู่
-                else {
-                    const similarMatch = pronesRows.find((p: any) => {
-                        const pFullAddr = `${p.CUSTOMER_ADDRESS1 || ''} ${p.CUSTOMER_ADDRESS2 || ''} ${p.CUSTOMER_ADDRESS3 || ''}`;
-                        return calculateSimilarity(mAddress, pFullAddr) > 0.6;
-                    });
-
-                    if (similarMatch) {
-                        status_check = 'Registered';
-                        pronesRef = similarMatch;
-                    }
-                }
-
-                return {
-                    ...vendor,
-                    status_check,
-                    prones_code: pronesRef ? pronesRef.CUSTOMER_CODE : null,
-                    prones_name_en: pronesRef ? pronesRef.CUSTOMER_NAME : null
-                };
-            });
-
-            // Filter by Prones Status if requested
-            // 1 = Registered, 0 = Not Registered
             const statusFilter = dataItem.SearchFilters?.find((item: any) => item.id === 'status');
-            let finalResult = resultWithStatus;
+            const filterValue = statusFilter && statusFilter.value ? statusFilter.value.toString() : null;
 
-            if (statusFilter && statusFilter.value) {
-                const filterValue = statusFilter.value.toString();
-                if (filterValue === '1') {
-                    finalResult = finalResult.filter((item: any) => item.status_check === 'Registered');
-                } else if (filterValue === '0') {
-                    finalResult = finalResult.filter((item: any) => item.status_check === 'Not Registered');
-                }
-            }
+            const finalResult = await matchVendorsWithPrones(resultData, filterValue);
 
             return res.status(200).json({
                 Status: true,
@@ -325,14 +258,19 @@ export const FindVendorController = {
         }
     },
 
-    // Export vendors to Excel
+    // Export vendors to Excel (Buffer / Template Approach)
     downloadFileForExport: async (req: Request, res: Response) => {
         try {
-            let dataItem = Object.entries(req.body).length === 0 ? req.query : req.body
-            const query = dataItem.DataForFetch || {}
-            const exportType = dataItem.TYPE || 'AllPage' // 'currentPage' or 'AllPage'
+            let dataItem
+            if (Object.entries(req.body).length === 0) {
+                dataItem = req.query.data ? JSON.parse(req.query.data as any) : req.query
+            } else {
+                dataItem = req.body
+            }
 
-            // Table mapping (same as search function)
+            const query = dataItem.DataForFetch || dataItem || {}
+
+            // Table mapping
             const tableIds = [
                 { table: 'v', id: 'company_name', Fns: 'LIKE' },
                 { table: 'v', id: 'fft_vendor_code', Fns: 'LIKE' },
@@ -358,17 +296,26 @@ export const FindVendorController = {
                 { table: 'vc', id: 'UPDATE_DATE', Fns: '=' },
             ]
 
-            // Filter out null/empty values from SearchFilters before passing to helper
             if (query.SearchFilters && Array.isArray(query.SearchFilters)) {
                 query.SearchFilters = query.SearchFilters.filter((item: any) =>
                     item.value !== null && item.value !== undefined && item.value !== ''
                 )
             }
 
-            // ใช้ helper function เพื่อสร้าง SQL WHERE อย่างปลอดภัย
+            const statusFilter = dataItem.DataForFetch?.SearchFilters?.find((item: any) => item.id === 'status');
+            const requiredStatus = statusFilter && statusFilter.value ? statusFilter.value.toString() : null;
+
+            // Intercept Order for SQL fallback
+            if (query.Order && Array.isArray(query.Order)) {
+                const statusSort = query.Order.find((o: any) => o.id === 'status_check')
+                if (statusSort) {
+                    query.Order = [{ id: 'company_name', desc: false }]
+                }
+            }
+
+            // Generate SQL Where
             getSqlWhere_elysia(query, tableIds, 'company_name')
 
-            // แปลงค่า sqlWhere จาก WHERE ... เป็น AND ...
             let sqlWhere = ''
             if (query.sqlWhere) {
                 sqlWhere = query.sqlWhere.replace(/^WHERE\s+/i, '')
@@ -377,46 +324,22 @@ export const FindVendorController = {
                 }
             }
 
-            // orderBy ถูกจัดการโดย helper function แล้วใน query.Order
+            // 1. Fetch ALL Data (Wait for full array)
+            const searchQuery = { ...query, sqlWhereColumnFilter: '', Order: query.Order || 'v.company_name ASC' };
+            const vendorRows = await FindVendorModel.searchAllForExport(searchQuery, sqlWhere) as any[];
 
-            let data: any[] = []
+            // 2. Fetch Prones Data & Match
+            const resultData = await matchVendorsWithPrones(vendorRows, requiredStatus);
 
-            if (exportType === 'currentPage') {
-                // Export current page only - use pagination
-                const limit = query.Limit || 20
-                const start = query.Start || 0
-                const offset = start * limit
+            // 3. Create Workbook & Worksheet (Memory Approach - like ClearTimeExport)
+            // Note: If you have a template file, use workbook.xlsx.readFile('path/to/template.xlsx')
+            const workbook = new excel.Workbook();
+            const worksheet = workbook.addWorksheet('Vendor List');
 
-                const searchQuery = {
-                    ...query,
-                    Order: query.Order || 'v.company_name ASC',
-                    Limit: limit,
-                    Offset: offset,
-                    sqlWhereColumnFilter: ''
-                }
-
-                // Use the search function which has pagination
-                const result = await FindVendorModel.searchVendors(searchQuery, sqlWhere)
-                data = result.resultData || []
-            } else {
-                // Export all data - no pagination
-                const searchQuery = {
-                    ...query,
-                    Order: query.Order || 'v.company_name ASC',
-                    sqlWhereColumnFilter: ''
-                }
-
-                data = await FindVendorModel.searchAllForExport(searchQuery, sqlWhere)
-            }
-
-            if (!data || data.length === 0) {
-                return res.status(400).json({ error: 'No data to export.' })
-            }
-
-            // Header mapping
+            // 4. Setup Headers
             const headerMap: Record<string, string> = {
                 fft_vendor_code: 'Vendor Code',
-                fft_status: 'Prones Status',
+                status_check: 'Prones Status',
                 company_name: 'Company Name',
                 vendor_type_name: 'Vendor Type',
                 province: 'Province',
@@ -435,173 +358,297 @@ export const FindVendorController = {
                 CREATE_DATE: 'Created Date',
                 UPDATE_DATE: 'Updated Date'
             }
+            const visibleColumns = Object.keys(headerMap);
 
-            // Columns to export
-            const visibleColumns = Object.keys(headerMap)
+            // Set Title Row
+            worksheet.getCell('A1').value = 'Export : Vendor List';
+            worksheet.getCell('A1').font = { name: 'Aptos Display', size: 18, bold: true };
 
-            // Create workbook
-            const wb = new xl.Workbook()
-            const ws = wb.addWorksheet('Vendor List')
+            // Set Header Row (Row 2)
+            visibleColumns.forEach((col, idx) => {
+                const cell = worksheet.getCell(2, idx + 1);
+                cell.value = headerMap[col];
+                cell.font = { name: 'Aptos Display', bold: true };
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBCD8F1' } };
+                cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+                cell.alignment = { vertical: 'middle', horizontal: 'center' };
+                worksheet.getColumn(idx + 1).width = 20;
+            });
 
-            // Header style
-            const headerStyle = wb.createStyle({
-                font: { name: 'Aptos', size: 11, bold: true },
-                alignment: { horizontal: 'center', vertical: 'center', wrapText: false },
-                border: {
-                    left: { style: 'thin' },
-                    right: { style: 'thin' },
-                    top: { style: 'thin' },
-                    bottom: { style: 'thin' },
-                },
-                fill: {
-                    type: 'pattern',
-                    patternType: 'solid',
-                    fgColor: '#D9D9D9',
-                },
-            })
+            // 5. Populate Data (Row 3+)
+            resultData.forEach((row: any, rIdx: number) => {
+                const rowIndex = 3 + rIdx;
 
-            // Body style
-            const bodyStyle = wb.createStyle({
-                font: { name: 'Arial', size: 11 },
-                alignment: { horizontal: 'left', vertical: 'center', wrapText: false },
-            })
+                visibleColumns.forEach((col, cIdx) => {
+                    let cellValue = row[col];
 
-            // Add headers
-            visibleColumns.forEach((col, colIndex) => {
-                const headerText = headerMap[col] || col
-                ws.cell(1, colIndex + 1).string(headerText).style(headerStyle)
-            })
-            ws.row(1).setHeight(25)
-
-            // Track max column widths
-            const maxColWidths: number[] = visibleColumns.map((col) => (headerMap[col] || col).length)
-
-            // Add data rows
-            data.forEach((row: any, rowIndex: number) => {
-                visibleColumns.forEach((col, colIndex) => {
-                    let cellValue = row[col]
-
-                    // Format date fields
+                    // Date Fmt
                     if ((col === 'CREATE_DATE' || col === 'UPDATE_DATE') && cellValue) {
-                        const date = new Date(cellValue)
-                        cellValue = date.toLocaleDateString('th-TH', {
-                            year: 'numeric',
-                            month: '2-digit',
-                            day: '2-digit'
-                        })
+                        const date = new Date(cellValue);
+                        cellValue = date.toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit' });
                     }
+                    if (col === 'model_list' && cellValue) cellValue = cellValue.replace(/\n/g, ', ');
 
-                    // Format model_list (replace newlines with commas)
-                    if (col === 'model_list' && cellValue) {
-                        cellValue = cellValue.replace(/\n/g, ', ')
-                    }
+                    const finalValue = cellValue !== undefined && cellValue !== null ? cellValue.toString() : '';
 
-                    const finalValue = cellValue !== undefined && cellValue !== null ? cellValue.toString() : ''
-                    ws.cell(rowIndex + 2, colIndex + 1).string(finalValue).style(bodyStyle)
-                    maxColWidths[colIndex] = Math.max(maxColWidths[colIndex], finalValue.length)
-                })
-            })
+                    const cell = worksheet.getCell(rowIndex, cIdx + 1);
+                    cell.value = finalValue;
+                    cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+                    cell.font = { name: 'Aptos Display', size: 11 };
+                    cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+                });
+            });
 
-            // Set column widths
-            maxColWidths.forEach((width, index) => {
-                const finalWidth = Math.min(Math.ceil(width * 1.4), 50)
-                ws.column(index + 1).setWidth(finalWidth)
-            })
+            // 6. Send Response logic (similar to ClearTime sendFile)
+            const date = new Date()
+            const year = date.getFullYear()
+            const month = String(date.getMonth() + 1).padStart(2, '0')
+            const day = String(date.getDate()).padStart(2, '0')
+            const hours = String(date.getHours()).padStart(2, '0')
+            const minutes = String(date.getMinutes()).padStart(2, '0')
+            const seconds = String(date.getSeconds()).padStart(2, '0')
+            const filename = `Vendor_List_${year}${month}${day}_${hours}${minutes}${seconds}.xlsx`
 
-            // Generate filename with timestamp
-            const now = new Date()
-            const pad = (n: number) => n.toString().padStart(2, '0')
-            const timestamp = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`
-            const filename = `Vendor_List_${timestamp}.xlsx`
+            const buffer = await workbook.xlsx.writeBuffer();
 
-            // Send file
-            wb.writeToBuffer()
-                .then((buffer: any) => {
-                    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-                    res.setHeader('Content-Disposition', `attachment; filename=${filename}`)
-                    res.send(buffer)
-                })
-                .catch((err: any) => {
-                    res.status(500).json({ error: 'Failed to generate file', err })
-                })
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.setHeader('Content-Length', (buffer as any).length);
+
+            res.end(buffer);
 
         } catch (error: any) {
             console.error('downloadFileForExport error:', error)
-            return res.status(500).json({ error: 'Export failed', message: error?.message })
+            if (!res.headersSent) return res.status(500).json({ error: 'Export failed', message: error?.message })
         }
     },
+
+    // Export vendors to Excel (Streaming)
+    // downloadFileForExport_Streaming: async (req: Request, res: Response) => {
+    //     try {
+    //         let dataItem
+    //         if (Object.entries(req.body).length === 0) {
+    //             dataItem = req.query.data ? JSON.parse(req.query.data as any) : req.query
+    //         } else {
+    //             dataItem = req.body
+    //         }
+    //
+    //         const query = dataItem.DataForFetch || dataItem || {}
+    //
+    //         // Table mapping
+    //         const tableIds = [
+    //             { table: 'v', id: 'company_name', Fns: 'LIKE' },
+    //             { table: 'v', id: 'fft_vendor_code', Fns: 'LIKE' },
+    //             { table: 'v', id: 'fft_status', Fns: '=' },
+    //             { table: 'v', id: 'inuse', Fns: '=' },
+    //             { table: 'v', id: 'province', Fns: 'LIKE' },
+    //             { table: 'v', id: 'website', Fns: 'LIKE' },
+    //             { table: 'v', id: 'address', Fns: 'LIKE' },
+    //             { table: 'v', id: 'tel_center', Fns: 'LIKE' },
+    //             { table: 'v', id: 'vendor_type_id', Fns: '=' },
+    //             { table: 'vt', id: 'vendor_type_name', alias: 'name', Fns: 'LIKE' },
+    //             { table: 'mpg', id: 'group_name', Fns: 'LIKE' },
+    //             { table: 'vp', id: 'product_group_id', Fns: '=' },
+    //             { table: 'vp', id: 'maker_name', Fns: 'LIKE' },
+    //             { table: 'vp', id: 'product_name', Fns: 'LIKE' },
+    //             { table: 'vp', id: 'model_list', Fns: 'LIKE' },
+    //             { table: 'vc', id: 'contact_name', Fns: 'LIKE' },
+    //             { table: 'vc', id: 'tel_phone', Fns: 'LIKE' },
+    //             { table: 'vc', id: 'email', Fns: 'LIKE' },
+    //             { table: 'vc', id: 'CREATE_BY', Fns: 'LIKE' },
+    //             { table: 'vc', id: 'UPDATE_BY', Fns: 'LIKE' },
+    //             { table: 'vc', id: 'CREATE_DATE', Fns: '=' },
+    //             { table: 'vc', id: 'UPDATE_DATE', Fns: '=' },
+    //         ]
+    //
+    //         // Filter out 'status' to prevent SQL errors (status is computed)
+    //         if (query.SearchFilters && Array.isArray(query.SearchFilters)) {
+    //             query.SearchFilters = query.SearchFilters.filter((item: any) =>
+    //                 item.value !== null && item.value !== undefined && item.value !== ''
+    //             )
+    //         }
+    //
+    //         const statusFilter = dataItem.DataForFetch?.SearchFilters?.find((item: any) => item.id === 'status');
+    //         const requiredStatus = statusFilter && statusFilter.value ? statusFilter.value.toString() : null;
+    //
+    //         // Intercept Order: if 'status_check', use default for SQL, but we generally can't sort effective streaming by computed field easily.
+    //         // For streaming large datasets, sorting by computed field is expensive/impossible without buffering.
+    //         // We will fallback to company_name ASC for SQL if status_check is requested.
+    //         if (query.Order && Array.isArray(query.Order)) {
+    //             const statusSort = query.Order.find((o: any) => o.id === 'status_check')
+    //             if (statusSort) {
+    //                 query.Order = [{ id: 'company_name', desc: false }]
+    //             }
+    //         }
+    //
+    //         // Generate SQL Where
+    //         getSqlWhere_elysia(query, tableIds, 'company_name')
+    //
+    //         let sqlWhere = ''
+    //         if (query.sqlWhere) {
+    //             sqlWhere = query.sqlWhere.replace(/^WHERE\s+/i, '')
+    //             if (sqlWhere) {
+    //                 sqlWhere = ` AND ${sqlWhere}`
+    //             }
+    //         }
+    //
+    //         // 1. Prepare Response Headers for Streaming
+    //         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    //         res.setHeader('Content-Disposition', `attachment; filename=Vendor_List_${new Date().getTime()}.xlsx`);
+    //
+    //         // 2. Initialize Excel Streaming Writer
+    //         const options = {
+    //             stream: res,
+    //             useStyles: true,
+    //             useSharedStrings: true
+    //         };
+    //         const workbook = new excel.stream.xlsx.WorkbookWriter(options);
+    //         const worksheet = workbook.addWorksheet('Vendor List');
+    //
+    //         // 3. Define Columns & Headers
+    //         const headerMap: Record<string, string> = {
+    //             fft_vendor_code: 'Vendor Code',
+    //             status_check: 'Prones Status',
+    //             company_name: 'Company Name',
+    //             vendor_type_name: 'Vendor Type',
+    //             province: 'Province',
+    //             website: 'Website',
+    //             address: 'Address',
+    //             tel_center: 'Tel Company',
+    //             group_name: 'Group Name',
+    //             maker_name: 'Maker Name',
+    //             product_name: 'Product Name',
+    //             model_list: 'Model List',
+    //             contact_name: 'Contact Name',
+    //             tel_phone: 'Tel Contact',
+    //             email: 'Email Contact',
+    //             CREATE_BY: 'Created By',
+    //             UPDATE_BY: 'Updated By',
+    //             CREATE_DATE: 'Created Date',
+    //             UPDATE_DATE: 'Updated Date'
+    //         }
+    //
+    //         const visibleColumns = Object.keys(headerMap);
+    //
+    //         // Set Title
+    //         worksheet.getCell('A1').value = 'Export : Vendor List';
+    //         worksheet.getCell('A1').font = { name: 'Aptos Display', size: 18, bold: true };
+    //
+    //         // Set Headers
+    //         visibleColumns.forEach((col, idx) => {
+    //             const cell = worksheet.getCell(2, idx + 1);
+    //             cell.value = headerMap[col];
+    //             cell.font = { name: 'Aptos Display', bold: true };
+    //             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBCD8F1' } };
+    //             cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    //             cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    //             // Manually set width as best effort since auto-fit isn't perfect in stream
+    //             worksheet.getColumn(idx + 1).width = 20;
+    //         });
+    //         worksheet.commit(); // Commit headers
+    //
+    //         // 4. Fetch Prones Lookup Data (Cache in Memory)
+    //         const pronesResponse = await FindVendorModel.getPronesData({}) as any;
+    //         const pronesRows = pronesResponse?.rows || [];
+    //
+    //         // Build Lookup Maps
+    //         const pronesTelMap = new Map();
+    //         const pronesNameMap = new Map();
+    //         pronesRows.forEach((p: any) => {
+    //             const pTel = cleanTel(p.CUSTOMER_TEL);
+    //             const pName = cleanName(p.CUSTOMER_NAME);
+    //             if (pTel) pronesTelMap.set(pTel, p);
+    //             if (pName) pronesNameMap.set(pName, p);
+    //         });
+    //
+    //         // 5. Start DB Stream
+    //         const searchQuery = { ...query, sqlWhereColumnFilter: '', Order: query.Order || 'v.company_name ASC' }; // Ensure order
+    //         const { stream, connection } = await FindVendorModel.streamAllForExport(searchQuery, sqlWhere);
+    //
+    //         let rowIndex = 3;
+    //
+    //         stream.on('data', (row: any) => {
+    //             // Determine Prones Status
+    //             const mTel = cleanTel(row.tel_center);
+    //             const mName = cleanName(row.company_name);
+    //             const mAddress = row.address || '';
+    //
+    //             let status_check = 'Not Registered';
+    //
+    //             if (mTel && pronesTelMap.has(mTel)) {
+    //                 status_check = 'Registered';
+    //             } else if (mName && pronesNameMap.has(mName)) {
+    //                 status_check = 'Registered';
+    //             } else {
+    //                 // Similar match logic - might be eager but included for completeness logic
+    //                 const similarMatch = pronesRows.find((p: any) => {
+    //                     const pFullAddr = `${p.CUSTOMER_ADDRESS1 || ''} ${p.CUSTOMER_ADDRESS2 || ''} ${p.CUSTOMER_ADDRESS3 || ''}`;
+    //                     return calculateSimilarity(mAddress, pFullAddr) > 0.7;
+    //                 });
+    //                 if (similarMatch) status_check = 'Registered';
+    //             }
+    //
+    //             // Filter on the fly
+    //             if (requiredStatus) {
+    //                 if (requiredStatus === '1' && status_check !== 'Registered') return; // Skip
+    //                 if (requiredStatus === '0' && status_check !== 'Not Registered') return; // Skip
+    //             }
+    //
+    //             row.status_check = status_check;
+    //
+    //             // Write Row
+    //             visibleColumns.forEach((col, colIndex) => {
+    //                 let cellValue = row[col];
+    //
+    //                 // Date Fmt
+    //                 if ((col === 'CREATE_DATE' || col === 'UPDATE_DATE') && cellValue) {
+    //                     const date = new Date(cellValue);
+    //                     cellValue = date.toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit' });
+    //                 }
+    //                 if (col === 'model_list' && cellValue) cellValue = cellValue.replace(/\n/g, ', ');
+    //
+    //                 const finalValue = cellValue !== undefined && cellValue !== null ? cellValue.toString() : '';
+    //
+    //                 const cell = worksheet.getCell(rowIndex, colIndex + 1);
+    //                 cell.value = finalValue;
+    //                 cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+    //                 cell.font = { name: 'Aptos Display', size: 11 };
+    //                 cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
+    //             });
+    //
+    //             worksheet.getRow(rowIndex).commit();
+    //             rowIndex++;
+    //         });
+    //
+    //         stream.on('end', async () => {
+    //             connection.release(); // Important: Release DB connection
+    //             await workbook.commit(); // Finish Excel file
+    //         });
+    //
+    //         stream.on('error', (err: any) => {
+    //             console.error('Stream Error:', err);
+    //             connection.release();
+    //             if (!res.headersSent) res.status(500).send('Error generating file');
+    //         });
+    //
+    //     } catch (error: any) {
+    //         console.error('downloadFileForExport error:', error)
+    //         if (!res.headersSent) return res.status(500).json({ error: 'Export failed', message: error?.message })
+    //     }
+    // },
 
     // Get prones data
     getPronesData: async (req: Request, res: Response) => {
         try {
             const dataItem = req.body;
 
-            // 1. ดึงข้อมูลจากทั้ง 2 Source
-            const pronesResponse = await FindVendorModel.getPronesData(dataItem) as any;
+            // 1. ดึงข้อมูล vendor ฝั่งเรา
             const myVendors = await FindVendorModel.getAllVendorNames();
 
-            // ดึงเฉพาะ Rows ออกมา (จัดการโครงสร้าง Oracle)
-            const pronesRows = pronesResponse?.rows || [];
+            // 2. ใช้ Helper เพื่อ Match กับ Prones Data
+            const resultRows = await matchVendorsWithPrones(myVendors);
 
-            // 2. สร้าง "Index" สำหรับข้อมูล Prones (เพื่อความเร็วระดับ O(1))
-            // เราจะเอาเบอร์โทรและชื่อจาก Prones มาทำเป็น Key ไว้รอให้ฝั่งเราวิ่งมาเช็ค
-            const pronesTelMap = new Map();
-            const pronesNameMap = new Map();
-
-            pronesRows.forEach((p: any) => {
-                const pTel = cleanTel(p.CUSTOMER_TEL);
-                const pName = cleanName(p.CUSTOMER_NAME);
-                if (pTel) pronesTelMap.set(pTel, p);
-                if (pName) pronesNameMap.set(pName, p);
-            });
-
-            // 3. เริ่มเปรียบเทียบโดยเอา "ข้อมูลฝั่งเรา (myVendors)" เป็นตัวตั้ง
-            const resultRows = myVendors.map((myItem: any) => {
-                const mTel = cleanTel(myItem.tel_center);
-                const mName = cleanName(myItem.company_name);
-                const mAddress = myItem.address || '';
-
-                let status = 'Not Registered';
-                let pronesRef = null;
-
-                // --- Logic การ Match (เรียงลำดับความแม่นยำ) ---
-
-                // Step 1: เช็คจากเบอร์โทร (แม่นยำสุด)
-                if (mTel && pronesTelMap.has(mTel)) {
-                    status = 'Registered';
-                    pronesRef = pronesTelMap.get(mTel);
-                }
-                // Step 2: เช็คจากชื่อบริษัท (ถ้าเบอร์ไม่ตรง)
-                else if (mName && pronesNameMap.has(mName)) {
-                    status = 'Registered';
-                    pronesRef = pronesNameMap.get(mName);
-                }
-                // Step 3: เช็คจากความคล้ายของที่อยู่ (ใช้เป็นทางเลือกสุดท้าย)
-                else {
-                    const similarMatch = pronesRows.find((p: any) => {
-                        const pFullAddr = `${p.CUSTOMER_ADDRESS1 || ''} ${p.CUSTOMER_ADDRESS2 || ''} ${p.CUSTOMER_ADDRESS3 || ''}`;
-                        return calculateSimilarity(mAddress, pFullAddr) > 0.6; // ปรับ Threshold ตามความเหมาะสม
-                    });
-
-                    if (similarMatch) {
-                        status = 'Registered';
-                        pronesRef = similarMatch;
-                    }
-                }
-
-                // 4. Return ผลลัพธ์ในรูปแบบข้อมูลฝั่งเรา + สถานะ
-                return {
-                    company_name: myItem.company_name,
-                    address: myItem.address,
-                    tel_center: myItem.tel_center,
-                    status_check: status,
-                    // ข้อมูลอ้างอิงจาก Prones (ถ้า Match เจอ)
-                    prones_code: pronesRef ? pronesRef.CUSTOMER_CODE : '-',
-                    prones_name_en: pronesRef ? pronesRef.CUSTOMER_NAME : '-'
-                };
-            });
-
-            // 5. ส่ง JSON กลับ
+            // 3. ส่ง JSON กลับ
             return res.status(200).json({
                 Status: true,
                 ResultOnDb: {
@@ -711,4 +758,69 @@ const calculateSimilarity = (str1: string, str2: string): number => {
     if (totalTokens === 0) return 0;
 
     return (2 * matches) / totalTokens;
+};
+
+// New Helper for Prones Matching Logic
+const matchVendorsWithPrones = async (vendors: any[], filterStatus: string | null = null) => {
+    // 1. Fetch Prones Data (Always fetch fresh data for consistency)
+    // Optimization: In a real app, we might want to cache this or pass it in if already fetched.
+    const pronesResponse = await FindVendorModel.getPronesData({}) as any;
+    const pronesRows = pronesResponse?.rows || [];
+
+    // 2. Build Index Maps
+    const pronesTelMap = new Map();
+    const pronesNameMap = new Map();
+
+    pronesRows.forEach((p: any) => {
+        const pTel = cleanTel(p.CUSTOMER_TEL);
+        const pName = cleanName(p.CUSTOMER_NAME);
+        if (pTel) pronesTelMap.set(pTel, p);
+        if (pName) pronesNameMap.set(pName, p);
+    });
+
+    // 3. Match & Calculate status_check
+    let enrichedData = vendors.map((vendor: any) => {
+        const mTel = cleanTel(vendor.tel_center);
+        const mName = cleanName(vendor.company_name);
+        const mAddress = vendor.address || '';
+
+        let status_check = 'Not Registered';
+        let pronesRef = null;
+
+        if (mTel && pronesTelMap.has(mTel)) {
+            status_check = 'Registered';
+            pronesRef = pronesTelMap.get(mTel);
+        } else if (mName && pronesNameMap.has(mName)) {
+            status_check = 'Registered';
+            pronesRef = pronesNameMap.get(mName);
+        } else {
+            const similarMatch = pronesRows.find((p: any) => {
+                const pFullAddr = `${p.CUSTOMER_ADDRESS1 || ''} ${p.CUSTOMER_ADDRESS2 || ''} ${p.CUSTOMER_ADDRESS3 || ''}`;
+                return calculateSimilarity(mAddress, pFullAddr) > 0.7;
+            });
+
+            if (similarMatch) {
+                status_check = 'Registered';
+                pronesRef = similarMatch;
+            }
+        }
+
+        return {
+            ...vendor,
+            status_check,
+            prones_code: pronesRef ? pronesRef.CUSTOMER_CODE : (vendor.fft_vendor_code || null),
+            prones_name_en: pronesRef ? pronesRef.CUSTOMER_NAME : null
+        };
+    });
+
+    // 4. Filter by Prones Status if requested
+    if (filterStatus) {
+        if (filterStatus === '1') {
+            enrichedData = enrichedData.filter((item: any) => item.status_check === 'Registered');
+        } else if (filterStatus === '0') {
+            enrichedData = enrichedData.filter((item: any) => item.status_check === 'Not Registered');
+        }
+    }
+
+    return enrichedData;
 };
