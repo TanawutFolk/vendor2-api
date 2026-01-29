@@ -457,7 +457,124 @@ export const FindVendorController = {
     },
 
     // Get prones data
+    // ==========================================
+    // 2. Main Controller Method
+    // ==========================================
+
     getPronesData: async (req: Request, res: Response) => {
+        try {
+            const dataItem = req.body;
+
+            // 1. ดึงข้อมูล
+            const pronesResponse = await FindVendorModel.getPronesData(dataItem as any) as any; // Cast to any to access .rows
+            const myVendors = await FindVendorModel.getAllVendorNames();
+
+            // --- จุดแก้สำคัญ: ดึงข้อมูลจาก .rows ---
+            // Oracle Driver มักจะ return { metaData: ..., rows: [...] }
+            // เราต้องเช็คก่อนว่ามี rows ไหม
+            const pronesRows = pronesResponse?.rows || [];
+
+            if (!Array.isArray(pronesRows)) {
+                console.warn('Warning: pronesRows is not an array', pronesResponse);
+                return res.status(200).json({
+                    Status: true,
+                    ResultOnDb: { metaData: [], rows: [] }, // Return โครงสร้างเดิมแต่ว่าง
+                    TotalCountOnDb: 0,
+                    MethodOnDb: 'Get Prones Data (Empty)',
+                    Message: 'No data rows found'
+                } as ResponseI);
+            }
+
+            // 2. เริ่ม Map ข้อมูล (ใช้ pronesRows แทน pronesData)
+            const resultRows = pronesRows.map((pItem: any) => {
+
+                // Handle ค่า null ใน JSON (เช่น CUSTOMER_TEL: null)
+                const pTel = cleanTel(pItem.CUSTOMER_TEL);
+                const pName = cleanName(pItem.CUSTOMER_NAME);
+
+                // รวม Address 3 ช่อง
+                const pFullAddress = `
+                ${pItem.CUSTOMER_ADDRESS1 || ''} 
+                ${pItem.CUSTOMER_ADDRESS2 || ''} 
+                ${pItem.CUSTOMER_ADDRESS3 || ''}
+            `.trim();
+
+                let status = 'Not Registered';
+
+                // วนลูปเทียบ
+                const isFound = myVendors.some((myItem: any) => {
+
+                    // Priority 1: เบอร์โทร
+                    const mTel = cleanTel(myItem.tel_center);
+                    if (pTel && mTel && pTel === mTel) return true;
+
+                    // Priority 2: ชื่อบริษัท
+                    const mName = cleanName(myItem.company_name);
+                    if (pName && mName && pName === mName) return true;
+
+                    // Priority 3: ที่อยู่ (Similarity Check)
+                    const similarity = calculateSimilarity(pFullAddress, myItem.address);
+                    if (similarity > 0.5) return true;
+
+                    return false;
+                });
+
+                if (isFound) status = 'Registered';
+
+                return {
+                    ...pItem,
+                    status_check: status
+                };
+            });
+
+            // 3. ส่งข้อมูลกลับ (รักษาโครงสร้าง metaData ไว้ให้เหมือนเดิม)
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: {
+                    metaData: pronesResponse.metaData, // ส่ง metaData กลับไปด้วย
+                    rows: resultRows                   // ส่ง rows ที่แปะ status แล้ว
+                },
+                TotalCountOnDb: resultRows.length,
+                MethodOnDb: 'Get Prones Data With Status Check',
+                Message: 'Get Data Success'
+            } as ResponseI);
+
+        } catch (error: any) {
+            console.error('getPronesData error:', error);
+            return res.status(500).json({
+                Status: false,
+                ResultOnDb: null,
+                TotalCountOnDb: 0,
+                MethodOnDb: 'Get Prones Data Failed',
+                Message: error?.message || 'Failed'
+            } as unknown as ResponseI); // Cast to unknown first to bypass type check complexity
+        }
+    },
+
+    // Get all vendor names
+    getAllVendorNames: async (req: Request, res: Response) => {
+        try {
+            const resultData = await FindVendorModel.getAllVendorNames()
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: resultData,
+                TotalCountOnDb: resultData.length,
+                MethodOnDb: 'Get All Vendor Names',
+                Message: 'Get Data Success'
+            } as ResponseI)
+        } catch (error: any) {
+            console.error('getAllVendorNames error:', error)
+            return res.status(500).json({
+                Status: false,
+                ResultOnDb: [],
+                TotalCountOnDb: 0,
+                MethodOnDb: 'Get All Vendor Names Failed',
+                Message: error?.message || 'Failed to get all vendor names'
+            } as ResponseI)
+        }
+    },
+    getPronesDataAll: async (req: Request, res: Response) => {
+        // Simple fetch without status check
         try {
             const dataItem = req.body
             const resultData = await FindVendorModel.getPronesData(dataItem)
@@ -479,4 +596,51 @@ export const FindVendorController = {
             } as ResponseI)
         }
     }
-}   
+}
+
+// ==========================================
+// 1. Helper Functions (วางไว้นอก Class)
+// ==========================================
+
+const cleanTel = (raw: string) => {
+    // เช็ค null/undefined ก่อน ถ้าไม่มีค่าให้คืน string ว่าง
+    return raw ? raw.toString().replace(/[^0-9]/g, '') : '';
+};
+
+const cleanName = (raw: string) => {
+    if (!raw) return '';
+    return raw.toString().toLowerCase()
+        .replace(/co\.,?ltd\.?/g, '')
+        .replace(/limited/g, '')
+        .replace(/ltd\.?/g, '')
+        .replace(/company/g, '')
+        .replace(/part\.,?ltd\.?/g, '')
+        .replace(/หจก\./g, '')
+        .replace(/บจก\./g, '')
+        .replace(/บริษัท/g, '')
+        .replace(/\s/g, '')
+        .replace(/[^a-z0-9ก-๙]/g, '');
+};
+
+const calculateSimilarity = (str1: string, str2: string): number => {
+    if (!str1 || !str2) return 0;
+
+    const tokenize = (text: string) => {
+        return text.toString().toLowerCase()
+            .replace(/[^a-z0-9ก-๙\s]/g, ' ')
+            .split(/\s+/)
+            .filter(w => w.length > 2);
+    };
+
+    const tokens1 = tokenize(str1);
+    const tokens2 = tokenize(str2);
+
+    let matches = 0;
+    const set2 = new Set(tokens2);
+    tokens1.forEach(token => { if (set2.has(token)) matches++; });
+
+    const totalTokens = tokens1.length + tokens2.length;
+    if (totalTokens === 0) return 0;
+
+    return (2 * matches) / totalTokens;
+};

@@ -447,6 +447,16 @@ export const FindVendorSQL = {
         return sql
     },
 
+    getAllVendorNames: () => {
+        let sql = `SELECT company_name,
+                        address,
+                        tel_center 
+                FROM vendors 
+                WHERE INUSE = 1`
+        // console.log(sql)
+        return sql
+    },
+
 
 
 

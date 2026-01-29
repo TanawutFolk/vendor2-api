@@ -101,10 +101,18 @@ export const FindVendorService = {
         return resultData
     },
 
+
     // Get prones data
     getPronesData: async (dataItem: any) => {
         const sql = await FindVendorSQL.getPronesData(dataItem)
         const resultData = (await OracleExecute.searchOracle(sql, 'PRONES')) as RowDataPacket[]
+        return resultData
+    },
+
+    // Get all vendor names
+    getAllVendorNames: async () => {
+        const sql = await FindVendorSQL.getAllVendorNames()
+        const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
         return resultData
     }
 }
