@@ -67,10 +67,69 @@ export const FindVendorController = {
         console.log('dataItem:', dataItem)
 
         try {
-            const { resultData, totalCount } = await FindVendorModel.searchVendors(dataItem, sqlWhere)
+            // ดึงข้อมูล vendors และ prones data พร้อมกัน
+            const [{ resultData, totalCount }, pronesResponse] = await Promise.all([
+                FindVendorModel.searchVendors(dataItem, sqlWhere),
+                FindVendorModel.getPronesData({})
+            ]);
+
+            // ดึงเฉพาะ Rows จาก Prones (จัดการโครงสร้าง Oracle)
+            const pronesRows = (pronesResponse as any)?.rows || [];
+
+            // สร้าง Index สำหรับ Prones data เพื่อ lookup เร็ว O(1)
+            const pronesTelMap = new Map();
+            const pronesNameMap = new Map();
+
+            pronesRows.forEach((p: any) => {
+                const pTel = cleanTel(p.CUSTOMER_TEL);
+                const pName = cleanName(p.CUSTOMER_NAME);
+                if (pTel) pronesTelMap.set(pTel, p);
+                if (pName) pronesNameMap.set(pName, p);
+            });
+
+            // Merge status_check เข้ากับ resultData
+            const resultWithStatus = resultData.map((vendor: any) => {
+                const mTel = cleanTel(vendor.tel_center);
+                const mName = cleanName(vendor.company_name);
+                const mAddress = vendor.address || '';
+
+                let status_check = 'Not Registered';
+                let pronesRef = null;
+
+                // Step 1: เช็คจากเบอร์โทร (แม่นยำสุด)
+                if (mTel && pronesTelMap.has(mTel)) {
+                    status_check = 'Registered';
+                    pronesRef = pronesTelMap.get(mTel);
+                }
+                // Step 2: เช็คจากชื่อบริษัท
+                else if (mName && pronesNameMap.has(mName)) {
+                    status_check = 'Registered';
+                    pronesRef = pronesNameMap.get(mName);
+                }
+                // Step 3: เช็คจากความคล้ายของที่อยู่
+                else {
+                    const similarMatch = pronesRows.find((p: any) => {
+                        const pFullAddr = `${p.CUSTOMER_ADDRESS1 || ''} ${p.CUSTOMER_ADDRESS2 || ''} ${p.CUSTOMER_ADDRESS3 || ''}`;
+                        return calculateSimilarity(mAddress, pFullAddr) > 0.6;
+                    });
+
+                    if (similarMatch) {
+                        status_check = 'Registered';
+                        pronesRef = similarMatch;
+                    }
+                }
+
+                return {
+                    ...vendor,
+                    status_check,
+                    prones_code: pronesRef ? pronesRef.CUSTOMER_CODE : null,
+                    prones_name_en: pronesRef ? pronesRef.CUSTOMER_NAME : null
+                };
+            });
+
             return res.status(200).json({
                 Status: true,
-                ResultOnDb: resultData,
+                ResultOnDb: resultWithStatus,
                 TotalCountOnDb: totalCount,
                 MethodOnDb: 'Search Vendors',
                 Message: 'Search Data Success'
@@ -457,97 +516,92 @@ export const FindVendorController = {
     },
 
     // Get prones data
-    // ==========================================
-    // 2. Main Controller Method
-    // ==========================================
-
     getPronesData: async (req: Request, res: Response) => {
         try {
             const dataItem = req.body;
 
-            // 1. ดึงข้อมูล
-            const pronesResponse = await FindVendorModel.getPronesData(dataItem as any) as any; // Cast to any to access .rows
+            // 1. ดึงข้อมูลจากทั้ง 2 Source
+            const pronesResponse = await FindVendorModel.getPronesData(dataItem) as any;
             const myVendors = await FindVendorModel.getAllVendorNames();
 
-            // --- จุดแก้สำคัญ: ดึงข้อมูลจาก .rows ---
-            // Oracle Driver มักจะ return { metaData: ..., rows: [...] }
-            // เราต้องเช็คก่อนว่ามี rows ไหม
+            // ดึงเฉพาะ Rows ออกมา (จัดการโครงสร้าง Oracle)
             const pronesRows = pronesResponse?.rows || [];
 
-            if (!Array.isArray(pronesRows)) {
-                console.warn('Warning: pronesRows is not an array', pronesResponse);
-                return res.status(200).json({
-                    Status: true,
-                    ResultOnDb: { metaData: [], rows: [] }, // Return โครงสร้างเดิมแต่ว่าง
-                    TotalCountOnDb: 0,
-                    MethodOnDb: 'Get Prones Data (Empty)',
-                    Message: 'No data rows found'
-                } as ResponseI);
-            }
+            // 2. สร้าง "Index" สำหรับข้อมูล Prones (เพื่อความเร็วระดับ O(1))
+            // เราจะเอาเบอร์โทรและชื่อจาก Prones มาทำเป็น Key ไว้รอให้ฝั่งเราวิ่งมาเช็ค
+            const pronesTelMap = new Map();
+            const pronesNameMap = new Map();
 
-            // 2. เริ่ม Map ข้อมูล (ใช้ pronesRows แทน pronesData)
-            const resultRows = pronesRows.map((pItem: any) => {
+            pronesRows.forEach((p: any) => {
+                const pTel = cleanTel(p.CUSTOMER_TEL);
+                const pName = cleanName(p.CUSTOMER_NAME);
+                if (pTel) pronesTelMap.set(pTel, p);
+                if (pName) pronesNameMap.set(pName, p);
+            });
 
-                // Handle ค่า null ใน JSON (เช่น CUSTOMER_TEL: null)
-                const pTel = cleanTel(pItem.CUSTOMER_TEL);
-                const pName = cleanName(pItem.CUSTOMER_NAME);
-
-                // รวม Address 3 ช่อง
-                const pFullAddress = `
-                ${pItem.CUSTOMER_ADDRESS1 || ''} 
-                ${pItem.CUSTOMER_ADDRESS2 || ''} 
-                ${pItem.CUSTOMER_ADDRESS3 || ''}
-            `.trim();
+            // 3. เริ่มเปรียบเทียบโดยเอา "ข้อมูลฝั่งเรา (myVendors)" เป็นตัวตั้ง
+            const resultRows = myVendors.map((myItem: any) => {
+                const mTel = cleanTel(myItem.tel_center);
+                const mName = cleanName(myItem.company_name);
+                const mAddress = myItem.address || '';
 
                 let status = 'Not Registered';
+                let pronesRef = null;
 
-                // วนลูปเทียบ
-                const isFound = myVendors.some((myItem: any) => {
+                // --- Logic การ Match (เรียงลำดับความแม่นยำ) ---
 
-                    // Priority 1: เบอร์โทร
-                    const mTel = cleanTel(myItem.tel_center);
-                    if (pTel && mTel && pTel === mTel) return true;
+                // Step 1: เช็คจากเบอร์โทร (แม่นยำสุด)
+                if (mTel && pronesTelMap.has(mTel)) {
+                    status = 'Registered';
+                    pronesRef = pronesTelMap.get(mTel);
+                }
+                // Step 2: เช็คจากชื่อบริษัท (ถ้าเบอร์ไม่ตรง)
+                else if (mName && pronesNameMap.has(mName)) {
+                    status = 'Registered';
+                    pronesRef = pronesNameMap.get(mName);
+                }
+                // Step 3: เช็คจากความคล้ายของที่อยู่ (ใช้เป็นทางเลือกสุดท้าย)
+                else {
+                    const similarMatch = pronesRows.find((p: any) => {
+                        const pFullAddr = `${p.CUSTOMER_ADDRESS1 || ''} ${p.CUSTOMER_ADDRESS2 || ''} ${p.CUSTOMER_ADDRESS3 || ''}`;
+                        return calculateSimilarity(mAddress, pFullAddr) > 0.6; // ปรับ Threshold ตามความเหมาะสม
+                    });
 
-                    // Priority 2: ชื่อบริษัท
-                    const mName = cleanName(myItem.company_name);
-                    if (pName && mName && pName === mName) return true;
+                    if (similarMatch) {
+                        status = 'Registered';
+                        pronesRef = similarMatch;
+                    }
+                }
 
-                    // Priority 3: ที่อยู่ (Similarity Check)
-                    const similarity = calculateSimilarity(pFullAddress, myItem.address);
-                    if (similarity > 0.5) return true;
-
-                    return false;
-                });
-
-                if (isFound) status = 'Registered';
-
+                // 4. Return ผลลัพธ์ในรูปแบบข้อมูลฝั่งเรา + สถานะ
                 return {
-                    ...pItem,
-                    status_check: status
+                    company_name: myItem.company_name,
+                    address: myItem.address,
+                    tel_center: myItem.tel_center,
+                    status_check: status,
+                    // ข้อมูลอ้างอิงจาก Prones (ถ้า Match เจอ)
+                    prones_code: pronesRef ? pronesRef.CUSTOMER_CODE : '-',
+                    prones_name_en: pronesRef ? pronesRef.CUSTOMER_NAME : '-'
                 };
             });
 
-            // 3. ส่งข้อมูลกลับ (รักษาโครงสร้าง metaData ไว้ให้เหมือนเดิม)
+            // 5. ส่ง JSON กลับ
             return res.status(200).json({
                 Status: true,
                 ResultOnDb: {
-                    metaData: pronesResponse.metaData, // ส่ง metaData กลับไปด้วย
-                    rows: resultRows                   // ส่ง rows ที่แปะ status แล้ว
+                    rows: resultRows
                 },
                 TotalCountOnDb: resultRows.length,
-                MethodOnDb: 'Get Prones Data With Status Check',
-                Message: 'Get Data Success'
+                MethodOnDb: 'Match Prones to MyVendors',
+                Message: 'Comparison Success'
             } as ResponseI);
 
         } catch (error: any) {
-            console.error('getPronesData error:', error);
+            console.error('Match Error:', error);
             return res.status(500).json({
                 Status: false,
-                ResultOnDb: null,
-                TotalCountOnDb: 0,
-                MethodOnDb: 'Get Prones Data Failed',
-                Message: error?.message || 'Failed'
-            } as unknown as ResponseI); // Cast to unknown first to bypass type check complexity
+                Message: error?.message || 'Internal Server Error'
+            });
         }
     },
 
@@ -598,10 +652,8 @@ export const FindVendorController = {
     }
 }
 
-// ==========================================
-// 1. Helper Functions (วางไว้นอก Class)
-// ==========================================
 
+// ------- Helper Functions  -------
 const cleanTel = (raw: string) => {
     // เช็ค null/undefined ก่อน ถ้าไม่มีค่าให้คืน string ว่าง
     return raw ? raw.toString().replace(/[^0-9]/g, '') : '';

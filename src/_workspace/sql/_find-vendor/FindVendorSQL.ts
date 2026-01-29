@@ -429,7 +429,7 @@ export const FindVendorSQL = {
 
 
     // //prones
-    getPronesData: (dataItem: any) => {
+    getPronesData: () => {
         let sql =
             `
             SELECT 
