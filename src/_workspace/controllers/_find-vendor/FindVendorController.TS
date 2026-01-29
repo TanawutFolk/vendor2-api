@@ -21,6 +21,7 @@ export const FindVendorController = {
             { table: 'v', id: 'company_name', Fns: 'LIKE' },
             { table: 'v', id: 'fft_vendor_code', Fns: 'LIKE' },
             { table: 'v', id: 'fft_status', Fns: '=' },
+            { table: 'v', id: 'inuse', Fns: '=' },
             { table: 'v', id: 'province', Fns: 'LIKE' },
             { table: 'v', id: 'website', Fns: 'LIKE' },
             { table: 'v', id: 'address', Fns: 'LIKE' },
@@ -39,7 +40,7 @@ export const FindVendorController = {
             { table: 'vc', id: 'UPDATE_BY', Fns: 'LIKE' },
             { table: 'vc', id: 'CREATE_DATE', Fns: '=' },
             { table: 'vc', id: 'UPDATE_DATE', Fns: '=' },
-            { table: 'v', id: 'status', Fns: '=' },
+            { table: 'vc', id: 'UPDATE_DATE', Fns: '=' },
         ]
 
         // Filter out null/empty values from SearchFilters before passing to helper
@@ -127,9 +128,23 @@ export const FindVendorController = {
                 };
             });
 
+            // Filter by Prones Status if requested
+            // 1 = Registered, 0 = Not Registered
+            const statusFilter = dataItem.SearchFilters?.find((item: any) => item.id === 'status');
+            let finalResult = resultWithStatus;
+
+            if (statusFilter && statusFilter.value) {
+                const filterValue = statusFilter.value.toString();
+                if (filterValue === '1') {
+                    finalResult = finalResult.filter((item: any) => item.status_check === 'Registered');
+                } else if (filterValue === '0') {
+                    finalResult = finalResult.filter((item: any) => item.status_check === 'Not Registered');
+                }
+            }
+
             return res.status(200).json({
                 Status: true,
-                ResultOnDb: resultWithStatus,
+                ResultOnDb: finalResult,
                 TotalCountOnDb: totalCount,
                 MethodOnDb: 'Search Vendors',
                 Message: 'Search Data Success'
@@ -322,6 +337,7 @@ export const FindVendorController = {
                 { table: 'v', id: 'company_name', Fns: 'LIKE' },
                 { table: 'v', id: 'fft_vendor_code', Fns: 'LIKE' },
                 { table: 'v', id: 'fft_status', Fns: '=' },
+                { table: 'v', id: 'inuse', Fns: '=' },
                 { table: 'v', id: 'province', Fns: 'LIKE' },
                 { table: 'v', id: 'website', Fns: 'LIKE' },
                 { table: 'v', id: 'address', Fns: 'LIKE' },

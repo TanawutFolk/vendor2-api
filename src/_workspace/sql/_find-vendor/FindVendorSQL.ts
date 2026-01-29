@@ -17,7 +17,7 @@ export const FindVendorSQL = {
             LEFT JOIN
                 master_product_groups mpg ON vp.product_group_id = mpg.product_group_id
             WHERE
-                v.INUSE = 1
+                1 = 1
                 dataItem.sqlWhere
                 dataItem.sqlWhereColumnFilter
         `
@@ -72,7 +72,7 @@ export const FindVendorSQL = {
             LEFT JOIN
                 master_product_groups mpg ON vp.product_group_id = mpg.product_group_id
             WHERE
-                v.INUSE = 1
+                1 = 1
                 dataItem.sqlWhere
                 dataItem.sqlWhereColumnFilter
             ORDER BY dataItem.Order
@@ -380,7 +380,7 @@ export const FindVendorSQL = {
             LEFT JOIN
                 master_product_groups mpg ON vp.product_group_id = mpg.product_group_id
             WHERE
-                v.INUSE = 1
+                1 = 1
                 dataItem.sqlWhere
                 dataItem.sqlWhereColumnFilter
             ORDER BY dataItem.Order
