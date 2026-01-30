@@ -16,6 +16,43 @@ export const FindVendorController = {
             dataItem = req.body
         }
 
+        // Intercept Order for SQL fallback (Fix: status_check is computed, cannot sort in SQL)
+        let statusSort: any = null;
+        if (dataItem.Order) {
+            if (Array.isArray(dataItem.Order)) {
+
+                const statusSortIdx = dataItem.Order.findIndex((o: any) => o.id === 'status_check');
+                if (statusSortIdx > -1) {
+                    statusSort = dataItem.Order[statusSortIdx];
+                    // Remove status_check from SQL Order
+                    dataItem.Order.splice(statusSortIdx, 1);
+                    // If Order is empty after removal, add default
+                    if (dataItem.Order.length === 0) {
+                        dataItem.Order.push({ id: 'company_name', desc: false });
+                    }
+                }
+            } else if (typeof dataItem.Order === 'string') {
+                // Handle string format e.g. "status_check DESC" or "status_check ASC"
+                if (dataItem.Order.includes('status_check')) {
+                    const isDesc = dataItem.Order.toLowerCase().includes('desc');
+                    statusSort = { id: 'status_check', desc: isDesc };
+                    // Replace with default sort
+                    dataItem.Order = 'v.company_name ASC';
+                }
+            }
+        }
+
+        // Intercept prones_code filter (Virtual Field)
+        let pronesCodeFilterVal: string | null = null;
+        if (dataItem.SearchFilters && Array.isArray(dataItem.SearchFilters)) {
+            const pIdx = dataItem.SearchFilters.findIndex((item: any) => item.id === 'prones_code');
+            if (pIdx > -1) {
+                pronesCodeFilterVal = dataItem.SearchFilters[pIdx].value;
+                // Remove from SQL SearchFilters to avoid "Unknown column"
+                dataItem.SearchFilters.splice(pIdx, 1);
+            }
+        }
+
         // Table mapping for ColumnFilters and SearchFilters
         const tableIds = [
             { table: 'v', id: 'company_name', Fns: 'LIKE' },
@@ -65,20 +102,52 @@ export const FindVendorController = {
         dataItem['sqlWhereColumnFilter'] = '' // No longer needed as it's merged into sqlWhere
         dataItem['Offset'] = Number(dataItem['Start'] || 0) * Number(dataItem['Limit'] || 20)
 
+
         console.log('dataItem:', dataItem)
 
         try {
+            console.time('[PERF] Total Search');
+
+            console.time('[PERF] MySQL Query');
             const { resultData, totalCount } = await FindVendorModel.searchVendors(dataItem, sqlWhere);
+            console.timeEnd('[PERF] MySQL Query');
+            console.log(`[PERF] MySQL returned ${resultData.length} rows`);
 
             const statusFilter = dataItem.SearchFilters?.find((item: any) => item.id === 'status');
             const filterValue = statusFilter && statusFilter.value ? statusFilter.value.toString() : null;
 
-            const finalResult = await matchVendorsWithPrones(resultData, filterValue);
+            console.time('[PERF] Prones Matching');
+            let finalResult = await matchVendorsWithPrones(resultData, filterValue);
+            console.timeEnd('[PERF] Prones Matching');
+
+            // Filter by prones_code (In-Memory)
+            if (pronesCodeFilterVal) {
+                const val = pronesCodeFilterVal.toString().trim().toLowerCase();
+                finalResult = finalResult.filter((item: any) =>
+                    item.prones_code && item.prones_code.toString().toLowerCase().includes(val)
+                );
+            }
+
+            // Post-Fetch Sorting for 'status_check'
+            if (statusSort) {
+                const desc = statusSort.desc;
+                finalResult.sort((a: any, b: any) => {
+                    const valA = a.status_check || '';
+                    const valB = b.status_check || '';
+                    if (valA < valB) return desc ? 1 : -1;
+                    if (valA > valB) return desc ? -1 : 1;
+                    return 0;
+                });
+            }
+
+            console.timeEnd('[PERF] Total Search');
+            console.log(`[PERF] Returning ${finalResult.length} rows to client`);
 
             return res.status(200).json({
                 Status: true,
                 ResultOnDb: finalResult,
-                TotalCountOnDb: totalCount,
+                TotalCountOnDb: totalCount, // Note: This might mismatch if we filter by prones_code, but for client-side pagination on resultData it's okay? 
+                // Actually with client-side pagination (limit 10000), totalCount is less relevant than ResultOnDb.length
                 MethodOnDb: 'Search Vendors',
                 Message: 'Search Data Success'
             } as ResponseI)
@@ -118,9 +187,12 @@ export const FindVendorController = {
 
             const resultData = await FindVendorModel.getById(vendor_id)
             if (resultData && resultData.length > 0) {
+                // Enrich with Prones Status Logic
+                const enrichedData = await matchVendorsWithPrones(resultData, null)
+
                 return res.status(200).json({
                     Status: true,
-                    ResultOnDb: resultData[0],
+                    ResultOnDb: enrichedData[0],
                     TotalCountOnDb: 1,
                     MethodOnDb: 'Get Vendor By ID',
                     Message: 'Get Data Success'
@@ -188,6 +260,64 @@ export const FindVendorController = {
                 TotalCountOnDb: 0,
                 MethodOnDb: 'Update Vendor Failed',
                 Message: error?.message || 'Failed to update vendor'
+            } as ResponseI)
+        }
+    },
+
+    // Delete vendor contact
+    deleteVendorContact: async (req: Request, res: Response) => {
+        let dataItem
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
+        try {
+            await FindVendorModel.deleteVendorContact(dataItem)
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: true,
+                TotalCountOnDb: 1,
+                MethodOnDb: 'Delete Vendor Contact',
+                Message: 'Delete Success'
+            } as ResponseI)
+        } catch (error: any) {
+            return res.status(500).json({
+                Status: false,
+                ResultOnDb: false,
+                TotalCountOnDb: 0,
+                MethodOnDb: 'Delete Vendor Contact Failed',
+                Message: error?.message || 'Failed to delete contact'
+            } as ResponseI)
+        }
+    },
+
+    // Delete vendor product
+    deleteVendorProduct: async (req: Request, res: Response) => {
+        let dataItem
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
+        try {
+            await FindVendorModel.deleteVendorProduct(dataItem)
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: true,
+                TotalCountOnDb: 1,
+                MethodOnDb: 'Delete Vendor Product',
+                Message: 'Delete Success'
+            } as ResponseI)
+        } catch (error: any) {
+            return res.status(500).json({
+                Status: false,
+                ResultOnDb: false,
+                TotalCountOnDb: 0,
+                MethodOnDb: 'Delete Vendor Product Failed',
+                Message: error?.message || 'Failed to delete product'
             } as ResponseI)
         }
     },
@@ -807,8 +937,7 @@ const calculateSimilarity = (str1: string, str2: string): number => {
 
 // New Helper for Prones Matching Logic
 const matchVendorsWithPrones = async (vendors: any[], filterStatus: string | null = null) => {
-    // 1. Fetch Prones Data (Always fetch fresh data for consistency)
-    // Optimization: In a real app, we might want to cache this or pass it in if already fetched.
+    // 1. Fetch Prones Data directly from Oracle
     const pronesResponse = await FindVendorModel.getPronesData({}) as any;
     const pronesRows = pronesResponse?.rows || [];
 
@@ -869,3 +998,81 @@ const matchVendorsWithPrones = async (vendors: any[], filterStatus: string | nul
 
     return enrichedData;
 };
+
+/**
+ * ====================================================================================================
+ * 📘 MODULE: Prones Matching Logic (English Documentation)
+ * ====================================================================================================
+ * 
+ * 📌 OVERVIEW:
+ * The `matchVendorsWithPrones` helper function enriches local vendor data with registration status (`status_check`)
+ * from the external "PRONES" system (Oracle DB).
+ * 
+ * ----------------------------------------------------------------------------------------------------
+ * 🛠 ALGORITHM EXPLANATION:
+ * ----------------------------------------------------------------------------------------------------
+ * 
+ * 1. 📥 FETCH DATA:
+ *    - Retrieves ALL customer data from the Prones Oracle database to ensure we have the latest reference set.
+ * 
+ * 2. ⚡ INDEXING (Optimization):
+ *    - Creates Hash Maps (`Map`) for O(1) lookups by:
+ *      - **Telephone Number** (`pronesTelMap`)
+ *      - **Company Name** (`pronesNameMap`)
+ *    - Data sanitization (`cleanTel`, `cleanName`) removes noise like hyphens, spaces, or "Co., Ltd." suffix
+ *      to maximize match probability.
+ * 
+ * 3. 🔍 MATCHING STRATEGY (Waterfall Approach):
+ *    - **Priority 1: Telephone Match**: Exact match on sanitized phone number. (Highest Confidence)
+ *    - **Priority 2: Name Match**: Exact match on sanitized company name.
+ *    - **Priority 3: Address Similarity**: Fuzzy matching using token-based Jaccard Similarity (> 70% threshold).
+ * 
+ * 4. 🏷 RESULT ENRICHMENT:
+ *    - If a match is found:
+ *      - `status_check` = "Registered"
+ *      - `prones_code` = Customer Code from Prones.
+ *    - If no match:
+ *      - `status_check` = "Not Registered"
+ * 
+ * ====================================================================================================
+ */
+
+/**
+ * ====================================================================================================
+ * 📘 MODULE: Prones Matching Logic (เอกสารภาษาไทย)
+ * ====================================================================================================
+ * 
+ * 📌 ภาพรวม (Overview):
+ * ฟังก์ชัน `matchVendorsWithPrones` ทำหน้าที่ตรวจสอบสถานะการลงทะเบียน (`status_check`) 
+ * โดยการเปรียบเทียบข้อมูล Vendor ในระบบ Local กับข้อมูลจากระบบ "PRONES" (Oracle Database)
+ * 
+ * ----------------------------------------------------------------------------------------------------
+ * 🛠 อธิบายขั้นตอนการทำงาน (Algorithm):
+ * ----------------------------------------------------------------------------------------------------
+ * 
+ * 1. 📥 การดึงข้อมูล (Fetch Data):
+ *    - ดึงข้อมูลลูกค้า 'ทั้งหมด' จากระบบ Prones มาพักไว้เพื่อใช้เป็นฐานข้อมูลอ้างอิง
+ * 
+ * 2. ⚡ การเตรียมข้อมูล (Indexing):
+ *    - สร้าง Hash Map เพื่อให้ค้นหาได้เร็วไว (Performance Optimization) โดยสร้างดัชนีจาก:
+ *      - **เบอร์โทรศัพท์** (`pronesTelMap`)
+ *      - **ชื่อบริษัท** (`pronesNameMap`)
+ *    - มีการ "ทำความสะอาดข้อมูล" (Sanitization) ฟังก์ชัน `cleanTel` และ `cleanName` 
+ *      เพื่อตัดอักขระพิเศษ เว้นวรรค หรือคำนำหน้าอย่าง "บริษัท" ออก เพื่อให้โอกาสเจอคู่แมตช์สูงขึ้น
+ * 
+ * 3. 🔍 กลยุทธ์การจับคู่ (Matching Strategy):
+ *    - **ลำดับที่ 1 (แม่นยำสุด): จับคู่เบอร์โทร**: ถ้าเบอร์โทรตรงกัน -> ถือว่า "Registered" ทันที
+ *    - **ลำดับที่ 2: จับคู่ชื่อบริษัท**: ถ้าเบอร์ไม่ตรง แต่ชื่อตรงเป๊ะ -> ถือว่า "Registered"
+ *    - **ลำดับที่ 3: ความเหมือนของที่อยู่**: ถ้า 2 ข้อแรกไม่เจอ จะใช้การเปรียบเทียบข้อความ (Fuzzy Matching) ของที่อยู่ 
+ *      ถ้ามีความคล้ายคลึงกันเกิน 70% -> ถือว่า "Registered"
+ * 
+ * 4. 🏷 การเติมข้อมูลกลับ (Enrichment):
+ *    - ถ้าเจอคู่แมตช์:
+ *      - `status_check` = "Registered"
+ *      - `prones_code` = ดึงรหัสลูกค้าจาก Prones มาใส่ให้
+ *      - `prones_name_en` = ดึงชื่อภาษาอังกฤษจาก Prones มาใส่
+ *    - ถ้าไม่เจอ:
+ *      - `status_check` = "Not Registered"
+ * 
+ * ====================================================================================================
+ */

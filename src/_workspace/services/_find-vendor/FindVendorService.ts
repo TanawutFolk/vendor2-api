@@ -68,6 +68,20 @@ export const FindVendorService = {
         return dataItem
     },
 
+    // Delete vendor contact
+    deleteVendorContact: async (dataItem: any) => {
+        const sql = await FindVendorSQL.deleteVendorContact(dataItem)
+        await MySQLExecute.execute(sql)
+        return true
+    },
+
+    // Delete vendor product
+    deleteVendorProduct: async (dataItem: any) => {
+        const sql = await FindVendorSQL.deleteVendorProduct(dataItem)
+        await MySQLExecute.execute(sql)
+        return true
+    },
+
     // Get vendor types
     getVendorTypes: async () => {
         const sql = await FindVendorSQL.getVendorTypes()
@@ -124,8 +138,8 @@ export const FindVendorService = {
 
 
     // Get prones data
-    getPronesData: async (dataItem: any) => {
-        const sql = await FindVendorSQL.getPronesData(dataItem)
+    getPronesData: async () => {
+        const sql = await FindVendorSQL.getPronesData()
         const resultData = (await OracleExecute.searchOracle(sql, 'PRONES')) as RowDataPacket[]
         return resultData
     },

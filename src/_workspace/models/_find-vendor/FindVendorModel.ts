@@ -9,6 +9,8 @@ export const FindVendorModel = {
     getProductGroups: async () => FindVendorService.getProductGroups(),
     searchAllForExport: async (dataItem: any, sqlWhere: string = '') => FindVendorService.searchAllForExport(dataItem, sqlWhere),
     streamAllForExport: async (dataItem: any, sqlWhere: string = '') => FindVendorService.streamAllForExport(dataItem, sqlWhere),
-    getPronesData: async (dataItem: any) => FindVendorService.getPronesData(dataItem),
-    getAllVendorNames: async () => FindVendorService.getAllVendorNames()
+    getPronesData: async (dataItem: any) => FindVendorService.getPronesData(),
+    getAllVendorNames: async () => FindVendorService.getAllVendorNames(),
+    deleteVendorContact: async (dataItem: any) => FindVendorService.deleteVendorContact(dataItem),
+    deleteVendorProduct: async (dataItem: any) => FindVendorService.deleteVendorProduct(dataItem)
 }
