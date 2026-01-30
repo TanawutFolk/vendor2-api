@@ -306,8 +306,9 @@ export const FindVendorController = {
             const requiredStatus = statusFilter && statusFilter.value ? statusFilter.value.toString() : null;
 
             // Intercept Order for SQL fallback
+            let statusSort: any = null;
             if (query.Order && Array.isArray(query.Order)) {
-                const statusSort = query.Order.find((o: any) => o.id === 'status_check')
+                statusSort = query.Order.find((o: any) => o.id === 'status_check')
                 if (statusSort) {
                     query.Order = [{ id: 'company_name', desc: false }]
                 }
@@ -324,12 +325,56 @@ export const FindVendorController = {
                 }
             }
 
-            // 1. Fetch ALL Data (Wait for full array)
+            // 1. Fetch Data
             const searchQuery = { ...query, sqlWhereColumnFilter: '', Order: query.Order || 'v.company_name ASC' };
-            const vendorRows = await FindVendorModel.searchAllForExport(searchQuery, sqlWhere) as any[];
+            let vendorRows: any[] = [];
+
+            if (query.vendor_ids && Array.isArray(query.vendor_ids) && query.vendor_ids.length > 0) {
+                // CASE A: Export Specific IDs (Current Page from Client-Side)
+                // We fetch these specific IDs.
+                // We must modify sqlWhere to filter by these IDs.
+                const ids = query.vendor_ids.join(',');
+                const idsSqlWhere = ` AND v.vendor_id IN (${ids})`;
+                // We use searchAllForExport but with specific IDs override
+                // We ignore Order from SQL, because we will sort by ID order in JS
+                vendorRows = await FindVendorModel.searchAllForExport(searchQuery, idsSqlWhere) as any[];
+
+                // Re-sort in Memory to match input ID order
+                const idMap = new Map();
+                if (Array.isArray(query.vendor_ids)) {
+                    query.vendor_ids.forEach((id: number, index: number) => idMap.set(id, index));
+                }
+
+                vendorRows.sort((a: any, b: any) => {
+                    const idxA = idMap.has(a?.vendor_id) ? idMap.get(a.vendor_id) : 999999;
+                    const idxB = idMap.has(b?.vendor_id) ? idMap.get(b.vendor_id) : 999999;
+                    return (Number(idxA) || 0) - (Number(idxB) || 0);
+                });
+
+            } else if (dataItem.TYPE === 'currentPage') {
+                // CASE B: Fallback Current Page (if no vendor_ids sent)
+                searchQuery['Offset'] = Number(searchQuery['Start'] || 0) * Number(searchQuery['Limit'] || 20)
+                const { resultData } = await FindVendorModel.searchVendors(searchQuery, sqlWhere);
+                vendorRows = resultData;
+            } else {
+                // CASE C: All Pages
+                vendorRows = await FindVendorModel.searchAllForExport(searchQuery, sqlWhere) as any[];
+            }
 
             // 2. Fetch Prones Data & Match
-            const resultData = await matchVendorsWithPrones(vendorRows, requiredStatus);
+            let resultData = await matchVendorsWithPrones(vendorRows, requiredStatus);
+
+            // 2.1 Post-Fetch Sorting for 'status_check'
+            if (statusSort) {
+                const desc = statusSort.desc;
+                resultData.sort((a: any, b: any) => {
+                    const valA = a.status_check || '';
+                    const valB = b.status_check || '';
+                    if (valA < valB) return desc ? 1 : -1;
+                    if (valA > valB) return desc ? -1 : 1;
+                    return 0;
+                });
+            }
 
             // 3. Create Workbook & Worksheet (Memory Approach - like ClearTimeExport)
             // Note: If you have a template file, use workbook.xlsx.readFile('path/to/template.xlsx')
