@@ -59,6 +59,8 @@ export const FindVendorSQL = {
                 vc.UPDATE_DATE AS contact_update_date,
                 
                 -- Product Audit
+                vp.CREATE_BY AS product_create_by,
+                vp.CREATE_DATE AS product_create_date,
                 vp.UPDATE_BY AS product_update_by,
                 vp.UPDATE_DATE AS product_update_date
             FROM
@@ -139,6 +141,8 @@ export const FindVendorSQL = {
                 vc.UPDATE_DATE AS contact_update_date,
                 
                 -- Product Audit
+                vp.CREATE_BY AS product_create_by,
+                vp.CREATE_DATE AS product_create_date,
                 vp.UPDATE_BY AS product_update_by,
                 vp.UPDATE_DATE AS product_update_date
             FROM
@@ -435,6 +439,8 @@ export const FindVendorSQL = {
                 vc.UPDATE_DATE AS contact_update_date,
                 
                 -- Product Audit
+                vp.CREATE_BY AS product_create_by,
+                vp.CREATE_DATE AS product_create_date,
                 vp.UPDATE_BY AS product_update_by,
                 vp.UPDATE_DATE AS product_update_date,
                 v.INUSE
@@ -511,7 +517,7 @@ export const FindVendorSQL = {
                     RTRIM(I_TEL) Customer_tel    
             FROM FFT.T_TRADE_MS
             WHERE  
-                I_DL_CD LIKE '20030CA%'
+                I_DL_CD LIKE '%%'
         `
         // console.log(sql)
         return sql
