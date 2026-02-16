@@ -533,6 +533,28 @@ export const FindVendorSQL = {
         return sql
     },
 
+    // Staging Prones - Truncate
+    truncateStagingPrones: () => {
+        return `TRUNCATE TABLE staging_prones_data`
+    },
 
+    // Staging Prones - Batch Insert
+    insertStagingPronesBatch: (rows: any[]) => {
+        const escape = FindVendorSQL.escapeSql
+        const values = rows.map((row: any) => {
+            return `('${escape(row.CUSTOMER_CODE)}', '${escape(row.CUSTOMER_NAME)}', '${escape(row.CUSTOMER_ADDRESS1)}', '${escape(row.CUSTOMER_ADDRESS2)}', '${escape(row.CUSTOMER_ADDRESS3)}', '${escape(row.CUSTOMER_TEL)}')`
+        }).join(',\n')
+
+        return `
+            INSERT INTO staging_prones_data (
+                customer_code,
+                customer_name,
+                customer_address1,
+                customer_address2,
+                customer_address3,
+                customer_tel
+            ) VALUES ${values}
+        `
+    },
 
 }

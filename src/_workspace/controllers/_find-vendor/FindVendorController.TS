@@ -842,7 +842,6 @@ export const FindVendorController = {
             });
         }
     },
-
     // Get all vendor names
     getAllVendorNames: async (req: Request, res: Response) => {
         try {
@@ -998,80 +997,3 @@ const matchVendorsWithPrones = async (vendors: any[], filterStatus: string | nul
     return enrichedData;
 };
 
-/**
- * ====================================================================================================
- * 📘 MODULE: Prones Matching Logic (English Documentation)
- * ====================================================================================================
- * 
- * 📌 OVERVIEW:
- * The `matchVendorsWithPrones` helper function enriches local vendor data with registration status (`status_check`)
- * from the external "PRONES" system (Oracle DB).
- * 
- * ----------------------------------------------------------------------------------------------------
- * 🛠 ALGORITHM EXPLANATION:
- * ----------------------------------------------------------------------------------------------------
- * 
- * 1. 📥 FETCH DATA:
- *    - Retrieves ALL customer data from the Prones Oracle database to ensure we have the latest reference set.
- * 
- * 2. ⚡ INDEXING (Optimization):
- *    - Creates Hash Maps (`Map`) for O(1) lookups by:
- *      - **Telephone Number** (`pronesTelMap`)
- *      - **Company Name** (`pronesNameMap`)
- *    - Data sanitization (`cleanTel`, `cleanName`) removes noise like hyphens, spaces, or "Co., Ltd." suffix
- *      to maximize match probability.
- * 
- * 3. 🔍 MATCHING STRATEGY (Waterfall Approach):
- *    - **Priority 1: Telephone Match**: Exact match on sanitized phone number. (Highest Confidence)
- *    - **Priority 2: Name Match**: Exact match on sanitized company name.
- *    - **Priority 3: Address Similarity**: Fuzzy matching using token-based Jaccard Similarity (> 70% threshold).
- * 
- * 4. 🏷 RESULT ENRICHMENT:
- *    - If a match is found:
- *      - `status_check` = "Registered"
- *      - `prones_code` = Customer Code from Prones.
- *    - If no match:
- *      - `status_check` = "Not Registered"
- * 
- * ====================================================================================================
- */
-
-/**
- * ====================================================================================================
- * 📘 MODULE: Prones Matching Logic (เอกสารภาษาไทย)
- * ====================================================================================================
- * 
- * 📌 ภาพรวม (Overview):
- * ฟังก์ชัน `matchVendorsWithPrones` ทำหน้าที่ตรวจสอบสถานะการลงทะเบียน (`status_check`) 
- * โดยการเปรียบเทียบข้อมูล Vendor ในระบบ Local กับข้อมูลจากระบบ "PRONES" (Oracle Database)
- * 
- * ----------------------------------------------------------------------------------------------------
- * 🛠 อธิบายขั้นตอนการทำงาน (Algorithm):
- * ----------------------------------------------------------------------------------------------------
- * 
- * 1. 📥 การดึงข้อมูล (Fetch Data):
- *    - ดึงข้อมูลลูกค้า 'ทั้งหมด' จากระบบ Prones มาพักไว้เพื่อใช้เป็นฐานข้อมูลอ้างอิง
- * 
- * 2. ⚡ การเตรียมข้อมูล (Indexing):
- *    - สร้าง Hash Map เพื่อให้ค้นหาได้เร็วไว (Performance Optimization) โดยสร้างดัชนีจาก:
- *      - **เบอร์โทรศัพท์** (`pronesTelMap`)
- *      - **ชื่อบริษัท** (`pronesNameMap`)
- *    - มีการ "ทำความสะอาดข้อมูล" (Sanitization) ฟังก์ชัน `cleanTel` และ `cleanName` 
- *      เพื่อตัดอักขระพิเศษ เว้นวรรค หรือคำนำหน้าอย่าง "บริษัท" ออก เพื่อให้โอกาสเจอคู่แมตช์สูงขึ้น
- * 
- * 3. 🔍 กลยุทธ์การจับคู่ (Matching Strategy):
- *    - **ลำดับที่ 1 (แม่นยำสุด): จับคู่เบอร์โทร**: ถ้าเบอร์โทรตรงกัน -> ถือว่า "Registered" ทันที
- *    - **ลำดับที่ 2: จับคู่ชื่อบริษัท**: ถ้าเบอร์ไม่ตรง แต่ชื่อตรงเป๊ะ -> ถือว่า "Registered"
- *    - **ลำดับที่ 3: ความเหมือนของที่อยู่**: ถ้า 2 ข้อแรกไม่เจอ จะใช้การเปรียบเทียบข้อความ (Fuzzy Matching) ของที่อยู่ 
- *      ถ้ามีความคล้ายคลึงกันเกิน 70% -> ถือว่า "Registered"
- * 
- * 4. 🏷 การเติมข้อมูลกลับ (Enrichment):
- *    - ถ้าเจอคู่แมตช์:
- *      - `status_check` = "Registered"
- *      - `prones_code` = ดึงรหัสลูกค้าจาก Prones มาใส่ให้
- *      - `prones_name_en` = ดึงชื่อภาษาอังกฤษจาก Prones มาใส่
- *    - ถ้าไม่เจอ:
- *      - `status_check` = "Not Registered"
- * 
- * ====================================================================================================
- */

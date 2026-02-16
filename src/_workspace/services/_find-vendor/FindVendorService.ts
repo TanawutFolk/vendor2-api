@@ -149,5 +149,33 @@ export const FindVendorService = {
         const sql = await FindVendorSQL.getAllVendorNames()
         const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
         return resultData
-    }
+    },
+
+    // Sync Prones data from Oracle → MySQL staging_prones_data
+    syncPronesToStaging: async () => {
+        // Step 1: SELECT from Oracle
+        const sql = FindVendorSQL.getPronesData()
+        const oracleResult = (await OracleExecute.searchOracle(sql, 'PRONES')) as any
+        const rows = oracleResult?.rows || []
+
+        if (rows.length === 0) {
+            console.log('[Prones Sync] No data from Oracle, skipping.')
+            return { synced: 0 }
+        }
+
+        // Step 2: Truncate staging table
+        await MySQLExecute.execute(FindVendorSQL.truncateStagingPrones())
+
+        // Step 3: Batch insert (500 rows per batch)
+        const batchSize = 500
+        for (let i = 0; i < rows.length; i += batchSize) {
+            const batch = rows.slice(i, i + batchSize)
+            const insertSql = FindVendorSQL.insertStagingPronesBatch(batch)
+            await MySQLExecute.execute(insertSql)
+        }
+
+        console.log(`[Prones Sync] Synced ${rows.length} rows to staging_prones_data`)
+        return { synced: rows.length }
+    },
 }
+
