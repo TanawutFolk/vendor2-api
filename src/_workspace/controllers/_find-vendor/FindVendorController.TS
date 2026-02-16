@@ -77,7 +77,7 @@ export const FindVendorController = {
             { table: 'vc', id: 'UPDATE_BY', Fns: 'LIKE' },
             { table: 'vc', id: 'CREATE_DATE', Fns: '=' },
             { table: 'vc', id: 'UPDATE_DATE', Fns: '=' },
-            { table: 'vc', id: 'UPDATE_DATE', Fns: '=' },
+            // { table: 'vc', id: 'UPDATE_DATE', Fns: '=' },
         ]
 
         // Filter out null/empty values from SearchFilters before passing to helper
@@ -865,29 +865,29 @@ export const FindVendorController = {
             } as ResponseI)
         }
     },
-    // getPronesDataAll: async (req: Request, res: Response) => {
-    //     // Simple fetch without status check
-    //     try {
-    //         const dataItem = req.body
-    //         const resultData = await FindVendorModel.getPronesData(dataItem)
-    //         return res.status(200).json({
-    //             Status: true,
-    //             ResultOnDb: resultData,
-    //             TotalCountOnDb: resultData.length,
-    //             MethodOnDb: 'Get Prones Data',
-    //             Message: 'Get Data Success'
-    //         } as ResponseI)
-    //     } catch (error: any) {
-    //         console.error('getPronesData error:', error)
-    //         return res.status(500).json({
-    //             Status: false,
-    //             ResultOnDb: [],
-    //             TotalCountOnDb: 0,
-    //             MethodOnDb: 'Get Prones Data Failed',
-    //             Message: error?.message || 'Failed to get prones data'
-    //         } as ResponseI)
-    //     }
-    // }
+    getPronesDataAll: async (req: Request, res: Response) => {
+        // Simple fetch without status check
+        try {
+            const dataItem = req.body
+            const resultData = await FindVendorModel.getPronesData(dataItem)
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: resultData,
+                TotalCountOnDb: resultData.length,
+                MethodOnDb: 'Get Prones Data',
+                Message: 'Get Data Success'
+            } as ResponseI)
+        } catch (error: any) {
+            console.error('getPronesData error:', error)
+            return res.status(500).json({
+                Status: false,
+                ResultOnDb: [],
+                TotalCountOnDb: 0,
+                MethodOnDb: 'Get Prones Data Failed',
+                Message: error?.message || 'Failed to get prones data'
+            } as ResponseI)
+        }
+    }
 }
 
 
@@ -935,7 +935,6 @@ const calculateSimilarity = (str1: string, str2: string): number => {
     return (2 * matches) / totalTokens;
 };
 
-// New Helper for Prones Matching Logic
 const matchVendorsWithPrones = async (vendors: any[], filterStatus: string | null = null) => {
     // 1. Fetch Prones Data directly from Oracle
     const pronesResponse = await FindVendorModel.getPronesData({}) as any;

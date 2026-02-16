@@ -21,5 +21,5 @@ findVendorRoutes.post('/dropdown/vendor-names', FindVendorController.getAllVendo
 findVendorRoutes.post('/downloadFileForExport', FindVendorController.downloadFileForExport)
 findVendorRoutes.post('/deleteContact', FindVendorController.deleteVendorContact)
 findVendorRoutes.post('/deleteProduct', FindVendorController.deleteVendorProduct)
-// findVendorRoutes.post('/dropdown/prones-data-all', FindVendorController.getPronesDataAll)
+findVendorRoutes.post('/prones-data-all', FindVendorController.getPronesDataAll)
 export default findVendorRoutes
