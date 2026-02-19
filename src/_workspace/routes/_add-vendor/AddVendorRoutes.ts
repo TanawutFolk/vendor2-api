@@ -6,7 +6,7 @@ import { CheckDuplicateSchema, CreateVendorSchema } from './validateSchema'
 const addVendorRoutes = Router()
 
 addVendorRoutes.post('/check-duplicate', validateData(CheckDuplicateSchema), AddVendorController.checkDuplicate)
-addVendorRoutes.post('/create', validateData(CreateVendorSchema), AddVendorController.create)
+addVendorRoutes.post('/CreateVendor', validateData(CreateVendorSchema), AddVendorController.create)
 addVendorRoutes.post('/vendor-types', AddVendorController.getVendorTypes)
 addVendorRoutes.post('/product-groups', AddVendorController.getProductGroups)
 addVendorRoutes.post('/create-product-group', AddVendorController.createProductGroup)

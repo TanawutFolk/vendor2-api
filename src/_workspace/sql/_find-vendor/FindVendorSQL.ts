@@ -557,4 +557,50 @@ export const FindVendorSQL = {
         `
     },
 
+    // Vendor Matching - Get staging prones data (from MySQL)
+    getStagingPronesData: () => {
+        return `SELECT customer_code, customer_name, customer_address1, customer_address2, customer_address3, customer_tel FROM staging_prones_data`
+    },
+
+    // Vendor Matching - Get vendors for matching
+    getVendorsForMatch: () => {
+        return `SELECT vendor_id, company_name, address, tel_center FROM vendors WHERE INUSE = 1`
+    },
+
+    // Vendor Matching - Truncate match result
+    truncateMatchResult: () => {
+        return `TRUNCATE TABLE vendor_match_result`
+    },
+
+    // Vendor Matching - Batch insert match results
+    insertMatchResultBatch: (rows: any[]) => {
+        const escape = FindVendorSQL.escapeSql
+        const values = rows.map((row: any) => {
+            return `(${row.vendor_id}, '${escape(row.status_check)}', '${escape(row.prones_code)}', '${escape(row.prones_name)}', '${escape(row.match_method)}', NOW())`
+        }).join(',\n')
+
+        return `
+            INSERT INTO vendor_match_result (
+                vendor_id,
+                status_check,
+                prones_code,
+                prones_name,
+                match_method,
+                last_updated
+            ) VALUES ${values}
+        `
+    },
+
+    // Vendor Matching - Get match result by vendor_id
+    getMatchResultByVendorIds: (vendorIds: number[]) => {
+        const ids = vendorIds.join(',')
+        return `SELECT vendor_id, status_check, prones_code, prones_name, match_method FROM vendor_match_result WHERE vendor_id IN (${ids})`
+    },
+
+    // Vendor Matching - Get all match results
+    getAllMatchResults: () => {
+        return `SELECT vendor_id, status_check, prones_code, prones_name, match_method FROM vendor_match_result`
+    },
+
 }
+

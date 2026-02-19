@@ -12,5 +12,7 @@ export const FindVendorModel = {
     getPronesData: async (dataItem: any) => FindVendorService.getPronesData(),
     getAllVendorNames: async () => FindVendorService.getAllVendorNames(),
     deleteVendorContact: async (dataItem: any) => FindVendorService.deleteVendorContact(dataItem),
-    deleteVendorProduct: async (dataItem: any) => FindVendorService.deleteVendorProduct(dataItem)
+    deleteVendorProduct: async (dataItem: any) => FindVendorService.deleteVendorProduct(dataItem),
+    getMatchResults: async () => FindVendorService.getMatchResults(),
+    getMatchResultsByVendorIds: async (vendorIds: number[]) => FindVendorService.getMatchResultsByVendorIds(vendorIds),
 }

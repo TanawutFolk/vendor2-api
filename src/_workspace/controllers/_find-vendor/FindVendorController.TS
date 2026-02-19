@@ -891,109 +891,40 @@ export const FindVendorController = {
 
 
 // ------- Helper Functions  -------
-const cleanTel = (raw: string) => {
-    // เช็ค null/undefined ก่อน ถ้าไม่มีค่าให้คืน string ว่าง
-    return raw ? raw.toString().replace(/[^0-9]/g, '') : '';
-};
-
-const cleanName = (raw: string) => {
-    if (!raw) return '';
-    return raw.toString().toLowerCase()
-        .replace(/co\.,?ltd\.?/g, '')
-        .replace(/limited/g, '')
-        .replace(/ltd\.?/g, '')
-        .replace(/company/g, '')
-        .replace(/part\.,?ltd\.?/g, '')
-        .replace(/หจก\./g, '')
-        .replace(/บจก\./g, '')
-        .replace(/บริษัท/g, '')
-        .replace(/\s/g, '')
-        .replace(/[^a-z0-9ก-๙]/g, '');
-};
-
-const calculateSimilarity = (str1: string, str2: string): number => {
-    if (!str1 || !str2) return 0;
-
-    const tokenize = (text: string) => {
-        return text.toString().toLowerCase()
-            .replace(/[^a-z0-9ก-๙\s]/g, ' ')
-            .split(/\s+/)
-            .filter(w => w.length > 2);
-    };
-
-    const tokens1 = tokenize(str1);
-    const tokens2 = tokenize(str2);
-
-    let matches = 0;
-    const set2 = new Set(tokens2);
-    tokens1.forEach(token => { if (set2.has(token)) matches++; });
-
-    const totalTokens = tokens1.length + tokens2.length;
-    if (totalTokens === 0) return 0;
-
-    return (2 * matches) / totalTokens;
-};
-
 const matchVendorsWithPrones = async (vendors: any[], filterStatus: string | null = null) => {
-    // 1. Fetch Prones Data directly from Oracle
-    const pronesResponse = await FindVendorModel.getPronesData({}) as any;
-    const pronesRows = pronesResponse?.rows || [];
+    // Read pre-computed match results from vendor_match_result table
+    const vendorIds = [...new Set(vendors.map((v: any) => v.vendor_id).filter(Boolean))] as number[]
 
-    // 2. Build Index Maps
-    const pronesTelMap = new Map();
-    const pronesNameMap = new Map();
+    let matchMap = new Map<number, any>()
 
-    pronesRows.forEach((p: any) => {
-        const pTel = cleanTel(p.CUSTOMER_TEL);
-        const pName = cleanName(p.CUSTOMER_NAME);
-        if (pTel) pronesTelMap.set(pTel, p);
-        if (pName) pronesNameMap.set(pName, p);
-    });
+    if (vendorIds.length > 0) {
+        const matchResults = await FindVendorModel.getMatchResultsByVendorIds(vendorIds) as any[]
+        matchResults.forEach((r: any) => {
+            matchMap.set(r.vendor_id, r)
+        })
+    }
 
-    // 3. Match & Calculate status_check
+    // Enrich vendors with match results
     let enrichedData = vendors.map((vendor: any) => {
-        const mTel = cleanTel(vendor.tel_center);
-        const mName = cleanName(vendor.company_name);
-        const mAddress = vendor.address || '';
-
-        let status_check = 'Not Registered';
-        let pronesRef = null;
-
-        if (mTel && pronesTelMap.has(mTel)) {
-            status_check = 'Registered';
-            pronesRef = pronesTelMap.get(mTel);
-        } else if (mName && pronesNameMap.has(mName)) {
-            status_check = 'Registered';
-            pronesRef = pronesNameMap.get(mName);
-        } else {
-            const similarMatch = pronesRows.find((p: any) => {
-                const pFullAddr = `${p.CUSTOMER_ADDRESS1 || ''} ${p.CUSTOMER_ADDRESS2 || ''} ${p.CUSTOMER_ADDRESS3 || ''}`;
-                return calculateSimilarity(mAddress, pFullAddr) > 0.7;
-            });
-
-            if (similarMatch) {
-                status_check = 'Registered';
-                pronesRef = similarMatch;
-            }
-        }
-
+        const match = matchMap.get(vendor.vendor_id)
         return {
             ...vendor,
-            status_check,
-            prones_code: pronesRef ? pronesRef.CUSTOMER_CODE : (vendor.fft_vendor_code || null),
-            prones_name_en: pronesRef ? pronesRef.CUSTOMER_NAME : null
-        };
-    });
+            status_check: match ? match.status_check : 'Not Registered',
+            prones_code: match ? match.prones_code : (vendor.fft_vendor_code || null),
+            prones_name_en: match ? match.prones_name : null,
+            match_method: match ? match.match_method : null,
+        }
+    })
 
-    // 4. Filter by Prones Status if requested
+    // Filter by Prones Status if requested
     if (filterStatus) {
         if (filterStatus === '1') {
-            enrichedData = enrichedData.filter((item: any) => item.status_check === 'Registered');
+            enrichedData = enrichedData.filter((item: any) => item.status_check === 'Registered')
         } else if (filterStatus === '0') {
-            enrichedData = enrichedData.filter((item: any) => item.status_check === 'Not Registered');
+            enrichedData = enrichedData.filter((item: any) => item.status_check === 'Not Registered')
         }
     }
 
-    return enrichedData;
-};
+    return enrichedData
+}
 

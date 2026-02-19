@@ -7,8 +7,14 @@ const runSync = async () => {
     console.log(`[Prones Sync] Starting sync at ${now}`)
 
     try {
-        const result = await FindVendorService.syncPronesToStaging()
-        console.log(`[Prones Sync] ✅ Done — ${result.synced} rows synced`)
+        // Step 1: Sync Oracle → staging_prones_data
+        const syncResult = await FindVendorService.syncPronesToStaging()
+        console.log(`[Prones Sync] ✅ Step 1 Done — ${syncResult.synced} rows synced to staging`)
+
+        // Step 2: Match staging_prones_data × vendors → vendor_match_result
+        const matchResult = await FindVendorService.runVendorMatching()
+        console.log(`[Prones Sync] ✅ Step 2 Done — ${matchResult.total} vendors checked, ${matchResult.registered} registered`)
+
     } catch (error: any) {
         console.error(`[Prones Sync] ❌ Failed:`, error?.message || error)
     }
