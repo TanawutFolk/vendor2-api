@@ -5,16 +5,16 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2'
 export const AddVendorService = {
     // Check if vendor already exists
     checkDuplicateVendor: async (dataItem: any) => {
-        console.log('=== CHECK DUPLICATE VENDOR ===')
-        console.log('Input dataItem:', JSON.stringify(dataItem, null, 2))
+        // console.log('=== CHECK DUPLICATE VENDOR ===')
+        // console.log('Input dataItem:', JSON.stringify(dataItem, null, 2))
 
         const sql = await AddVendorSQL.checkDuplicateVendor(dataItem)
-        console.log('Generated SQL:', sql)
+        // console.log('Generated SQL:', sql)
 
         const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
-        console.log('Query Result:', JSON.stringify(resultData, null, 2))
-        console.log('Result Count:', resultData.length)
-        console.log('=== END CHECK ===')
+        // console.log('Query Result:', JSON.stringify(resultData, null, 2))
+        // console.log('Result Count:', resultData.length)
+        // console.log('=== END CHECK ===')
 
         if (resultData.length > 0) {
             const response = {
@@ -23,7 +23,7 @@ export const AddVendorService = {
                 existingVendorId: resultData[0].vendor_id,
                 Message: 'Vendor already exists',
             }
-            console.log('RETURNING (DUPLICATE FOUND):', JSON.stringify(response, null, 2))
+            // console.log('RETURNING (DUPLICATE FOUND):', JSON.stringify(response, null, 2))
             return response
         }
 
@@ -33,7 +33,7 @@ export const AddVendorService = {
             existingVendorId: null,
             Message: 'Vendor is available for registration',
         }
-        console.log('RETURNING (NOT DUPLICATE):', JSON.stringify(response, null, 2))
+        // console.log('RETURNING (NOT DUPLICATE):', JSON.stringify(response, null, 2))
         return response
     },
 

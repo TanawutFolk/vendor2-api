@@ -103,7 +103,7 @@ export const FindVendorController = {
         dataItem['Offset'] = Number(dataItem['Start'] || 0) * Number(dataItem['Limit'] || 20)
 
 
-        console.log('dataItem:', dataItem)
+        // console.log('dataItem:', dataItem)
 
         try {
             console.time('[PERF] Total Search');
