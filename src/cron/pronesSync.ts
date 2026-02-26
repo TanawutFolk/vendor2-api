@@ -1,5 +1,6 @@
 import { FindVendorService } from '../_workspace/services/_find-vendor/FindVendorService'
 
+const DAILY_HOUR = 18 // 18:00 น. (6 โมงเย็น) เวลาไทย
 const INTERVAL_MS = 24 * 60 * 60 * 1000 // 24 ชั่วโมง
 
 const runSync = async () => {
@@ -20,12 +21,35 @@ const runSync = async () => {
     }
 }
 
+/** คำนวณ milliseconds ที่เหลือจากตอนนี้ถึง 18:00 น. วันนี้ (หรือพรุ่งนี้ถ้าเลยแล้ว) */
+const getMsUntilNextRun = (): number => {
+    const nowUtc = new Date()
+    // แปลงเป็นเวลาไทย (UTC+7)
+    const bangkokOffset = 7 * 60 * 60 * 1000
+    const nowBangkok = new Date(nowUtc.getTime() + bangkokOffset)
+
+    const next = new Date(nowBangkok)
+    next.setUTCHours(DAILY_HOUR, 0, 0, 0) // ตั้งเป็น 18:00:00.000 เวลาไทย
+
+    if (next.getTime() <= nowBangkok.getTime()) {
+        // ถ้าเลย 18:00 แล้ววันนี้ → ไปรันพรุ่งนี้
+        next.setUTCDate(next.getUTCDate() + 1)
+    }
+
+    return next.getTime() - nowBangkok.getTime()
+}
+
 export const startPronesSyncScheduler = () => {
-    console.log(`[Prones Sync] Scheduler registered — will sync every 24 hours`)
+    const msUntilFirst = getMsUntilNextRun()
+    const hours = Math.floor(msUntilFirst / 1000 / 60 / 60)
+    const minutes = Math.floor((msUntilFirst / 1000 / 60) % 60)
 
-    // รันครั้งแรกทันทีตอน server start
-    runSync()
+    console.log(`[Prones Sync] Scheduler registered — จะ sync ครั้งถัดไปใน ${hours}h ${minutes}m (ทุกวัน 18:00 น.)`)
 
-    // ตั้ง interval ทุก 24 ชม.
-    setInterval(runSync, INTERVAL_MS)
+    // รอจนถึง 18:00 น. แล้วค่อยรันครั้งแรก
+    setTimeout(() => {
+        runSync()
+        // หลังจากนั้น loop ทุก 24 ชม. ตรงเวลาเดิม
+        setInterval(runSync, INTERVAL_MS)
+    }, msUntilFirst)
 }
