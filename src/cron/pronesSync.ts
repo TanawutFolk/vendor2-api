@@ -1,6 +1,6 @@
 import { FindVendorService } from '../_workspace/services/_find-vendor/FindVendorService'
 
-const DAILY_HOUR = 18 // 18:00 น. (6 โมงเย็น) เวลาไทย
+const DAILY_HOUR = 12.30 // 18:00 น. (6 โมงเย็น) เวลาไทย
 const INTERVAL_MS = 24 * 60 * 60 * 1000 // 24 ชั่วโมง
 
 const runSync = async () => {
@@ -44,7 +44,7 @@ export const startPronesSyncScheduler = () => {
     const hours = Math.floor(msUntilFirst / 1000 / 60 / 60)
     const minutes = Math.floor((msUntilFirst / 1000 / 60) % 60)
 
-    console.log(`[Prones Sync] Scheduler registered — จะ sync ครั้งถัดไปใน ${hours}h ${minutes}m (ทุกวัน 18:00 น.)`)
+    console.log(`[Prones Sync] Scheduler registered — จะ sync ครั้งถัดไปใน ${hours}h ${minutes}m (ทุกวัน 12:30 น.)`)
 
     // รอจนถึง 18:00 น. แล้วค่อยรันครั้งแรก
     setTimeout(() => {
