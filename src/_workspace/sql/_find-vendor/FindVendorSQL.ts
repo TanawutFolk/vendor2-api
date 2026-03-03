@@ -33,11 +33,13 @@ export const FindVendorSQL = {
                 vc.vendor_contact_id,
                 v.company_name,
                 vt.name AS vendor_type_name,
+                v.vendor_region,
                 v.province,
                 v.postal_code,
                 v.website,
                 v.address,
                 v.tel_center,
+                v.emailmain,
                 mpg.group_name,
                 vp.maker_name,
                 vp.product_name,
@@ -113,11 +115,13 @@ export const FindVendorSQL = {
                 v.company_name,
                 v.vendor_type_id,
                 vt.name AS vendor_type_name,
+                v.vendor_region,
                 v.province,
                 v.postal_code,
                 v.website,
                 v.address,
                 v.tel_center,
+                v.emailmain,
                 vp.vendor_product_id,
                 mpg.group_name,
                 vp.maker_name,
@@ -175,11 +179,13 @@ export const FindVendorSQL = {
             UPDATE vendors SET
                 company_name = 'dataItem.company_name',
                 vendor_type_id = dataItem.vendor_type_id,
+                vendor_region = 'dataItem.vendor_region',
                 province = 'dataItem.province',
                 postal_code = 'dataItem.postal_code',
                 website = 'dataItem.website',
                 address = 'dataItem.address',
                 tel_center = 'dataItem.tel_center',
+                emailmain = 'dataItem.emailmain',
                 INUSE = dataItem.INUSE,
                 UPDATE_BY = 'dataItem.UPDATE_BY',
                 UPDATE_DATE = NOW()
@@ -187,11 +193,13 @@ export const FindVendorSQL = {
         `
         sql = sql.replaceAll('dataItem.company_name', escape(dataItem.company_name))
         sql = sql.replaceAll('dataItem.vendor_type_id', String(dataItem.vendor_type_id))
+        sql = sql.replaceAll('dataItem.vendor_region', escape(dataItem.vendor_region || 'Local'))
         sql = sql.replaceAll('dataItem.province', escape(dataItem.province))
         sql = sql.replaceAll('dataItem.postal_code', escape(dataItem.postal_code))
         sql = sql.replaceAll('dataItem.website', escape(dataItem.website))
         sql = sql.replaceAll('dataItem.address', escape(dataItem.address))
         sql = sql.replaceAll('dataItem.tel_center', escape(dataItem.tel_center))
+        sql = sql.replaceAll('dataItem.emailmain', escape(dataItem.emailmain || ''))
         sql = sql.replaceAll('dataItem.INUSE', String(dataItem.INUSE !== undefined ? Number(dataItem.INUSE) : 1))
         sql = sql.replaceAll('dataItem.UPDATE_BY', escape(dataItem.UPDATE_BY))
         sql = sql.replaceAll('dataItem.vendor_id', String(dataItem.vendor_id))
@@ -414,11 +422,13 @@ export const FindVendorSQL = {
                 vc.vendor_contact_id,
                 v.company_name,
                 vt.name AS vendor_type_name,
+                v.vendor_region,
                 v.province,
                 v.postal_code,
                 v.website,
                 v.address,
                 v.tel_center,
+                v.emailmain,
                 mpg.group_name,
                 vp.maker_name,
                 vp.product_name,
@@ -479,6 +489,7 @@ export const FindVendorSQL = {
                     OR v.province LIKE 'searchVal'
                     OR v.website LIKE 'searchVal'
                     OR v.fft_vendor_code LIKE 'searchVal'
+                    OR v.emailmain LIKE 'searchVal'
                     OR vc.email LIKE 'searchVal'
                     OR vc.contact_name LIKE 'searchVal'
                     OR vc.tel_phone LIKE 'searchVal'

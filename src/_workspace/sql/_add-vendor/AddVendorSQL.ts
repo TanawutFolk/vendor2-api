@@ -31,8 +31,10 @@ export const AddVendorSQL = {
                 province,
                 postal_code,
                 vendor_type_id,
+                vendor_region,
                 website,
                 tel_center,
+                emailmain,
                 address,
                 note,
                 CREATE_BY,
@@ -44,8 +46,10 @@ export const AddVendorSQL = {
                 'dataItem.province',
                 'dataItem.postal_code',
                 dataItem.vendor_type_id,
+                'dataItem.vendor_region',
                 'dataItem.website',
                 'dataItem.tel_center',
+                'dataItem.emailmain',
                 'dataItem.address',
                 'dataItem.note',
                 'dataItem.CREATE_BY',
@@ -58,8 +62,10 @@ export const AddVendorSQL = {
         sql = sql.replaceAll('dataItem.province', dataItem['province'] || '')
         sql = sql.replaceAll('dataItem.postal_code', dataItem['postal_code'] || '')
         sql = sql.replaceAll('dataItem.vendor_type_id', String(Number(dataItem['vendor_type_id']) || 0))
+        sql = sql.replaceAll('dataItem.vendor_region', dataItem['vendor_region'] || 'Local')
         sql = sql.replaceAll('dataItem.website', dataItem['website'] || '')
         sql = sql.replaceAll('dataItem.tel_center', dataItem['tel_center'] || '')
+        sql = sql.replaceAll('dataItem.emailmain', dataItem['emailmain'] || '')
         sql = sql.replaceAll('dataItem.address', dataItem['address'] || '')
         sql = sql.replaceAll('dataItem.note', dataItem['note'] || '')
         sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || '')
