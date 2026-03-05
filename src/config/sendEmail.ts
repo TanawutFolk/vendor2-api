@@ -71,9 +71,9 @@ const sendEmail = async (message: string, send_to: string) => {
   // 2. ลบ \n (Enter) ของ Code ออกให้เหลือบรรทัดเดียว (Minify) เพื่อกัน Error
   const cleanMessage = fixedMessage.replace(/[\r\n]+/g, '').trim()
   const form = new FormData()
-  form.append('To', '') //change to send_to when deploy
+  form.append('To', send_to)
   form.append('CC', '') // ใส่ค่าว่าง หรืออีเมลถ้ามี
-  form.append('Subject', '__Test New Template Leave System__')
+  form.append('Subject', '[Vendor Registration System] New Registration Request Assigned')
   form.append('BodyHtml', cleanMessage)
 
   try {

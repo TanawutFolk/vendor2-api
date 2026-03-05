@@ -1,29 +1,45 @@
 import { MySQLExecute } from '@businessData/dbExecute'
 import { RegisterRequestSQL } from '../../sql/_find-vendor/RegisterRequestSQL'
 import { RowDataPacket, ResultSetHeader } from 'mysql2'
+import sendEmail from '@src/config/sendEmail'
+import { registerVendorTemplate } from '@src/config/mailTemplate'
 
 export const RegisterRequestService = {
     // Create a new registration request and return the inserted ID
     createRequest: async (dataItem: any) => {
-        // 1. Fetch Vendor Region
-        const regionSql = `SELECT vendor_region FROM vendors WHERE vendor_id = ${Number(dataItem.vendor_id) || 0} LIMIT 1`
-        const regionRes = (await MySQLExecute.search(regionSql)) as RowDataPacket[]
-        const vendorRegion = regionRes[0]?.vendor_region || 'Local'
+        // 1. Fetch Vendor details (including Region, address, contacts)
+        const vendorSql = `
+            SELECT 
+                v.company_name, 
+                v.address,
+                v.vendor_region,
+                vc.contact_name,
+                vc.email,
+                vc.tel_phone
+            FROM vendors v
+            LEFT JOIN vendor_contacts vc ON vc.vendor_id = v.vendor_id
+            WHERE v.vendor_id = ${Number(dataItem.vendor_id) || 0} 
+            LIMIT 1
+        `
+        const vendorRes = (await MySQLExecute.search(vendorSql)) as RowDataPacket[]
+        const vendorData = vendorRes[0] || {}
+        const vendorRegion = vendorData.vendor_region || 'Local'
         const isOversea = vendorRegion.toLowerCase() === 'oversea'
         const assignmentGroup = isOversea ? 'Oversea' : 'Local'
 
         // 2. Fetch Active Assignees from DB (must be seeded manually in assignees_to)
-        const fetchAssigneesSql = `SELECT empcode, empEmail FROM assignees_to WHERE group_name = '${assignmentGroup}' AND INUSE = 1 ORDER BY Assignees_id ASC`
+        const fetchAssigneesSql = `SELECT empName, empcode, empEmail FROM assignees_to WHERE group_name = '${assignmentGroup}' AND INUSE = 1 ORDER BY Assignees_id ASC`
         const assigneesRes = (await MySQLExecute.search(fetchAssigneesSql)) as RowDataPacket[]
 
-        const activeAssignees: { empCode: string; empEmail: string }[] = assigneesRes.map(row => ({
+        const activeAssignees: { empName: string; empCode: string; empEmail: string }[] = assigneesRes.map(row => ({
+            empName: row.empName || row.empcode || '', // Fallback to empCode if empName is null
             empCode: row.empcode || '',
             empEmail: row.empEmail || ''
         }))
 
         // Fallback in case table is empty or all inactive
         if (activeAssignees.length === 0) {
-            activeAssignees.push({ empCode: 'ADMIN', empEmail: 'admin@furukawaelectric.com' })
+            activeAssignees.push({ empName: 'Admin', empCode: 'ADMIN', empEmail: 'admin@furukawaelectric.com' })
         }
 
         // 3. Find the LAST assigned person for this specific region from request_register_vendor
@@ -51,7 +67,48 @@ export const RegisterRequestService = {
 
         const sql = await RegisterRequestSQL.createRequest(dataItem)
         const result = (await MySQLExecute.execute(sql)) as ResultSetHeader
-        return result.insertId
+        const insertedId = result.insertId
+
+        // 6. Fetch Requester Info for Email
+        const requesterSql = `SELECT empName, empSurname FROM Person.MEMBER_FED WHERE empCode = '${dataItem.Request_By_EmployeeCode || ''}' LIMIT 1`
+        const requesterRes = (await MySQLExecute.search(requesterSql)) as RowDataPacket[]
+        const requesterData = requesterRes[0] || {}
+        const requesterFullName = requesterData.empName ? `${requesterData.empName} ${requesterData.empSurname || ''}`.trim() : (dataItem.Request_By_EmployeeCode || 'Unknown')
+
+        // 7. Format Request Number (e.g. Register_Selection-26-0001)
+        const currentYear = new Date().getFullYear().toString().slice(-2)
+        const paddedId = String(insertedId).padStart(4, '0')
+        const requestNumber = `Register_Selection-${currentYear}-${paddedId}`
+
+        // 8. Generate System Link (From ENV or generic local fallback)
+        const systemOrigin = process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'
+        // Using common route format based on existing paths, update if frontend routing requires a different format
+        const systemLink = `${systemOrigin}/workspace/request-register`
+
+        // 9. Send Email to PIC using the new Template
+        if (nextAssignee.empEmail) {
+            const emailHtml = registerVendorTemplate({
+                requestNumber: requestNumber,
+                picName: nextAssignee.empName,
+                vendorName: vendorData.company_name || 'N/A',
+                address: vendorData.address || 'N/A',
+                contactPic: vendorData.contact_name || 'N/A',
+                email: vendorData.email || 'N/A',
+                tel: vendorData.tel_phone || 'N/A',
+                supportProduct: dataItem.supportProduct_Process || 'N/A',
+                purchaseFrequency: dataItem.purchase_frequency || 'N/A',
+                systemLink: systemLink,
+                requesterName: requesterFullName,
+                requesterTel: 'Tel. Ext in Directory' // Hardcoded or fetch from another field if available
+            })
+
+            // Run sendEmail asynchronously without blocking the API response
+            sendEmail(emailHtml, nextAssignee.empEmail).catch((err: any) => {
+                console.error('Failed to send register email to PIC:', err)
+            })
+        }
+
+        return insertedId
     },
 
     // Get all registration requests
