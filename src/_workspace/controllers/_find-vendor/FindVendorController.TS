@@ -1,5 +1,6 @@
 import { FindVendorModel } from '@src/_workspace/models/_find-vendor/FindVendorModel'
 import { getSqlWhereByColumnFilters_elysia } from '@src/helpers/getSqlWhereByFilterColumn'
+import getSqlWhere_aggrid from '@src/helpers/getSqlWhere_aggrid'
 import getSqlWhere_elysia from '@src/helpers/getSqlWhere_elysia'
 import { ResponseI } from '@src/types/ResponseI'
 import { Request, Response } from 'express'
@@ -16,40 +17,20 @@ export const FindVendorController = {
             dataItem = req.body
         }
 
-        // Intercept Order for SQL fallback (Fix: status_check is computed, cannot sort in SQL)
-        let statusSort: any = null;
-        if (dataItem.Order) {
-            if (Array.isArray(dataItem.Order)) {
+        // Intercept Order for SQL fallback (Removed: status_check is now natively supported in SQL)
 
-                const statusSortIdx = dataItem.Order.findIndex((o: any) => o.id === 'status_check');
-                if (statusSortIdx > -1) {
-                    statusSort = dataItem.Order[statusSortIdx];
-                    // Remove status_check from SQL Order
-                    dataItem.Order.splice(statusSortIdx, 1);
-                    // If Order is empty after removal, add default
-                    if (dataItem.Order.length === 0) {
-                        dataItem.Order.push({ id: 'company_name', desc: false });
-                    }
-                }
-            } else if (typeof dataItem.Order === 'string') {
-                // Handle string format e.g. "status_check DESC" or "status_check ASC"
-                if (dataItem.Order.includes('status_check')) {
-                    const isDesc = dataItem.Order.toLowerCase().includes('desc');
-                    statusSort = { id: 'status_check', desc: isDesc };
-                    // Replace with default sort
-                    dataItem.Order = 'v.company_name ASC';
-                }
-            }
-        }
-
-        // Intercept prones_code filter (Virtual Field)
-        let pronesCodeFilterVal: string | null = null;
+        // Translate 'status' frontend filter ID to 'status_check' table column
         if (dataItem.SearchFilters && Array.isArray(dataItem.SearchFilters)) {
-            const pIdx = dataItem.SearchFilters.findIndex((item: any) => item.id === 'prones_code');
-            if (pIdx > -1) {
-                pronesCodeFilterVal = dataItem.SearchFilters[pIdx].value;
-                // Remove from SQL SearchFilters to avoid "Unknown column"
-                dataItem.SearchFilters.splice(pIdx, 1);
+            const statusIdx = dataItem.SearchFilters.findIndex((item: any) => item.id === 'status');
+            if (statusIdx > -1) {
+                const val = dataItem.SearchFilters[statusIdx].value;
+                if (val === '1' || val === 1) {
+                    dataItem.SearchFilters[statusIdx] = { id: 'status_check', value: 'Registered' };
+                } else if (val === '0' || val === 0) {
+                    dataItem.SearchFilters[statusIdx] = { id: 'status_check', value: 'Not Registered' };
+                } else {
+                    dataItem.SearchFilters.splice(statusIdx, 1);
+                }
             }
         }
 
@@ -79,7 +60,8 @@ export const FindVendorController = {
             { table: 'vc', id: 'UPDATE_BY', Fns: 'LIKE' },
             { table: 'vc', id: 'CREATE_DATE', Fns: '=' },
             { table: 'vc', id: 'UPDATE_DATE', Fns: '=' },
-            // { table: 'vc', id: 'UPDATE_DATE', Fns: '=' },
+            { table: 'vmr', id: 'status_check', Fns: '=' },
+            { table: 'vmr', id: 'prones_code', Fns: 'LIKE' },
         ]
 
         // Filter out null/empty values from SearchFilters before passing to helper
@@ -89,8 +71,9 @@ export const FindVendorController = {
             )
         }
 
-        // Create SQL WHERE and ORDER BY
-        getSqlWhere_elysia(dataItem, tableIds, 'company_name')
+        // Create SQL WHERE, ORDER BY, and Offset using AG Grid-compatible helper
+        // (uses Start directly as row offset — no Start * Limit multiplication)
+        getSqlWhere_aggrid(dataItem, tableIds, 'company_name')
 
         // Extract sqlWhere from dataItem (it now contains both SearchFilters and ColumnFilters)
         let sqlWhere = ''
@@ -102,7 +85,6 @@ export const FindVendorController = {
         }
 
         dataItem['sqlWhereColumnFilter'] = '' // No longer needed as it's merged into sqlWhere
-        dataItem['Offset'] = Number(dataItem['Start'] || 0) * Number(dataItem['Limit'] || 20)
 
 
         // console.log('dataItem:', dataItem)
@@ -115,32 +97,8 @@ export const FindVendorController = {
             console.timeEnd('[PERF] MySQL Query');
             console.log(`[PERF] MySQL returned ${resultData.length} rows`);
 
-            const statusFilter = dataItem.SearchFilters?.find((item: any) => item.id === 'status');
-            const filterValue = statusFilter && statusFilter.value ? statusFilter.value.toString() : null;
-
-            console.time('[PERF] Prones Matching');
-            let finalResult = await matchVendorsWithPrones(resultData, filterValue);
-            console.timeEnd('[PERF] Prones Matching');
-
-            // Filter by prones_code (In-Memory)
-            if (pronesCodeFilterVal) {
-                const val = pronesCodeFilterVal.toString().trim().toLowerCase();
-                finalResult = finalResult.filter((item: any) =>
-                    item.prones_code && item.prones_code.toString().toLowerCase().includes(val)
-                );
-            }
-
-            // Post-Fetch Sorting for 'status_check'
-            if (statusSort) {
-                const desc = statusSort.desc;
-                finalResult.sort((a: any, b: any) => {
-                    const valA = a.status_check || '';
-                    const valB = b.status_check || '';
-                    if (valA < valB) return desc ? 1 : -1;
-                    if (valA > valB) return desc ? -1 : 1;
-                    return 0;
-                });
-            }
+            // No in-memory filtering/sorting needed anymore! Everything is done natively in SQL.
+            let finalResult = resultData;
 
             console.timeEnd('[PERF] Total Search');
             console.log(`[PERF] Returning ${finalResult.length} rows to client`);

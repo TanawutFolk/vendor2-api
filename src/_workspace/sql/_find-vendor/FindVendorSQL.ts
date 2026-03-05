@@ -16,6 +16,8 @@ export const FindVendorSQL = {
                 vendor_products vp ON v.vendor_id = vp.vendor_id AND vp.INUSE = 1
             LEFT JOIN
                 master_product_groups mpg ON vp.product_group_id = mpg.product_group_id
+            LEFT JOIN
+                vendor_match_result vmr ON v.vendor_id = vmr.vendor_id
             WHERE
                 1 = 1
                 dataItem.sqlWhere
@@ -54,6 +56,12 @@ export const FindVendorSQL = {
                 v.UPDATE_DATE,
                 v.INUSE,
                 
+                -- Prones Matching Data
+                IFNULL(vmr.status_check, 'Not Registered') AS status_check,
+                IFNULL(vmr.prones_code, v.fft_vendor_code) AS prones_code,
+                vmr.prones_name AS prones_name_en,
+                vmr.match_method,
+                
                 -- Contact Audit
                 vc.CREATE_BY AS contact_create_by,
                 vc.UPDATE_BY AS contact_update_by,
@@ -75,6 +83,8 @@ export const FindVendorSQL = {
                 vendor_products vp ON v.vendor_id = vp.vendor_id AND vp.INUSE = 1
             LEFT JOIN
                 master_product_groups mpg ON vp.product_group_id = mpg.product_group_id
+            LEFT JOIN
+                vendor_match_result vmr ON v.vendor_id = vmr.vendor_id
             WHERE
                 1 = 1
                 dataItem.sqlWhere
@@ -441,6 +451,13 @@ export const FindVendorSQL = {
                 v.UPDATE_BY,
                 v.CREATE_DATE,
                 v.UPDATE_DATE,
+                v.INUSE,
+
+                -- Prones Matching Data
+                IFNULL(vmr.status_check, 'Not Registered') AS status_check,
+                IFNULL(vmr.prones_code, v.fft_vendor_code) AS prones_code,
+                vmr.prones_name AS prones_name_en,
+                vmr.match_method,
                 
                 -- Contact Audit
                 vc.CREATE_BY AS contact_create_by,
@@ -464,6 +481,8 @@ export const FindVendorSQL = {
                 vendor_products vp ON v.vendor_id = vp.vendor_id AND vp.INUSE = 1
             LEFT JOIN
                 master_product_groups mpg ON vp.product_group_id = mpg.product_group_id
+            LEFT JOIN
+                vendor_match_result vmr ON v.vendor_id = vmr.vendor_id
             WHERE
                 1 = 1
                 dataItem.sqlWhere

@@ -1,6 +1,7 @@
 import compression from 'compression'
 import cors from 'cors'
 import express, { Request, Response } from 'express'
+import path from 'path'
 
 import Routers from './_workspace/Routes'
 import { loadEnvironmentVariables } from './config/env'
@@ -44,6 +45,10 @@ app.get(prefix, (req: Request, res: Response) => {
   - Last Update       : 2025-Mar-25 18:31
   `)
 })
+
+// * Static Files
+// Serve uploaded documents at: GET /uploads/documents/<filename>
+app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))
 
 app.use(prefix, Routers)
 
