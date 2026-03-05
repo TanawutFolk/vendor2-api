@@ -180,5 +180,46 @@ export const RegisterRequestController = {
                 Message: error?.message || 'Failed to update status'
             } as ResponseI)
         }
+    },
+
+    // Send agreement/document-request email to the Vendor
+    sendAgreementEmail: async (req: Request, res: Response) => {
+        let dataItem
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
+        try {
+            if (!dataItem.emailmain) {
+                return res.status(400).json({
+                    Status: false,
+                    ResultOnDb: {},
+                    TotalCountOnDb: 0,
+                    MethodOnDb: 'Send Agreement Email',
+                    Message: 'Vendor emailmain is required'
+                } as ResponseI)
+            }
+
+            const result = await RegisterRequestModel.sendAgreementEmail(dataItem)
+
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: result,
+                TotalCountOnDb: 1,
+                MethodOnDb: 'Send Agreement Email',
+                Message: `Agreement email sent to ${result.sent_to}`
+            } as ResponseI)
+        } catch (error: any) {
+            return res.status(500).json({
+                Status: false,
+                ResultOnDb: {},
+                TotalCountOnDb: 0,
+                MethodOnDb: 'Send Agreement Email Failed',
+                Message: error?.message || 'Failed to send agreement email'
+            } as ResponseI)
+        }
     }
 }
+

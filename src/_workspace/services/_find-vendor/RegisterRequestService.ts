@@ -2,7 +2,7 @@ import { MySQLExecute } from '@businessData/dbExecute'
 import { RegisterRequestSQL } from '../../sql/_find-vendor/RegisterRequestSQL'
 import { RowDataPacket, ResultSetHeader } from 'mysql2'
 import sendEmail from '@src/config/sendEmail'
-import { registerVendorTemplate } from '@src/config/mailTemplate'
+import { registerVendorTemplate, vendorAgreementTemplate } from '@src/config/mailTemplate'
 
 export const RegisterRequestService = {
     // Create a new registration request and return the inserted ID
@@ -135,5 +135,65 @@ export const RegisterRequestService = {
         const sql = await RegisterRequestSQL.updateStatus(dataItem)
         await MySQLExecute.execute(sql)
         return true
+    },
+
+    // Send agreement email to vendor (emailmain), CC PIC
+    sendAgreementEmail: async (dataItem: any) => {
+        const {
+            request_id,
+            vendor_id,
+            emailmain,
+            company_name,
+            address,
+            contacts,
+            supportProduct_Process,
+            purchase_frequency,
+            assign_to,
+            PIC_Email,
+            isReregister,
+        } = dataItem
+
+        if (!emailmain) {
+            throw new Error('Vendor emailmain is missing — cannot send agreement email')
+        }
+
+        // Format request number
+        const currentYear = new Date().getFullYear().toString().slice(-2)
+        const paddedId = String(Number(request_id) || 0).padStart(4, '0')
+        const requestNumber = `Register_Selection-${currentYear}-${isReregister ? 'R' : 'N'}${paddedId}`
+
+        // Resolve PIC name from DB
+        const picSql = `SELECT empName, empSurname FROM Person.MEMBER_FED WHERE empCode = '${assign_to || ''}' LIMIT 1`
+        const picRes = (await MySQLExecute.search(picSql)) as RowDataPacket[]
+        const picRow = picRes[0] || {}
+        const picName = picRow.empName ? `${picRow.empName} ${picRow.empSurname || ''}`.trim() : (assign_to || 'PIC')
+
+        // Parse first contact name from JSON field
+        let contactName = '-'
+        try {
+            const contactsParsed = typeof contacts === 'string' ? JSON.parse(contacts) : (contacts || [])
+            const first = contactsParsed.find((c: any) => c)
+            if (first?.contact_name) contactName = first.contact_name
+        } catch { /* ignore */ }
+
+        const emailHtml = vendorAgreementTemplate({
+            requestNumber,
+            vendorName: company_name || 'N/A',
+            vendorAddress: address || '-',
+            contactName,
+            picName,
+            picEmail: PIC_Email || '',
+            supportProduct: supportProduct_Process || '-',
+            purchaseFrequency: purchase_frequency || '-',
+            isReregister: !!isReregister,
+        })
+
+        // Send to vendor (emailmain), CC PIC
+        await sendEmail(emailHtml, emailmain)
+        if (PIC_Email && PIC_Email !== emailmain) {
+            sendEmail(emailHtml, PIC_Email).catch(() => { })
+        }
+
+        return { sent_to: emailmain, cc: PIC_Email || null, requestNumber }
     }
 }

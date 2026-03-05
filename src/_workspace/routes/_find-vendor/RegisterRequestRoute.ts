@@ -43,4 +43,7 @@ registerRequestRoutes.post('/getById', RegisterRequestController.getById)
 // POST /register-request/updateStatus
 registerRequestRoutes.post('/updateStatus', RegisterRequestController.updateStatus)
 
+// POST /register-request/sendAgreementEmail
+registerRequestRoutes.post('/sendAgreementEmail', RegisterRequestController.sendAgreementEmail)
+
 export default registerRequestRoutes

@@ -5,4 +5,5 @@ export const RegisterRequestModel = {
     getAllRequests: async (dataItem?: any) => RegisterRequestService.getAllRequests(dataItem),
     getById: async (dataItem: any) => RegisterRequestService.getById(dataItem),
     updateStatus: async (dataItem: any) => RegisterRequestService.updateStatus(dataItem),
+    sendAgreementEmail: async (dataItem: any) => RegisterRequestService.sendAgreementEmail(dataItem),
 }
