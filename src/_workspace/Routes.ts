@@ -76,7 +76,7 @@ import ClearTimeProcessForSctRoutes from './routes/_ClearTimeSystem/ClearTimePro
 import ClearTimeTotalForSctRoutes from './routes/_ClearTimeSystem/ClearTimeTotalForSctRoutes'
 import addVendorRoutes from './routes/_add-vendor/AddVendorRoutes'
 import findVendorRoutes from './routes/_find-vendor/FindVendorRoute'
-import registerRequestRoutes from './routes/_find-vendor/RegisterRequestRoute'
+import registerRequestRoutes from './routes/_request-registrer/RegisterRequestRoute'
 
 const Routers = Router()
 

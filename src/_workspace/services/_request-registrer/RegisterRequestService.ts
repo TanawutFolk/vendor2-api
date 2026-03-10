@@ -1,5 +1,5 @@
 import { MySQLExecute } from '@businessData/dbExecute'
-import { RegisterRequestSQL } from '../../sql/_find-vendor/RegisterRequestSQL'
+import { RegisterRequestSQL } from '../../sql/_request-registrer/RegisterRequestSQL'
 import { RowDataPacket, ResultSetHeader } from 'mysql2'
 import sendEmail from '@src/config/sendEmail'
 import { registerVendorTemplate, vendorAgreementTemplate } from '@src/config/mailTemplate'
@@ -108,6 +108,39 @@ export const RegisterRequestService = {
             })
         }
 
+        // ── Auto-create approval steps from m_request_status ──
+        const statusSql = RegisterRequestSQL.getStatusOptions()
+        const statusRows = (await MySQLExecute.search(statusSql)) as RowDataPacket[]
+        // Exclude 'Rejected' — it's not a step, it's an action that can happen at any point
+        const workflowStatuses = statusRows.filter((s: any) => s.value !== 'Rejected')
+
+        for (const [idx, ws] of workflowStatuses.entries()) {
+            const stepOrder = idx + 1
+            const stepSql = await RegisterRequestSQL.createApprovalStep({
+                request_id: insertedId,
+                step_order: stepOrder,
+                approver_id: stepOrder === 1 ? nextAssignee.empCode : '',
+                step_status: stepOrder === 1 ? 'in_progress' : 'pending',
+                DESCRIPTION: ws.label,
+                CREATE_BY: dataItem.CREATE_BY || 'SYSTEM',
+            })
+            await MySQLExecute.execute(stepSql)
+        }
+
+        // ── Auto-create initial approval log (link to first step) ──
+        const firstStepSql = await RegisterRequestSQL.getApprovalSteps({ request_id: insertedId })
+        const firstStepRows = (await MySQLExecute.search(firstStepSql)) as RowDataPacket[]
+        const firstStepId = firstStepRows[0]?.step_id || null
+
+        const logSql = await RegisterRequestSQL.createApprovalLog({
+            request_id: insertedId,
+            step_id: firstStepId,
+            action_by: dataItem.Request_By_EmployeeCode || 'SYSTEM',
+            action_type: 'submitted',
+            remark: 'Request submitted',
+        })
+        await MySQLExecute.execute(logSql)
+
         return insertedId
     },
 
@@ -147,11 +180,126 @@ export const RegisterRequestService = {
         return result[0] || null
     },
 
-    // Update status (approve / reject)
+    // Get all active status options from m_request_status
+    getStatusOptions: async () => {
+        const sql = RegisterRequestSQL.getStatusOptions()
+        const result = (await MySQLExecute.search(sql)) as RowDataPacket[]
+        return result
+    },
+
+    // Update status (approve / reject) + auto-update approval step & log
     updateStatus: async (dataItem: any) => {
         const sql = await RegisterRequestSQL.updateStatus(dataItem)
         await MySQLExecute.execute(sql)
+
+        const newStatus = dataItem.request_status || ''
+
+        // ── Find all approval steps for this request (sorted by step_order) ──
+        const stepsSql = await RegisterRequestSQL.getApprovalSteps({ request_id: dataItem.request_id })
+        const steps = (await MySQLExecute.search(stepsSql)) as RowDataPacket[]
+        if (steps.length === 0) return true
+
+        // ── Find the current in_progress step ──
+        const currentStep = steps.find((s: any) => s.step_status === 'in_progress')
+
+        if (newStatus === 'Rejected') {
+            // Reject: mark current step as rejected, skip all remaining pending steps
+            if (currentStep) {
+                const rejectSql = await RegisterRequestSQL.updateApprovalStep({
+                    step_id: currentStep.step_id,
+                    step_status: 'rejected',
+                    UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+                })
+                await MySQLExecute.execute(rejectSql)
+
+                const logSql = await RegisterRequestSQL.createApprovalLog({
+                    request_id: dataItem.request_id,
+                    step_id: currentStep.step_id,
+                    action_by: dataItem.approve_by || dataItem.UPDATE_BY || 'SYSTEM',
+                    action_type: 'rejected',
+                    remark: dataItem.approver_remark || '',
+                })
+                await MySQLExecute.execute(logSql)
+            }
+
+            // Skip all remaining pending steps
+            const pendingSteps = steps.filter((s: any) => s.step_status === 'pending')
+            for (const ps of pendingSteps) {
+                const skipSql = await RegisterRequestSQL.updateApprovalStep({
+                    step_id: ps.step_id,
+                    step_status: 'skipped',
+                    UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
+                })
+                await MySQLExecute.execute(skipSql)
+            }
+        } else {
+            // Approve/advance: mark current step as approved, activate next step
+            if (currentStep) {
+                const approveSql = await RegisterRequestSQL.updateApprovalStep({
+                    step_id: currentStep.step_id,
+                    step_status: 'approved',
+                    UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+                })
+                await MySQLExecute.execute(approveSql)
+
+                const logSql = await RegisterRequestSQL.createApprovalLog({
+                    request_id: dataItem.request_id,
+                    step_id: currentStep.step_id,
+                    action_by: dataItem.approve_by || dataItem.UPDATE_BY || 'SYSTEM',
+                    action_type: 'approved',
+                    remark: dataItem.approver_remark || '',
+                })
+                await MySQLExecute.execute(logSql)
+
+                // Activate next pending step
+                const nextStep = steps.find((s: any) => s.step_order === currentStep.step_order + 1 && s.step_status === 'pending')
+                if (nextStep) {
+                    const activateSql = await RegisterRequestSQL.updateApprovalStep({
+                        step_id: nextStep.step_id,
+                        step_status: 'in_progress',
+                        UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
+                    })
+                    await MySQLExecute.execute(activateSql)
+                }
+            }
+        }
+
         return true
+    },
+
+    // Create an approval step for a request
+    createApprovalStep: async (dataItem: any) => {
+        const sql = await RegisterRequestSQL.createApprovalStep(dataItem)
+        const result = (await MySQLExecute.execute(sql)) as ResultSetHeader
+        return result.insertId
+    },
+
+    // Get all approval steps for a request
+    getApprovalSteps: async (dataItem: any) => {
+        const sql = await RegisterRequestSQL.getApprovalSteps(dataItem)
+        const result = (await MySQLExecute.search(sql)) as RowDataPacket[]
+        return result
+    },
+
+    // Update an approval step status
+    updateApprovalStep: async (dataItem: any) => {
+        const sql = await RegisterRequestSQL.updateApprovalStep(dataItem)
+        await MySQLExecute.execute(sql)
+        return true
+    },
+
+    // Create an approval log entry
+    createApprovalLog: async (dataItem: any) => {
+        const sql = await RegisterRequestSQL.createApprovalLog(dataItem)
+        const result = (await MySQLExecute.execute(sql)) as ResultSetHeader
+        return result.insertId
+    },
+
+    // Get all approval logs for a request
+    getApprovalLogs: async (dataItem: any) => {
+        const sql = await RegisterRequestSQL.getApprovalLogs(dataItem)
+        const result = (await MySQLExecute.search(sql)) as RowDataPacket[]
+        return result
     },
 
     // Send agreement email to vendor (emailmain), CC PIC

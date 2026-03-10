@@ -2,7 +2,7 @@ import { Router } from 'express'
 import multer from 'multer'
 import path from 'path'
 import fs from 'fs'
-import { RegisterRequestController } from '@src/_workspace/controllers/_find-vendor/RegisterRequestController'
+import { RegisterRequestController } from '@src/_workspace/controllers/_request-registrer/RegisterRequestController'
 
 // --- Multer Configuration (Local Disk Storage) ---
 // Files will be saved to: <project_root>/uploads/documents/
@@ -34,8 +34,8 @@ const registerRequestRoutes = Router()
 // POST /register-request/create  — accepts multipart/form-data with optional file uploads
 registerRequestRoutes.post('/create', upload.array('files'), RegisterRequestController.create)
 
-// POST /register-request/getAll
-registerRequestRoutes.post('/getAll', RegisterRequestController.getAll)
+// POST /register-request/searchRequest
+registerRequestRoutes.post('/searchRequest', RegisterRequestController.getAll)
 
 // POST /register-request/getById
 registerRequestRoutes.post('/getById', RegisterRequestController.getById)
@@ -45,5 +45,20 @@ registerRequestRoutes.post('/updateStatus', RegisterRequestController.updateStat
 
 // POST /register-request/sendAgreementEmail
 registerRequestRoutes.post('/sendAgreementEmail', RegisterRequestController.sendAgreementEmail)
+
+// GET /register-request/getStatusOptions
+registerRequestRoutes.get('/getStatusOptions', RegisterRequestController.getStatusOptions)
+
+// POST /register-request/getApprovalSteps
+registerRequestRoutes.post('/getApprovalSteps', RegisterRequestController.getApprovalSteps)
+
+// POST /register-request/getApprovalLogs
+registerRequestRoutes.post('/getApprovalLogs', RegisterRequestController.getApprovalLogs)
+
+// POST /register-request/createApprovalStep
+registerRequestRoutes.post('/createApprovalStep', RegisterRequestController.createApprovalStep)
+
+// POST /register-request/updateApprovalStep
+registerRequestRoutes.post('/updateApprovalStep', RegisterRequestController.updateApprovalStep)
 
 export default registerRequestRoutes

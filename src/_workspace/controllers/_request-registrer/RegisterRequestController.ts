@@ -1,4 +1,4 @@
-import { RegisterRequestModel } from '@src/_workspace/models/_find-vendor/RegisterRequestModel'
+import { RegisterRequestModel } from '@src/_workspace/models/_request-registrer/RegisterRequestModel'
 import { ResponseI } from '@src/types/ResponseI'
 import { Request, Response } from 'express'
 import path from 'path'
@@ -45,9 +45,12 @@ export const RegisterRequestController = {
             // Insert each uploaded file into the request_register_document table
             if (files.length > 0) {
                 for (const file of files) {
+                    // Multer reads originalname as latin1 bytes — decode back to utf8
+                    // so Thai/Japanese/etc. filenames are stored correctly in the DB.
+                    const file_name = Buffer.from(file.originalname, 'latin1').toString('utf8')
                     await RegisterRequestModel.createDocument({
                         request_id: insertedId,
-                        file_name: file.originalname || path.basename(file.path),
+                        file_name: file_name || path.basename(file.path),
                         file_path: file.filename || path.basename(file.path),
                         file_size: file.size || 0,
                         file_type: file.mimetype || '',
@@ -148,6 +151,7 @@ export const RegisterRequestController = {
                 sqlWhere = ` AND ${sqlWhere}`
             }
 
+            dataItem.sqlWhere = sqlWhere
             dataItem['sqlWhereColumnFilter'] = ''
 
             const { data, totalCount } = await RegisterRequestModel.getAllRequests(dataItem, sqlWhere)
@@ -232,11 +236,14 @@ export const RegisterRequestController = {
                 } as ResponseI)
             }
 
+            const now = new Date()
+            const mysqlDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
+
             await RegisterRequestModel.updateStatus({
                 request_id,
                 request_status: dataItem.request_status || '',
                 approve_by: dataItem.approve_by || '',
-                approve_date: dataItem.request_status === 'Approved' ? new Date() : null,
+                approve_date: ['MD Approval', 'Rejected'].includes(dataItem.request_status) ? mysqlDate : null,
                 approver_remark: dataItem.approver_remark || '',
                 UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
             })
@@ -295,6 +302,192 @@ export const RegisterRequestController = {
                 TotalCountOnDb: 0,
                 MethodOnDb: 'Send Agreement Email Failed',
                 Message: error?.message || 'Failed to send agreement email'
+            } as ResponseI)
+        }
+    },
+
+    // Get all active status options from m_request_status
+    getStatusOptions: async (_req: Request, res: Response) => {
+        try {
+            const result = await RegisterRequestModel.getStatusOptions()
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: result,
+                TotalCountOnDb: result.length,
+                MethodOnDb: 'Get Status Options',
+                Message: 'Get Data Success'
+            } as ResponseI)
+        } catch (error: any) {
+            return res.status(500).json({
+                Status: false,
+                ResultOnDb: [],
+                TotalCountOnDb: 0,
+                MethodOnDb: 'Get Status Options Failed',
+                Message: error?.message || 'Failed to get status options'
+            } as ResponseI)
+        }
+    },
+
+    // Get approval steps for a request
+    getApprovalSteps: async (req: Request, res: Response) => {
+        let dataItem
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
+        try {
+            const request_id = parseInt(dataItem.request_id as string)
+            if (!request_id || isNaN(request_id)) {
+                return res.status(400).json({
+                    Status: false, ResultOnDb: [], TotalCountOnDb: 0,
+                    MethodOnDb: 'Get Approval Steps', Message: 'Invalid request_id'
+                } as ResponseI)
+            }
+
+            const result = await RegisterRequestModel.getApprovalSteps({ request_id })
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: result,
+                TotalCountOnDb: result.length,
+                MethodOnDb: 'Get Approval Steps',
+                Message: 'Get Data Success'
+            } as ResponseI)
+        } catch (error: any) {
+            return res.status(500).json({
+                Status: false, ResultOnDb: [], TotalCountOnDb: 0,
+                MethodOnDb: 'Get Approval Steps Failed',
+                Message: error?.message || 'Failed to get approval steps'
+            } as ResponseI)
+        }
+    },
+
+    // Get approval logs for a request
+    getApprovalLogs: async (req: Request, res: Response) => {
+        let dataItem
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
+        try {
+            const request_id = parseInt(dataItem.request_id as string)
+            if (!request_id || isNaN(request_id)) {
+                return res.status(400).json({
+                    Status: false, ResultOnDb: [], TotalCountOnDb: 0,
+                    MethodOnDb: 'Get Approval Logs', Message: 'Invalid request_id'
+                } as ResponseI)
+            }
+
+            const result = await RegisterRequestModel.getApprovalLogs({ request_id })
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: result,
+                TotalCountOnDb: result.length,
+                MethodOnDb: 'Get Approval Logs',
+                Message: 'Get Data Success'
+            } as ResponseI)
+        } catch (error: any) {
+            return res.status(500).json({
+                Status: false, ResultOnDb: [], TotalCountOnDb: 0,
+                MethodOnDb: 'Get Approval Logs Failed',
+                Message: error?.message || 'Failed to get approval logs'
+            } as ResponseI)
+        }
+    },
+
+    // Create an approval step
+    createApprovalStep: async (req: Request, res: Response) => {
+        let dataItem
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
+        try {
+            const request_id = parseInt(dataItem.request_id as string)
+            if (!request_id || isNaN(request_id)) {
+                return res.status(400).json({
+                    Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                    MethodOnDb: 'Create Approval Step', Message: 'Invalid request_id'
+                } as ResponseI)
+            }
+
+            const insertedId = await RegisterRequestModel.createApprovalStep({
+                request_id,
+                step_order: dataItem.step_order || 1,
+                approver_id: dataItem.approver_id || '',
+                step_status: dataItem.step_status || 'pending',
+                DESCRIPTION: dataItem.DESCRIPTION || '',
+                CREATE_BY: dataItem.CREATE_BY || '',
+            })
+
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: { step_id: insertedId },
+                TotalCountOnDb: 1,
+                MethodOnDb: 'Create Approval Step',
+                Message: 'Create Data Success'
+            } as ResponseI)
+        } catch (error: any) {
+            return res.status(500).json({
+                Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                MethodOnDb: 'Create Approval Step Failed',
+                Message: error?.message || 'Failed to create approval step'
+            } as ResponseI)
+        }
+    },
+
+    // Update an approval step and log the action
+    updateApprovalStep: async (req: Request, res: Response) => {
+        let dataItem
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
+        try {
+            const step_id = parseInt(dataItem.step_id as string)
+            if (!step_id || isNaN(step_id)) {
+                return res.status(400).json({
+                    Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                    MethodOnDb: 'Update Approval Step', Message: 'Invalid step_id'
+                } as ResponseI)
+            }
+
+            await RegisterRequestModel.updateApprovalStep({
+                step_id,
+                step_status: dataItem.step_status || '',
+                UPDATE_BY: dataItem.UPDATE_BY || '',
+            })
+
+            // Create approval log
+            if (dataItem.request_id) {
+                await RegisterRequestModel.createApprovalLog({
+                    request_id: parseInt(dataItem.request_id as string),
+                    step_id,
+                    action_by: dataItem.action_by || dataItem.UPDATE_BY || '',
+                    action_type: dataItem.action_type || dataItem.step_status || '',
+                    remark: dataItem.remark || '',
+                })
+            }
+
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: {},
+                TotalCountOnDb: 1,
+                MethodOnDb: 'Update Approval Step',
+                Message: 'Update Data Success'
+            } as ResponseI)
+        } catch (error: any) {
+            return res.status(500).json({
+                Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                MethodOnDb: 'Update Approval Step Failed',
+                Message: error?.message || 'Failed to update approval step'
             } as ResponseI)
         }
     }
