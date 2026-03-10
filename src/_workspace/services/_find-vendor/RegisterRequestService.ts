@@ -111,8 +111,25 @@ export const RegisterRequestService = {
         return insertedId
     },
 
+    // Insert a new document for a registration request
+    createDocument: async (dataItem: any) => {
+        const sql = await RegisterRequestSQL.createDocument(dataItem)
+        const result = (await MySQLExecute.execute(sql)) as ResultSetHeader
+        return result.insertId
+    },
+
     // Get all registration requests
-    getAllRequests: async (dataItem?: any) => {
+    getAllRequests: async (dataItem?: any, sqlWhere: string = '') => {
+        // Check for Global Search
+        const globalSearchFilter = dataItem?.SearchFilters?.find((item: any) => item.id === 'global_search')
+        if (globalSearchFilter?.value) {
+            // Reusing FindVendorSQL's global search logic or building a custom one here if needed
+            // For now, passing down to SQL if we implement it, or we can handle request_register specific fields
+
+            // Note: If you have a specific generateGlobalSearchSql in RegisterRequestSQL, call it instead.
+            // Assuming we just pass down sqlWhere for column filters for now
+        }
+
         // Returns string[] — use searchList to run each query separately
         const sqlArray = await RegisterRequestSQL.getAllRequests(dataItem)
         const result = (await MySQLExecute.searchList(sqlArray)) as any[][]
@@ -150,6 +167,7 @@ export const RegisterRequestService = {
             purchase_frequency,
             assign_to,
             PIC_Email,
+            vendor_contact_id,
             isReregister,
         } = dataItem
 
@@ -170,11 +188,28 @@ export const RegisterRequestService = {
 
         // Parse first contact name from JSON field
         let contactName = '-'
+        let targetEmail = emailmain
+
         try {
             const contactsParsed = typeof contacts === 'string' ? JSON.parse(contacts) : (contacts || [])
-            const first = contactsParsed.find((c: any) => c)
-            if (first?.contact_name) contactName = first.contact_name
+
+            // If we have a specific vendor_contact_id chosen, try to find that specific contact
+            if (vendor_contact_id) {
+                const specificContact = contactsParsed.find((c: any) => c && c.vendor_contact_id === Number(vendor_contact_id))
+                if (specificContact) {
+                    if (specificContact.contact_name) contactName = specificContact.contact_name
+                    if (specificContact.email) targetEmail = specificContact.email
+                }
+            } else {
+                // Fallback to first contact if none chosen
+                const first = contactsParsed.find((c: any) => c)
+                if (first?.contact_name) contactName = first.contact_name
+            }
         } catch { /* ignore */ }
+
+        if (!targetEmail) {
+            throw new Error('Vendor target email is missing — cannot send agreement email')
+        }
 
         const emailHtml = vendorAgreementTemplate({
             requestNumber,
@@ -188,12 +223,12 @@ export const RegisterRequestService = {
             isReregister: !!isReregister,
         })
 
-        // Send to vendor (emailmain), CC PIC
-        await sendEmail(emailHtml, emailmain)
-        if (PIC_Email && PIC_Email !== emailmain) {
+        // Send to targeted vendor email (fallback to emailmain), CC PIC
+        await sendEmail(emailHtml, targetEmail)
+        if (PIC_Email && PIC_Email !== targetEmail) {
             sendEmail(emailHtml, PIC_Email).catch(() => { })
         }
 
-        return { sent_to: emailmain, cc: PIC_Email || null, requestNumber }
+        return { sent_to: targetEmail, cc: PIC_Email || null, requestNumber }
     }
 }

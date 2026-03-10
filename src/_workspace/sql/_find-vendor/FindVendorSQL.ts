@@ -5,7 +5,7 @@ export const FindVendorSQL = {
 
         // Count query - นับทุก rows (รวม products ของแต่ละ vendor)
         let sqlCount = `
-            SELECT COUNT(*) AS TOTAL_COUNT
+            SELECT COUNT(DISTINCT v.vendor_id) AS TOTAL_COUNT
             FROM
                 vendors v
             LEFT JOIN
@@ -62,17 +62,45 @@ export const FindVendorSQL = {
                 vmr.prones_name AS prones_name_en,
                 vmr.match_method,
                 
-                -- Contact Audit
-                vc.CREATE_BY AS contact_create_by,
-                vc.UPDATE_BY AS contact_update_by,
-                vc.CREATE_DATE AS contact_create_date,
-                vc.UPDATE_DATE AS contact_update_date,
-                
-                -- Product Audit
-                vp.CREATE_BY AS product_create_by,
-                vp.CREATE_DATE AS product_create_date,
-                vp.UPDATE_BY AS product_update_by,
-                vp.UPDATE_DATE AS product_update_date
+                -- Contacts JSON (aggregated)
+                (
+                    SELECT JSON_ARRAYAGG(
+                        JSON_OBJECT(
+                            'vendor_contact_id', sub_vc.vendor_contact_id,
+                            'contact_name', sub_vc.contact_name,
+                            'tel_phone', sub_vc.tel_phone,
+                            'email', sub_vc.email,
+                            'position', sub_vc.position,
+                            'CREATE_BY', sub_vc.CREATE_BY,
+                            'UPDATE_BY', sub_vc.UPDATE_BY,
+                            'CREATE_DATE', DATE_FORMAT(sub_vc.CREATE_DATE, '%Y-%m-%d %H:%i:%s'),
+                            'UPDATE_DATE', DATE_FORMAT(sub_vc.UPDATE_DATE, '%Y-%m-%d %H:%i:%s')
+                        )
+                    )
+                    FROM vendor_contacts sub_vc
+                    WHERE sub_vc.vendor_id = v.vendor_id AND sub_vc.INUSE = 1
+                ) AS contacts_json,
+
+                -- Products JSON (aggregated)
+                (
+                    SELECT JSON_ARRAYAGG(
+                        JSON_OBJECT(
+                            'vendor_product_id', sub_vp.vendor_product_id,
+                            'product_group_id', sub_vp.product_group_id,
+                            'group_name', sub_mpg.group_name,
+                            'maker_name', sub_vp.maker_name,
+                            'product_name', sub_vp.product_name,
+                            'model_list', sub_vp.model_list,
+                            'CREATE_BY', sub_vp.CREATE_BY,
+                            'UPDATE_BY', sub_vp.UPDATE_BY,
+                            'CREATE_DATE', DATE_FORMAT(sub_vp.CREATE_DATE, '%Y-%m-%d %H:%i:%s'),
+                            'UPDATE_DATE', DATE_FORMAT(sub_vp.UPDATE_DATE, '%Y-%m-%d %H:%i:%s')
+                        )
+                    )
+                    FROM vendor_products sub_vp
+                    LEFT JOIN master_product_groups sub_mpg ON sub_vp.product_group_id = sub_mpg.product_group_id
+                    WHERE sub_vp.vendor_id = v.vendor_id AND sub_vp.INUSE = 1
+                ) AS products_json
             FROM
                 vendors v
             LEFT JOIN
@@ -89,19 +117,20 @@ export const FindVendorSQL = {
                 1 = 1
                 dataItem.sqlWhere
                 dataItem.sqlWhereColumnFilter
+            GROUP BY v.vendor_id
             ORDER BY dataItem.Order
             LIMIT dataItem.Limit OFFSET dataItem.Offset
         `
 
         // Replace placeholders
-        sqlCount = sqlCount.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
+        sqlCount = sqlCount.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'])
         sqlCount = sqlCount.replaceAll('dataItem.sqlWhere', sqlWhere)
 
-        sqlData = sqlData.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
+        sqlData = sqlData.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'])
         sqlData = sqlData.replaceAll('dataItem.sqlWhere', sqlWhere)
-        sqlData = sqlData.replaceAll('dataItem.Order', dataItem['Order'] || 'v.company_name ASC')
-        sqlData = sqlData.replaceAll('dataItem.Limit', String(dataItem['Limit'] || 20))
-        sqlData = sqlData.replaceAll('dataItem.Offset', String(dataItem['Offset'] || 0))
+        sqlData = sqlData.replaceAll('dataItem.Order', dataItem['Order'])
+        sqlData = sqlData.replaceAll('dataItem.Limit', dataItem['Limit'])
+        sqlData = sqlData.replaceAll('dataItem.Offset', dataItem['Offset'])
 
         sqlList.push(sqlCount)
         sqlList.push(sqlData)
@@ -184,7 +213,6 @@ export const FindVendorSQL = {
 
     // Update vendor
     updateVendor: (dataItem: any) => {
-        const escape = FindVendorSQL.escapeSql
         let sql = `
             UPDATE vendors SET
                 company_name = 'dataItem.company_name',
@@ -201,25 +229,24 @@ export const FindVendorSQL = {
                 UPDATE_DATE = NOW()
             WHERE vendor_id = dataItem.vendor_id
         `
-        sql = sql.replaceAll('dataItem.company_name', escape(dataItem.company_name))
-        sql = sql.replaceAll('dataItem.vendor_type_id', String(dataItem.vendor_type_id))
-        sql = sql.replaceAll('dataItem.vendor_region', escape(dataItem.vendor_region || 'Local'))
-        sql = sql.replaceAll('dataItem.province', escape(dataItem.province))
-        sql = sql.replaceAll('dataItem.postal_code', escape(dataItem.postal_code))
-        sql = sql.replaceAll('dataItem.website', escape(dataItem.website))
-        sql = sql.replaceAll('dataItem.address', escape(dataItem.address))
-        sql = sql.replaceAll('dataItem.tel_center', escape(dataItem.tel_center))
-        sql = sql.replaceAll('dataItem.emailmain', escape(dataItem.emailmain || ''))
-        sql = sql.replaceAll('dataItem.INUSE', String(dataItem.INUSE !== undefined ? Number(dataItem.INUSE) : 1))
-        sql = sql.replaceAll('dataItem.UPDATE_BY', escape(dataItem.UPDATE_BY))
-        sql = sql.replaceAll('dataItem.vendor_id', String(dataItem.vendor_id))
+        sql = sql.replaceAll('dataItem.company_name', dataItem['company_name'])
+        sql = sql.replaceAll('dataItem.vendor_type_id', dataItem['vendor_type_id'])
+        sql = sql.replaceAll('dataItem.vendor_region', dataItem['vendor_region'])
+        sql = sql.replaceAll('dataItem.province', dataItem['province'])
+        sql = sql.replaceAll('dataItem.postal_code', dataItem['postal_code'])
+        sql = sql.replaceAll('dataItem.website', dataItem['website'])
+        sql = sql.replaceAll('dataItem.address', dataItem['address'])
+        sql = sql.replaceAll('dataItem.tel_center', dataItem['tel_center'])
+        sql = sql.replaceAll('dataItem.emailmain', dataItem['emailmain'])
+        sql = sql.replaceAll('dataItem.INUSE', dataItem['INUSE'])
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'])
+        sql = sql.replaceAll('dataItem.vendor_id', dataItem['vendor_id'])
 
         return sql
     },
 
     // Update vendor contact
     updateVendorContact: (dataItem: any) => {
-        const escape = FindVendorSQL.escapeSql
         let sql = `
             UPDATE vendor_contacts SET
                 contact_name = 'dataItem.contact_name',
@@ -230,19 +257,18 @@ export const FindVendorSQL = {
                 UPDATE_DATE = NOW()
             WHERE vendor_contact_id = dataItem.vendor_contact_id
         `
-        sql = sql.replaceAll('dataItem.contact_name', escape(dataItem.contact_name))
-        sql = sql.replaceAll('dataItem.tel_phone', escape(dataItem.tel_phone))
-        sql = sql.replaceAll('dataItem.email', escape(dataItem.email))
-        sql = sql.replaceAll('dataItem.position', escape(dataItem.position))
-        sql = sql.replaceAll('dataItem.UPDATE_BY', escape(dataItem.UPDATE_BY))
-        sql = sql.replaceAll('dataItem.vendor_contact_id', String(dataItem.vendor_contact_id))
+        sql = sql.replaceAll('dataItem.contact_name', dataItem['contact_name'])
+        sql = sql.replaceAll('dataItem.tel_phone', dataItem['tel_phone'])
+        sql = sql.replaceAll('dataItem.email', dataItem['email'])
+        sql = sql.replaceAll('dataItem.position', dataItem['position'])
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'])
+        sql = sql.replaceAll('dataItem.vendor_contact_id', dataItem['vendor_contact_id'])
 
         return sql
     },
 
     // Create vendor contact
     createVendorContact: (dataItem: any) => {
-        const escape = FindVendorSQL.escapeSql
         let sql = `
             INSERT INTO vendor_contacts (
                 vendor_id,
@@ -268,19 +294,18 @@ export const FindVendorSQL = {
                 1
             )
         `
-        sql = sql.replaceAll('dataItem.vendor_id', String(dataItem.vendor_id))
-        sql = sql.replaceAll('dataItem.contact_name', escape(dataItem.contact_name))
-        sql = sql.replaceAll('dataItem.tel_phone', escape(dataItem.tel_phone))
-        sql = sql.replaceAll('dataItem.email', escape(dataItem.email))
-        sql = sql.replaceAll('dataItem.position', escape(dataItem.position))
-        sql = sql.replaceAll('dataItem.UPDATE_BY', escape(dataItem.UPDATE_BY))
+        sql = sql.replaceAll('dataItem.vendor_id', dataItem['vendor_id'])
+        sql = sql.replaceAll('dataItem.contact_name', dataItem['contact_name'])
+        sql = sql.replaceAll('dataItem.tel_phone', dataItem['tel_phone'])
+        sql = sql.replaceAll('dataItem.email', dataItem['email'])
+        sql = sql.replaceAll('dataItem.position', dataItem['position'])
+        sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'])
 
         return sql
     },
 
     // Update vendor product
     updateVendorProduct: (dataItem: any) => {
-        const escape = FindVendorSQL.escapeSql
         let sql = `
             UPDATE vendor_products SET
                 product_group_id = dataItem.product_group_id,
@@ -291,19 +316,18 @@ export const FindVendorSQL = {
                 UPDATE_DATE = NOW()
             WHERE vendor_product_id = dataItem.vendor_product_id
         `
-        sql = sql.replaceAll('dataItem.product_group_id', String(Number(dataItem.product_group_id) || 1))
-        sql = sql.replaceAll('dataItem.maker_name', escape(dataItem.maker_name))
-        sql = sql.replaceAll('dataItem.product_name', escape(dataItem.product_name))
-        sql = sql.replaceAll('dataItem.model_list', escape(dataItem.model_list))
-        sql = sql.replaceAll('dataItem.UPDATE_BY', escape(dataItem.UPDATE_BY))
-        sql = sql.replaceAll('dataItem.vendor_product_id', String(dataItem.vendor_product_id))
+        sql = sql.replaceAll('dataItem.product_group_id', dataItem['product_group_id'])
+        sql = sql.replaceAll('dataItem.maker_name', dataItem['maker_name'])
+        sql = sql.replaceAll('dataItem.product_name', dataItem['product_name'])
+        sql = sql.replaceAll('dataItem.model_list', dataItem['model_list'])
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'])
+        sql = sql.replaceAll('dataItem.vendor_product_id', dataItem['vendor_product_id'])
 
         return sql
     },
 
     // Create vendor product
     createVendorProduct: (dataItem: any) => {
-        const escape = FindVendorSQL.escapeSql
         let sql = `
             INSERT INTO vendor_products (
                 vendor_id,
@@ -329,21 +353,18 @@ export const FindVendorSQL = {
                 1
             )
         `
-        sql = sql.replaceAll('dataItem.vendor_id', String(dataItem.vendor_id))
-        sql = sql.replaceAll('dataItem.product_group_id', String(Number(dataItem.product_group_id) || 1))
-        sql = sql.replaceAll('dataItem.maker_name', escape(dataItem.maker_name))
-        sql = sql.replaceAll('dataItem.product_name', escape(dataItem.product_name))
-        sql = sql.replaceAll('dataItem.model_list', escape(dataItem.model_list))
-        sql = sql.replaceAll('dataItem.UPDATE_BY', escape(dataItem.UPDATE_BY))
-
-        sql = sql.replaceAll('dataItem.UPDATE_BY', escape(dataItem.UPDATE_BY))
+        sql = sql.replaceAll('dataItem.vendor_id', dataItem['vendor_id'])
+        sql = sql.replaceAll('dataItem.product_group_id', dataItem['product_group_id'])
+        sql = sql.replaceAll('dataItem.maker_name', dataItem['maker_name'])
+        sql = sql.replaceAll('dataItem.product_name', dataItem['product_name'])
+        sql = sql.replaceAll('dataItem.model_list', dataItem['model_list'])
+        sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'])
 
         return sql
     },
 
     // Delete vendor contact (Soft Delete)
     deleteVendorContact: (dataItem: any) => {
-        const escape = FindVendorSQL.escapeSql
         let sql = `
             UPDATE vendor_contacts SET
                 INUSE = 0,
@@ -351,14 +372,13 @@ export const FindVendorSQL = {
                 UPDATE_DATE = NOW()
             WHERE vendor_contact_id = dataItem.vendor_contact_id
         `
-        sql = sql.replaceAll('dataItem.UPDATE_BY', escape(dataItem.UPDATE_BY))
-        sql = sql.replaceAll('dataItem.vendor_contact_id', String(dataItem.vendor_contact_id))
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'])
+        sql = sql.replaceAll('dataItem.vendor_contact_id', dataItem['vendor_contact_id'])
         return sql
     },
 
     // Delete vendor product (Soft Delete)
     deleteVendorProduct: (dataItem: any) => {
-        const escape = FindVendorSQL.escapeSql
         let sql = `
             UPDATE vendor_products SET
                 INUSE = 0,
@@ -366,8 +386,8 @@ export const FindVendorSQL = {
                 UPDATE_DATE = NOW()
             WHERE vendor_product_id = dataItem.vendor_product_id
         `
-        sql = sql.replaceAll('dataItem.UPDATE_BY', escape(dataItem.UPDATE_BY))
-        sql = sql.replaceAll('dataItem.vendor_product_id', String(dataItem.vendor_product_id))
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'])
+        sql = sql.replaceAll('dataItem.vendor_product_id', dataItem['vendor_product_id'])
         return sql
     },
 
@@ -490,9 +510,9 @@ export const FindVendorSQL = {
             ORDER BY dataItem.Order
         `
 
-        sqlData = sqlData.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
+        sqlData = sqlData.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'])
         sqlData = sqlData.replaceAll('dataItem.sqlWhere', sqlWhere)
-        sqlData = sqlData.replaceAll('dataItem.Order', dataItem['Order'] || 'v.company_name ASC')
+        sqlData = sqlData.replaceAll('dataItem.Order', dataItem['Order'])
 
         return sqlData
     },

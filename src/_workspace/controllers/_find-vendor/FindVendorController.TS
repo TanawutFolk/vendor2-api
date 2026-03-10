@@ -78,7 +78,11 @@ export const FindVendorController = {
         // Extract sqlWhere from dataItem (it now contains both SearchFilters and ColumnFilters)
         let sqlWhere = ''
         if (dataItem.sqlWhere) {
-            sqlWhere = dataItem.sqlWhere.replace(/^WHERE\s+/i, '')
+            sqlWhere = dataItem.sqlWhere.trim()
+            // getSqlWhere_aggrid might have prefixed with WHERE. 
+            // The FindVendorSQL base query already has `WHERE 1 = 1`.
+            // So we must strip WHERE and replace it with AND.
+            sqlWhere = sqlWhere.replace(/^WHERE\s+/i, '')
             if (sqlWhere) {
                 sqlWhere = ` AND ${sqlWhere}`
             }
@@ -97,8 +101,41 @@ export const FindVendorController = {
             console.timeEnd('[PERF] MySQL Query');
             console.log(`[PERF] MySQL returned ${resultData.length} rows`);
 
-            // No in-memory filtering/sorting needed anymore! Everything is done natively in SQL.
-            let finalResult = resultData;
+            // Parse JSON_ARRAYAGG strings into arrays
+            let finalResult = resultData.map((row: any) => {
+                let contacts = []
+                let products = []
+
+                try {
+                    if (row.contacts_json) {
+                        contacts = typeof row.contacts_json === 'string' ? JSON.parse(row.contacts_json) : row.contacts_json
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse contacts_json for vendor_id ' + row.vendor_id)
+                }
+
+                try {
+                    if (row.products_json) {
+                        products = typeof row.products_json === 'string' ? JSON.parse(row.products_json) : row.products_json
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse products_json for vendor_id ' + row.vendor_id)
+                }
+
+                // MySQL JSON_ARRAYAGG on empty joins defaults to [null], filter that out
+                if (contacts.length === 1 && contacts[0] === null) contacts = []
+                if (products.length === 1 && products[0] === null) products = []
+
+                // Delete the raw JSON strings to save payload size
+                delete row.contacts_json
+                delete row.products_json
+
+                return {
+                    ...row,
+                    contacts,
+                    products
+                }
+            });
 
             console.timeEnd('[PERF] Total Search');
             console.log(`[PERF] Returning ${finalResult.length} rows to client`);
