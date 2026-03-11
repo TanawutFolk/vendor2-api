@@ -76,7 +76,7 @@ export const RegisterRequestSQL = {
 
     // ─── GET ALL (returns string[] for searchList) ─────────────────────────────────────────────
     getAllRequests: async (dataItem?: any): Promise<string[]> => {
-        console.log(dataItem,'dataItem in getAllRequests')
+        console.log(dataItem, 'dataItem in getAllRequests')
         let countSql = `
             SELECT COUNT(DISTINCT rr.request_id) AS TOTAL_COUNT
             FROM request_register_vendor rr
@@ -371,6 +371,7 @@ export const RegisterRequestSQL = {
             status_label  AS label,
             chip_color    AS chipColor,
             accent_color  AS accent,
+            icon          AS icon,
             sort_order    AS sortOrder
         FROM m_request_status
         WHERE is_active = 1

@@ -77,6 +77,7 @@ import ClearTimeTotalForSctRoutes from './routes/_ClearTimeSystem/ClearTimeTotal
 import addVendorRoutes from './routes/_add-vendor/AddVendorRoutes'
 import findVendorRoutes from './routes/_find-vendor/FindVendorRoute'
 import registerRequestRoutes from './routes/_request-registrer/RegisterRequestRoute'
+import assigneesRoutes from './routes/_task-manager/AssigneesRoutes'
 
 const Routers = Router()
 
@@ -173,5 +174,8 @@ Routers.use('/find-vendor', findVendorRoutes)
 
 // ? Register Request Routes
 Routers.use('/register-request', registerRequestRoutes)
+
+// ? Assignees Configuration Routes
+Routers.use('/assignees', assigneesRoutes)
 
 export default Routers

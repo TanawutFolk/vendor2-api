@@ -116,11 +116,15 @@ export const RegisterRequestService = {
 
         for (const [idx, ws] of workflowStatuses.entries()) {
             const stepOrder = idx + 1
+            let initialStatus = 'pending'
+            if (stepOrder === 1) initialStatus = 'completed' // "Sent To PO" starts completed
+            else if (stepOrder === 2) initialStatus = 'in_progress' // Next step starts in-progress
+
             const stepSql = await RegisterRequestSQL.createApprovalStep({
                 request_id: insertedId,
                 step_order: stepOrder,
-                approver_id: stepOrder === 1 ? nextAssignee.empCode : '',
-                step_status: stepOrder === 1 ? 'in_progress' : 'pending',
+                approver_id: stepOrder <= 2 ? nextAssignee.empCode : '',
+                step_status: initialStatus,
                 DESCRIPTION: ws.label,
                 CREATE_BY: dataItem.CREATE_BY || 'SYSTEM',
             })
@@ -254,6 +258,27 @@ export const RegisterRequestService = {
                 // Activate next pending step
                 const nextStep = steps.find((s: any) => s.step_order === currentStep.step_order + 1 && s.step_status === 'pending')
                 if (nextStep) {
+
+                    // --- Dynamic Approver Assignment ---
+                    let dynamicApprover = ''
+                    const descLower = (nextStep.DESCRIPTION || '').toLowerCase()
+
+                    if (descLower.includes('manager')) {
+                        const mgrSql = `SELECT empcode FROM assignees_to WHERE group_name = 'PO_Manager' AND INUSE = 1 LIMIT 1`
+                        const mgrRes = (await MySQLExecute.search(mgrSql)) as RowDataPacket[]
+                        if (mgrRes.length > 0) dynamicApprover = mgrRes[0].empcode
+                    } else if (descLower.includes('md') || descLower.includes('director')) {
+                        const mdSql = `SELECT empcode FROM assignees_to WHERE group_name = 'MD' AND INUSE = 1 LIMIT 1`
+                        const mdRes = (await MySQLExecute.search(mdSql)) as RowDataPacket[]
+                        if (mdRes.length > 0) dynamicApprover = mdRes[0].empcode
+                    }
+
+                    // Update approver_id if we found one
+                    if (dynamicApprover) {
+                        const assignSql = `UPDATE request_approval_step SET approver_id = '${dynamicApprover}' WHERE step_id = ${nextStep.step_id}`
+                        await MySQLExecute.execute(assignSql)
+                    }
+
                     const activateSql = await RegisterRequestSQL.updateApprovalStep({
                         step_id: nextStep.step_id,
                         step_status: 'in_progress',
