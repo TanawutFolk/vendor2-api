@@ -239,11 +239,13 @@ export const RegisterRequestController = {
             const now = new Date()
             const mysqlDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
 
+            // approve_date: set when Rejected, or when it's the final step (no next pending step exists)
+            const isFinalStepOrRejected = dataItem.request_status === 'Rejected' || dataItem.isFinalStep === true
             await RegisterRequestModel.updateStatus({
                 request_id,
                 request_status: dataItem.request_status || '',
                 approve_by: dataItem.approve_by || '',
-                approve_date: ['MD Approval', 'Rejected'].includes(dataItem.request_status) ? mysqlDate : null,
+                approve_date: isFinalStepOrRejected ? mysqlDate : null,
                 approver_remark: dataItem.approver_remark || '',
                 UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
             })
@@ -488,6 +490,136 @@ export const RegisterRequestController = {
                 Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
                 MethodOnDb: 'Update Approval Step Failed',
                 Message: error?.message || 'Failed to update approval step'
+            } as ResponseI)
+        }
+    },
+
+    // Update CC emails list for a request
+    updateCcEmails: async (req: Request, res: Response) => {
+        const dataItem = req.body || {}
+        try {
+            const request_id = parseInt(dataItem.request_id as string)
+            if (!request_id || isNaN(request_id)) {
+                return res.status(400).json({
+                    Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                    MethodOnDb: 'Update CC Emails', Message: 'Invalid request_id'
+                } as ResponseI)
+            }
+            await RegisterRequestModel.updateCcEmails({
+                request_id,
+                cc_emails: dataItem.cc_emails || [],
+                UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
+            })
+            return res.status(200).json({
+                Status: true, ResultOnDb: {}, TotalCountOnDb: 1,
+                MethodOnDb: 'Update CC Emails', Message: 'CC emails updated successfully'
+            } as ResponseI)
+        } catch (error: any) {
+            return res.status(500).json({
+                Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                MethodOnDb: 'Update CC Emails Failed', Message: error?.message || 'Failed to update CC emails'
+            } as ResponseI)
+        }
+    },
+
+    // Save GPR form (Supplier / Outsourcing Selection Sheet)
+    saveGprForm: async (req: Request, res: Response) => {
+        const dataItem = req.body || {}
+        try {
+            const request_id = parseInt(dataItem.request_id as string)
+            if (!request_id || isNaN(request_id)) {
+                return res.status(400).json({
+                    Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                    MethodOnDb: 'Save GPR Form', Message: 'Invalid request_id'
+                } as ResponseI)
+            }
+            await RegisterRequestModel.saveGprForm({
+                request_id,
+                gpr_data: dataItem.gpr_data || {},
+                UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
+            })
+            return res.status(200).json({
+                Status: true, ResultOnDb: {}, TotalCountOnDb: 1,
+                MethodOnDb: 'Save GPR Form', Message: 'GPR form saved successfully'
+            } as ResponseI)
+        } catch (error: any) {
+            return res.status(500).json({
+                Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                MethodOnDb: 'Save GPR Form Failed', Message: error?.message || 'Failed to save GPR form'
+            } as ResponseI)
+        }
+    },
+
+    // Attach a single document file to an existing request (e.g. GPR criteria PDF, generated Form A PDF)
+    addDocument: async (req: Request, res: Response) => {
+        const file = req.file
+        const { request_id, CREATE_BY } = req.body
+        try {
+            const reqId = parseInt(request_id as string)
+            if (!reqId || isNaN(reqId)) {
+                return res.status(400).json({
+                    Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                    MethodOnDb: 'Add Document', Message: 'Invalid request_id'
+                } as ResponseI)
+            }
+            if (!file) {
+                return res.status(400).json({
+                    Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                    MethodOnDb: 'Add Document', Message: 'No file uploaded'
+                } as ResponseI)
+            }
+            const file_name = Buffer.from(file.originalname, 'latin1').toString('utf8')
+            const document_id = await RegisterRequestModel.createDocument({
+                request_id: reqId,
+                file_name:  file_name || path.basename(file.path),
+                file_path:  file.filename || path.basename(file.path),
+                file_size:  file.size || 0,
+                file_type:  file.mimetype || '',
+                CREATE_BY:  CREATE_BY || 'SYSTEM',
+            })
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: {
+                    document_id,
+                    file_path:  file.filename || path.basename(file.path),
+                    file_name:  file_name || path.basename(file.path),
+                },
+                TotalCountOnDb: 1,
+                MethodOnDb: 'Add Document',
+                Message: 'Document added successfully'
+            } as ResponseI)
+        } catch (error: any) {
+            return res.status(500).json({
+                Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                MethodOnDb: 'Add Document Failed', Message: error?.message || 'Failed to add document'
+            } as ResponseI)
+        }
+    },
+
+    // Account PIC: complete vendor registration (fill vendor code + trigger final email)
+    completeRegistration: async (req: Request, res: Response) => {
+        const dataItem = req.body || {}
+        try {
+            const request_id = parseInt(dataItem.request_id as string)
+            if (!request_id || isNaN(request_id)) {
+                return res.status(400).json({
+                    Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                    MethodOnDb: 'Complete Registration', Message: 'Invalid request_id'
+                } as ResponseI)
+            }
+            await RegisterRequestModel.completeRegistration({
+                request_id,
+                vendor_code: dataItem.vendor_code || '',
+                UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
+            })
+            return res.status(200).json({
+                Status: true, ResultOnDb: {}, TotalCountOnDb: 1,
+                MethodOnDb: 'Complete Registration', Message: 'Vendor registration completed successfully'
+            } as ResponseI)
+        } catch (error: any) {
+            return res.status(500).json({
+                Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                MethodOnDb: 'Complete Registration Failed', Message: error?.message || 'Failed to complete registration'
             } as ResponseI)
         }
     }

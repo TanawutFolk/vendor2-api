@@ -1,6 +1,52 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared internal vendor info table rows (EN + TH) — used in multiple templates
+// ─────────────────────────────────────────────────────────────────────────────
+type VendorInfoData = { vendorName: string; address: string; contactPic: string; email: string; tel: string; supportProduct: string; purchaseFrequency: string }
+
+const vendorInfoRowsEN = (d: VendorInfoData) => `
+    <table style="width:100%; border-collapse:collapse; font-size:14px; line-height:1.7; margin:0 0 20px 0;">
+        <tr><td style="padding:4px 0; color:#64748b; width:210px; vertical-align:top;">Vendor Name :</td><td style="padding:4px 0; vertical-align:top;">${d.vendorName}</td></tr>
+        <tr><td style="padding:4px 0; color:#64748b; vertical-align:top;">Address :</td><td style="padding:4px 0; vertical-align:top;">${d.address}</td></tr>
+        <tr><td style="padding:4px 0; color:#64748b; vertical-align:top;">Contact PIC :</td><td style="padding:4px 0; vertical-align:top;">${d.contactPic}</td></tr>
+        <tr><td style="padding:4px 0; color:#64748b; vertical-align:top;">Email :</td><td style="padding:4px 0; vertical-align:top;">${d.email}</td></tr>
+        <tr><td style="padding:4px 0; color:#64748b; vertical-align:top;">Tel :</td><td style="padding:4px 0; vertical-align:top;">${d.tel}</td></tr>
+        <tr><td style="padding:4px 0; color:#64748b; vertical-align:top;">For support product / process :</td><td style="padding:4px 0; vertical-align:top;">${d.supportProduct}</td></tr>
+        <tr><td style="padding:4px 0; color:#64748b; vertical-align:top;">Purchase Frequency :</td><td style="padding:4px 0; vertical-align:top;">${d.purchaseFrequency}</td></tr>
+    </table>`
+
+const vendorInfoRowsTH = (d: VendorInfoData) => `
+    <table style="width:100%; border-collapse:collapse; font-size:14px; line-height:1.7; margin:0 0 20px 0;">
+        <tr><td style="padding:4px 0; color:#64748b; width:210px; vertical-align:top;">ชื่อเวนเดอร์ :</td><td style="padding:4px 0; vertical-align:top;">${d.vendorName}</td></tr>
+        <tr><td style="padding:4px 0; color:#64748b; vertical-align:top;">ที่อยู่ :</td><td style="padding:4px 0; vertical-align:top;">${d.address}</td></tr>
+        <tr><td style="padding:4px 0; color:#64748b; vertical-align:top;">ชื่อผู้ติดต่อ :</td><td style="padding:4px 0; vertical-align:top;">${d.contactPic}</td></tr>
+        <tr><td style="padding:4px 0; color:#64748b; vertical-align:top;">อีเมล :</td><td style="padding:4px 0; vertical-align:top;">${d.email}</td></tr>
+        <tr><td style="padding:4px 0; color:#64748b; vertical-align:top;">เบอร์ติดต่อ :</td><td style="padding:4px 0; vertical-align:top;">${d.tel}</td></tr>
+        <tr><td style="padding:4px 0; color:#64748b; vertical-align:top;">สำหรับสนับสนุนผลิตภัณฑ์/กระบวนการ :</td><td style="padding:4px 0; vertical-align:top;">${d.supportProduct}</td></tr>
+        <tr><td style="padding:4px 0; color:#64748b; vertical-align:top;">ความถี่ในการสั่งซื้อ :</td><td style="padding:4px 0; vertical-align:top;">${d.purchaseFrequency}</td></tr>
+    </table>`
+
+const emailWrapper = (content: string) =>
+    `<div style="background-color:#f4f7f6; padding:40px 20px; font-family:'Segoe UI','Helvetica Neue',Arial,sans-serif;">
+    <div style="max-width:640px; margin:0 auto; background-color:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.06);">
+        ${content}
+    </div>
+</div>`
+
+const emailSignature = (picName: string, picTel?: string) =>
+    `<hr style="border:none; border-top:1px solid #e2e8f0; margin:28px 0 20px 0;">
+    <p style="margin:0 0 2px 0; color:#475569; font-size:14px;">Thank you &amp; Best regards,</p>
+    <p style="margin:0; font-weight:700; color:#0f172a; font-size:14px;">${picName}${picTel ? ` (#Tel. ${picTel})` : ''}</p>`
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Internal Step Notification Template
+// Used for all internal approval/check steps: Checker, PM Mgr, GM, MD, Account
+// stepAction 'check'  → [Request Check]  subject & "Under checking" status
+// stepAction 'approve'→ [Request Appraval] subject & "Under approval" status
+// ─────────────────────────────────────────────────────────────────────────────
 export const registerVendorTemplate = (data: {
     requestNumber: string;
-    picName: string;
+    recipientName: string;   // Dear: [name] — pass empty string for MD (no Dear line)
+    stepAction: 'check' | 'approve';
     vendorName: string;
     address: string;
     contactPic: string;
@@ -9,109 +55,37 @@ export const registerVendorTemplate = (data: {
     supportProduct: string;
     purchaseFrequency: string;
     systemLink: string;
-    requesterName: string;
-    requesterTel: string;
+    picName: string;         // Signature: PO PIC Name
+    picTel?: string;         // Signature: #Tel. XXX
 }) => {
-    return `
-<div style="background-color: #f4f7f6; padding: 40px 20px; font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;">
-    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-        
-        <div style="background-color: #1e293b; padding: 30px 40px; text-align: center;">
-            <p style="color: #94a3b8; margin: 0 0 8px 0; font-size: 13px; text-transform: uppercase; letter-spacing: 1px;">Action Required</p>
-            <h1 style="color: #ffffff; margin: 0; font-size: 20px; font-weight: 600;">Vendor Registration</h1>
-            <p style="color: #cbd5e1; margin: 8px 0 0 0; font-size: 14px;">Req No: ${data.requestNumber}</p>
+    const isCheck = data.stepAction === 'check'
+    const statusEN  = isCheck ? 'Under checking register vendor'  : 'Under approval register vendor'
+    const actionEN  = isCheck ? 'Please request register vendor follow as' : 'Please approve register vendor follow as'
+    const statusTH  = isCheck ? 'อยู่ระหว่างการตรวจสอบการลงทะเบียนผู้ขาย' : 'อยู่ระหว่างการอนุมัติการลงทะเบียนผู้ขาย'
+    const actionTH  = isCheck ? 'โปรดตรวจสอบการลงทะเบียนผู้ขายตามหมายเลข' : 'โปรดอนุมัติการลงทะเบียนผู้ขายตามหมายเลข'
+    const headerBg  = isCheck ? '#1e3a5f' : '#1e293b'
+    const headerLbl = isCheck ? 'Request Check' : 'Request Approval'
+
+    return emailWrapper(`
+        <div style="background-color:${headerBg}; padding:24px 36px;">
+            <p style="color:#93c5fd; margin:0 0 4px 0; font-size:12px; text-transform:uppercase; letter-spacing:1px;">Furukawa FITEL (Thailand) Co., Ltd.</p>
+            <h2 style="color:#ffffff; margin:0; font-size:18px; font-weight:600;">${headerLbl} — Vendor Registration</h2>
+            <p style="color:#bfdbfe; margin:6px 0 0 0; font-size:13px;">${data.requestNumber}</p>
         </div>
-
-        <div style="padding: 40px;">
-            <p style="font-size: 12px; color: #94a3b8; margin-top: 0; text-align: right;">
-                CC: [Email of SubPIC]
-            </p>
-
-            <p style="font-size: 16px; color: #334155; margin-top: 0;">
-                Dear <strong style="color: #0f172a;">${data.picName}</strong>,
-            </p>
-            
-            <p style="color: #475569; font-size: 15px; line-height: 1.6;">
-                Please proceed with the vendor registration process in the system within <strong style="color: #e11d48;">2 weeks</strong>.<br>
-                <span style="font-size: 13px; color: #94a3b8;">โปรดดำเนินการลงทะเบียนผู้ขายในระบบภายใน 2 สัปดาห์</span>
-            </p>
-
-            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 25px; margin: 30px 0;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px; line-height: 1.5;">
-                    <tr>
-                        <td style="padding: 10px 0; color: #64748b; width: 45%; border-bottom: 1px solid #f1f5f9; vertical-align: top;">
-                            Vendor Name<br><span style="font-size: 12px; color: #94a3b8;">ชื่อเวนเดอร์</span>
-                        </td>
-                        <td style="padding: 10px 0; color: #0f172a; font-weight: 600; border-bottom: 1px solid #f1f5f9; vertical-align: top;">
-                            ${data.vendorName}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 10px 0; color: #64748b; border-bottom: 1px solid #f1f5f9; vertical-align: top;">
-                            Address<br><span style="font-size: 12px; color: #94a3b8;">ที่อยู่</span>
-                        </td>
-                        <td style="padding: 10px 0; color: #0f172a; font-weight: 500; border-bottom: 1px solid #f1f5f9; vertical-align: top;">
-                            ${data.address}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 10px 0; color: #64748b; border-bottom: 1px solid #f1f5f9; vertical-align: top;">
-                            Contact Person<br><span style="font-size: 12px; color: #94a3b8;">ชื่อผู้ติดต่อ</span>
-                        </td>
-                        <td style="padding: 10px 0; color: #0f172a; font-weight: 500; border-bottom: 1px solid #f1f5f9; vertical-align: top;">
-                            ${data.contactPic}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 10px 0; color: #64748b; border-bottom: 1px solid #f1f5f9; vertical-align: top;">
-                            Contact Info<br><span style="font-size: 12px; color: #94a3b8;">ข้อมูลติดต่อ</span>
-                        </td>
-                        <td style="padding: 10px 0; color: #0f172a; font-weight: 500; border-bottom: 1px solid #f1f5f9; vertical-align: top;">
-                            ✉️ ${data.email}<br>📞 ${data.tel}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 10px 0; color: #64748b; border-bottom: 1px solid #f1f5f9; vertical-align: top;">
-                            Support Product<br><span style="font-size: 12px; color: #94a3b8;">สนับสนุนผลิตภัณฑ์</span>
-                        </td>
-                        <td style="padding: 10px 0; color: #0f172a; font-weight: 500; border-bottom: 1px solid #f1f5f9; vertical-align: top;">
-                            ${data.supportProduct}
-                        </td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 10px 0; color: #64748b; vertical-align: top;">
-                            Purchase Freq.<br><span style="font-size: 12px; color: #94a3b8;">ความถี่การสั่งซื้อ</span>
-                        </td>
-                        <td style="padding: 10px 0; color: #0f172a; font-weight: 500; vertical-align: top;">
-                            ${data.purchaseFrequency}
-                        </td>
-                    </tr>
-                </table>
-            </div>
-
-            <div style="text-align: center; margin: 40px 0;">
-                <a href="${data.systemLink}" target="_blank" style="display: inline-block; background-color: #0284c7; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 6px; font-weight: 600; font-size: 15px; box-shadow: 0 2px 4px rgba(2, 132, 199, 0.3);">
-                    Access System / เข้าสู่ระบบ
-                </a>
-                <p style="margin-top: 15px; font-size: 12px; color: #94a3b8;">
-                    If the button doesn't work, click the link below:<br>
-                    <a href="${data.systemLink}" style="color: #0284c7; text-decoration: underline; word-break: break-all;">${data.systemLink}</a>
-                </p>
-            </div>
-
-            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
-
-            <div style="font-size: 14px; line-height: 1.6;">
-                <p style="color: #475569; margin: 0 0 5px 0;">Thank you &amp; Best regards,</p>
-                <p style="color: #0f172a; font-weight: 600; margin: 0; font-size: 16px;">${data.requesterName}</p>
-                <p style="color: #64748b; margin: 3px 0 0 0; font-size: 13px;">Requester &nbsp;|&nbsp; 📞 Tel: ${data.requesterTel}</p>
-            </div>
-            
-        </div>
-    </div>
-</div>
-`;
+        <div style="padding:32px 36px; color:#334155; font-size:14px; line-height:1.7;">
+            ${data.recipientName ? `<p style="margin:0 0 16px 0;">Dear <strong>${data.recipientName}</strong>,</p>` : ''}
+            <p style="margin:0 0 4px 0;">Status : ${statusEN}</p>
+            <p style="margin:0 0 16px 0;">${actionEN} <strong>&quot;${data.requestNumber}&quot;</strong></p>
+            ${vendorInfoRowsEN(data)}
+            <p style="margin:0 0 28px 0;">You can access the system through this link &nbsp;<a href="${data.systemLink}" style="color:#0284c7;">${data.systemLink}</a></p>
+            <p style="margin:0 0 4px 0;">สถานะ : ${statusTH}</p>
+            <p style="margin:0 0 16px 0;">${actionTH} <strong>&quot;${data.requestNumber}&quot;</strong></p>
+            ${vendorInfoRowsTH(data)}
+            ${emailSignature(data.picName, data.picTel)}
+        </div>`)
 };
+
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Vendor Agreement Request Template
@@ -259,5 +233,82 @@ export const vendorAgreementTemplate = (data: {
 </div>
 </div>
 `
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Account Notification Template
+// Sent to Account PIC when MD approves (same format as other approval steps)
+// ─────────────────────────────────────────────────────────────────────────────
+export const accountNotificationTemplate = (data: {
+    requestNumber: string;
+    accountName: string;      // Dear: [accountName]
+    vendorName: string;
+    address: string;
+    contactPic: string;
+    email: string;
+    tel: string;
+    supportProduct: string;
+    purchaseFrequency: string;
+    systemLink: string;
+    picName: string;          // Signature: PO PIC Name
+    picTel?: string;
+}) => {
+    return emailWrapper(`
+        <div style="background-color:#1e293b; padding:24px 36px;">
+            <p style="color:#93c5fd; margin:0 0 4px 0; font-size:12px; text-transform:uppercase; letter-spacing:1px;">Furukawa FITEL (Thailand) Co., Ltd.</p>
+            <h2 style="color:#ffffff; margin:0; font-size:18px; font-weight:600;">Request Approval — Vendor Registration</h2>
+            <p style="color:#bfdbfe; margin:6px 0 0 0; font-size:13px;">${data.requestNumber}</p>
+        </div>
+        <div style="padding:32px 36px; color:#334155; font-size:14px; line-height:1.7;">
+            <p style="margin:0 0 16px 0;">Dear <strong>${data.accountName}</strong>,</p>
+            <p style="margin:0 0 4px 0;">Status : Under approval register vendor</p>
+            <p style="margin:0 0 16px 0;">Please approve register vendor follow as <strong>&quot;${data.requestNumber}&quot;</strong></p>
+            ${vendorInfoRowsEN({ vendorName: data.vendorName, address: data.address, contactPic: data.contactPic, email: data.email, tel: data.tel, supportProduct: data.supportProduct, purchaseFrequency: data.purchaseFrequency })}
+            <p style="margin:0 0 28px 0;">You can access the system through this link &nbsp;<a href="${data.systemLink}" style="color:#0284c7;">${data.systemLink}</a></p>
+            <p style="margin:0 0 4px 0;">สถานะ : อยู่ระหว่างการอนุมัติการลงทะเบียนผู้ขาย</p>
+            <p style="margin:0 0 16px 0;">โปรดอนุมัติการลงทะเบียนผู้ขายตามหมายเลข <strong>&quot;${data.requestNumber}&quot;</strong></p>
+            ${vendorInfoRowsTH({ vendorName: data.vendorName, address: data.address, contactPic: data.contactPic, email: data.email, tel: data.tel, supportProduct: data.supportProduct, purchaseFrequency: data.purchaseFrequency })}
+            ${emailSignature(data.picName, data.picTel)}
+        </div>`)
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Registration Completion Email Template
+// Sent to Requester + CC all concerned after Account completes vendor registration
+// ─────────────────────────────────────────────────────────────────────────────
+export const completionEmailTemplate = (data: {
+    requestNumber: string;
+    requesterName: string;   // Dear: [user]
+    vendorName: string;
+    address: string;
+    contactPic: string;
+    email: string;
+    tel: string;
+    supportProduct: string;
+    purchaseFrequency: string;
+    vendorCode: string;
+    ccList?: string[];
+    systemLink: string;
+    picName: string;         // Signature: PO PIC Name
+    picTel?: string;
+}) => {
+    return emailWrapper(`
+        <div style="background-color:#155e2e; padding:24px 36px;">
+            <p style="color:#86efac; margin:0 0 4px 0; font-size:12px; text-transform:uppercase; letter-spacing:1px;">Furukawa FITEL (Thailand) Co., Ltd.</p>
+            <h2 style="color:#ffffff; margin:0; font-size:18px; font-weight:600;">Complete — Vendor Registration</h2>
+            <p style="color:#bbf7d0; margin:6px 0 0 0; font-size:13px;">${data.requestNumber}</p>
+        </div>
+        <div style="padding:32px 36px; color:#334155; font-size:14px; line-height:1.7;">
+            <p style="margin:0 0 16px 0;">Dear <strong>${data.requesterName}</strong>,</p>
+            <p style="margin:0 0 4px 0;">Status : Complete register vendor.</p>
+            <p style="margin:0 0 16px 0;">Complete register vendor follow as <strong>&quot;${data.requestNumber}&quot;</strong></p>
+            ${vendorInfoRowsEN({ vendorName: data.vendorName, address: data.address, contactPic: data.contactPic, email: data.email, tel: data.tel, supportProduct: data.supportProduct, purchaseFrequency: data.purchaseFrequency })}
+            <p style="margin:0 0 4px 0; font-weight:700; color:#155e2e;">Vendor code : <span style="font-size:16px;">${data.vendorCode || '-'}</span></p>
+            <p style="margin:0 0 28px 0;">You can access the system through this link &nbsp;<a href="${data.systemLink}" style="color:#0284c7;">${data.systemLink}</a></p>
+            <p style="margin:0 0 4px 0;">สถานะ : การลงทะเบียนผู้ขายสำเร็จ</p>
+            <p style="margin:0 0 16px 0;">การลงทะเบียนผู้ขายตามหมายเลข <strong>&quot;${data.requestNumber}&quot;</strong> สำเร็จ</p>
+            ${vendorInfoRowsTH({ vendorName: data.vendorName, address: data.address, contactPic: data.contactPic, email: data.email, tel: data.tel, supportProduct: data.supportProduct, purchaseFrequency: data.purchaseFrequency })}
+            ${emailSignature(data.picName, data.picTel)}
+        </div>`)
 }
 

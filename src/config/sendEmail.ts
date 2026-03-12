@@ -60,7 +60,7 @@ const FormData = require('form-data')
 //   });
 // };
 
-const sendEmail = async (message: string, send_to: string) => {
+const sendEmail = async (message: string, send_to: string, subject?: string, cc?: string[]) => {
   // URL ของ API (เอามาจากบรรทัด API_URL ในรูป Python ของคุณ)
   const API_URL = 'http://192.168.0.250:9002/api/mail/send'
 
@@ -72,8 +72,8 @@ const sendEmail = async (message: string, send_to: string) => {
   const cleanMessage = fixedMessage.replace(/[\r\n]+/g, '').trim()
   const form = new FormData()
   form.append('To', send_to)
-  form.append('CC', '') // ใส่ค่าว่าง หรืออีเมลถ้ามี
-  form.append('Subject', '[Vendor Registration System] New Registration Request Assigned')
+  form.append('CC', cc && cc.length > 0 ? cc.join(';') : '')
+  form.append('Subject', subject || '[Vendor Registration System] Vendor Registration')
   form.append('BodyHtml', cleanMessage)
 
   try {

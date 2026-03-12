@@ -61,4 +61,16 @@ registerRequestRoutes.post('/createApprovalStep', RegisterRequestController.crea
 // POST /register-request/updateApprovalStep
 registerRequestRoutes.post('/updateApprovalStep', RegisterRequestController.updateApprovalStep)
 
+// POST /register-request/updateCcEmails
+registerRequestRoutes.post('/updateCcEmails', RegisterRequestController.updateCcEmails)
+
+// POST /register-request/completeRegistration
+registerRequestRoutes.post('/completeRegistration', RegisterRequestController.completeRegistration)
+
+// POST /register-request/saveGprForm
+registerRequestRoutes.post('/saveGprForm', RegisterRequestController.saveGprForm)
+
+// POST /register-request/addDocument  — single file upload for a request (GPR criteria docs, PDF export, etc.)
+registerRequestRoutes.post('/addDocument', upload.single('file'), RegisterRequestController.addDocument)
+
 export default registerRequestRoutes

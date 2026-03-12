@@ -102,6 +102,9 @@ export const RegisterRequestSQL = {
                 rr.approve_by,
                 rr.approve_date,
                 rr.approver_remark,
+                rr.vendor_code,
+                rr.cc_emails,
+                rr.gpr_data,
                 rr.Request_By_EmployeeCode AS EMPLOYEE_CODE,
                 CONCAT(m.empName, ' ', m.empSurname) AS FULL_NAME,
                 m.empDept AS EMPLOYEE_DEPT,
@@ -231,6 +234,9 @@ export const RegisterRequestSQL = {
                 rr.approver_remark,
                 rr.approve_by,
                 rr.approve_date,
+                rr.vendor_code,
+                rr.cc_emails,
+                rr.gpr_data,
                 rr.assign_to,
                 rr.PIC_Email,
                 rr.vendor_contact_id,
@@ -502,5 +508,56 @@ export const RegisterRequestSQL = {
         sql = sql.replaceAll('dataItem.request_id', dataItem['request_id'])
 
         return sql
-    }
+    },
+
+    // ─── UPDATE CC EMAILS ────────────────────────────────────────────────────
+    updateCcEmails: async (dataItem: any) => {
+        const ccArr = Array.isArray(dataItem.cc_emails) ? dataItem.cc_emails : []
+        const ccJson = JSON.stringify(ccArr).replace(/'/g, "''")
+        const updateBy = (dataItem.UPDATE_BY || 'SYSTEM').replace(/'/g, "''")
+        return `
+            UPDATE request_register_vendor SET
+                cc_emails = '${ccJson}',
+                UPDATE_BY  = '${updateBy}',
+                UPDATE_DATE = NOW()
+            WHERE request_id = ${Number(dataItem.request_id)}
+        `
+    },
+
+    // ─── COMPLETE REGISTRATION (Account fills vendor code) ──────────────────
+    completeRegistration: async (dataItem: any) => {
+        const vendorCode = (dataItem.vendor_code || '').replace(/'/g, "''")
+        const updateBy   = (dataItem.UPDATE_BY || 'SYSTEM').replace(/'/g, "''")
+        return `
+            UPDATE request_register_vendor SET
+                vendor_code    = '${vendorCode}',
+                request_status = 'Completed',
+                approve_by     = '${updateBy}',
+                approve_date   = NOW(),
+                UPDATE_BY      = '${updateBy}',
+                UPDATE_DATE    = NOW()
+            WHERE request_id = ${Number(dataItem.request_id)}
+        `
+    },
+
+    // ─── SAVE GPR FORM A (Supplier / Outsourcing Selection Sheet — vendor agreed) ──
+    saveGprForm: async (dataItem: any) => {
+        const gprJson  = JSON.stringify(dataItem.gpr_data || {}).replace(/'/g, "''")
+        const updateBy = (dataItem.UPDATE_BY || 'SYSTEM').replace(/'/g, "''")
+        return `
+            UPDATE request_register_vendor SET
+                gpr_data    = '${gprJson}',
+                UPDATE_BY   = '${updateBy}',
+                UPDATE_DATE = NOW()
+            WHERE request_id = ${Number(dataItem.request_id)}
+        `
+    },
+
+    // ─── GET GPR DATA for a request ─────────────────────────────────────────
+    getGprForm: (request_id: number) => `
+        SELECT gpr_data FROM request_register_vendor
+        WHERE request_id = ${Number(request_id)} AND INUSE = 1
+        LIMIT 1
+    `
 }
+

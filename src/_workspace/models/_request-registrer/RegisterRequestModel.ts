@@ -13,4 +13,8 @@ export const RegisterRequestModel = {
     updateApprovalStep: async (dataItem: any) => RegisterRequestService.updateApprovalStep(dataItem),
     createApprovalLog: async (dataItem: any) => RegisterRequestService.createApprovalLog(dataItem),
     getApprovalLogs: async (dataItem: any) => RegisterRequestService.getApprovalLogs(dataItem),
+    updateCcEmails: async (dataItem: any) => RegisterRequestService.updateCcEmails(dataItem),
+    completeRegistration: async (dataItem: any) => RegisterRequestService.completeRegistration(dataItem),
+    saveGprForm: async (dataItem: any) => RegisterRequestService.saveGprForm(dataItem),
+    getGprForm: async (request_id: number) => RegisterRequestService.getGprForm(request_id),
 }
