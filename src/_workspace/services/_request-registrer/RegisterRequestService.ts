@@ -191,20 +191,74 @@ export const RegisterRequestService = {
         return result
     },
 
-    // Update status (approve / reject) + auto-update approval step & log
-    updateStatus: async (dataItem: any) => {
-        const sql = await RegisterRequestSQL.updateStatus(dataItem)
+    // Update request data (PIC แก้ไขข้อมูลคำขอ — เฉพาะตอนยังอยู่ step ของ PIC เท่านั้น)
+    updateRequest: async (dataItem: any) => {
+        const requestId = Number(dataItem.request_id)
+        if (!requestId) throw new Error('Invalid request_id')
+
+        // 1. ตรวจสอบ request status — ต้องอยู่ใน step แรกของ PIC เท่านั้น
+        const checkSql = `SELECT request_status, assign_to FROM request_register_vendor WHERE request_id = ${requestId} AND INUSE = 1 LIMIT 1`
+        const checkRes = (await MySQLExecute.search(checkSql)) as RowDataPacket[]
+        const request = checkRes[0]
+
+        if (!request) throw new Error('Request not found')
+
+        // 2. ตรวจสอบว่า step ปัจจุบันคือ PIC step (step_order 2 = "PO & SCM(PIC) Approved" ที่ in_progress)
+        const stepsSql = await RegisterRequestSQL.getApprovalSteps({ request_id: requestId })
+        const steps = (await MySQLExecute.search(stepsSql)) as RowDataPacket[]
+        const currentStep = steps.find((s: any) => s.step_status === 'in_progress')
+
+        if (!currentStep || currentStep.step_order !== 2) {
+            throw new Error('Request can only be edited when it is in the PIC checking step')
+        }
+
+        // 3. Authorization: ตรวจว่า user เป็น PIC (assign_to) ที่ถูก assign จริง
+        const editBy = dataItem.UPDATE_BY || ''
+        if (editBy && request.assign_to && request.assign_to !== editBy) {
+            throw new Error(`Unauthorized: You (${editBy}) are not the assigned PIC (${request.assign_to}) for this request`)
+        }
+
+        // 4. Update ข้อมูล
+        const sql = await RegisterRequestSQL.updateRequest(dataItem)
         await MySQLExecute.execute(sql)
 
+        // 5. Log action
+        const logSql = await RegisterRequestSQL.createApprovalLog({
+            request_id: requestId,
+            step_id: currentStep.step_id,
+            action_by: editBy || 'SYSTEM',
+            action_type: 'edited',
+            remark: 'PIC edited request details',
+        })
+        await MySQLExecute.execute(logSql)
+
+        return true
+    },
+
+    // Update status (approve / reject) + auto-update approval step & log
+    updateStatus: async (dataItem: any) => {
         const newStatus = dataItem.request_status || ''
 
         // ── Find all approval steps for this request (sorted by step_order) ──
         const stepsSql = await RegisterRequestSQL.getApprovalSteps({ request_id: dataItem.request_id })
         const steps = (await MySQLExecute.search(stepsSql)) as RowDataPacket[]
-        if (steps.length === 0) return true
 
         // ── Find the current in_progress step ──
         const currentStep = steps.find((s: any) => s.step_status === 'in_progress')
+
+        // ── Authorization: ตรวจสอบว่า user ที่ approve/reject เป็น approver ที่ถูก assign จริง ──
+        if (currentStep && currentStep.approver_id) {
+            const actionBy = dataItem.approve_by || dataItem.UPDATE_BY || ''
+            if (actionBy && currentStep.approver_id !== actionBy) {
+                throw new Error(`Unauthorized: You (${actionBy}) are not the assigned approver (${currentStep.approver_id}) for this step`)
+            }
+        }
+
+        // ── Update request_register_vendor status (only after auth check passes) ──
+        const sql = await RegisterRequestSQL.updateStatus(dataItem)
+        await MySQLExecute.execute(sql)
+
+        if (steps.length === 0) return true
 
         if (newStatus === 'Rejected') {
             // Reject: mark current step as rejected, skip all remaining pending steps
@@ -619,7 +673,7 @@ export const RegisterRequestService = {
 
     // Get GPR form data for a request
     getGprForm: async (request_id: number) => {
-        const sql = RegisterRequestSQL.getGprForm(request_id)
+        const sql = RegisterRequestSQL.getGprForm({ request_id: String(request_id) })
         const rows = (await MySQLExecute.search(sql)) as RowDataPacket[]
         if (!rows[0]) return null
         const raw = rows[0].gpr_data

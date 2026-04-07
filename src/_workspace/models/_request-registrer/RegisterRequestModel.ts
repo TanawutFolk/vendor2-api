@@ -6,6 +6,7 @@ export const RegisterRequestModel = {
     getAllRequests: async (dataItem?: any, sqlWhere: string = '') => RegisterRequestService.getAllRequests(dataItem, sqlWhere),
     getById: async (dataItem: any) => RegisterRequestService.getById(dataItem),
     updateStatus: async (dataItem: any) => RegisterRequestService.updateStatus(dataItem),
+    updateRequest: async (dataItem: any) => RegisterRequestService.updateRequest(dataItem),
     sendAgreementEmail: async (dataItem: any) => RegisterRequestService.sendAgreementEmail(dataItem),
     getStatusOptions: async () => RegisterRequestService.getStatusOptions(),
     createApprovalStep: async (dataItem: any) => RegisterRequestService.createApprovalStep(dataItem),

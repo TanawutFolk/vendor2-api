@@ -40,6 +40,9 @@ registerRequestRoutes.post('/searchRequest', RegisterRequestController.getAll)
 // POST /register-request/getById
 registerRequestRoutes.post('/getById', RegisterRequestController.getById)
 
+// POST /register-request/updateRequest  — PIC แก้ไขข้อมูลคำขอ
+registerRequestRoutes.post('/updateRequest', RegisterRequestController.updateRequest)
+
 // POST /register-request/updateStatus
 registerRequestRoutes.post('/updateStatus', RegisterRequestController.updateStatus)
 

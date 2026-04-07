@@ -10,6 +10,7 @@ export const RegisterRequestSQL = {
                 supportProduct_Process,
                 purchase_frequency,
                 request_status,
+                cc_emails,
                 requester_remark,
                 assign_to,
                 PIC_Email,
@@ -22,6 +23,7 @@ export const RegisterRequestSQL = {
                 'dataItem.supportProduct_Process',
                 'dataItem.purchase_frequency',
                 'Sent To PO & SCM(PIC)',
+                'dataItem.cc_emails',
                 'dataItem.requester_remark',
                 'dataItem.assign_to',
                 'dataItem.PIC_Email',
@@ -35,6 +37,7 @@ export const RegisterRequestSQL = {
         sql = sql.replaceAll('dataItem.Request_By_EmployeeCode', dataItem['Request_By_EmployeeCode'])
         sql = sql.replaceAll('dataItem.supportProduct_Process', dataItem['supportProduct_Process'])
         sql = sql.replaceAll('dataItem.purchase_frequency', dataItem['purchase_frequency'])
+        sql = sql.replaceAll('dataItem.cc_emails', dataItem['cc_emails'])
         sql = sql.replaceAll('dataItem.requester_remark', dataItem['requester_remark'])
         sql = sql.replaceAll('dataItem.assign_to', dataItem['assign_to'])
         sql = sql.replaceAll('dataItem.PIC_Email', dataItem['PIC_Email'])
@@ -346,18 +349,37 @@ export const RegisterRequestSQL = {
         return sql
     },
 
+    // ─── UPDATE REQUEST (PIC แก้ไขข้อมูลคำขอ) ─────────────────────────────────
+    updateRequest: async (dataItem: any) => {
+        let sql = `
+            UPDATE request_register_vendor SET
+                vendor_contact_id        = dataItem.vendor_contact_id,
+                supportProduct_Process   = 'dataItem.supportProduct_Process',
+                purchase_frequency       = 'dataItem.purchase_frequency',
+                requester_remark         = 'dataItem.requester_remark',
+                UPDATE_BY                = 'dataItem.UPDATE_BY',
+                UPDATE_DATE              = NOW()
+            WHERE request_id = dataItem.request_id
+        `
+
+        sql = sql.replaceAll('dataItem.request_id', dataItem['request_id'])
+        sql = sql.replaceAll('dataItem.vendor_contact_id', dataItem['vendor_contact_id'] || 'NULL')
+        sql = sql.replaceAll('dataItem.supportProduct_Process', dataItem['supportProduct_Process'] || '')
+        sql = sql.replaceAll('dataItem.purchase_frequency', dataItem['purchase_frequency'] || '')
+        sql = sql.replaceAll('dataItem.requester_remark', dataItem['requester_remark'] || '')
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+
+        return sql
+    },
+
     // ─── UPDATE STATUS ────────────────────────────────────────────────────────
     updateStatus: async (dataItem: any) => {
-        const approveBy = dataItem['approve_by'] ? `'${dataItem['approve_by']}'` : 'NULL'
-        const approveDate = dataItem['approve_date'] ? `'${dataItem['approve_date']}'` : 'NULL'
-        const approverRemark = dataItem['approver_remark'] ? `'${dataItem['approver_remark']}'` : 'NULL'
-
         let sql = `
             UPDATE request_register_vendor SET
                 request_status = 'dataItem.request_status',
-                approve_by = ${approveBy},
-                approve_date = ${approveDate},
-                approver_remark = ${approverRemark},
+                approve_by = 'dataItem.approve_by',
+                approve_date = 'dataItem.approve_date',
+                approver_remark = 'dataItem.approver_remark',
                 UPDATE_BY = 'dataItem.UPDATE_BY',
                 UPDATE_DATE = NOW()
             WHERE request_id = dataItem.request_id
@@ -365,6 +387,9 @@ export const RegisterRequestSQL = {
 
         sql = sql.replaceAll('dataItem.request_id', dataItem['request_id'])
         sql = sql.replaceAll('dataItem.request_status', dataItem['request_status'])
+        sql = sql.replaceAll('dataItem.approve_by', dataItem['approve_by'] || '')
+        sql = sql.replaceAll('dataItem.approve_date', dataItem['approve_date'] || '')
+        sql = sql.replaceAll('dataItem.approver_remark', dataItem['approver_remark'] || '')
         sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'])
 
         return sql
@@ -460,8 +485,6 @@ export const RegisterRequestSQL = {
 
     // ─── APPROVAL LOGS ──────────────────────────────────────────────────────
     createApprovalLog: async (dataItem: any) => {
-        const stepId = dataItem['step_id'] ? dataItem['step_id'] : 'NULL'
-
         let sql = `
             INSERT INTO request_approval_log (
                 request_id,
@@ -472,7 +495,7 @@ export const RegisterRequestSQL = {
                 action_date
             ) VALUES (
                 dataItem.request_id,
-                ${stepId},
+                dataItem.step_id,
                 'dataItem.action_by',
                 'dataItem.action_type',
                 'dataItem.remark',
@@ -481,9 +504,10 @@ export const RegisterRequestSQL = {
         `
 
         sql = sql.replaceAll('dataItem.request_id', dataItem['request_id'])
+        sql = sql.replaceAll('dataItem.step_id', dataItem['step_id'] || 'NULL')
         sql = sql.replaceAll('dataItem.action_by', dataItem['action_by'])
         sql = sql.replaceAll('dataItem.action_type', dataItem['action_type'])
-        sql = sql.replaceAll('dataItem.remark', dataItem['remark'])
+        sql = sql.replaceAll('dataItem.remark', dataItem['remark'] || '')
 
         return sql
     },
@@ -512,52 +536,70 @@ export const RegisterRequestSQL = {
 
     // ─── UPDATE CC EMAILS ────────────────────────────────────────────────────
     updateCcEmails: async (dataItem: any) => {
-        const ccArr = Array.isArray(dataItem.cc_emails) ? dataItem.cc_emails : []
-        const ccJson = JSON.stringify(ccArr).replace(/'/g, "''")
-        const updateBy = (dataItem.UPDATE_BY || 'SYSTEM').replace(/'/g, "''")
-        return `
+        let sql = `
             UPDATE request_register_vendor SET
-                cc_emails = '${ccJson}',
-                UPDATE_BY  = '${updateBy}',
+                cc_emails   = 'dataItem.cc_emails',
+                UPDATE_BY   = 'dataItem.UPDATE_BY',
                 UPDATE_DATE = NOW()
-            WHERE request_id = ${Number(dataItem.request_id)}
+            WHERE request_id = dataItem.request_id
         `
+
+        const ccArr = Array.isArray(dataItem['cc_emails']) ? dataItem['cc_emails'] : []
+        sql = sql.replaceAll('dataItem.request_id', dataItem['request_id'])
+        sql = sql.replaceAll('dataItem.cc_emails', JSON.stringify(ccArr))
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+
+        return sql
     },
 
     // ─── COMPLETE REGISTRATION (Account fills vendor code) ──────────────────
     completeRegistration: async (dataItem: any) => {
-        const vendorCode = (dataItem.vendor_code || '').replace(/'/g, "''")
-        const updateBy   = (dataItem.UPDATE_BY || 'SYSTEM').replace(/'/g, "''")
-        return `
+        let sql = `
             UPDATE request_register_vendor SET
-                vendor_code    = '${vendorCode}',
+                vendor_code    = 'dataItem.vendor_code',
                 request_status = 'Completed',
-                approve_by     = '${updateBy}',
+                approve_by     = 'dataItem.UPDATE_BY',
                 approve_date   = NOW(),
-                UPDATE_BY      = '${updateBy}',
+                UPDATE_BY      = 'dataItem.UPDATE_BY',
                 UPDATE_DATE    = NOW()
-            WHERE request_id = ${Number(dataItem.request_id)}
+            WHERE request_id = dataItem.request_id
         `
+
+        sql = sql.replaceAll('dataItem.request_id', dataItem['request_id'])
+        sql = sql.replaceAll('dataItem.vendor_code', dataItem['vendor_code'] || '')
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+
+        return sql
     },
 
     // ─── SAVE GPR FORM A (Supplier / Outsourcing Selection Sheet — vendor agreed) ──
     saveGprForm: async (dataItem: any) => {
-        const gprJson  = JSON.stringify(dataItem.gpr_data || {}).replace(/'/g, "''")
-        const updateBy = (dataItem.UPDATE_BY || 'SYSTEM').replace(/'/g, "''")
-        return `
+        let sql = `
             UPDATE request_register_vendor SET
-                gpr_data    = '${gprJson}',
-                UPDATE_BY   = '${updateBy}',
+                gpr_data    = 'dataItem.gpr_data',
+                UPDATE_BY   = 'dataItem.UPDATE_BY',
                 UPDATE_DATE = NOW()
-            WHERE request_id = ${Number(dataItem.request_id)}
+            WHERE request_id = dataItem.request_id
         `
+
+        sql = sql.replaceAll('dataItem.request_id', dataItem['request_id'])
+        sql = sql.replaceAll('dataItem.gpr_data', JSON.stringify(dataItem['gpr_data'] || {}))
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+
+        return sql
     },
 
     // ─── GET GPR DATA for a request ─────────────────────────────────────────
-    getGprForm: (request_id: number) => `
-        SELECT gpr_data FROM request_register_vendor
-        WHERE request_id = ${Number(request_id)} AND INUSE = 1
-        LIMIT 1
-    `
+    getGprForm: (dataItem: any) => {
+        let sql = `
+            SELECT gpr_data FROM request_register_vendor
+            WHERE request_id = dataItem.request_id AND INUSE = 1
+            LIMIT 1
+        `
+
+        sql = sql.replaceAll('dataItem.request_id', dataItem['request_id'])
+
+        return sql
+    }
 }
 

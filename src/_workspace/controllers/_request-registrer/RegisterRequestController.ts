@@ -37,6 +37,7 @@ export const RegisterRequestController = {
                 Request_By_EmployeeCode: dataItem.Request_By_EmployeeCode || '',
                 supportProduct_Process: dataItem.support_type || '',
                 purchase_frequency: dataItem.purchase_frequency || '',
+                cc_emails: dataItem.cc_emails || '[]',
                 requester_remark: dataItem.requester_remark || '',
                 CREATE_BY: dataItem.CREATE_BY || 'ถ้าเห็นข้อความนี้แจ้งS524',
                 // assign_to is resolved by the service via round-robin logic (do NOT set here)
@@ -128,7 +129,8 @@ export const RegisterRequestController = {
             // Manually add root-level filters (frontend passes these directly instead of via SearchFilters)
             const manualFilters: string[] = []
             if (dataItem.assign_to) {
-                manualFilters.push(`rr.assign_to = '${dataItem.assign_to}'`)
+                // PIC เห็น request ที่ assign ให้ตัวเอง + Approver (Manager/MD/Account) เห็น request ที่ step ถึงคิว
+                manualFilters.push(`(rr.assign_to = '${dataItem.assign_to}' OR EXISTS (SELECT 1 FROM request_approval_step ras WHERE ras.request_id = rr.request_id AND ras.approver_id = '${dataItem.assign_to}' AND ras.step_status = 'in_progress' AND ras.INUSE = 1))`)
             }
             if (dataItem.Request_By_EmployeeCode) {
                 manualFilters.push(`rr.Request_By_EmployeeCode = '${dataItem.Request_By_EmployeeCode}'`)
@@ -210,6 +212,51 @@ export const RegisterRequestController = {
                 TotalCountOnDb: 0,
                 MethodOnDb: 'Get Registration Request Failed',
                 Message: error?.message || 'Failed to get registration request'
+            } as ResponseI)
+        }
+    },
+
+    // Update request details (PIC แก้ไขข้อมูลคำขอ)
+    updateRequest: async (req: Request, res: Response) => {
+        const dataItem = req.body || {}
+        try {
+            const request_id = parseInt(dataItem.request_id as string)
+
+            if (!request_id || isNaN(request_id)) {
+                return res.status(400).json({
+                    Status: false,
+                    ResultOnDb: {},
+                    TotalCountOnDb: 0,
+                    MethodOnDb: 'Update Request',
+                    Message: 'Invalid request_id'
+                } as ResponseI)
+            }
+
+            await RegisterRequestModel.updateRequest({
+                request_id,
+                vendor_contact_id: dataItem.vendor_contact_id || null,
+                supportProduct_Process: dataItem.supportProduct_Process || '',
+                purchase_frequency: dataItem.purchase_frequency || '',
+                requester_remark: dataItem.requester_remark || '',
+                UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
+            })
+
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: {},
+                TotalCountOnDb: 1,
+                MethodOnDb: 'Update Request',
+                Message: 'Request updated successfully'
+            } as ResponseI)
+        } catch (error: any) {
+            // Unauthorized หรือ status check fail → ส่ง 403
+            const statusCode = error?.message?.startsWith('Unauthorized') ? 403 : 500
+            return res.status(statusCode).json({
+                Status: false,
+                ResultOnDb: {},
+                TotalCountOnDb: 0,
+                MethodOnDb: 'Update Request Failed',
+                Message: error?.message || 'Failed to update request'
             } as ResponseI)
         }
     },
