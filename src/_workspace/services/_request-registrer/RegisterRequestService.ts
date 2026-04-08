@@ -666,20 +666,107 @@ export const RegisterRequestService = {
 
     // Save GPR form (Supplier / Outsourcing Selection Sheet)
     saveGprForm: async (dataItem: any) => {
-        const sql = await RegisterRequestSQL.saveGprForm(dataItem)
-        await MySQLExecute.execute(sql)
+        const reqId = dataItem.request_id
+        if (!reqId) return false
+        
+        const formData = typeof dataItem.gpr_data === 'string' ? JSON.parse(dataItem.gpr_data) : (dataItem.gpr_data || {})
+        formData.request_id = reqId
+        formData.UPDATE_BY = dataItem.UPDATE_BY || 'SYSTEM'
+
+        // 1. Upsert Selection Main Table
+        const checkSql = RegisterRequestSQL.checkSelectionExists(formData)
+        const checkRes = (await MySQLExecute.search(checkSql)) as RowDataPacket[]
+        let selection_id = checkRes[0]?.selection_id
+        
+        if (selection_id) {
+            formData.selection_id = selection_id
+            const updateSql = RegisterRequestSQL.updateSelection(formData)
+            await MySQLExecute.execute(updateSql)
+        } else {
+            const insertSql = RegisterRequestSQL.insertSelection(formData)
+            const res = (await MySQLExecute.execute(insertSql)) as any
+            selection_id = res.insertId
+        }
+
+        if (!selection_id) return false
+
+        // 2. Clear existing sub-tables
+        await MySQLExecute.execute(RegisterRequestSQL.deleteFinancials({ selection_id }))
+        await MySQLExecute.execute(RegisterRequestSQL.deleteCriteria({ selection_id }))
+
+        // 3. Insert Financials
+        const salesProfit = formData.sales_profit || []
+        for (const sp of salesProfit) {
+            sp.selection_id = selection_id
+            const sql = RegisterRequestSQL.insertFinancial(sp)
+            await MySQLExecute.execute(sql)
+        }
+
+        // 4. Insert Criteria
+        const criteria = formData.criteria || []
+        for (const cr of criteria) {
+            cr.selection_id = selection_id
+            const sql = RegisterRequestSQL.insertCriteria(cr)
+            await MySQLExecute.execute(sql)
+        }
+
         return true
     },
 
-    // Get GPR form data for a request
+    // Get GPR form data for a request combining the 3 new tables
     getGprForm: async (request_id: number) => {
-        const sql = RegisterRequestSQL.getGprForm({ request_id: String(request_id) })
-        const rows = (await MySQLExecute.search(sql)) as RowDataPacket[]
-        if (!rows[0]) return null
-        const raw = rows[0].gpr_data
-        if (!raw) return null
-        try { return typeof raw === 'string' ? JSON.parse(raw) : raw }
-        catch { return null }
+        const reqItem = { request_id: String(request_id) }
+        
+        // 1. Get Main Selection
+        const selSql = RegisterRequestSQL.getSelection(reqItem)
+        const selRes = (await MySQLExecute.search(selSql)) as RowDataPacket[]
+        if (!selRes[0]) return null
+        
+        const selection = selRes[0]
+        const selection_id = selection.selection_id
+        
+        // 2. Get Financials
+        const finSql = RegisterRequestSQL.getFinancials({ selection_id })
+        const finRes = (await MySQLExecute.search(finSql)) as RowDataPacket[]
+        
+        // 3. Get Criteria
+        const critSql = RegisterRequestSQL.getCriteria({ selection_id })
+        const critRes = (await MySQLExecute.search(critSql)) as RowDataPacket[]
+        
+        // Map back to frontend expected structure
+        // Note: Missing static string data (like company_name) will be merged by frontend's buildDefault
+        const result = {
+            business_category: selection.business_category || '',
+            start_year: selection.start_year || '',
+            authorized_capital: selection.authorized_capital || '',
+            establish: selection.establish_years || '',
+            number_of_employees: selection.number_of_employees || '',
+            manufactured_country: selection.manufactured_country || '',
+            vendor_original_country: selection.vendor_original_country || '',
+            sanctions: selection.sanctions_status || '',
+            currency: selection.currency || 'THB',
+            suggestion: selection.suggestion || '',
+            result: selection.result_status || '',
+            path: selection.document_path || '',
+            vendor_code_selector: selection.vendor_code_selector || '',
+            pm_manager: selection.pm_manager || '',
+            completion_date: selection.completion_date ? new Date(selection.completion_date).toISOString().slice(0, 10) : '',
+            sales_profit: finRes.map((f: any) => ({
+                year: f.year,
+                total_revenue: f.total_revenue !== null ? f.total_revenue.toString() : '',
+                net_profit: f.net_profit !== null ? f.net_profit.toString() : ''
+            })),
+            criteria: critRes.map((c: any) => ({
+                no: c.no,
+                detail: '', 
+                criteria: c.criteria,
+                remark: c.remark || '',
+                uploaded_file: c.uploaded_file || '',
+                uploaded_name: c.uploaded_name || ''
+            }))
+        }
+        
+        return result
     },
 
     // Account PIC: fill vendor code + complete registration → send final email

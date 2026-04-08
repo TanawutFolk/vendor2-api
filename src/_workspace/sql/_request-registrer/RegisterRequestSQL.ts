@@ -107,7 +107,6 @@ export const RegisterRequestSQL = {
                 rr.approver_remark,
                 rr.vendor_code,
                 rr.cc_emails,
-                rr.gpr_data,
                 rr.Request_By_EmployeeCode AS EMPLOYEE_CODE,
                 CONCAT(m.empName, ' ', m.empSurname) AS FULL_NAME,
                 m.empDept AS EMPLOYEE_DEPT,
@@ -239,7 +238,6 @@ export const RegisterRequestSQL = {
                 rr.approve_date,
                 rr.vendor_code,
                 rr.cc_emails,
-                rr.gpr_data,
                 rr.assign_to,
                 rr.PIC_Email,
                 rr.vendor_contact_id,
@@ -572,32 +570,203 @@ export const RegisterRequestSQL = {
         return sql
     },
 
-    // ─── SAVE GPR FORM A (Supplier / Outsourcing Selection Sheet — vendor agreed) ──
-    saveGprForm: async (dataItem: any) => {
+    // ─── GET SELECTION DATA ──────────────────────────────────────────────────
+    getSelection: (dataItem: any) => {
         let sql = `
-            UPDATE request_register_vendor SET
-                gpr_data    = 'dataItem.gpr_data',
-                UPDATE_BY   = 'dataItem.UPDATE_BY',
-                UPDATE_DATE = NOW()
-            WHERE request_id = dataItem.request_id
+            SELECT * FROM request_vendor_selections
+            WHERE request_id = 'dataItem.request_id' AND INUSE = 1
+            LIMIT 1
         `
-
         sql = sql.replaceAll('dataItem.request_id', dataItem['request_id'])
-        sql = sql.replaceAll('dataItem.gpr_data', JSON.stringify(dataItem['gpr_data'] || {}))
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
-
         return sql
     },
 
-    // ─── GET GPR DATA for a request ─────────────────────────────────────────
-    getGprForm: (dataItem: any) => {
+    getFinancials: (dataItem: any) => {
         let sql = `
-            SELECT gpr_data FROM request_register_vendor
-            WHERE request_id = dataItem.request_id AND INUSE = 1
-            LIMIT 1
+            SELECT year, total_revenue, net_profit 
+            FROM vendor_selection_financials
+            WHERE selection_id = dataItem.selection_id
+            ORDER BY year ASC
         `
+        sql = sql.replaceAll('dataItem.selection_id', dataItem['selection_id'])
+        return sql
+    },
 
+    getCriteria: (dataItem: any) => {
+        let sql = `
+            SELECT criteria_no AS no, criteria_value AS criteria, remark, 
+                   uploaded_file_path AS uploaded_file, uploaded_file_name AS uploaded_name
+            FROM vendor_selection_criteria
+            WHERE selection_id = dataItem.selection_id
+            ORDER BY criteria_id ASC
+        `
+        sql = sql.replaceAll('dataItem.selection_id', dataItem['selection_id'])
+        return sql
+    },
+
+    // ─── SAVE GPR FORM A (Vendor Selection) ──────────────────────────────────
+    
+    // 1. Check if selection exists
+    checkSelectionExists: (dataItem: any) => {
+        let sql = `
+            SELECT selection_id FROM request_vendor_selections 
+            WHERE request_id = 'dataItem.request_id' LIMIT 1
+        `
         sql = sql.replaceAll('dataItem.request_id', dataItem['request_id'])
+        return sql
+    },
+
+    // 2A. Insert selection
+    insertSelection: (dataItem: any) => {
+        let sql = `
+            INSERT INTO request_vendor_selections (
+                request_id, business_category, start_year, authorized_capital, 
+                establish_years, number_of_employees, manufactured_country, 
+                vendor_original_country, sanctions_status, currency, suggestion, 
+                result_status, document_path, vendor_code_selector, 
+                completion_date, CREATE_BY, UPDATE_BY
+            ) VALUES (
+                'dataItem.request_id', 'dataItem.business_category', 'dataItem.start_year', 'dataItem.authorized_capital', 
+                'dataItem.establish', 'dataItem.number_of_employees', 'dataItem.manufactured_country', 
+                'dataItem.vendor_original_country', 'dataItem.sanctions', 'dataItem.currency', 'dataItem.suggestion', 
+                'dataItem.result', 'dataItem.path', 'dataItem.vendor_code_selector', 
+                dataItem.completion_date_null, 'dataItem.UPDATE_BY', 'dataItem.UPDATE_BY'
+            )
+        `
+        const d = dataItem
+        // Escape quotes helper
+        const esc = (str: any) => String(str || '').replace(/'/g, "\\'")
+
+        sql = sql.replaceAll('dataItem.request_id', esc(d['request_id']))
+        sql = sql.replaceAll('dataItem.business_category', esc(d['business_category']))
+        sql = sql.replaceAll('dataItem.start_year', esc(d['start_year']))
+        sql = sql.replaceAll('dataItem.authorized_capital', esc(d['authorized_capital']))
+        sql = sql.replaceAll('dataItem.establish', esc(d['establish']))
+        sql = sql.replaceAll('dataItem.number_of_employees', esc(d['number_of_employees']))
+        sql = sql.replaceAll('dataItem.manufactured_country', esc(d['manufactured_country']))
+        sql = sql.replaceAll('dataItem.vendor_original_country', esc(d['vendor_original_country']))
+        sql = sql.replaceAll('dataItem.sanctions', esc(d['sanctions']))
+        sql = sql.replaceAll('dataItem.currency', esc(d['currency'] || 'THB'))
+        sql = sql.replaceAll('dataItem.suggestion', esc(d['suggestion']))
+        sql = sql.replaceAll('dataItem.result', esc(d['result']))
+        sql = sql.replaceAll('dataItem.path', esc(d['path']))
+        sql = sql.replaceAll('dataItem.vendor_code_selector', esc(d['vendor_code_selector']))
+        
+        if (d.completion_date) {
+            sql = sql.replaceAll('dataItem.completion_date_null', `'${esc(d.completion_date)}'`)
+        } else {
+            sql = sql.replaceAll('dataItem.completion_date_null', 'NULL')
+        }
+        
+        sql = sql.replaceAll('dataItem.UPDATE_BY', esc(d['UPDATE_BY'] || 'SYSTEM'))
+        return sql
+    },
+
+    // 2B. Update selection
+    updateSelection: (dataItem: any) => {
+        let sql = `
+            UPDATE request_vendor_selections SET
+                business_category = 'dataItem.business_category',
+                start_year = 'dataItem.start_year',
+                authorized_capital = 'dataItem.authorized_capital',
+                establish_years = 'dataItem.establish',
+                number_of_employees = 'dataItem.number_of_employees',
+                manufactured_country = 'dataItem.manufactured_country',
+                vendor_original_country = 'dataItem.vendor_original_country',
+                sanctions_status = 'dataItem.sanctions',
+                currency = 'dataItem.currency',
+                suggestion = 'dataItem.suggestion',
+                result_status = 'dataItem.result',
+                document_path = 'dataItem.path',
+                vendor_code_selector = 'dataItem.vendor_code_selector',
+                completion_date = dataItem.completion_date_null,
+                UPDATE_BY = 'dataItem.UPDATE_BY',
+                UPDATE_DATE = NOW()
+            WHERE selection_id = dataItem.selection_id
+        `
+        const d = dataItem
+        const esc = (str: any) => String(str || '').replace(/'/g, "\\'")
+
+        sql = sql.replaceAll('dataItem.selection_id', String(d['selection_id']))
+        sql = sql.replaceAll('dataItem.business_category', esc(d['business_category']))
+        sql = sql.replaceAll('dataItem.start_year', esc(d['start_year']))
+        sql = sql.replaceAll('dataItem.authorized_capital', esc(d['authorized_capital']))
+        sql = sql.replaceAll('dataItem.establish', esc(d['establish']))
+        sql = sql.replaceAll('dataItem.number_of_employees', esc(d['number_of_employees']))
+        sql = sql.replaceAll('dataItem.manufactured_country', esc(d['manufactured_country']))
+        sql = sql.replaceAll('dataItem.vendor_original_country', esc(d['vendor_original_country']))
+        sql = sql.replaceAll('dataItem.sanctions', esc(d['sanctions']))
+        sql = sql.replaceAll('dataItem.currency', esc(d['currency'] || 'THB'))
+        sql = sql.replaceAll('dataItem.suggestion', esc(d['suggestion']))
+        sql = sql.replaceAll('dataItem.result', esc(d['result']))
+        sql = sql.replaceAll('dataItem.path', esc(d['path']))
+        sql = sql.replaceAll('dataItem.vendor_code_selector', esc(d['vendor_code_selector']))
+
+        if (d.completion_date) {
+            sql = sql.replaceAll('dataItem.completion_date_null', `'${esc(d.completion_date)}'`)
+        } else {
+            sql = sql.replaceAll('dataItem.completion_date_null', 'NULL')
+        }
+
+        sql = sql.replaceAll('dataItem.UPDATE_BY', esc(d['UPDATE_BY'] || 'SYSTEM'))
+        return sql
+    },
+
+    // 3. Clear existing list data
+    deleteFinancials: (dataItem: any) => {
+        let sql = `DELETE FROM vendor_selection_financials WHERE selection_id = dataItem.selection_id`
+        sql = sql.replaceAll('dataItem.selection_id', dataItem.selection_id)
+        return sql
+    },
+
+    deleteCriteria: (dataItem: any) => {
+        let sql = `DELETE FROM vendor_selection_criteria WHERE selection_id = dataItem.selection_id`
+        sql = sql.replaceAll('dataItem.selection_id', dataItem.selection_id)
+        return sql
+    },
+
+    // 4. Insert Financial Data
+    insertFinancial: (dataItem: any) => {
+        let sql = `
+            INSERT INTO vendor_selection_financials (selection_id, year, total_revenue, net_profit)
+            VALUES (dataItem.selection_id, 'dataItem.year', dataItem.total_revenue, dataItem.net_profit)
+        `
+        const esc = (str: any) => String(str || '').replace(/'/g, "\\'")
+        sql = sql.replaceAll('dataItem.selection_id', dataItem.selection_id)
+        sql = sql.replaceAll('dataItem.year', esc(dataItem.year))
+        
+        // Ensure numeric or NULL
+        const rev = parseFloat(dataItem.total_revenue)
+        const pro = parseFloat(dataItem.net_profit)
+        sql = sql.replaceAll('dataItem.total_revenue', isNaN(rev) ? 'NULL' : String(rev))
+        sql = sql.replaceAll('dataItem.net_profit', isNaN(pro) ? 'NULL' : String(pro))
+        
+        return sql
+    },
+
+    // 5. Insert Criteria Data
+    insertCriteria: (dataItem: any) => {
+        let sql = `
+            INSERT INTO vendor_selection_criteria (selection_id, criteria_no, criteria_value, remark, uploaded_file_path, uploaded_file_name)
+            VALUES (dataItem.selection_id, 'dataItem.no', 'dataItem.criteria', 'dataItem.remark', dataItem.path_null, dataItem.name_null)
+        `
+        const esc = (str: any) => String(str || '').replace(/'/g, "\\'")
+        sql = sql.replaceAll('dataItem.selection_id', dataItem.selection_id)
+        sql = sql.replaceAll('dataItem.no', esc(dataItem.no))
+        sql = sql.replaceAll('dataItem.criteria', esc(dataItem.criteria))
+        sql = sql.replaceAll('dataItem.remark', esc(dataItem.remark))
+
+        if (dataItem.uploaded_file) {
+            sql = sql.replaceAll('dataItem.path_null', `'${esc(dataItem.uploaded_file)}'`)
+        } else {
+            sql = sql.replaceAll('dataItem.path_null', 'NULL')
+        }
+
+        if (dataItem.uploaded_name) {
+            sql = sql.replaceAll('dataItem.name_null', `'${esc(dataItem.uploaded_name)}'`)
+        } else {
+            sql = sql.replaceAll('dataItem.name_null', 'NULL')
+        }
 
         return sql
     }

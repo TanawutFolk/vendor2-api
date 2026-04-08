@@ -597,6 +597,30 @@ export const RegisterRequestController = {
         }
     },
 
+    // Get GPR form data (Supplier / Outsourcing Selection Sheet)
+    getGprForm: async (req: Request, res: Response) => {
+        const dataItem = req.body || {}
+        try {
+            const request_id = parseInt(dataItem.request_id as string)
+            if (!request_id || isNaN(request_id)) {
+                return res.status(400).json({
+                    Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                    MethodOnDb: 'Get GPR Form', Message: 'Invalid request_id'
+                } as ResponseI)
+            }
+            const result = await RegisterRequestModel.getGprForm(request_id)
+            return res.status(200).json({
+                Status: true, ResultOnDb: result || null, TotalCountOnDb: result ? 1 : 0,
+                MethodOnDb: 'Get GPR Form', Message: 'Success'
+            } as ResponseI)
+        } catch (error: any) {
+            return res.status(500).json({
+                Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                MethodOnDb: 'Get GPR Form Failed', Message: error?.message || 'Failed to get GPR form'
+            } as ResponseI)
+        }
+    },
+
     // Attach a single document file to an existing request (e.g. GPR criteria PDF, generated Form A PDF)
     addDocument: async (req: Request, res: Response) => {
         const file = req.file

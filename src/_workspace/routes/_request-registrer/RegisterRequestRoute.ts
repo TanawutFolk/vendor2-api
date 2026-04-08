@@ -73,6 +73,9 @@ registerRequestRoutes.post('/completeRegistration', RegisterRequestController.co
 // POST /register-request/saveGprForm
 registerRequestRoutes.post('/saveGprForm', RegisterRequestController.saveGprForm)
 
+// POST /register-request/getGprForm
+registerRequestRoutes.post('/getGprForm', RegisterRequestController.getGprForm)
+
 // POST /register-request/addDocument  — single file upload for a request (GPR criteria docs, PDF export, etc.)
 registerRequestRoutes.post('/addDocument', upload.single('file'), RegisterRequestController.addDocument)
 
