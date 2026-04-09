@@ -5,46 +5,31 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2'
 export const AddVendorService = {
     // Check if vendor already exists
     checkDuplicateVendor: async (dataItem: any) => {
-        // console.log('=== CHECK DUPLICATE VENDOR ===')
-        // console.log('Input dataItem:', JSON.stringify(dataItem, null, 2))
-
         const sql = await AddVendorSQL.checkDuplicateVendor(dataItem)
-        // console.log('Generated SQL:', sql)
-
         const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
-        // console.log('Query Result:', JSON.stringify(resultData, null, 2))
-        // console.log('Result Count:', resultData.length)
-        // console.log('=== END CHECK ===')
 
         if (resultData.length > 0) {
-            const response = {
+            return {
                 Status: true,
                 isDuplicate: true,
                 existingVendorId: resultData[0].vendor_id,
                 Message: 'Vendor already exists',
             }
-            // console.log('RETURNING (DUPLICATE FOUND):', JSON.stringify(response, null, 2))
-            return response
         }
 
-        const response = {
+        return {
             Status: true,
             isDuplicate: false,
             existingVendorId: null,
             Message: 'Vendor is available for registration',
         }
-        // console.log('RETURNING (NOT DUPLICATE):', JSON.stringify(response, null, 2))
-        return response
     },
 
     // Create vendor with contacts and products
     createVendor: async (dataItem: any) => {
         try {
             // Step 1: Check duplicate first
-            const checkResult = await AddVendorService.checkDuplicateVendor({
-                company_name: dataItem.company_name,
-                email: dataItem.email,
-            })
+            const checkResult = await AddVendorService.checkDuplicateVendor(dataItem)
 
             if (checkResult.isDuplicate) {
                 return {
@@ -71,48 +56,47 @@ export const AddVendorService = {
             }
 
             const vendorId = resultVendor.insertId
+            const sqlList = []
 
-            // Step 3: Insert contacts
-            if (dataItem.contacts && dataItem.contacts.length > 0) {
+            // Step 3: Prepare contacts
+            if (dataItem.contacts && Array.isArray(dataItem.contacts)) {
                 for (const contact of dataItem.contacts) {
                     const contactData = {
+                        ...contact,
                         vendor_id: vendorId,
-                        contact_name: contact.contact_name,
-                        tel_phone: contact.tel_phone || '',
-                        email: contact.email || '',
-                        position: contact.position || '',
                         CREATE_BY: dataItem.CREATE_BY,
                     }
-                    const sqlContact = await AddVendorSQL.createVendorContact(contactData)
-                    await MySQLExecute.execute(sqlContact)
+                    sqlList.push(await AddVendorSQL.createVendorContact(contactData))
                 }
             }
 
-            // Step 4: Insert products
-            if (dataItem.products && dataItem.products.length > 0) {
+            // Step 4: Prepare products
+            if (dataItem.products && Array.isArray(dataItem.products)) {
                 for (const product of dataItem.products) {
                     const productData = {
+                        ...product,
                         vendor_id: vendorId,
-                        product_group_id: product.product_group_id,
-                        maker_name: product.maker_name,
-                        product_name: product.product_name,
-                        model_list: product.model_list || '',
                         CREATE_BY: dataItem.CREATE_BY,
                     }
-                    const sqlProduct = await AddVendorSQL.createVendorProduct(productData)
-                    await MySQLExecute.execute(sqlProduct)
+                    sqlList.push(await AddVendorSQL.createVendorProduct(productData))
                 }
+            }
+
+            // Step 5: Execute sub-queries
+            let resultData = null
+            if (sqlList.length > 0) {
+                resultData = await MySQLExecute.executeList(sqlList)
             }
 
             return {
                 Status: true,
                 Message: 'บันทึกข้อมูลเรียบร้อยแล้ว Data has been saved successfully',
-                ResultOnDb: { vendorId },
+                ResultOnDb: { vendorId, subQueries: resultData },
                 MethodOnDb: 'Create Vendor Success',
                 TotalCountOnDb: 1,
-                vendorId,
             }
         } catch (error: any) {
+            console.error('Error in AddVendorService.createVendor:', error)
             return {
                 Status: false,
                 Message: error?.message || 'Failed to create vendor',
@@ -124,15 +108,15 @@ export const AddVendorService = {
     },
 
     // Get vendor types for dropdown
-    getVendorTypes: async () => {
-        const sql = await AddVendorSQL.getVendorTypes()
+    getVendorTypes: async (dataItem: any) => {
+        const sql = await AddVendorSQL.getVendorTypes(dataItem)
         const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
         return resultData
     },
 
     // Get product groups for dropdown
-    getProductGroups: async () => {
-        const sql = await AddVendorSQL.getProductGroups()
+    getProductGroups: async (dataItem: any) => {
+        const sql = await AddVendorSQL.getProductGroups(dataItem)
         const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
         return resultData
     },
@@ -176,6 +160,7 @@ export const AddVendorService = {
                 TotalCountOnDb: 0,
             }
         } catch (error: any) {
+            console.error('Error in AddVendorService.createProductGroup:', error)
             return {
                 Status: false,
                 Message: error?.message || 'Failed to create product group',

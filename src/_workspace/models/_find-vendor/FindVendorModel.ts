@@ -1,18 +1,18 @@
 import { FindVendorService } from '@src/_workspace/services/_find-vendor/FindVendorService'
 
 export const FindVendorModel = {
-    searchVendors: async (dataItem: any, sqlWhere: string = '') => FindVendorService.searchVendors(dataItem, sqlWhere),
-    getById: async (vendor_id: number) => FindVendorService.getById(vendor_id),
+    searchVendors: async (dataItem: any) => FindVendorService.searchVendors(dataItem),
+    getById: async (vendor_id: number) => FindVendorService.getById({ vendor_id }),
     updateVendor: async (dataItem: any) => FindVendorService.updateVendor(dataItem),
-    getVendorTypes: async () => FindVendorService.getVendorTypes(),
-    getProvinces: async () => FindVendorService.getProvinces(),
-    getProductGroups: async () => FindVendorService.getProductGroups(),
-    searchAllForExport: async (dataItem: any, sqlWhere: string = '') => FindVendorService.searchAllForExport(dataItem, sqlWhere),
-    streamAllForExport: async (dataItem: any, sqlWhere: string = '') => FindVendorService.streamAllForExport(dataItem, sqlWhere),
-    getPronesData: async (dataItem: any) => FindVendorService.getPronesData(),
-    getAllVendorNames: async () => FindVendorService.getAllVendorNames(),
+    getVendorTypes: async (dataItem: any = {}) => FindVendorService.getVendorTypes(dataItem),
+    getProvinces: async (dataItem: any = {}) => FindVendorService.getProvinces(dataItem),
+    getProductGroups: async (dataItem: any = {}) => FindVendorService.getProductGroups(dataItem),
+    searchAllForExport: async (dataItem: any) => FindVendorService.searchAllForExport(dataItem),
+    // streamAllForExport is omitted as it does not exist on FindVendorService
+    getPronesData: async (dataItem: any = {}) => FindVendorService.getPronesData(dataItem),
+    getAllVendorNames: async (dataItem: any = {}) => FindVendorService.getAllVendorNames(dataItem),
     deleteVendorContact: async (dataItem: any) => FindVendorService.deleteVendorContact(dataItem),
     deleteVendorProduct: async (dataItem: any) => FindVendorService.deleteVendorProduct(dataItem),
-    getMatchResults: async () => FindVendorService.getMatchResults(),
-    getMatchResultsByVendorIds: async (vendorIds: number[]) => FindVendorService.getMatchResultsByVendorIds(vendorIds),
+    getMatchResults: async (dataItem: any = {}) => FindVendorService.getMatchResults(dataItem),
+    getMatchResultsByVendorIds: async (vendorIds: number[]) => FindVendorService.getMatchResultsByVendorIds({ vendorIds }),
 }

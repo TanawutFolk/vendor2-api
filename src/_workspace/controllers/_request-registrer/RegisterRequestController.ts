@@ -9,6 +9,7 @@ export const RegisterRequestController = {
     // Create a new vendor registration request
     create: async (req: Request, res: Response) => {
         let dataItem
+
         if (!req.body || Object.entries(req.body).length === 0) {
             dataItem = req.query
         } else {
@@ -68,11 +69,12 @@ export const RegisterRequestController = {
                 Message: 'Create Data Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Create Registration Request Error:', error);
+            return res.status(200).json({
                 Status: false,
                 ResultOnDb: {},
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Create Registration Request Failed',
+                MethodOnDb: 'Create Registration Request',
                 Message: error?.message || 'Failed to create registration request'
             } as ResponseI)
         }
@@ -81,6 +83,7 @@ export const RegisterRequestController = {
     // Get all registration requests
     getAll: async (req: Request, res: Response) => {
         let dataItem
+
         if (!req.body || Object.entries(req.body).length === 0) {
             dataItem = req.query
         } else {
@@ -165,11 +168,12 @@ export const RegisterRequestController = {
                 Message: 'Get Data Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Get All Registration Requests Error:', error);
+            return res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Get All Registration Requests Failed',
+                MethodOnDb: 'Get All Registration Requests',
                 Message: error?.message || 'Failed to get registration requests'
             } as ResponseI)
         }
@@ -178,6 +182,7 @@ export const RegisterRequestController = {
     // Get a single registration request
     getById: async (req: Request, res: Response) => {
         let dataItem
+
         if (!req.body || Object.entries(req.body).length === 0) {
             dataItem = req.query
         } else {
@@ -198,7 +203,7 @@ export const RegisterRequestController = {
             }
 
             const result = await RegisterRequestModel.getById({ request_id })
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: result || {},
                 TotalCountOnDb: result ? 1 : 0,
@@ -206,11 +211,12 @@ export const RegisterRequestController = {
                 Message: 'Get Data Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Get Registration Request Error:', error);
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: {},
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Get Registration Request Failed',
+                MethodOnDb: 'Get Registration Request',
                 Message: error?.message || 'Failed to get registration request'
             } as ResponseI)
         }
@@ -218,7 +224,14 @@ export const RegisterRequestController = {
 
     // Update request details (PIC แก้ไขข้อมูลคำขอ)
     updateRequest: async (req: Request, res: Response) => {
-        const dataItem = req.body || {}
+        let dataItem
+
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
         try {
             const request_id = parseInt(dataItem.request_id as string)
 
@@ -241,7 +254,7 @@ export const RegisterRequestController = {
                 UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
             })
 
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: {},
                 TotalCountOnDb: 1,
@@ -249,13 +262,12 @@ export const RegisterRequestController = {
                 Message: 'Request updated successfully'
             } as ResponseI)
         } catch (error: any) {
-            // Unauthorized หรือ status check fail → ส่ง 403
-            const statusCode = error?.message?.startsWith('Unauthorized') ? 403 : 500
-            return res.status(statusCode).json({
+            console.error('Update Request Error:', error);
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: {},
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Update Request Failed',
+                MethodOnDb: 'Update Request',
                 Message: error?.message || 'Failed to update request'
             } as ResponseI)
         }
@@ -264,6 +276,7 @@ export const RegisterRequestController = {
     // Update request status (approve/reject)
     updateStatus: async (req: Request, res: Response) => {
         let dataItem
+
         if (!req.body || Object.entries(req.body).length === 0) {
             dataItem = req.query
         } else {
@@ -297,7 +310,7 @@ export const RegisterRequestController = {
                 UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
             })
 
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: {},
                 TotalCountOnDb: 1,
@@ -305,11 +318,12 @@ export const RegisterRequestController = {
                 Message: 'Update Data Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Update Status Error:', error);
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: {},
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Update Request Status Failed',
+                MethodOnDb: 'Update Request Status',
                 Message: error?.message || 'Failed to update status'
             } as ResponseI)
         }
@@ -318,6 +332,7 @@ export const RegisterRequestController = {
     // Send agreement/document-request email to the Vendor
     sendAgreementEmail: async (req: Request, res: Response) => {
         let dataItem
+
         if (!req.body || Object.entries(req.body).length === 0) {
             dataItem = req.query
         } else {
@@ -345,21 +360,30 @@ export const RegisterRequestController = {
                 Message: `Agreement email sent to ${result.sent_to}`
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Send Agreement Email Error:', error);
+            return res.status(200).json({
                 Status: false,
                 ResultOnDb: {},
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Send Agreement Email Failed',
+                MethodOnDb: 'Send Agreement Email',
                 Message: error?.message || 'Failed to send agreement email'
             } as ResponseI)
         }
     },
 
     // Get all active status options from m_request_status
-    getStatusOptions: async (_req: Request, res: Response) => {
+    getStatusOptions: async (req: Request, res: Response) => {
+        let dataItem
+
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
         try {
             const result = await RegisterRequestModel.getStatusOptions()
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: result,
                 TotalCountOnDb: result.length,
@@ -367,11 +391,12 @@ export const RegisterRequestController = {
                 Message: 'Get Data Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Get Status Options Error:', error);
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Get Status Options Failed',
+                MethodOnDb: 'Get Status Options',
                 Message: error?.message || 'Failed to get status options'
             } as ResponseI)
         }
@@ -380,6 +405,7 @@ export const RegisterRequestController = {
     // Get approval steps for a request
     getApprovalSteps: async (req: Request, res: Response) => {
         let dataItem
+
         if (!req.body || Object.entries(req.body).length === 0) {
             dataItem = req.query
         } else {
@@ -396,7 +422,7 @@ export const RegisterRequestController = {
             }
 
             const result = await RegisterRequestModel.getApprovalSteps({ request_id })
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: result,
                 TotalCountOnDb: result.length,
@@ -404,9 +430,10 @@ export const RegisterRequestController = {
                 Message: 'Get Data Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Get Approval Steps Error:', error);
+            res.status(200).json({
                 Status: false, ResultOnDb: [], TotalCountOnDb: 0,
-                MethodOnDb: 'Get Approval Steps Failed',
+                MethodOnDb: 'Get Approval Steps',
                 Message: error?.message || 'Failed to get approval steps'
             } as ResponseI)
         }
@@ -415,6 +442,7 @@ export const RegisterRequestController = {
     // Get approval logs for a request
     getApprovalLogs: async (req: Request, res: Response) => {
         let dataItem
+
         if (!req.body || Object.entries(req.body).length === 0) {
             dataItem = req.query
         } else {
@@ -431,7 +459,7 @@ export const RegisterRequestController = {
             }
 
             const result = await RegisterRequestModel.getApprovalLogs({ request_id })
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: result,
                 TotalCountOnDb: result.length,
@@ -439,9 +467,10 @@ export const RegisterRequestController = {
                 Message: 'Get Data Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Get Approval Logs Error:', error);
+            res.status(200).json({
                 Status: false, ResultOnDb: [], TotalCountOnDb: 0,
-                MethodOnDb: 'Get Approval Logs Failed',
+                MethodOnDb: 'Get Approval Logs',
                 Message: error?.message || 'Failed to get approval logs'
             } as ResponseI)
         }
@@ -450,6 +479,7 @@ export const RegisterRequestController = {
     // Create an approval step
     createApprovalStep: async (req: Request, res: Response) => {
         let dataItem
+
         if (!req.body || Object.entries(req.body).length === 0) {
             dataItem = req.query
         } else {
@@ -474,7 +504,7 @@ export const RegisterRequestController = {
                 CREATE_BY: dataItem.CREATE_BY || '',
             })
 
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: { step_id: insertedId },
                 TotalCountOnDb: 1,
@@ -482,9 +512,10 @@ export const RegisterRequestController = {
                 Message: 'Create Data Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Create Approval Step Error:', error);
+            res.status(200).json({
                 Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
-                MethodOnDb: 'Create Approval Step Failed',
+                MethodOnDb: 'Create Approval Step',
                 Message: error?.message || 'Failed to create approval step'
             } as ResponseI)
         }
@@ -493,6 +524,7 @@ export const RegisterRequestController = {
     // Update an approval step and log the action
     updateApprovalStep: async (req: Request, res: Response) => {
         let dataItem
+
         if (!req.body || Object.entries(req.body).length === 0) {
             dataItem = req.query
         } else {
@@ -525,7 +557,7 @@ export const RegisterRequestController = {
                 })
             }
 
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: {},
                 TotalCountOnDb: 1,
@@ -533,9 +565,10 @@ export const RegisterRequestController = {
                 Message: 'Update Data Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Update Approval Step Error:', error);
+            res.status(200).json({
                 Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
-                MethodOnDb: 'Update Approval Step Failed',
+                MethodOnDb: 'Update Approval Step',
                 Message: error?.message || 'Failed to update approval step'
             } as ResponseI)
         }
@@ -543,7 +576,14 @@ export const RegisterRequestController = {
 
     // Update CC emails list for a request
     updateCcEmails: async (req: Request, res: Response) => {
-        const dataItem = req.body || {}
+        let dataItem
+
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
         try {
             const request_id = parseInt(dataItem.request_id as string)
             if (!request_id || isNaN(request_id)) {
@@ -557,21 +597,29 @@ export const RegisterRequestController = {
                 cc_emails: dataItem.cc_emails || [],
                 UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
             })
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true, ResultOnDb: {}, TotalCountOnDb: 1,
                 MethodOnDb: 'Update CC Emails', Message: 'CC emails updated successfully'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Update CC Emails Error:', error);
+            res.status(200).json({
                 Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
-                MethodOnDb: 'Update CC Emails Failed', Message: error?.message || 'Failed to update CC emails'
+                MethodOnDb: 'Update CC Emails', Message: error?.message || 'Failed to update CC emails'
             } as ResponseI)
         }
     },
 
     // Save GPR form (Supplier / Outsourcing Selection Sheet)
     saveGprForm: async (req: Request, res: Response) => {
-        const dataItem = req.body || {}
+        let dataItem
+
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
         try {
             const request_id = parseInt(dataItem.request_id as string)
             if (!request_id || isNaN(request_id)) {
@@ -585,21 +633,29 @@ export const RegisterRequestController = {
                 gpr_data: dataItem.gpr_data || {},
                 UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
             })
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true, ResultOnDb: {}, TotalCountOnDb: 1,
                 MethodOnDb: 'Save GPR Form', Message: 'GPR form saved successfully'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Save GPR Form Error:', error);
+            res.status(200).json({
                 Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
-                MethodOnDb: 'Save GPR Form Failed', Message: error?.message || 'Failed to save GPR form'
+                MethodOnDb: 'Save GPR Form', Message: error?.message || 'Failed to save GPR form'
             } as ResponseI)
         }
     },
 
     // Get GPR form data (Supplier / Outsourcing Selection Sheet)
     getGprForm: async (req: Request, res: Response) => {
-        const dataItem = req.body || {}
+        let dataItem
+
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
         try {
             const request_id = parseInt(dataItem.request_id as string)
             if (!request_id || isNaN(request_id)) {
@@ -609,14 +665,15 @@ export const RegisterRequestController = {
                 } as ResponseI)
             }
             const result = await RegisterRequestModel.getGprForm(request_id)
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true, ResultOnDb: result || null, TotalCountOnDb: result ? 1 : 0,
                 MethodOnDb: 'Get GPR Form', Message: 'Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Get GPR Form Error:', error);
+            res.status(200).json({
                 Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
-                MethodOnDb: 'Get GPR Form Failed', Message: error?.message || 'Failed to get GPR form'
+                MethodOnDb: 'Get GPR Form', Message: error?.message || 'Failed to get GPR form'
             } as ResponseI)
         }
     },
@@ -624,7 +681,16 @@ export const RegisterRequestController = {
     // Attach a single document file to an existing request (e.g. GPR criteria PDF, generated Form A PDF)
     addDocument: async (req: Request, res: Response) => {
         const file = req.file
-        const { request_id, CREATE_BY } = req.body
+        let dataItem
+
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
+        const { request_id, CREATE_BY } = dataItem
+
         try {
             const reqId = parseInt(request_id as string)
             if (!reqId || isNaN(reqId)) {
@@ -648,7 +714,7 @@ export const RegisterRequestController = {
                 file_type:  file.mimetype || '',
                 CREATE_BY:  CREATE_BY || 'SYSTEM',
             })
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: {
                     document_id,
@@ -660,16 +726,24 @@ export const RegisterRequestController = {
                 Message: 'Document added successfully'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Add Document Error:', error);
+            res.status(200).json({
                 Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
-                MethodOnDb: 'Add Document Failed', Message: error?.message || 'Failed to add document'
+                MethodOnDb: 'Add Document', Message: error?.message || 'Failed to add document'
             } as ResponseI)
         }
     },
 
     // Account PIC: complete vendor registration (fill vendor code + trigger final email)
     completeRegistration: async (req: Request, res: Response) => {
-        const dataItem = req.body || {}
+        let dataItem
+
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
         try {
             const request_id = parseInt(dataItem.request_id as string)
             if (!request_id || isNaN(request_id)) {
@@ -683,14 +757,15 @@ export const RegisterRequestController = {
                 vendor_code: dataItem.vendor_code || '',
                 UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
             })
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true, ResultOnDb: {}, TotalCountOnDb: 1,
                 MethodOnDb: 'Complete Registration', Message: 'Vendor registration completed successfully'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Complete Registration Error:', error);
+            res.status(200).json({
                 Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
-                MethodOnDb: 'Complete Registration Failed', Message: error?.message || 'Failed to complete registration'
+                MethodOnDb: 'Complete Registration', Message: error?.message || 'Failed to complete registration'
             } as ResponseI)
         }
     }

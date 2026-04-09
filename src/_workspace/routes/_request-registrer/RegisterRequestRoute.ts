@@ -32,7 +32,7 @@ const upload = multer({
 const registerRequestRoutes = Router()
 
 // POST /register-request/create  — accepts multipart/form-data with optional file uploads
-registerRequestRoutes.post('/create', upload.array('files'), RegisterRequestController.create)
+registerRequestRoutes.post('/createRequestVendor', upload.array('files'), RegisterRequestController.create)
 
 // POST /register-request/searchRequest
 registerRequestRoutes.post('/searchRequest', RegisterRequestController.getAll)

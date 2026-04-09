@@ -143,17 +143,17 @@ export const FindVendorController = {
             return res.status(200).json({
                 Status: true,
                 ResultOnDb: finalResult,
-                TotalCountOnDb: totalCount, // Note: This might mismatch if we filter by prones_code, but for client-side pagination on resultData it's okay? 
-                // Actually with client-side pagination (limit 10000), totalCount is less relevant than ResultOnDb.length
+                TotalCountOnDb: totalCount,
                 MethodOnDb: 'Search Vendors',
                 Message: 'Search Data Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Search Vendors Error:', error);
+            return res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Search Vendors Failed',
+                MethodOnDb: 'Search Vendors',
                 Message: error?.message || 'Failed to search vendors'
             } as ResponseI)
         }
@@ -184,8 +184,38 @@ export const FindVendorController = {
 
             const resultData = await FindVendorModel.getById(vendor_id)
             if (resultData && resultData.length > 0) {
-                // Enrich with Prones Status Logic
-                const enrichedData = await matchVendorsWithPrones(resultData, null)
+                // Parse JSON_ARRAYAGG strings if they exist
+                const row = resultData[0];
+                let contacts = []
+                let products = []
+
+                try {
+                    if (row.contacts_json) {
+                        contacts = typeof row.contacts_json === 'string' ? JSON.parse(row.contacts_json) : row.contacts_json
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse contacts_json for getById vendor_id ' + vendor_id)
+                }
+
+                try {
+                    if (row.products_json) {
+                        products = typeof row.products_json === 'string' ? JSON.parse(row.products_json) : row.products_json
+                    }
+                } catch (e) {
+                    console.warn('Failed to parse products_json for getById vendor_id ' + vendor_id)
+                }
+
+                // Filter out [null] from empty JSON_ARRAYAGG
+                if (contacts.length === 1 && contacts[0] === null) contacts = []
+                if (products.length === 1 && products[0] === null) products = []
+
+                delete row.contacts_json
+                delete row.products_json
+
+                const vendorObj = { ...row, contacts, products }
+
+                // Enrich with Prones Status Logic (helper expects array)
+                const enrichedData = await matchVendorsWithPrones([vendorObj], null)
 
                 return res.status(200).json({
                     Status: true,
@@ -195,7 +225,8 @@ export const FindVendorController = {
                     Message: 'Get Data Success'
                 } as ResponseI)
             } else {
-                return res.status(404).json({
+
+                return res.status(200).json({
                     Status: false,
                     ResultOnDb: [],
                     TotalCountOnDb: 0,
@@ -204,11 +235,12 @@ export const FindVendorController = {
                 } as ResponseI)
             }
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Get Vendor By ID Error:', error);
+            return res.status(200).json({
                 Status: false,
                 ResultOnDb: {},
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Get Vendor By ID Failed',
+                MethodOnDb: 'Get Vendor By ID',
                 Message: error?.message || 'Failed to get vendor'
             } as ResponseI)
         }
@@ -243,7 +275,7 @@ export const FindVendorController = {
             }
 
             const result = await FindVendorModel.updateVendor(updateData)
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: result,
                 TotalCountOnDb: 1,
@@ -251,11 +283,12 @@ export const FindVendorController = {
                 Message: 'Update Data Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Update Vendor Error:', error);
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: {},
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Update Vendor Failed',
+                MethodOnDb: 'Update Vendor',
                 Message: error?.message || 'Failed to update vendor'
             } as ResponseI)
         }
@@ -272,7 +305,7 @@ export const FindVendorController = {
 
         try {
             await FindVendorModel.deleteVendorContact(dataItem)
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: true,
                 TotalCountOnDb: 1,
@@ -280,11 +313,12 @@ export const FindVendorController = {
                 Message: 'Delete Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Delete Vendor Contact Error:', error);
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: false,
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Delete Vendor Contact Failed',
+                MethodOnDb: 'Delete Vendor Contact',
                 Message: error?.message || 'Failed to delete contact'
             } as ResponseI)
         }
@@ -301,7 +335,7 @@ export const FindVendorController = {
 
         try {
             await FindVendorModel.deleteVendorProduct(dataItem)
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: true,
                 TotalCountOnDb: 1,
@@ -309,11 +343,12 @@ export const FindVendorController = {
                 Message: 'Delete Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Delete Vendor Product Error:', error);
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: false,
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Delete Vendor Product Failed',
+                MethodOnDb: 'Delete Vendor Product',
                 Message: error?.message || 'Failed to delete product'
             } as ResponseI)
         }
@@ -321,9 +356,17 @@ export const FindVendorController = {
 
     // Get vendor types for dropdown
     getVendorTypes: async (req: Request, res: Response) => {
+        let dataItem
+
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
         try {
             const result = await FindVendorModel.getVendorTypes()
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: result,
                 TotalCountOnDb: result.length,
@@ -331,11 +374,12 @@ export const FindVendorController = {
                 Message: 'Get Data Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Get Vendor Types Error:', error);
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Get Vendor Types Failed',
+                MethodOnDb: 'Get Vendor Types',
                 Message: error?.message || 'Failed to get vendor types'
             } as ResponseI)
         }
@@ -343,9 +387,17 @@ export const FindVendorController = {
 
     // Get provinces for dropdown
     getProvinces: async (req: Request, res: Response) => {
+        let dataItem
+
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
         try {
             const result = await FindVendorModel.getProvinces()
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: result,
                 TotalCountOnDb: result.length,
@@ -353,11 +405,12 @@ export const FindVendorController = {
                 Message: 'Get Data Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Get Provinces Error:', error);
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Get Provinces Failed',
+                MethodOnDb: 'Get Provinces',
                 Message: error?.message || 'Failed to get provinces'
             } as ResponseI)
         }
@@ -365,9 +418,17 @@ export const FindVendorController = {
 
     // Get product groups for dropdown
     getProductGroups: async (req: Request, res: Response) => {
+        let dataItem
+
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
         try {
             const result = await FindVendorModel.getProductGroups()
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: result,
                 TotalCountOnDb: result.length,
@@ -375,11 +436,12 @@ export const FindVendorController = {
                 Message: 'Get Data Success'
             } as ResponseI)
         } catch (error: any) {
-            return res.status(500).json({
+            console.error('Get Product Groups Error:', error);
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Get Product Groups Failed',
+                MethodOnDb: 'Get Product Groups',
                 Message: error?.message || 'Failed to get product groups'
             } as ResponseI)
         }
@@ -816,7 +878,13 @@ export const FindVendorController = {
     // Get prones data
     getPronesData: async (req: Request, res: Response) => {
         try {
-            const dataItem = req.body;
+            let dataItem
+
+            if (!req.body || Object.entries(req.body).length === 0) {
+                dataItem = req.query
+            } else {
+                dataItem = req.body
+            }
 
             // 1. ดึงข้อมูล vendor ฝั่งเรา
             const myVendors = await FindVendorModel.getAllVendorNames();
@@ -825,29 +893,32 @@ export const FindVendorController = {
             const resultRows = await matchVendorsWithPrones(myVendors);
 
             // 3. ส่ง JSON กลับ
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: {
                     rows: resultRows
                 },
                 TotalCountOnDb: resultRows.length,
-                MethodOnDb: 'Match Prones to MyVendors',
+                MethodOnDb: 'Comparison Prones',
                 Message: 'Comparison Success'
             } as ResponseI);
 
         } catch (error: any) {
-            console.error('Match Error:', error);
-            return res.status(500).json({
+            console.error('Match Prones Error:', error);
+            res.status(200).json({
                 Status: false,
+                ResultOnDb: [],
+                TotalCountOnDb: 0,
+                MethodOnDb: 'Comparison Prones',
                 Message: error?.message || 'Internal Server Error'
-            });
+            } as ResponseI);
         }
     },
     // Get all vendor names
     getAllVendorNames: async (req: Request, res: Response) => {
         try {
             const resultData = await FindVendorModel.getAllVendorNames()
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: resultData,
                 TotalCountOnDb: resultData.length,
@@ -855,12 +926,12 @@ export const FindVendorController = {
                 Message: 'Get Data Success'
             } as ResponseI)
         } catch (error: any) {
-            console.error('getAllVendorNames error:', error)
-            return res.status(500).json({
+            console.error('Get All Vendor Names Error:', error)
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Get All Vendor Names Failed',
+                MethodOnDb: 'Get All Vendor Names',
                 Message: error?.message || 'Failed to get all vendor names'
             } as ResponseI)
         }
@@ -868,22 +939,29 @@ export const FindVendorController = {
     getPronesDataAll: async (req: Request, res: Response) => {
         // Simple fetch without status check
         try {
-            const dataItem = req.body
+            let dataItem
+
+            if (!req.body || Object.entries(req.body).length === 0) {
+                dataItem = req.query
+            } else {
+                dataItem = req.body
+            }
+
             const resultData = await FindVendorModel.getPronesData(dataItem)
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: resultData,
                 TotalCountOnDb: resultData.length,
-                MethodOnDb: 'Get Prones Data',
+                MethodOnDb: 'Get Prones Data All',
                 Message: 'Get Data Success'
             } as ResponseI)
         } catch (error: any) {
-            console.error('getPronesData error:', error)
-            return res.status(500).json({
+            console.error('Get Prones Data All Error:', error)
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Get Prones Data Failed',
+                MethodOnDb: 'Get Prones Data All',
                 Message: error?.message || 'Failed to get prones data'
             } as ResponseI)
         }

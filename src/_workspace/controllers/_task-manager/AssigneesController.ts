@@ -4,9 +4,17 @@ import { ResponseI } from '@src/types/ResponseI'
 
 export const AssigneesController = {
     search: async (req: Request, res: Response) => {
+        let dataItem
+
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
         try {
-            const result = await AssigneesService.search(req.body)
-            res.status(200).json({
+            const result = await AssigneesService.search(dataItem)
+            return res.status(200).json({
                 Status: true,
                 ResultOnDb: result,
                 TotalCountOnDb: result.length,
@@ -14,21 +22,29 @@ export const AssigneesController = {
                 Message: 'Success'
             } as ResponseI)
         } catch (error: any) {
-            console.error('Error fetching assignees:', error)
-            res.status(500).json({
+            console.error('Search Assignees Error:', error)
+            return res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Search Assignees Failed',
-                Message: error?.message
+                MethodOnDb: 'Search Assignees',
+                Message: error?.message || 'Failed to search assignees'
             } as ResponseI)
         }
     },
 
     save: async (req: Request, res: Response) => {
+        let dataItem
+
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
         try {
-            const result = await AssigneesService.save(req.body)
-            res.status(200).json({
+            const result = await AssigneesService.save(dataItem)
+            return res.status(200).json({
                 Status: true,
                 ResultOnDb: result,
                 TotalCountOnDb: 1,
@@ -36,13 +52,13 @@ export const AssigneesController = {
                 Message: 'Success'
             } as ResponseI)
         } catch (error: any) {
-            console.error('Error saving assignee:', error)
-            res.status(500).json({
+            console.error('Save Assignee Error:', error)
+            return res.status(200).json({
                 Status: false,
                 ResultOnDb: {},
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Save Assignee Failed',
-                Message: error?.message
+                MethodOnDb: 'Save Assignee',
+                Message: error?.message || 'Failed to save assignee'
             } as ResponseI)
         }
     },
@@ -51,7 +67,7 @@ export const AssigneesController = {
         try {
             const id = Number(req.params.id)
             const result = await AssigneesService.delete(id)
-            res.status(200).json({
+            return res.status(200).json({
                 Status: true,
                 ResultOnDb: result,
                 TotalCountOnDb: 1,
@@ -59,13 +75,13 @@ export const AssigneesController = {
                 Message: 'Success'
             } as ResponseI)
         } catch (error: any) {
-            console.error('Error deleting assignee:', error)
-            res.status(500).json({
+            console.error('Delete Assignee Error:', error)
+            return res.status(200).json({
                 Status: false,
                 ResultOnDb: {},
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Delete Assignee Failed',
-                Message: error?.message
+                MethodOnDb: 'Delete Assignee',
+                Message: error?.message || 'Failed to delete assignee'
             } as ResponseI)
         }
     }

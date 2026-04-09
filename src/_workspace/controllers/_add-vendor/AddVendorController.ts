@@ -14,15 +14,27 @@ export const AddVendorController = {
         }
 
         try {
-            const result = await AddVendorModel.checkDuplicateVendor(dataItem)
-            res.status(200).json(result)
+            const result = await AddVendorModel.checkDuplicateVendor(dataItem) as any
+            return res.status(200).json({
+                Status: result?.Status ?? true,
+                isDuplicate: result?.isDuplicate ?? false,
+                existingVendorId: result?.existingVendorId ?? null,
+                ResultOnDb: result?.ResultOnDb ?? [],
+                TotalCountOnDb: result?.TotalCountOnDb ?? 0,
+                MethodOnDb: 'Check Duplicate Vendor',
+                Message: result?.Message || 'Success'
+            } as ResponseI)
         } catch (error: any) {
-            res.status(500).json({
+            console.error('Check Duplicate Vendor Error:', error);
+            return res.status(200).json({
                 Status: false,
                 isDuplicate: false,
                 existingVendorId: null,
+                ResultOnDb: [],
+                TotalCountOnDb: 0,
+                MethodOnDb: 'Check Duplicate Vendor',
                 Message: error?.message || 'Failed to check duplicate'
-            })
+            } as ResponseI)
         }
     },
 
@@ -46,13 +58,14 @@ export const AddVendorController = {
             }
 
             const result = await AddVendorModel.createVendor(dataItem)
-            res.status(200).json(result as ResponseI)
+            return res.status(200).json(result as ResponseI)
         } catch (error: any) {
-            res.status(500).json({
+            console.error('Create Vendor Error:', error);
+            return res.status(200).json({
                 Status: false,
                 Message: error?.message || 'Failed to create vendor',
                 ResultOnDb: [],
-                MethodOnDb: 'Create Vendor Failed',
+                MethodOnDb: 'Create Vendor',
                 TotalCountOnDb: 0
             } as ResponseI)
         }
@@ -63,7 +76,7 @@ export const AddVendorController = {
         try {
             const result = await AddVendorModel.getVendorTypes()
 
-            return res.json({
+            return res.status(200).json({
                 Status: true,
                 ResultOnDb: result,
                 TotalCountOnDb: result.length,
@@ -71,11 +84,12 @@ export const AddVendorController = {
                 Message: 'Search Data Success',
             } as ResponseI)
         } catch (error: any) {
-            res.status(500).json({
+            console.error('Get Vendor Types Error:', error);
+            return res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Get Vendor Types Failed',
+                MethodOnDb: 'Get Vendor Types',
                 Message: error?.message || 'Failed to get vendor types',
             } as ResponseI)
         }
@@ -83,10 +97,18 @@ export const AddVendorController = {
 
     // Get product groups for dropdown
     getProductGroups: async (req: Request, res: Response) => {
+        let dataItem
+
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
         try {
             const result = await AddVendorModel.getProductGroups()
 
-            return res.json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: result,
                 TotalCountOnDb: result.length,
@@ -94,11 +116,11 @@ export const AddVendorController = {
                 Message: 'Search Data Success',
             } as ResponseI)
         } catch (error: any) {
-            res.status(500).json({
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Get Product Groups Failed',
+                MethodOnDb: 'Get Product Groups',
                 Message: error?.message || 'Failed to get product groups',
             } as ResponseI)
         }
@@ -118,11 +140,11 @@ export const AddVendorController = {
             const result = await AddVendorModel.createProductGroup(dataItem)
             res.status(200).json(result as ResponseI)
         } catch (error: any) {
-            res.status(500).json({
+            res.status(200).json({
                 Status: false,
                 Message: error?.message || 'Failed to create product group',
                 ResultOnDb: [],
-                MethodOnDb: 'Create Product Group Failed',
+                MethodOnDb: 'Create Product Group',
                 TotalCountOnDb: 0
             } as ResponseI)
         }
