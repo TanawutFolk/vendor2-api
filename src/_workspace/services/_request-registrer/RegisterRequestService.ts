@@ -272,10 +272,19 @@ export const RegisterRequestService = {
             const steps = (await MySQLExecute.search(stepsSql)) as RowDataPacket[]
             const currentStep = steps.find((s: any) => s.step_status === 'in_progress')
 
+            // We need vendor_id for updating vendor status if rejected
+            const checkSql = `SELECT vendor_id, assign_to FROM request_register_vendor WHERE request_id = ${dataItem.request_id} LIMIT 1`
+            const checkRes = (await MySQLExecute.search(checkSql)) as any[]
+            const vendor_id = checkRes[0]?.vendor_id
+            const assign_to = checkRes[0]?.assign_to
+
             // Auth Check
             if (currentStep && currentStep.approver_id) {
                 const actionBy = dataItem.approve_by || dataItem.UPDATE_BY || ''
-                if (actionBy && currentStep.approver_id !== actionBy) {
+                const isDesignatedApprover = currentStep.approver_id === actionBy
+                const isAssignedPic = assign_to && assign_to === actionBy
+                
+                if (actionBy && !isDesignatedApprover && !isAssignedPic) {
                     throw new Error('Unauthorized approver only')
                 }
             }
@@ -285,6 +294,9 @@ export const RegisterRequestService = {
 
             if (steps.length > 0) {
                 if (newStatus === 'Rejected') {
+                    if (vendor_id) {
+                        sqlList.push(`UPDATE vendors SET fft_status = 2 WHERE vendor_id = ${vendor_id}`)
+                    }
                     if (currentStep) {
                         sqlList.push(await RegisterRequestSQL.updateApprovalStep({
                             step_id: currentStep.step_id,

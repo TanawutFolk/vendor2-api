@@ -6,7 +6,7 @@ import { RowDataPacket } from 'mysql2'
 export const FindVendorService = {
     // Search vendors with contacts
     searchVendors: async (dataItem: any) => {
-        let sqlWhere = ''
+        let sqlWhere = dataItem.sqlWhere || ''
         
         // Handle Global Search inside Service to match Bom pattern style
         const globalSearchFilter = dataItem.SearchFilters?.find((item: any) => item.id === 'global_search')
@@ -150,7 +150,7 @@ export const FindVendorService = {
 
     // Search all vendors for export
     searchAllForExport: async (dataItem: any) => {
-        let sqlWhere = ''
+        let sqlWhere = dataItem.sqlWhere || ''
         const globalSearchFilter = dataItem.SearchFilters?.find((item: any) => item.id === 'global_search')
         if (globalSearchFilter?.value) {
             sqlWhere += FindVendorSQL.generateGlobalSearchSql({ searchKeyword: globalSearchFilter.value })

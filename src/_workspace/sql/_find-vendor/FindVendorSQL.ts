@@ -87,10 +87,18 @@ export const FindVendorSQL = {
                                      , v.INUSE
                                      
                                      -- Prones Matching Data
-                                     , IFNULL(vmr.status_check, 'Not Registered') AS status_check
+                                     , IF(v.fft_status = 2, 'Cannot Register', IFNULL(vmr.status_check, 'Not Registered')) AS status_check
                                      , IFNULL(vmr.prones_code, v.fft_vendor_code) AS prones_code
                                      , vmr.prones_name AS prones_name_en
                                      , vmr.match_method
+
+                                     -- Reject Reason
+                                     , (
+                                          SELECT rrv.approver_remark
+                                          FROM request_register_vendor rrv
+                                          WHERE rrv.vendor_id = v.vendor_id AND rrv.request_status = 'Rejected'
+                                          ORDER BY rrv.request_id DESC LIMIT 1
+                                     ) AS reject_reason
                                      
                                      -- Contacts JSON (aggregated)
                                      , (
@@ -199,7 +207,7 @@ export const FindVendorSQL = {
                                      , v.INUSE
                                      
                                      -- Prones Matching Data
-                                     , IFNULL(vmr.status_check, 'Not Registered') AS status_check
+                                     , IF(v.fft_status = 2, 'Cannot Register', IFNULL(vmr.status_check, 'Not Registered')) AS status_check
                                      , IFNULL(vmr.prones_code, v.fft_vendor_code) AS prones_code
                                      , vmr.prones_name AS prones_name_en
                                      , vmr.match_method
@@ -538,10 +546,18 @@ export const FindVendorSQL = {
                                      , v.INUSE
 
                                      -- Prones Matching Data
-                                     , IFNULL(vmr.status_check, 'Not Registered') AS status_check
+                                     , IF(v.fft_status = 2, 'Cannot Register', IFNULL(vmr.status_check, 'Not Registered')) AS status_check
                                      , IFNULL(vmr.prones_code, v.fft_vendor_code) AS prones_code
                                      , vmr.prones_name AS prones_name_en
                                      , vmr.match_method
+
+                                     -- Reject Reason
+                                     , (
+                                          SELECT rrv.approver_remark
+                                          FROM request_register_vendor rrv
+                                          WHERE rrv.vendor_id = v.vendor_id AND rrv.request_status = 'Rejected'
+                                          ORDER BY rrv.request_id DESC LIMIT 1
+                                     ) AS reject_reason
                                      
                                      -- Contact Audit
                                      , vc.CREATE_BY AS contact_create_by

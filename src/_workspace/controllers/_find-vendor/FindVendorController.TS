@@ -28,6 +28,8 @@ export const FindVendorController = {
                     dataItem.SearchFilters[statusIdx] = { id: 'status_check', value: 'Registered' };
                 } else if (val === '0' || val === 0) {
                     dataItem.SearchFilters[statusIdx] = { id: 'status_check', value: 'Not Registered' };
+                } else if (val === 'Cannot Register') {
+                    dataItem.SearchFilters[statusIdx] = { id: 'fft_status', value: 2 };
                 } else {
                     dataItem.SearchFilters.splice(statusIdx, 1);
                 }
@@ -89,7 +91,7 @@ export const FindVendorController = {
         }
 
         dataItem['sqlWhereColumnFilter'] = '' // No longer needed as it's merged into sqlWhere
-
+        dataItem.sqlWhere = sqlWhere
 
         // console.log('dataItem:', dataItem)
 
@@ -97,7 +99,7 @@ export const FindVendorController = {
             console.time('[PERF] Total Search');
 
             console.time('[PERF] MySQL Query');
-            const { resultData, totalCount } = await FindVendorModel.searchVendors(dataItem, sqlWhere);
+            const { resultData, totalCount } = await FindVendorModel.searchVendors(dataItem);
             console.timeEnd('[PERF] MySQL Query');
             console.log(`[PERF] MySQL returned ${resultData.length} rows`);
 
@@ -528,7 +530,8 @@ export const FindVendorController = {
                 const idsSqlWhere = ` AND v.vendor_id IN (${ids})`;
                 // We use searchAllForExport but with specific IDs override
                 // We ignore Order from SQL, because we will sort by ID order in JS
-                vendorRows = await FindVendorModel.searchAllForExport(searchQuery, idsSqlWhere) as any[];
+                searchQuery.sqlWhere = idsSqlWhere;
+                vendorRows = await FindVendorModel.searchAllForExport(searchQuery) as any[];
 
                 // Re-sort in Memory to match input ID order
                 const idMap = new Map();
@@ -545,11 +548,13 @@ export const FindVendorController = {
             } else if (dataItem.TYPE === 'currentPage') {
                 // CASE B: Fallback Current Page (if no vendor_ids sent)
                 searchQuery['Offset'] = Number(searchQuery['Start'] || 0) * Number(searchQuery['Limit'] || 20)
-                const { resultData } = await FindVendorModel.searchVendors(searchQuery, sqlWhere);
+                searchQuery.sqlWhere = sqlWhere;
+                const { resultData } = await FindVendorModel.searchVendors(searchQuery);
                 vendorRows = resultData;
             } else {
                 // CASE C: All Pages
-                vendorRows = await FindVendorModel.searchAllForExport(searchQuery, sqlWhere) as any[];
+                searchQuery.sqlWhere = sqlWhere;
+                vendorRows = await FindVendorModel.searchAllForExport(searchQuery) as any[];
             }
 
             // 2. Fetch Prones Data & Match
@@ -986,9 +991,15 @@ const matchVendorsWithPrones = async (vendors: any[], filterStatus: string | nul
     // Enrich vendors with match results
     let enrichedData = vendors.map((vendor: any) => {
         const match = matchMap.get(vendor.vendor_id)
+        
+        let finalStatus = match ? match.status_check : 'Not Registered'
+        if (vendor.fft_status == 2 || vendor.fft_status === 'Cannot Register') {
+            finalStatus = 'Cannot Register'
+        }
+
         return {
             ...vendor,
-            status_check: match ? match.status_check : 'Not Registered',
+            status_check: finalStatus,
             prones_code: match ? match.prones_code : (vendor.fft_vendor_code || null),
             prones_name_en: match ? match.prones_name : null,
             match_method: match ? match.match_method : null,

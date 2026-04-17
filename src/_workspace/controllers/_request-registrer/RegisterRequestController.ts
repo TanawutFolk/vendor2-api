@@ -245,7 +245,7 @@ export const RegisterRequestController = {
                 } as ResponseI)
             }
 
-            await RegisterRequestModel.updateRequest({
+            const result = await RegisterRequestModel.updateRequest({
                 request_id,
                 vendor_contact_id: dataItem.vendor_contact_id || null,
                 supportProduct_Process: dataItem.supportProduct_Process || '',
@@ -254,13 +254,7 @@ export const RegisterRequestController = {
                 UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
             })
 
-            res.status(200).json({
-                Status: true,
-                ResultOnDb: {},
-                TotalCountOnDb: 1,
-                MethodOnDb: 'Update Request',
-                Message: 'Request updated successfully'
-            } as ResponseI)
+            res.status(200).json(result as ResponseI)
         } catch (error: any) {
             console.error('Update Request Error:', error);
             res.status(200).json({
@@ -301,7 +295,7 @@ export const RegisterRequestController = {
 
             // approve_date: set when Rejected, or when it's the final step (no next pending step exists)
             const isFinalStepOrRejected = dataItem.request_status === 'Rejected' || dataItem.isFinalStep === true
-            await RegisterRequestModel.updateStatus({
+            const result = await RegisterRequestModel.updateStatus({
                 request_id,
                 request_status: dataItem.request_status || '',
                 approve_by: dataItem.approve_by || '',
@@ -310,13 +304,7 @@ export const RegisterRequestController = {
                 UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
             })
 
-            res.status(200).json({
-                Status: true,
-                ResultOnDb: {},
-                TotalCountOnDb: 1,
-                MethodOnDb: 'Update Request Status',
-                Message: 'Update Data Success'
-            } as ResponseI)
+            res.status(200).json(result as ResponseI)
         } catch (error: any) {
             console.error('Update Status Error:', error);
             res.status(200).json({
@@ -628,15 +616,12 @@ export const RegisterRequestController = {
                     MethodOnDb: 'Save GPR Form', Message: 'Invalid request_id'
                 } as ResponseI)
             }
-            await RegisterRequestModel.saveGprForm({
+            const result = await RegisterRequestModel.saveGprForm({
                 request_id,
                 gpr_data: dataItem.gpr_data || {},
                 UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
             })
-            res.status(200).json({
-                Status: true, ResultOnDb: {}, TotalCountOnDb: 1,
-                MethodOnDb: 'Save GPR Form', Message: 'GPR form saved successfully'
-            } as ResponseI)
+            res.status(200).json(result as ResponseI)
         } catch (error: any) {
             console.error('Save GPR Form Error:', error);
             res.status(200).json({
@@ -752,15 +737,12 @@ export const RegisterRequestController = {
                     MethodOnDb: 'Complete Registration', Message: 'Invalid request_id'
                 } as ResponseI)
             }
-            await RegisterRequestModel.completeRegistration({
+            const result = await RegisterRequestModel.completeRegistration({
                 request_id,
                 vendor_code: dataItem.vendor_code || '',
                 UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
             })
-            res.status(200).json({
-                Status: true, ResultOnDb: {}, TotalCountOnDb: 1,
-                MethodOnDb: 'Complete Registration', Message: 'Vendor registration completed successfully'
-            } as ResponseI)
+            res.status(200).json(result as ResponseI)
         } catch (error: any) {
             console.error('Complete Registration Error:', error);
             res.status(200).json({
