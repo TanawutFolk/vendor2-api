@@ -692,7 +692,7 @@ export const emailToPMMgrTemplate = (data: ApprovalEmailData) => `
             <tr><td style="padding: 2px 0; color: blue; vertical-align: top;">CC:</td><td style="padding: 2px 0; color: blue;">${data.ccEmail}</td></tr>
             <tr><td style="padding: 16px 0 2px 0; vertical-align: top;">Topic</td><td style="padding: 16px 0 2px 0;">[Request Approval] Please approve register vendor follow as "${data.requestNumber}"</td></tr>
         </table>
-        <p style="margin: 0 0 16px 0;">Dear : &nbsp;&nbsp;&nbsp;<span style="color: blue;">PO Mgr</span></p>
+        <p style="margin: 0 0 16px 0;">Dear : &nbsp;&nbsp;&nbsp;<span style="color: blue;">${data.recipientName || 'PO Mgr'}</span></p>
         <p style="margin: 0 0 16px 0;">Status: Under approval register vendor<br>Please approve register vendor follow as "${data.requestNumber}"</p>
         <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 16px;">
             <tr><td style="width: 220px; padding: 2px 0;">Vendor Name:</td><td style="padding: 2px 0;">${data.vendorName}</td></tr>

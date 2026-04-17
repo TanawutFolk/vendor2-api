@@ -539,7 +539,7 @@ export const RegisterRequestSQL = {
         sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
         sql = sql.replaceAll('dataItem.request_status', dataItem['request_status'] || '')
         sql = sql.replaceAll('dataItem.approve_by', dataItem['approve_by'] || '')
-        sql = sql.replaceAll('dataItem.approve_date', dataItem['approve_date'] || '')
+        sql = sql.replaceAll("'dataItem.approve_date'", dataItem['approve_date'] === 'NOW()' ? 'NOW()' : 'approve_date')
         sql = sql.replaceAll('dataItem.approver_remark', dataItem['approver_remark'] || '')
         sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
 

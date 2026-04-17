@@ -2,7 +2,17 @@ import { MySQLExecute } from '@businessData/dbExecute'
 import { RegisterRequestSQL } from '../../sql/_request-registrer/RegisterRequestSQL'
 import { RowDataPacket, ResultSetHeader } from 'mysql2'
 import sendEmail from '@src/config/sendEmail'
-import { emailRequestRegisterVendorTemplate } from '@src/config/mailTemplate'
+import {
+    emailRequestRegisterVendorTemplate,
+    emailToPMMgrTemplate,
+    emailToPMGMTemplate,
+    emailToMDTemplate,
+    emailToAccountPICTemplate,
+    emailReject1Template,
+    emailCompleteTemplate,
+    type ApprovalEmailData,
+    type EmailCompleteData
+} from '@src/config/mailTemplate'
 
 export const RegisterRequestService = {
     // Create a new registration request
@@ -26,7 +36,7 @@ export const RegisterRequestService = {
             const vendorData = vendorRes[0] || {}
             const vendorRegion = vendorData.vendor_region || 'Local'
             const isOversea = vendorRegion.toLowerCase() === 'oversea'
-            const assignmentGroup = isOversea ? 'Oversea' : 'Local'
+            const assignmentGroup = isOversea ? 'OVERSEA PO PIC' : 'LOCAL PO PIC'
 
             // 2. Fetch Active Assignees
             const fetchAssigneesSql = `SELECT empName, empcode, empEmail FROM assignees_to WHERE group_name = '${assignmentGroup}' AND INUSE = 1 ORDER BY Assignees_id ASC`
@@ -272,20 +282,50 @@ export const RegisterRequestService = {
             const steps = (await MySQLExecute.search(stepsSql)) as RowDataPacket[]
             const currentStep = steps.find((s: any) => s.step_status === 'in_progress')
 
-            // We need vendor_id for updating vendor status if rejected
-            const checkSql = `SELECT vendor_id, assign_to FROM request_register_vendor WHERE request_id = ${dataItem.request_id} LIMIT 1`
+            // We need vendor_id + vendor_region for updating vendor status and account group lookup
+            const checkSql = `
+                SELECT rr.vendor_id, rr.assign_to, v.vendor_region
+                FROM request_register_vendor rr
+                LEFT JOIN vendors v ON v.vendor_id = rr.vendor_id
+                WHERE rr.request_id = ${dataItem.request_id} LIMIT 1
+            `
             const checkRes = (await MySQLExecute.search(checkSql)) as any[]
             const vendor_id = checkRes[0]?.vendor_id
             const assign_to = checkRes[0]?.assign_to
+            const isOversea = (checkRes[0]?.vendor_region || '').toLowerCase() === 'oversea'
 
-            // Auth Check
-            if (currentStep && currentStep.approver_id) {
+            // ── Auth Check ───────────────────────────────────────────────────
+            if (currentStep) {
                 const actionBy = dataItem.approve_by || dataItem.UPDATE_BY || ''
-                const isDesignatedApprover = currentStep.approver_id === actionBy
-                const isAssignedPic = assign_to && assign_to === actionBy
-                
-                if (actionBy && !isDesignatedApprover && !isAssignedPic) {
-                    throw new Error('Unauthorized approver only')
+                const currentDesc = (currentStep.DESCRIPTION || '').toLowerCase()
+
+                // Is this a PIC-handled step? (description contains 'pic')
+                const isPicStep = currentDesc.includes('pic')
+
+                // Is this a management role step requiring a specific approver?
+                const requiresRoleApprover =
+                    currentDesc.includes('mgr') || currentDesc.includes('manager') ||
+                    currentDesc.includes('gm') || currentDesc.includes('general manager') ||
+                    currentDesc.includes('md') || currentDesc.includes('director') ||
+                    currentDesc.includes('account') ||
+                    currentDesc.includes('checker')
+
+                if (currentStep.approver_id) {
+                    const isDesignatedApprover = currentStep.approver_id === actionBy
+                    // PIC steps: also allow the assigned PIC (assign_to) to action
+                    const isAssignedPic = isPicStep && assign_to && assign_to === actionBy
+
+                    if (actionBy && !isDesignatedApprover && !isAssignedPic) {
+                        throw new Error(`Unauthorized: step "${currentStep.DESCRIPTION}" requires approver [${currentStep.approver_id}]`)
+                    }
+                } else if (requiresRoleApprover) {
+                    // Role step with no approver assigned yet — block everyone
+                    throw new Error(`Approver not yet assigned for step "${currentStep.DESCRIPTION}". Please contact admin.`)
+                } else {
+                    // PIC step with no explicit approver — only assign_to may act
+                    if (actionBy && assign_to && assign_to !== actionBy) {
+                        throw new Error(`Unauthorized: only the assigned PIC [${assign_to}] can action this step`)
+                    }
                 }
             }
 
@@ -319,6 +359,8 @@ export const RegisterRequestService = {
                             UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
                         }))
                     }
+                    // Rejection email — notify PIC that request was rejected
+                    RegisterRequestService.triggerRejectionEmail(dataItem, currentStep).catch(console.error)
                 } else if (currentStep) {
                     sqlList.push(await RegisterRequestSQL.updateApprovalStep({
                         step_id: currentStep.step_id,
@@ -336,19 +378,36 @@ export const RegisterRequestService = {
                     // Activate Next Step Logic
                     const nextStep = steps.find((s: any) => s.step_order === currentStep.step_order + 1 && s.step_status === 'pending')
                     if (nextStep) {
-                        // Dynamic Approver Lookup
+                        // ── Dynamic Approver Lookup (group names must match assignees_to.group_name exactly) ──
                         let dynamicApprover = ''
                         const desc = (nextStep.DESCRIPTION || '').toLowerCase()
-                        if (desc.includes('manager') || desc.includes('mgr')) {
-                            const mgrRes = await MySQLExecute.search("SELECT empcode FROM assignees_to WHERE group_name = 'PO_Manager' AND INUSE = 1 LIMIT 1") as any[]
+
+                        if (desc.includes('gm') || desc.includes('general manager')) {
+                            // PO GM — check BEFORE 'mgr' to avoid false-match on "PO GM Approve"
+                            const gmRes = await MySQLExecute.search("SELECT empcode FROM assignees_to WHERE group_name = 'PO GM' AND INUSE = 1 LIMIT 1") as any[]
+                            if (gmRes.length > 0) dynamicApprover = gmRes[0].empcode
+
+                        } else if (desc.includes('mgr') || desc.includes('manager')) {
+                            // PO Mgr — note: DB group_name = 'PO_MGR'
+                            const mgrRes = await MySQLExecute.search("SELECT empcode FROM assignees_to WHERE group_name = 'PO_MGR' AND INUSE = 1 LIMIT 1") as any[]
                             if (mgrRes.length > 0) dynamicApprover = mgrRes[0].empcode
+
                         } else if (desc.includes('md') || desc.includes('director')) {
                             const mdRes = await MySQLExecute.search("SELECT empcode FROM assignees_to WHERE group_name = 'MD' AND INUSE = 1 LIMIT 1") as any[]
                             if (mdRes.length > 0) dynamicApprover = mdRes[0].empcode
+
                         } else if (desc.includes('account')) {
-                            const acctRes = await MySQLExecute.search("SELECT empcode FROM assignees_to WHERE group_name = 'Account' AND INUSE = 1 LIMIT 1") as any[]
+                            // Account group differs by vendor region
+                            const acctGroup = isOversea ? 'Acc_Oversea_Main' : 'Acc_Local_Main'
+                            const acctRes = await MySQLExecute.search(`SELECT empcode FROM assignees_to WHERE group_name = '${acctGroup}' AND INUSE = 1 LIMIT 1`) as any[]
                             if (acctRes.length > 0) dynamicApprover = acctRes[0].empcode
+
+                        } else if (desc.includes('checker') || desc.includes('check all document')) {
+                            // PO Checker step
+                            const checkerRes = await MySQLExecute.search("SELECT empcode FROM assignees_to WHERE group_name = 'PO CHECKER (Main)' AND INUSE = 1 LIMIT 1") as any[]
+                            if (checkerRes.length > 0) dynamicApprover = checkerRes[0].empcode
                         }
+                        // Steps with no role keyword (e.g., PIC steps) → no dynamicApprover → assign_to remains responsible
 
                         if (dynamicApprover) {
                             sqlList.push(`UPDATE request_approval_step SET approver_id = '${dynamicApprover}' WHERE step_id = ${nextStep.step_id}`)
@@ -363,8 +422,10 @@ export const RegisterRequestService = {
                         // Trigger Email Notifications (Async)
                         RegisterRequestService.triggerApprovalEmails(dataItem, nextStep, dynamicApprover, currentStep).catch(console.error)
                     } else {
-                        // Close Request if no more steps
+                        // No more steps — close the request and notify requester
                         sqlList.push(`UPDATE request_register_vendor SET request_status = 'Completed', approve_date = NOW() WHERE request_id = ${dataItem.request_id}`)
+                        // Completion email — notify requester that registration is done
+                        RegisterRequestService.triggerCompletionEmail(dataItem).catch(console.error)
                     }
                 }
             }
@@ -389,10 +450,256 @@ export const RegisterRequestService = {
         }
     },
 
-    // Helper for approval notifications
+    // Helper for approval notifications — fires async after DB commit
     triggerApprovalEmails: async (dataItem: any, nextStep: any, dynamicApprover: string, currentStep: any) => {
-        // ... Logged simplified email logic to focus on refactoring structure ...
-        // [Assuming the detailed email logic from the original remains same in production]
+        try {
+            const requestId = dataItem.request_id
+
+            // ── Fetch vendor + request + requester data ────────────────────
+            const vendorSql = `
+                SELECT v.company_name, v.address,
+                       vc.contact_name, vc.email AS vendor_email, vc.tel_phone,
+                       rr.assign_to, rr.supportProduct_Process, rr.purchase_frequency, rr.cc_emails,
+                       rr.Request_By_EmployeeCode
+                FROM request_register_vendor rr
+                LEFT JOIN vendors v ON v.vendor_id = rr.vendor_id
+                LEFT JOIN vendor_contacts vc ON vc.vendor_id = v.vendor_id
+                WHERE rr.request_id = ${requestId} LIMIT 1
+            `
+            const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
+            const vd = vendorRes[0] || {}
+
+            // PIC email (primary sender / signer)
+            const picSql = `SELECT empName, empSurname, empEmail FROM assignees_to WHERE empcode = '${vd.assign_to || ''}' LIMIT 1`
+            const picRes = (await MySQLExecute.search(picSql)) as any[]
+            const picRow = picRes[0] || {}
+            const picName = picRow.empName ? `${picRow.empName} ${picRow.empSurname || ''}`.trim() : (vd.assign_to || 'PIC')
+            const picEmail = picRow.empEmail || ''
+            const picTel = ''
+
+            // Approver email from assignees_to
+            const approverEmailSql = `SELECT empEmail FROM assignees_to WHERE empcode = '${dynamicApprover}' LIMIT 1`
+            const approverEmailRes = (await MySQLExecute.search(approverEmailSql)) as any[]
+            const approverEmail = approverEmailRes[0]?.empEmail || ''
+
+            // Request number
+            const currentYear = new Date().getFullYear().toString().slice(-2)
+            const paddedId = String(requestId).padStart(4, '0')
+            const requestNumber = `Register_Selection-${currentYear}-${paddedId}`
+            const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
+
+            // CC list: pic + cc_emails
+            const ccEmails: string[] = []
+            if (picEmail) ccEmails.push(picEmail)
+            if (vd.cc_emails) {
+                try {
+                    const ccParsed = typeof vd.cc_emails === 'string' ? JSON.parse(vd.cc_emails) : vd.cc_emails
+                    if (Array.isArray(ccParsed)) {
+                        ccParsed.forEach((c: any) => { if (c?.email) ccEmails.push(c.email) })
+                    }
+                } catch { /* ignore */ }
+            }
+
+            const baseEmailData: ApprovalEmailData = {
+                toEmail: approverEmail,
+                ccEmail: ccEmails.join('; '),
+                requestNumber,
+                vendorName: vd.company_name || 'N/A',
+                address: vd.address || 'N/A',
+                contactPic: vd.contact_name || 'N/A',
+                email: vd.vendor_email || 'N/A',
+                tel: vd.tel_phone || 'N/A',
+                supportProduct: vd.supportProduct_Process || 'N/A',
+                purchaseFrequency: vd.purchase_frequency || 'N/A',
+                systemLink,
+                picName,
+                picTel,
+            }
+
+            // ── Choose template based on next step DESCRIPTION ─────────────
+            if (!approverEmail) return  // no email = skip silently
+
+            const nextDesc = (nextStep?.DESCRIPTION || '').toLowerCase()
+            let emailHtml: string
+            let emailSubject: string
+
+            if (nextDesc.includes('gm') || nextDesc.includes('general manager')) {
+                emailHtml = emailToPMGMTemplate(baseEmailData)
+                emailSubject = `[Request Approval] Please approve register vendor "${requestNumber}" - PO GM Step`
+            } else if (nextDesc.includes('manager') || nextDesc.includes('mgr')) {
+                emailHtml = emailToPMMgrTemplate(baseEmailData)
+                emailSubject = `[Request Approval] Please approve register vendor "${requestNumber}" - PO Mgr Step`
+            } else if (nextDesc.includes('md') || nextDesc.includes('director')) {
+                emailHtml = emailToMDTemplate(baseEmailData)
+                emailSubject = `[Request Approval] Please approve register vendor "${requestNumber}" - MD Approval`
+            } else if (nextDesc.includes('account')) {
+                emailHtml = emailToAccountPICTemplate({ ...baseEmailData, recipientName: 'Account PIC' })
+                emailSubject = `[Request Action] Please process register vendor "${requestNumber}" - Account Step`
+            } else if (nextDesc.includes('checker') || nextDesc.includes('check all document')) {
+                emailHtml = emailToPMMgrTemplate({ ...baseEmailData, toEmail: approverEmail, recipientName: 'Document Checker' })
+                emailSubject = `[Request Action] Please check document for register vendor "${requestNumber}"`
+            } else {
+                // Generic fallback — send to PIC (step 2 PIC check etc.)
+                emailHtml = emailToPMMgrTemplate({ ...baseEmailData, toEmail: approverEmail })
+                emailSubject = `[Request Approval] Please process register vendor "${requestNumber}"`
+            }
+
+            await sendEmail(emailHtml, approverEmail, emailSubject, ccEmails)
+        } catch (err: any) {
+            console.error('[triggerApprovalEmails] Failed:', err?.message)
+        }
+    },
+
+    // Helper for rejection email — fires async after DB commit
+    triggerRejectionEmail: async (dataItem: any, currentStep: any) => {
+        try {
+            const requestId = dataItem.request_id
+
+            const vendorSql = `
+                SELECT v.company_name, v.address,
+                       vc.contact_name, vc.email AS vendor_email, vc.tel_phone,
+                       rr.assign_to, rr.supportProduct_Process, rr.purchase_frequency, rr.cc_emails,
+                       rr.Request_By_EmployeeCode
+                FROM request_register_vendor rr
+                LEFT JOIN vendors v ON v.vendor_id = rr.vendor_id
+                LEFT JOIN vendor_contacts vc ON vc.vendor_id = v.vendor_id
+                WHERE rr.request_id = ${requestId} LIMIT 1
+            `
+            const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
+            const vd = vendorRes[0] || {}
+
+            // PIC email
+            const picEmailSql = `SELECT empName, empSurname, empEmail FROM assignees_to WHERE empcode = '${vd.assign_to || ''}' LIMIT 1`
+            const picRes = (await MySQLExecute.search(picEmailSql)) as any[]
+            const picRow = picRes[0] || {}
+            const picEmail = picRow.empEmail || ''
+            const picName = picRow.empName ? `${picRow.empName} ${picRow.empSurname || ''}`.trim() : (vd.assign_to || 'PIC')
+            const picTel = ''
+
+            // Approver who rejected
+            const approverEmailSql = `SELECT empEmail FROM assignees_to WHERE empcode = '${currentStep?.approver_id || ''}' LIMIT 1`
+            const approverRes = (await MySQLExecute.search(approverEmailSql)) as any[]
+            const approverEmail = approverRes[0]?.empEmail || ''
+
+            const currentYear = new Date().getFullYear().toString().slice(-2)
+            const paddedId = String(requestId).padStart(4, '0')
+            const requestNumber = `Register_Selection-${currentYear}-${paddedId}`
+            const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
+
+            const ccEmails: string[] = []
+            if (approverEmail) ccEmails.push(approverEmail)
+            if (vd.cc_emails) {
+                try {
+                    const ccParsed = typeof vd.cc_emails === 'string' ? JSON.parse(vd.cc_emails) : vd.cc_emails
+                    if (Array.isArray(ccParsed)) {
+                        ccParsed.forEach((c: any) => { if (c?.email) ccEmails.push(c.email) })
+                    }
+                } catch { /* ignore */ }
+            }
+
+            if (!picEmail) return
+
+            const rejectRemark = dataItem.approver_remark || ''
+            const emailHtml = emailReject1Template({
+                toEmail: picEmail,
+                ccEmailLine1: approverEmail,
+                ccEmailLine2: ccEmails.filter(e => e !== approverEmail).join('; '),
+                requestNumber,
+                remarkEN: rejectRemark,
+                remarkTH: rejectRemark,
+                vendorName: vd.company_name || 'N/A',
+                address: vd.address || 'N/A',
+                contactPic: vd.contact_name || 'N/A',
+                email: vd.vendor_email || 'N/A',
+                tel: vd.tel_phone || 'N/A',
+                supportProduct: vd.supportProduct_Process || 'N/A',
+                purchaseFrequency: vd.purchase_frequency || 'N/A',
+                systemLink,
+                picName,
+                picTel,
+            })
+
+            await sendEmail(
+                emailHtml,
+                picEmail,
+                `[REJECT] Register vendor "${requestNumber}" has been rejected`,
+                ccEmails
+            )
+        } catch (err: any) {
+            console.error('[triggerRejectionEmail] Failed:', err?.message)
+        }
+    },
+
+    // Helper for completion email
+    triggerCompletionEmail: async (dataItem: any) => {
+        try {
+            const requestId = dataItem.request_id
+
+            const vendorSql = `
+                SELECT v.company_name, v.address,
+                       vc.contact_name, vc.email AS vendor_email, vc.tel_phone,
+                       rr.assign_to, rr.supportProduct_Process, rr.purchase_frequency, rr.cc_emails,
+                       rr.Request_By_EmployeeCode, rr.vendor_code
+                FROM request_register_vendor rr
+                LEFT JOIN vendors v ON v.vendor_id = rr.vendor_id
+                LEFT JOIN vendor_contacts vc ON vc.vendor_id = v.vendor_id
+                WHERE rr.request_id = ${requestId} LIMIT 1
+            `
+            const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
+            const vd = vendorRes[0] || {}
+
+            // Requester
+            const requesterSql = `SELECT empName, empSurname, empEmail FROM Person.MEMBER_FED WHERE empCode = '${vd.Request_By_EmployeeCode || ''}' LIMIT 1`
+            const requesterRes = (await MySQLExecute.search(requesterSql)) as any[]
+            const req = requesterRes[0] || {}
+            const requesterName = req.empName ? `${req.empName} ${req.empSurname || ''}`.trim() : vd.Request_By_EmployeeCode
+            const requesterEmail = req.empEmail || ''
+
+            const picEmailSql = `SELECT empName, empSurname, empEmail FROM assignees_to WHERE empcode = '${vd.assign_to || ''}' LIMIT 1`
+            const picRes = (await MySQLExecute.search(picEmailSql)) as any[]
+            const picRow = picRes[0] || {}
+            const picName = picRow.empName ? `${picRow.empName} ${picRow.empSurname || ''}`.trim() : (vd.assign_to || 'PIC')
+            const picEmail = picRow.empEmail || ''
+            const picTel = ''
+
+            const currentYear = new Date().getFullYear().toString().slice(-2)
+            const paddedId = String(requestId).padStart(4, '0')
+            const requestNumber = `Register_Selection-${currentYear}-${paddedId}`
+            const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
+
+            const ccEmails: string[] = []
+            if (picEmail) ccEmails.push(picEmail)
+
+            if (!requesterEmail) return
+
+            const completionData: EmailCompleteData = {
+                toEmail: requesterEmail,
+                ccEmail: ccEmails.join('; '),
+                requestNumber,
+                vendorName: vd.company_name || 'N/A',
+                address: vd.address || 'N/A',
+                contactPic: vd.contact_name || 'N/A',
+                email: vd.vendor_email || 'N/A',
+                tel: vd.tel_phone || 'N/A',
+                supportProduct: vd.supportProduct_Process || 'N/A',
+                purchaseFrequency: vd.purchase_frequency || 'N/A',
+                systemLink,
+                picName,
+                picTel,
+                vendorCode: dataItem.vendor_code || vd.vendor_code || 'Pending',
+                userName: requesterName || 'Requester',
+            }
+
+            const emailHtml = emailCompleteTemplate(completionData)
+            await sendEmail(
+                emailHtml,
+                requesterEmail,
+                `[Complete] Register vendor "${requestNumber}" is now completed`,
+                ccEmails
+            )
+        } catch (err: any) {
+            console.error('[triggerCompletionEmail] Failed:', err?.message)
+        }
     },
 
     // Save GPR form

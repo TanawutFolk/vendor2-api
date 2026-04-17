@@ -131,9 +131,16 @@ export const RegisterRequestController = {
 
             // Manually add root-level filters (frontend passes these directly instead of via SearchFilters)
             const manualFilters: string[] = []
-            if (dataItem.assign_to) {
-                // PIC เห็น request ที่ assign ให้ตัวเอง + Approver (Manager/MD/Account) เห็น request ที่ step ถึงคิว
-                manualFilters.push(`(rr.assign_to = '${dataItem.assign_to}' OR EXISTS (SELECT 1 FROM request_approval_step ras WHERE ras.request_id = rr.request_id AND ras.approver_id = '${dataItem.assign_to}' AND ras.step_status = 'in_progress' AND ras.INUSE = 1))`)
+            if (dataItem.approver_id) {
+                // Approval pages (MD / PO GM / PO Mgr / Check Document):
+                // Show requests where this approver has an in_progress OR already-actioned (approved/rejected) step.
+                // Items stay visible after being actioned so the approver can track their work history.
+                // The Approve/Reject buttons are hidden on the frontend when step_status is not 'in_progress'.
+                manualFilters.push(`EXISTS (SELECT 1 FROM request_approval_step ras WHERE ras.request_id = rr.request_id AND ras.approver_id = '${dataItem.approver_id}' AND ras.step_status IN ('in_progress', 'approved', 'rejected') AND ras.INUSE = 1)`)
+            } else if (dataItem.assign_to) {
+                // PIC dashboard: show requests assigned to PIC only.
+                // Excludes approver step records so PIC doesn't see MD/GM/Mgr queues.
+                manualFilters.push(`rr.assign_to = '${dataItem.assign_to}'`)
             }
             if (dataItem.Request_By_EmployeeCode) {
                 manualFilters.push(`rr.Request_By_EmployeeCode = '${dataItem.Request_By_EmployeeCode}'`)
@@ -290,16 +297,13 @@ export const RegisterRequestController = {
                 } as ResponseI)
             }
 
-            const now = new Date()
-            const mysqlDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
-
-            // approve_date: set when Rejected, or when it's the final step (no next pending step exists)
+            // approve_date: set to 'NOW()' (DB CURRENT_TIMESTAMP) when Rejected, or when it's the final step
             const isFinalStepOrRejected = dataItem.request_status === 'Rejected' || dataItem.isFinalStep === true
             const result = await RegisterRequestModel.updateStatus({
                 request_id,
                 request_status: dataItem.request_status || '',
                 approve_by: dataItem.approve_by || '',
-                approve_date: isFinalStepOrRejected ? mysqlDate : null,
+                approve_date: isFinalStepOrRejected ? 'NOW()' : null,
                 approver_remark: dataItem.approver_remark || '',
                 UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
             })
