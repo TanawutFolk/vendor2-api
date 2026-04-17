@@ -284,7 +284,7 @@ export const RegisterRequestService = {
 
             // We need vendor_id + vendor_region for updating vendor status and account group lookup
             const checkSql = `
-                SELECT rr.vendor_id, rr.assign_to, v.vendor_region
+                SELECT rr.vendor_id, rr.assign_to, rr.gpr_data, v.vendor_region
                 FROM request_register_vendor rr
                 LEFT JOIN vendors v ON v.vendor_id = rr.vendor_id
                 WHERE rr.request_id = ${dataItem.request_id} LIMIT 1
@@ -292,6 +292,7 @@ export const RegisterRequestService = {
             const checkRes = (await MySQLExecute.search(checkSql)) as any[]
             const vendor_id = checkRes[0]?.vendor_id
             const assign_to = checkRes[0]?.assign_to
+            const rawGprData = checkRes[0]?.gpr_data
             const isOversea = (checkRes[0]?.vendor_region || '').toLowerCase() === 'oversea'
 
             // ── Auth Check ───────────────────────────────────────────────────
@@ -327,10 +328,34 @@ export const RegisterRequestService = {
                         throw new Error(`Unauthorized: only the assigned PIC [${assign_to}] can action this step`)
                     }
                 }
+
+                // ── Account Registered Vendor Code Check ──
+                if (currentDesc.includes('account registered') && newStatus !== 'Rejected') {
+                    let extractedVendorCode = ''
+                    if (rawGprData) {
+                        try {
+                            const parsedGpr = typeof rawGprData === 'string' ? JSON.parse(rawGprData) : rawGprData
+                            extractedVendorCode = parsedGpr?.vendor_code_selector || ''
+                        } catch (e) {
+                            console.error('Failed to parse gpr_data', e)
+                        }
+                    }
+                    if (!extractedVendorCode.trim()) {
+                        throw new Error('Approval blocked: You must open the GPR Form and specify the "Vendor Code" before approving this step.')
+                    }
+                    dataItem.vendor_code_extracted = extractedVendorCode
+                }
             }
 
             const sqlList = []
             sqlList.push(await RegisterRequestSQL.updateStatus(dataItem))
+
+            if (dataItem.vendor_code_extracted) {
+                sqlList.push(`UPDATE request_register_vendor SET vendor_code = '${dataItem.vendor_code_extracted}' WHERE request_id = ${dataItem.request_id}`)
+                if (vendor_id) {
+                    sqlList.push(`UPDATE vendors SET fft_vendor_code = '${dataItem.vendor_code_extracted}' WHERE vendor_id = ${vendor_id}`)
+                }
+            }
 
             if (steps.length > 0) {
                 if (newStatus === 'Rejected') {
@@ -376,7 +401,19 @@ export const RegisterRequestService = {
                     }))
 
                     // Activate Next Step Logic
-                    const nextStep = steps.find((s: any) => s.step_order === currentStep.step_order + 1 && s.step_status === 'pending')
+                    let nextStep = steps.find((s: any) => s.step_order === currentStep.step_order + 1 && s.step_status === 'pending')
+
+                    // 🔥 Force terminate flow if the step we just approved is "Account Registered"
+                    const isAccountRegistered = (currentStep.DESCRIPTION || '').toLowerCase().includes('account registered')
+                    if (isAccountRegistered) {
+                        nextStep = undefined // Force block the next step
+                        // Mark any lingering steps as skipped
+                        const remainingSteps = steps.filter((s: any) => s.step_status === 'pending' && s.step_order > currentStep.step_order)
+                        for (const rs of remainingSteps) {
+                            sqlList.push(`UPDATE request_approval_step SET step_status = 'skipped', UPDATE_BY = '${dataItem.UPDATE_BY || 'SYSTEM'}' WHERE step_id = ${rs.step_id}`)
+                        }
+                    }
+
                     if (nextStep) {
                         // ── Dynamic Approver Lookup (group names must match assignees_to.group_name exactly) ──
                         let dynamicApprover = ''
@@ -477,10 +514,14 @@ export const RegisterRequestService = {
             const picEmail = picRow.empEmail || ''
             const picTel = ''
 
-            // Approver email from assignees_to
-            const approverEmailSql = `SELECT empEmail FROM assignees_to WHERE empcode = '${dynamicApprover}' LIMIT 1`
-            const approverEmailRes = (await MySQLExecute.search(approverEmailSql)) as any[]
-            const approverEmail = approverEmailRes[0]?.empEmail || ''
+            // Approver email from assignees_to or fallback to DB step / PIC
+            const targetApprover = dynamicApprover || nextStep?.approver_id || vd.assign_to || ''
+            let approverEmail = ''
+            if (targetApprover) {
+                const approverEmailSql = `SELECT empEmail FROM assignees_to WHERE empcode = '${targetApprover}' LIMIT 1`
+                const approverEmailRes = (await MySQLExecute.search(approverEmailSql)) as any[]
+                approverEmail = approverEmailRes[0]?.empEmail || ''
+            }
 
             // Request number
             const currentYear = new Date().getFullYear().toString().slice(-2)
