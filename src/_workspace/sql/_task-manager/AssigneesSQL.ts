@@ -3,6 +3,7 @@ export interface AssigneesDataItem {
     empcode?: string;
     empName?: string;
     empEmail?: string;
+    group_code?: string;
     group_name?: string;
     INUSE?: number | string;
     keyword?: string;
@@ -17,6 +18,7 @@ export const AssigneesSQL = {
                                      , empcode
                                      , empName
                                      , empEmail
+                                     , group_code
                                      , group_name
                                      , INUSE 
                             FROM
@@ -27,7 +29,7 @@ export const AssigneesSQL = {
                                        dataItem.groupSql
                                        dataItem.inUseSql
                             ORDER BY
-                                       group_name, empcode ASC
+                                       group_code, empcode ASC
         `
 
         let keywordSql = ''
@@ -38,8 +40,8 @@ export const AssigneesSQL = {
         }
 
         let groupSql = ''
-        if (dataItem.group_name) {
-            groupSql = ` AND group_name = 'dataItem.group_name'`
+        if (dataItem.group_code) {
+            groupSql = ` AND group_code = 'dataItem.group_code'`
         }
 
         let inUseSql = ''
@@ -50,7 +52,7 @@ export const AssigneesSQL = {
         sql = sql.replaceAll('dataItem.keywordSql', keywordSql)
         sql = sql.replaceAll('dataItem.groupSql', groupSql)
         sql = sql.replaceAll('dataItem.inUseSql', inUseSql)
-        sql = sql.replaceAll('dataItem.group_name', dataItem.group_name || '')
+        sql = sql.replaceAll('dataItem.group_code', dataItem.group_code || '')
         sql = sql.replaceAll('dataItem.in_use', (dataItem.in_use || 0).toString())
 
         return sql
@@ -62,6 +64,7 @@ export const AssigneesSQL = {
                                        empcode
                                      , empName
                                      , empEmail
+                                     , group_code
                                      , group_name
                                      , INUSE
                             )
@@ -69,6 +72,7 @@ export const AssigneesSQL = {
                                        'dataItem.empcode'
                                      , 'dataItem.empName'
                                      , 'dataItem.empEmail'
+                                     , 'dataItem.group_code'
                                      , 'dataItem.group_name'
                                      ,  dataItem.INUSE
                             )
@@ -76,6 +80,7 @@ export const AssigneesSQL = {
         sql = sql.replaceAll('dataItem.empcode', dataItem.empcode || '')
         sql = sql.replaceAll('dataItem.empName', dataItem.empName || '')
         sql = sql.replaceAll('dataItem.empEmail', dataItem.empEmail || '')
+        sql = sql.replaceAll('dataItem.group_code', dataItem.group_code || '')
         sql = sql.replaceAll('dataItem.group_name', dataItem.group_name || '')
         sql = sql.replaceAll('dataItem.INUSE', (dataItem.INUSE !== undefined ? dataItem.INUSE : 1).toString())
 
@@ -88,6 +93,7 @@ export const AssigneesSQL = {
                                        empcode = 'dataItem.empcode'
                                      , empName = 'dataItem.empName'
                                      , empEmail = 'dataItem.empEmail'
+                                     , group_code = 'dataItem.group_code'
                                      , group_name = 'dataItem.group_name'
                                      , INUSE = dataItem.INUSE
                             WHERE
@@ -96,6 +102,7 @@ export const AssigneesSQL = {
         sql = sql.replaceAll('dataItem.empcode', dataItem.empcode || '')
         sql = sql.replaceAll('dataItem.empName', dataItem.empName || '')
         sql = sql.replaceAll('dataItem.empEmail', dataItem.empEmail || '')
+        sql = sql.replaceAll('dataItem.group_code', dataItem.group_code || '')
         sql = sql.replaceAll('dataItem.group_name', dataItem.group_name || '')
         sql = sql.replaceAll('dataItem.INUSE', (dataItem.INUSE !== undefined ? dataItem.INUSE : 1).toString())
         sql = sql.replaceAll('dataItem.Assignees_id', (dataItem.Assignees_id || 0).toString())

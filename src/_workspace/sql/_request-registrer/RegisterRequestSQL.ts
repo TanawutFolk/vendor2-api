@@ -1,5 +1,6 @@
 export interface RegisterRequestDataItem {
     request_id?: number | string;
+    request_number?: string;
     vendor_id?: number | string;
     vendor_contact_id?: number | string;
     Request_By_EmployeeCode?: string;
@@ -29,6 +30,10 @@ export interface RegisterRequestDataItem {
     approver_id?: string;
     step_status?: string;
     DESCRIPTION?: string;
+    step_code?: string;
+    actor_type?: string;
+    group_code?: string;
+    assignment_mode?: string;
     action_by?: string;
     action_type?: string;
     remark?: string;
@@ -58,6 +63,14 @@ export interface RegisterRequestDataItem {
     uploaded_name?: string;
     path_null?: string;
     name_null?: string;
+    vendor_region?: string;
+    group_name?: string;
+    scope?: string;
+    from_empcode?: string;
+    to_empcode?: string;
+    changed_by?: string;
+    reason?: string;
+    fft_status?: number | string;
 }
 
 export const RegisterRequestSQL = {
@@ -161,6 +174,7 @@ export const RegisterRequestSQL = {
         let dataSql = `
                             SELECT
                                        rr.request_id
+                                                                         , rr.request_number
                                      , rr.vendor_id
                                      , rr.request_status
                                      , rr.supportProduct_Process
@@ -266,6 +280,10 @@ export const RegisterRequestSQL = {
                                                                                'approver_id', ras.approver_id,
                                                                                'step_status', ras.step_status,
                                                                                'DESCRIPTION', ras.DESCRIPTION,
+                                                                               'step_code', ras.step_code,
+                                                                               'actor_type', ras.actor_type,
+                                                                               'group_code', ras.group_code,
+                                                                               'assignment_mode', ras.assignment_mode,
                                                                                'CREATE_DATE', ras.CREATE_DATE,
                                                                                'UPDATE_BY', ras.UPDATE_BY,
                                                                                'UPDATE_DATE', ras.UPDATE_DATE
@@ -338,6 +356,7 @@ export const RegisterRequestSQL = {
         let sql = `
                             SELECT
                                        rr.request_id
+                                                                         , rr.request_number
                                      , rr.vendor_id
                                      , rr.request_status
                                      , rr.supportProduct_Process
@@ -443,6 +462,10 @@ export const RegisterRequestSQL = {
                                                                                'approver_id', ras.approver_id,
                                                                                'step_status', ras.step_status,
                                                                                'DESCRIPTION', ras.DESCRIPTION,
+                                                                               'step_code', ras.step_code,
+                                                                               'actor_type', ras.actor_type,
+                                                                               'group_code', ras.group_code,
+                                                                               'assignment_mode', ras.assignment_mode,
                                                                                'CREATE_DATE', ras.CREATE_DATE,
                                                                                'UPDATE_BY', ras.UPDATE_BY,
                                                                                'UPDATE_DATE', ras.UPDATE_DATE
@@ -546,12 +569,189 @@ export const RegisterRequestSQL = {
         return sql
     },
 
+    getRequestStatusContext: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            SELECT
+                                       rr.vendor_id
+                                     , rr.assign_to
+                                     , rvs.vendor_code_selector
+                                     , v.vendor_region
+                            FROM
+                                       request_register_vendor rr
+                                            LEFT JOIN
+                                       vendors v ON v.vendor_id = rr.vendor_id
+                                            LEFT JOIN
+                                       request_vendor_selections rvs ON rvs.request_id = rr.request_id AND rvs.INUSE = 1
+                            WHERE
+                                       rr.request_id = dataItem.request_id
+                            ORDER BY
+                                       rvs.selection_id DESC
+                            LIMIT
+                                       1
+        `
+
+        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+
+        return sql
+    },
+
+    updateRequestVendorCode: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            UPDATE request_register_vendor SET
+                                       vendor_code = 'dataItem.vendor_code'
+                                     , UPDATE_BY = 'dataItem.UPDATE_BY'
+                                     , UPDATE_DATE = NOW()
+                            WHERE
+                                       request_id = dataItem.request_id
+        `
+
+        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+        sql = sql.replaceAll('dataItem.vendor_code', dataItem['vendor_code'] || '')
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+
+        return sql
+    },
+
+    updateVendorFftVendorCode: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            UPDATE vendors SET
+                                       fft_vendor_code = 'dataItem.vendor_code'
+                            WHERE
+                                       vendor_id = dataItem.vendor_id
+        `
+
+        sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
+        sql = sql.replaceAll('dataItem.vendor_code', dataItem['vendor_code'] || '')
+
+        return sql
+    },
+
+    updateVendorFftStatus: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            UPDATE vendors SET
+                                       fft_status = dataItem.fft_status
+                            WHERE
+                                       vendor_id = dataItem.vendor_id
+        `
+
+        sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
+        sql = sql.replaceAll('dataItem.fft_status', (dataItem['fft_status'] || 0).toString())
+
+        return sql
+    },
+
+    updateApprovalStepApprover: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            UPDATE request_approval_step SET
+                                       approver_id = 'dataItem.approver_id'
+                                     , assignment_mode = 'dataItem.assignment_mode'
+                                     , UPDATE_BY = 'dataItem.UPDATE_BY'
+                                     , UPDATE_DATE = NOW()
+                            WHERE
+                                       step_id = dataItem.step_id
+        `
+
+        sql = sql.replaceAll('dataItem.step_id', (dataItem['step_id'] || 0).toString())
+        sql = sql.replaceAll('dataItem.approver_id', dataItem['approver_id'] || '')
+        sql = sql.replaceAll('dataItem.assignment_mode', dataItem['assignment_mode'] || 'MANUAL')
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+
+        return sql
+    },
+
+    getApproverByGroupCode: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            SELECT
+                                       empcode
+                                     , empName
+                                     , empEmail
+                            FROM
+                                       assignees_to
+                            WHERE
+                                       group_code = 'dataItem.group_code'
+                                       AND INUSE = 1
+                            ORDER BY
+                                       Assignees_id ASC
+                            LIMIT
+                                       1
+        `
+
+        sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
+
+        return sql
+    },
+
+    getAssigneeByEmpCode: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            SELECT
+                                       Assignees_id
+                                     , empcode
+                                     , empName
+                                     , empEmail
+                                     , group_code
+                                     , group_name
+                                     , INUSE
+                            FROM
+                                       assignees_to
+                            WHERE
+                                       empcode = 'dataItem.to_empcode'
+                            LIMIT
+                                       1
+        `
+
+        sql = sql.replaceAll('dataItem.to_empcode', dataItem['to_empcode'] || '')
+
+        return sql
+    },
+
+    updateRequestPicAssignee: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            UPDATE request_register_vendor SET
+                                       assign_to = 'dataItem.assign_to'
+                                     , PIC_Email = 'dataItem.PIC_Email'
+                                     , UPDATE_BY = 'dataItem.UPDATE_BY'
+                                     , UPDATE_DATE = NOW()
+                            WHERE
+                                       request_id = dataItem.request_id
+        `
+
+        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+        sql = sql.replaceAll('dataItem.assign_to', dataItem['assign_to'] || '')
+        sql = sql.replaceAll('dataItem.PIC_Email', dataItem['PIC_Email'] || '')
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+
+        return sql
+    },
+
+    markRequestCompleted: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            UPDATE request_register_vendor SET
+                                       request_status = 'Completed'
+                                     , approve_date = NOW()
+                                     , UPDATE_BY = 'dataItem.UPDATE_BY'
+                                     , UPDATE_DATE = NOW()
+                            WHERE
+                                       request_id = dataItem.request_id
+        `
+
+        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+
+        return sql
+    },
+
     // ─── GET STATUS OPTIONS ──────────────────────────────────────────────────
     getStatusOptions: async (dataItem?: any) => {
         let sql = `
                             SELECT
                                        status_value AS value
                                      , status_label AS label
+                                     , step_code AS stepCode
+                                     , actor_type AS actorType
+                                     , default_group_code_local AS defaultGroupCodeLocal
+                                     , default_group_code_oversea AS defaultGroupCodeOversea
+                                     , requires_vendor_reply AS requiresVendorReply
+                                     , requires_vendor_code AS requiresVendorCode
                                      , chip_color AS chipColor
                                      , accent_color AS accent
                                      , icon AS icon
@@ -575,6 +775,10 @@ export const RegisterRequestSQL = {
                                      , approver_id
                                      , step_status
                                      , DESCRIPTION
+                                     , step_code
+                                     , actor_type
+                                     , group_code
+                                     , assignment_mode
                                      , CREATE_BY
                                      , INUSE
                             ) VALUES (
@@ -583,6 +787,10 @@ export const RegisterRequestSQL = {
                                      , 'dataItem.approver_id'
                                      , 'dataItem.step_status'
                                      , 'dataItem.DESCRIPTION'
+                                     , 'dataItem.step_code'
+                                     , 'dataItem.actor_type'
+                                     , 'dataItem.group_code'
+                                     , 'dataItem.assignment_mode'
                                      , 'dataItem.CREATE_BY'
                                      ,  1
                             )
@@ -593,6 +801,10 @@ export const RegisterRequestSQL = {
         sql = sql.replaceAll('dataItem.approver_id', dataItem['approver_id'] || '')
         sql = sql.replaceAll('dataItem.step_status', dataItem['step_status'] || '')
         sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem['DESCRIPTION'] || '')
+        sql = sql.replaceAll('dataItem.step_code', dataItem['step_code'] || '')
+        sql = sql.replaceAll('dataItem.actor_type', dataItem['actor_type'] || '')
+        sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
+        sql = sql.replaceAll('dataItem.assignment_mode', dataItem['assignment_mode'] || 'AUTO')
         sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || '')
 
         return sql
@@ -607,6 +819,10 @@ export const RegisterRequestSQL = {
                                      , ras.approver_id
                                      , ras.step_status
                                      , ras.DESCRIPTION
+                                     , ras.step_code
+                                     , ras.actor_type
+                                     , ras.group_code
+                                     , ras.assignment_mode
                                      , ras.CREATE_BY
                                      , ras.CREATE_DATE
                                      , ras.UPDATE_BY
@@ -624,6 +840,56 @@ export const RegisterRequestSQL = {
         `
 
         sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+
+        return sql
+    },
+
+    insertAssignmentHistory: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            INSERT INTO request_assignment_history (
+                                       request_id
+                                     , step_id
+                                     , scope
+                                     , step_code
+                                     , group_code
+                                     , from_empcode
+                                     , to_empcode
+                                     , reason
+                                     , DESCRIPTION
+                                     , changed_by
+                                     , CREATE_BY
+                                     , UPDATE_BY
+                                     , INUSE
+                            ) VALUES (
+                                        dataItem.request_id
+                                     ,  dataItem.step_id
+                                     , 'dataItem.scope'
+                                     , 'dataItem.step_code'
+                                     , 'dataItem.group_code'
+                                     , 'dataItem.from_empcode'
+                                     , 'dataItem.to_empcode'
+                                     , 'dataItem.reason'
+                                     , 'dataItem.DESCRIPTION'
+                                     , 'dataItem.changed_by'
+                                     , 'dataItem.CREATE_BY'
+                                     , 'dataItem.UPDATE_BY'
+                                     ,  dataItem.INUSE
+                            )
+        `
+
+        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+        sql = sql.replaceAll('dataItem.step_id', dataItem['step_id'] ? dataItem['step_id'].toString() : 'NULL')
+        sql = sql.replaceAll('dataItem.scope', dataItem['scope'] || '')
+        sql = sql.replaceAll('dataItem.step_code', dataItem['step_code'] || '')
+        sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
+        sql = sql.replaceAll('dataItem.from_empcode', dataItem['from_empcode'] || '')
+        sql = sql.replaceAll('dataItem.to_empcode', dataItem['to_empcode'] || '')
+        sql = sql.replaceAll('dataItem.reason', dataItem['reason'] || '')
+        sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem['DESCRIPTION'] || dataItem['reason'] || '')
+        sql = sql.replaceAll('dataItem.changed_by', dataItem['changed_by'] || dataItem['UPDATE_BY'] || 'SYSTEM')
+        sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || dataItem['changed_by'] || dataItem['UPDATE_BY'] || 'SYSTEM')
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || dataItem['changed_by'] || 'SYSTEM')
+        sql = sql.replaceAll('dataItem.INUSE', '1')
 
         return sql
     },
@@ -747,6 +1013,8 @@ export const RegisterRequestSQL = {
                                        request_vendor_selections
                             WHERE
                                        request_id = 'dataItem.request_id' AND INUSE = 1
+                            ORDER BY
+                                       selection_id DESC
                             LIMIT
                                        1
         `

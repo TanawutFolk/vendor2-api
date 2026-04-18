@@ -40,7 +40,7 @@ export const RegisterRequestController = {
                 purchase_frequency: dataItem.purchase_frequency || '',
                 cc_emails: dataItem.cc_emails || '[]',
                 requester_remark: dataItem.requester_remark || '',
-                CREATE_BY: dataItem.CREATE_BY || 'ถ้าเห็นข้อความนี้แจ้งS524',
+                CREATE_BY: dataItem.CREATE_BY || 'ถ้าเห็นข้อความนี้แจ้งS524ด่วนๆ',
                 // assign_to is resolved by the service via round-robin logic (do NOT set here)
             })
 
@@ -60,7 +60,6 @@ export const RegisterRequestController = {
                     })
                 }
             }
-
             return res.status(200).json({
                 Status: true,
                 ResultOnDb: { request_id: insertedId },
@@ -493,6 +492,10 @@ export const RegisterRequestController = {
                 approver_id: dataItem.approver_id || '',
                 step_status: dataItem.step_status || 'pending',
                 DESCRIPTION: dataItem.DESCRIPTION || '',
+                step_code: dataItem.step_code || '',
+                actor_type: dataItem.actor_type || '',
+                group_code: dataItem.group_code || '',
+                assignment_mode: dataItem.assignment_mode || 'AUTO',
                 CREATE_BY: dataItem.CREATE_BY || '',
             })
 
@@ -602,6 +605,43 @@ export const RegisterRequestController = {
         }
     },
 
+    reassign: async (req: Request, res: Response) => {
+        let dataItem
+
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
+        try {
+            const request_id = parseInt(dataItem.request_id as string)
+            if (!request_id || isNaN(request_id)) {
+                return res.status(400).json({
+                    Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                    MethodOnDb: 'Reassign Request', Message: 'Invalid request_id'
+                } as ResponseI)
+            }
+
+            const result = await RegisterRequestModel.reassignAssignment({
+                request_id,
+                scope: dataItem.scope || '',
+                to_empcode: dataItem.to_empcode || '',
+                reason: dataItem.reason || '',
+                UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
+            })
+
+            res.status(200).json(result as ResponseI)
+        } catch (error: any) {
+            console.error('Reassign Request Error:', error);
+            res.status(200).json({
+                Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                MethodOnDb: 'Reassign Request',
+                Message: error?.message || 'Failed to reassign request'
+            } as ResponseI)
+        }
+    },
+
     // Save GPR form (Supplier / Outsourcing Selection Sheet)
     saveGprForm: async (req: Request, res: Response) => {
         let dataItem
@@ -655,7 +695,7 @@ export const RegisterRequestController = {
             }
             const result = await RegisterRequestModel.getGprForm(request_id)
             res.status(200).json({
-                Status: true, ResultOnDb: result || null, TotalCountOnDb: result ? 1 : 0,
+                Status: true, ResultOnDb: result || [], TotalCountOnDb: result ? 1 : 0,
                 MethodOnDb: 'Get GPR Form', Message: 'Success'
             } as ResponseI)
         } catch (error: any) {

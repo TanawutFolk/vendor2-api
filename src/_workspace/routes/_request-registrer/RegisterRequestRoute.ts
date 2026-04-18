@@ -67,6 +67,9 @@ registerRequestRoutes.post('/updateApprovalStep', RegisterRequestController.upda
 // POST /register-request/updateCcEmails
 registerRequestRoutes.post('/updateCcEmails', RegisterRequestController.updateCcEmails)
 
+// POST /register-request/reassign
+registerRequestRoutes.post('/reassign', RegisterRequestController.reassign)
+
 // POST /register-request/completeRegistration
 registerRequestRoutes.post('/completeRegistration', RegisterRequestController.completeRegistration)
 

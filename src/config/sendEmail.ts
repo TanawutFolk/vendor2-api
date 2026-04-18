@@ -60,6 +60,28 @@ const FormData = require('form-data')
 //   });
 // };
 
+const normalizeCcList = (cc?: string[]) => {
+  if (!Array.isArray(cc) || cc.length === 0) return []
+
+  const seen = new Set<string>()
+  const emails: string[] = []
+
+  cc.forEach(item => {
+    String(item || '')
+      .split(/[;,]+/)
+      .map(s => s.trim().toLowerCase())
+      .filter(Boolean)
+      .forEach(email => {
+        if (!seen.has(email)) {
+          seen.add(email)
+          emails.push(email)
+        }
+      })
+  })
+
+  return emails
+}
+
 const sendEmail = async (message: string, send_to: string, subject?: string, cc?: string[]) => {
   // URL ของ API (เอามาจากบรรทัด API_URL ในรูป Python ของคุณ)
   const API_URL = 'http://192.168.0.250:9002/api/mail/send'
@@ -70,11 +92,19 @@ const sendEmail = async (message: string, send_to: string, subject?: string, cc?
 
   // 2. ลบ \n (Enter) ของ Code ออกให้เหลือบรรทัดเดียว (Minify) เพื่อกัน Error
   const cleanMessage = fixedMessage.replace(/[\r\n]+/g, '').trim()
+  const normalizedCc = normalizeCcList(cc)
   const form = new FormData()
   form.append('To', send_to)
-  form.append('CC', cc && cc.length > 0 ? cc.join(';') : '')
+  form.append('CC', normalizedCc.length > 0 ? normalizedCc.join(';') : '')
   form.append('Subject', subject || '[Vendor Registration System] Vendor Registration')
   form.append('BodyHtml', cleanMessage)
+
+  console.log('[MAIL DEBUG][sendEmail] Request payload', {
+    to: send_to,
+    cc: normalizedCc,
+    subject: subject || '[Vendor Registration System] Vendor Registration',
+    ccRawInput: cc,
+  })
 
   try {
     // console.log("กำลังส่งข้อมูล...", formData.toString()); // Log ดูข้อมูลที่จะส่ง
@@ -86,10 +116,20 @@ const sendEmail = async (message: string, send_to: string, subject?: string, cc?
       },
     })
 
+    console.log('[MAIL DEBUG][sendEmail] API response', {
+      status: response.status,
+      data: response.data,
+    })
+
     if (response.status === 200) {
       // console.log(`ส่งเมลหา ${send_to} สำเร็จ!`);
     }
   } catch (error: any) {
+    console.error('[MAIL DEBUG][sendEmail] API error', {
+      message: error?.message,
+      status: error?.response?.status,
+      data: error?.response?.data,
+    })
     // console.error(`ส่งเมลหา ${send_to} ไม่สำเร็จ:`, error.message);
     if (error.response) {
       // ดูว่า Server ตอบ error อะไรกลับมา (ช่วย debug ได้ดีมาก)
