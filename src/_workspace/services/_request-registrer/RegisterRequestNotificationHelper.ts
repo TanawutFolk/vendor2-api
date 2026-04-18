@@ -2,6 +2,8 @@ import { RowDataPacket } from 'mysql2'
 import { MySQLExecute } from '@businessData/dbExecute'
 import sendEmail from '@src/config/sendEmail'
 import {
+    emailAfterCheckerApproverGPRCTemplate,
+    emailExternalSubmitGPRBTemplate,
     emailCompleteTemplate,
     emailReject1Template,
     emailRequestRegisterVendorTemplate,
@@ -191,7 +193,7 @@ export const sendAgreementEmail = async (dataItem: any) => {
     return { sent_to: recipientEmail }
 }
 
-export const triggerVendorDocumentEmail = async (requestId: number) => {
+export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: string) => {
     try {
         const vendorSql = `
             SELECT
@@ -239,7 +241,11 @@ export const triggerVendorDocumentEmail = async (requestId: number) => {
             manualCc
         ).filter(email => email !== normalizeEmail(vendorEmail)), [vendorEmail, vd.emailmain])
 
-        const emailHtml = emailVendorDocumentRequestTemplate({
+        const stageHintRaw = String(stageHint || '').trim().toLowerCase()
+        const isGprBStage = stageHintRaw.includes('gpr b')
+        const isGprCStage = stageHintRaw.includes('gpr c')
+
+        let emailHtml = emailVendorDocumentRequestTemplate({
             vendorEmail,
             ccEmail: ccEmails.join('; '),
             topicRef: requestNumber,
@@ -247,13 +253,39 @@ export const triggerVendorDocumentEmail = async (requestId: number) => {
             picName,
             picTel,
         })
+        let emailSubject = `[Request Submit] Document for ${requestNumber}`
 
-        await sendEmail(
-            emailHtml,
-            vendorEmail,
-            `[Request Submit] Document for ${requestNumber}`,
-            ccEmails
-        )
+        if (isGprBStage) {
+            emailHtml = emailExternalSubmitGPRBTemplate({
+                vendorEmail,
+                ccEmail: ccEmails.join('; '),
+                requestNumber,
+                picName,
+                picTel,
+            })
+            emailSubject = `[Request Submit] Please submit ${requestNumber} - General Purchase Specification Form B`
+        } else if (isGprCStage) {
+            // Reuse existing Form C template available in the project.
+            emailHtml = emailAfterCheckerApproverGPRCTemplate({
+                toEmail: vendorEmail,
+                ccEmail: ccEmails.join('; '),
+                requestNumber,
+                picNextStepName: 'Supplier',
+                picName,
+                picTel,
+                vendorName: vd.company_name || 'N/A',
+                address: vd.address || 'N/A',
+                contactPic: vd.contact_name || 'N/A',
+                email: vd.emailmain || 'N/A',
+                tel: vd.tel_phone || 'N/A',
+                supportProduct: vd.supportProduct_Process || 'N/A',
+                purchaseFrequency: vd.purchase_frequency || 'N/A',
+                systemLink: `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`,
+            })
+            emailSubject = `[Request Submit] Please submit ${requestNumber} - General Purchase Specification Form C`
+        }
+
+        await sendEmail(emailHtml, vendorEmail, emailSubject, ccEmails)
 
         return { sent: true, to: vendorEmail, ccCount: ccEmails.length }
     } catch (err: any) {
@@ -470,5 +502,74 @@ export const triggerCompletionEmail = async (dataItem: any) => {
         )
     } catch (err: any) {
         console.error('[triggerCompletionEmail] Failed:', err?.message)
+    }
+}
+
+export const triggerVendorDisagreeEmail = async (dataItem: any) => {
+    try {
+        const requestId = Number(dataItem.request_id) || 0
+        if (!requestId) return
+
+        const vendorSql = `
+            SELECT
+                   v.company_name,
+                   rr.request_number,
+                   rr.CREATE_DATE,
+                   rr.assign_to,
+                   rr.cc_emails,
+                   rr.Request_By_EmployeeCode
+            FROM request_register_vendor rr
+            LEFT JOIN vendors v ON v.vendor_id = rr.vendor_id
+            WHERE rr.request_id = ${requestId}
+            LIMIT 1
+        `
+        const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
+        const vd = vendorRes[0] || {}
+
+        const requesterSql = `SELECT empName, empSurname, empEmail FROM Person.MEMBER_FED WHERE empCode = '${vd.Request_By_EmployeeCode || ''}' LIMIT 1`
+        const requesterRes = (await MySQLExecute.search(requesterSql)) as any[]
+        const requester = requesterRes[0] || {}
+
+        const requesterName = requester.empName
+            ? `${requester.empName} ${requester.empSurname || ''}`.trim()
+            : (vd.Request_By_EmployeeCode || 'Requester')
+        const requesterEmail = requester.empEmail || ''
+        if (!requesterEmail) return
+
+        const picSql = `SELECT empEmail FROM assignees_to WHERE empcode = '${vd.assign_to || ''}' LIMIT 1`
+        const picRes = (await MySQLExecute.search(picSql)) as any[]
+        const picEmail = picRes[0]?.empEmail || ''
+
+        const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
+        const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
+
+        const ccEmails = mergeUniqueEmails(
+            picEmail ? [picEmail] : [],
+            parseCcEmails(vd.cc_emails)
+        ).filter(email => email !== normalizeEmail(requesterEmail))
+
+        const safeRemark = String(dataItem.approver_remark || '').trim()
+        const emailHtml = `
+            <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937;">
+                <h3 style="margin:0 0 12px;">Vendor Registration Request Closed</h3>
+                <p style="margin:0 0 8px;">Dear ${requesterName},</p>
+                <p style="margin:0 0 8px;">
+                    Request <strong>${requestNumber}</strong> for vendor <strong>${vd.company_name || 'N/A'}</strong>
+                    has been closed because the vendor did not agree after GPR negotiation rounds.
+                </p>
+                ${safeRemark ? `<p style="margin:0 0 8px;"><strong>Remark:</strong> ${safeRemark}</p>` : ''}
+                <p style="margin:0 0 8px;">Please review details in the system: <a href="${systemLink}">${systemLink}</a></p>
+                <p style="margin:0;">Best regards,<br/>Vendor Registration System</p>
+            </div>
+        `
+
+        await sendEmail(
+            emailHtml,
+            requesterEmail,
+            `[Closed] Register vendor "${requestNumber}" ended as Vendor Disagreed`,
+            ccEmails
+        )
+    } catch (err: any) {
+        console.error('[triggerVendorDisagreeEmail] Failed:', err?.message)
     }
 }
