@@ -131,11 +131,30 @@ export const RegisterRequestController = {
             // Manually add root-level filters (frontend passes these directly instead of via SearchFilters)
             const manualFilters: string[] = []
             if (dataItem.approver_id) {
+                const queueStepCode = String(dataItem.queue_step_code || '').trim().toUpperCase().replace(/[^A-Z0-9_]/g, '')
+
+                const queueStepCondition = (() => {
+                    if (!queueStepCode) return ''
+                    if (queueStepCode === 'DOC_CHECK') {
+                        return `(UPPER(IFNULL(ras.step_code, '')) = 'DOC_CHECK' OR LOWER(IFNULL(ras.description, '')) LIKE '%checker%' OR LOWER(IFNULL(ras.description, '')) LIKE '%check all document%')`
+                    }
+                    if (queueStepCode === 'ACCOUNT_REGISTERED') {
+                        return `(UPPER(IFNULL(ras.step_code, '')) = 'ACCOUNT_REGISTERED' OR LOWER(IFNULL(ras.description, '')) LIKE '%account%')`
+                    }
+                    return `UPPER(IFNULL(ras.step_code, '')) = '${queueStepCode}'`
+                })()
+
                 // Approval pages (MD / PO GM / PO Mgr / Check Document):
                 // Show requests where this approver has an in_progress OR already-actioned (approved/rejected) step.
                 // Items stay visible after being actioned so the approver can track their work history.
                 // The Approve/Reject buttons are hidden on the frontend when step_status is not 'in_progress'.
-                manualFilters.push(`EXISTS (SELECT 1 FROM request_approval_step ras WHERE ras.request_id = rr.request_id AND ras.approver_id = '${dataItem.approver_id}' AND ras.step_status IN ('in_progress', 'approved', 'rejected') AND ras.INUSE = 1)`)
+                if (queueStepCondition) {
+                    // Queue view: keep actionable + action history for this queue step.
+                    manualFilters.push(`EXISTS (SELECT 1 FROM request_approval_step ras WHERE ras.request_id = rr.request_id AND ras.approver_id = '${dataItem.approver_id}' AND ras.step_status IN ('in_progress', 'approved', 'rejected') AND ${queueStepCondition} AND ras.INUSE = 1)`)
+                } else {
+                    // Fallback (legacy): include in-progress and action history for this approver.
+                    manualFilters.push(`EXISTS (SELECT 1 FROM request_approval_step ras WHERE ras.request_id = rr.request_id AND ras.approver_id = '${dataItem.approver_id}' AND ras.step_status IN ('in_progress', 'approved', 'rejected') AND ras.INUSE = 1)`)
+                }
             } else if (dataItem.assign_to) {
                 // PIC dashboard: show requests assigned to PIC only.
                 // Excludes approver step records so PIC doesn't see MD/GM/Mgr queues.

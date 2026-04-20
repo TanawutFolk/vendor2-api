@@ -23,27 +23,18 @@ import { RegisterRequestGprService } from './RegisterRequestGprService'
 export const RegisterRequestService = {
     createRequest: async (dataItem: any) => {
         try {
-            const vendorCheckSql = `
-                SELECT
-                    v.company_name,
-                    v.address,
-                    v.vendor_region,
-                    v.emailmain,
-                    vc.contact_name,
-                    vc.email,
-                    vc.tel_phone
-                FROM vendors v
-                LEFT JOIN vendor_contacts vc ON vc.vendor_id = v.vendor_id
-                WHERE v.vendor_id = ${Number(dataItem.vendor_id) || 0}
-                LIMIT 1
-            `
+            const vendorCheckSql = await RegisterRequestSQL.getVendorCreateContext({
+                vendor_id: Number(dataItem.vendor_id) || 0,
+            })
             const vendorRes = (await MySQLExecute.search(vendorCheckSql)) as RowDataPacket[]
             const vendorData = vendorRes[0] || {}
             const vendorRegion = vendorData.vendor_region || 'Local'
             const isOversea = String(vendorRegion).toLowerCase() === 'oversea'
             const assignmentGroupCode = isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
 
-            const fetchAssigneesSql = `SELECT empName, empcode, empEmail FROM assignees_to WHERE group_code = '${assignmentGroupCode}' AND INUSE = 1 ORDER BY Assignees_id ASC`
+            const fetchAssigneesSql = await RegisterRequestSQL.getActiveAssigneesByGroupCode({
+                group_code: assignmentGroupCode,
+            })
             const assigneesRes = (await MySQLExecute.search(fetchAssigneesSql)) as RowDataPacket[]
             const activeAssignees = assigneesRes.map(row => ({
                 empName: row.empName || row.empcode || '',
@@ -55,16 +46,9 @@ export const RegisterRequestService = {
                 activeAssignees.push({ empName: 'Admin', empCode: 'ADMIN', empEmail: 'admin@furukawaelectric.com' })
             }
 
-            const lastAssignSql = `
-                SELECT rr.assign_to
-                FROM request_register_vendor rr
-                JOIN vendors v ON v.vendor_id = rr.vendor_id
-                WHERE (v.vendor_region ${isOversea ? "= 'Oversea'" : "!= 'Oversea' OR v.vendor_region IS NULL"})
-                  AND rr.assign_to IS NOT NULL
-                  AND rr.assign_to != ''
-                ORDER BY rr.request_id DESC
-                LIMIT 1
-            `
+                        const lastAssignSql = await RegisterRequestSQL.getLastAssignedPicByVendorRegion({
+                                is_oversea: isOversea,
+                        })
             const lastAssignRes = (await MySQLExecute.search(lastAssignSql)) as RowDataPacket[]
             const lastAssignTo = lastAssignRes[0]?.assign_to || ''
             const lastIdx = activeAssignees.findIndex((a: any) => a.empCode === lastAssignTo)
@@ -81,13 +65,11 @@ export const RegisterRequestService = {
             if (!insertedId) throw new Error('Failed to insert registration request')
 
             const requestNumber = formatRequestNumber(insertedId)
-            const setRequestNumberSql = `
-                UPDATE request_register_vendor
-                SET request_number = '${requestNumber}',
-                    UPDATE_BY = '${dataItem.CREATE_BY || 'SYSTEM'}',
-                    UPDATE_DATE = NOW()
-                WHERE request_id = ${insertedId}
-            `
+            const setRequestNumberSql = await RegisterRequestSQL.updateRequestNumber({
+                request_id: insertedId,
+                request_number: requestNumber,
+                UPDATE_BY: dataItem.CREATE_BY || 'SYSTEM',
+            })
             await MySQLExecute.execute(setRequestNumberSql)
 
             const sqlList = []

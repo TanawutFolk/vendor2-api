@@ -71,9 +71,243 @@ export interface RegisterRequestDataItem {
     changed_by?: string;
     reason?: string;
     fft_status?: number | string;
+    empcode?: string;
+    target_group?: string;
+    target_compact?: string;
+    is_oversea?: boolean | number | string;
 }
 
 export const RegisterRequestSQL = {
+
+    getVendorCreateContext: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            SELECT
+                                       v.company_name
+                                     , v.address
+                                     , v.vendor_region
+                                     , v.emailmain
+                                     , vc.contact_name
+                                     , vc.email
+                                     , vc.tel_phone
+                            FROM
+                                       vendors v
+                                            LEFT JOIN
+                                       vendor_contacts vc ON vc.vendor_id = v.vendor_id
+                            WHERE
+                                       v.vendor_id = dataItem.vendor_id
+                            LIMIT
+                                       1
+        `
+
+        sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
+
+        return sql
+    },
+
+    getActiveAssigneesByGroupCode: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            SELECT
+                                       empName
+                                     , empcode
+                                     , empEmail
+                            FROM
+                                       assignees_to
+                            WHERE
+                                       group_code = 'dataItem.group_code'
+                                       AND INUSE = 1
+                            ORDER BY
+                                       Assignees_id ASC
+        `
+
+        sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
+
+        return sql
+    },
+
+    getLastAssignedPicByVendorRegion: async (dataItem: RegisterRequestDataItem) => {
+        const isOversea = String(dataItem['is_oversea'] || '').toLowerCase() === 'true' || Number(dataItem['is_oversea']) === 1
+
+        const vendorRegionClause = isOversea
+            ? `= 'Oversea'`
+            : `!= 'Oversea' OR v.vendor_region IS NULL`
+
+        let sql = `
+                            SELECT
+                                       rr.assign_to
+                            FROM
+                                       request_register_vendor rr
+                                            JOIN
+                                       vendors v ON v.vendor_id = rr.vendor_id
+                            WHERE
+                                       (v.vendor_region ${vendorRegionClause})
+                                       AND rr.assign_to IS NOT NULL
+                                       AND rr.assign_to != ''
+                            ORDER BY
+                                       rr.request_id DESC
+                            LIMIT
+                                       1
+        `
+
+        return sql
+    },
+
+    updateRequestNumber: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            UPDATE request_register_vendor SET
+                                       request_number = 'dataItem.request_number'
+                                     , UPDATE_BY = 'dataItem.UPDATE_BY'
+                                     , UPDATE_DATE = NOW()
+                            WHERE
+                                       request_id = dataItem.request_id
+        `
+
+        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+        sql = sql.replaceAll('dataItem.request_number', dataItem['request_number'] || '')
+        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+
+        return sql
+    },
+
+    getRequestStatusAndAssign: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            SELECT
+                                       request_status
+                                     , assign_to
+                            FROM
+                                       request_register_vendor
+                            WHERE
+                                       request_id = dataItem.request_id
+                                       AND INUSE = 1
+                            LIMIT
+                                       1
+        `
+
+        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+
+        return sql
+    },
+
+    getPeerCcRowsByNormalizedGroup: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            SELECT
+                                       empcode
+                                     , empEmail
+                                     , group_code
+                                     , group_name
+                            FROM
+                                       assignees_to
+                            WHERE
+                                       (
+                                           UPPER(TRIM(COALESCE(group_code, ''))) = 'dataItem.target_group'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_') = 'dataItem.target_group'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_code, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.target_compact'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.target_compact'
+                                       )
+                                       AND INUSE = 1
+                            ORDER BY
+                                       Assignees_id ASC
+        `
+
+        sql = sql.replaceAll('dataItem.target_group', dataItem['target_group'] || '')
+        sql = sql.replaceAll('dataItem.target_compact', dataItem['target_compact'] || '')
+
+        return sql
+    },
+
+    getMemberByEmpCode: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            SELECT
+                                       empName
+                                     , empSurname
+                                     , empEmail
+                            FROM
+                                       Person.MEMBER_FED
+                            WHERE
+                                       empCode = 'dataItem.empcode'
+                            LIMIT
+                                       1
+        `
+
+        sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
+
+        return sql
+    },
+
+    getAssigneeByEmpCodeContact: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            SELECT
+                                       empName
+                                     , empEmail
+                            FROM
+                                       assignees_to
+                            WHERE
+                                       empcode = 'dataItem.empcode'
+                            LIMIT
+                                       1
+        `
+
+        sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
+
+        return sql
+    },
+
+    getAssigneeEmailByEmpCode: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            SELECT
+                                       empEmail
+                            FROM
+                                       assignees_to
+                            WHERE
+                                       empcode = 'dataItem.empcode'
+                            LIMIT
+                                       1
+        `
+
+        sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
+
+        return sql
+    },
+
+    getNotificationVendorContextByRequestId: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            SELECT
+                                       rr.request_number
+                                     , rr.CREATE_DATE
+                                     , rr.assign_to
+                                     , rr.supportProduct_Process
+                                     , rr.purchase_frequency
+                                     , rr.cc_emails
+                                     , rr.vendor_contact_id
+                                     , rr.Request_By_EmployeeCode
+                                     , rr.vendor_code
+                                     , v.company_name
+                                     , v.address
+                                     , v.vendor_region
+                                     , v.emailmain
+                                     , v.emailmain AS vendor_main_email
+                                     , v.fft_vendor_code
+                                     , vc.contact_name
+                                     , vc.email AS vendor_email
+                                     , vc.tel_phone
+                                     , vc_sel.email AS selected_vendor_email
+                            FROM
+                                       request_register_vendor rr
+                                            LEFT JOIN
+                                       vendors v ON v.vendor_id = rr.vendor_id
+                                            LEFT JOIN
+                                       vendor_contacts vc ON vc.vendor_id = v.vendor_id
+                                            LEFT JOIN
+                                       vendor_contacts vc_sel ON vc_sel.vendor_contact_id = rr.vendor_contact_id AND vc_sel.INUSE = 1
+                            WHERE
+                                       rr.request_id = dataItem.request_id
+                            LIMIT
+                                       1
+        `
+
+        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+
+        return sql
+    },
 
     // ─── CREATE ──────────────────────────────────────────────────────────────
     createRequest: async (dataItem: RegisterRequestDataItem) => {
@@ -278,6 +512,7 @@ export const RegisterRequestSQL = {
                                                                                'step_id', ras.step_id,
                                                                                'step_order', ras.step_order,
                                                                                'approver_id', ras.approver_id,
+                                                                               'approver_name', (SELECT CONCAT(pm.empName, ' ', pm.empSurname) FROM Person.MEMBER_FED pm WHERE pm.empCode = ras.approver_id LIMIT 1),
                                                                                'step_status', ras.step_status,
                                                                                'DESCRIPTION', ras.DESCRIPTION,
                                                                                'step_code', ras.step_code,
@@ -460,6 +695,7 @@ export const RegisterRequestSQL = {
                                                                                'step_id', ras.step_id,
                                                                                'step_order', ras.step_order,
                                                                                'approver_id', ras.approver_id,
+                                                                               'approver_name', (SELECT CONCAT(pm.empName, ' ', pm.empSurname) FROM Person.MEMBER_FED pm WHERE pm.empCode = ras.approver_id LIMIT 1),
                                                                                'step_status', ras.step_status,
                                                                                'DESCRIPTION', ras.DESCRIPTION,
                                                                                'step_code', ras.step_code,

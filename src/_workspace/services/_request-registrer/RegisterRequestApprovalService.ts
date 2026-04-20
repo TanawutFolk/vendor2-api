@@ -42,7 +42,7 @@ export const RegisterRequestApprovalService = {
             const requestId = Number(dataItem.request_id)
             if (!requestId) throw new Error('Invalid request_id')
 
-            const checkSql = `SELECT request_status, assign_to FROM request_register_vendor WHERE request_id = ${requestId} AND INUSE = 1 LIMIT 1`
+            const checkSql = await RegisterRequestSQL.getRequestStatusAndAssign({ request_id: requestId })
             const checkRes = (await MySQLExecute.search(checkSql)) as RowDataPacket[]
             const request = checkRes[0]
             if (!request) throw new Error('Request not found')
@@ -125,7 +125,13 @@ export const RegisterRequestApprovalService = {
                 if (isPicStep(step)) return String(assign_to || '')
 
                 const stepGroupCode = resolveGroupCodeForStep(step, isOversea)
+                const stepCode = inferStepCode(step)
                 const desc = (step.DESCRIPTION || '').toLowerCase()
+
+                // Always route document-check step to Checker Main regardless of misconfigured group_code.
+                if (stepCode === 'DOC_CHECK' || desc.includes('checker') || desc.includes('check all document')) {
+                    return await getApproverByGroup(GROUP_CODE.PO_CHECKER_MAIN)
+                }
 
                 if (stepGroupCode || desc.includes('gm') || desc.includes('general manager')) {
                     return await getApproverByGroup(stepGroupCode || GROUP_CODE.PO_GM)
@@ -134,9 +140,6 @@ export const RegisterRequestApprovalService = {
                 if (desc.includes('md') || desc.includes('director')) return await getApproverByGroup(GROUP_CODE.MD)
                 if (desc.includes('account')) {
                     return await getApproverByGroup(isOversea ? GROUP_CODE.ACC_OVERSEA_MAIN : GROUP_CODE.ACC_LOCAL_MAIN)
-                }
-                if (desc.includes('checker') || desc.includes('check all document')) {
-                    return await getApproverByGroup(GROUP_CODE.PO_CHECKER_MAIN)
                 }
                 return ''
             }

@@ -1,3 +1,6 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+
 export type MailTemplateData = {
     toEmail?: string;
     ccEmail?: string;
@@ -25,6 +28,52 @@ export type MailTemplateData = {
     remarkEN?: string;
     remarkTH?: string;
     reasons?: string[];
+};
+
+const readLogoAsDataUri = () => {
+    const candidates = [
+        path.resolve(process.cwd(), '../vendor2-app/src/_workspace/utils/fitelLogo.png'),
+        path.resolve(process.cwd(), 'vendor2-app/src/_workspace/utils/fitelLogo.png'),
+    ];
+
+    for (const logoPath of candidates) {
+        try {
+            if (!fs.existsSync(logoPath)) continue;
+            const b64 = fs.readFileSync(logoPath).toString('base64');
+            if (b64) return `data:image/png;base64,${b64}`;
+        } catch {
+            // Ignore and try next candidate path.
+        }
+    }
+
+    return '';
+};
+
+const EMAIL_LOGO_DATA_URI = readLogoAsDataUri();
+
+const resolveLogoUrlFromEnv = () => {
+    const raw = String(process.env.MAIL_LOGO_URL || process.env.LEAVE_SYSTEM_ORIGIN || '').trim();
+    if (!raw) return '';
+
+    // Accept full image URL directly, e.g. https://cdn.example.com/fitelLogo.png
+    if (/\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i.test(raw) || raw.startsWith('vendor2-app\public\fitelLogo.png')) {
+        return raw;
+    }
+
+    // Otherwise treat as origin/base path and append default logo filename.
+    return `${raw.replace(/\/$/, '')}/fitelLogo.png`;
+};
+    
+const EMAIL_LOGO_SRC = resolveLogoUrlFromEnv() || EMAIL_LOGO_DATA_URI;
+
+const renderTopLogo = () => {
+    if (!EMAIL_LOGO_SRC) return '';
+
+    return `
+        <div style="padding: 20px 32px 0 32px; text-align: left;">
+            <img src="${EMAIL_LOGO_SRC}" alt="Fitel Logo" style="height: 38px; width: auto; max-width: 220px; display: block;" />
+        </div>
+    `;
 };
 
 //User sent to Approver PIC
@@ -95,23 +144,8 @@ export const emailVendorDocumentRequestTemplate = (data: MailTemplateData) => {
     return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
+        ${renderTopLogo()}
         <div style="padding: 32px;">
-            <div style="background-color: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    <tr>
-                        <td style="width: 80px; padding: 4px 0; color: #6b7280; font-weight: 500;">Email to:</td>
-                        <td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.vendorEmail}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 4px 0; color: #6b7280; font-weight: 500;">CC:</td>
-                        <td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.ccEmail}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 12px 0 0 0; color: #6b7280; font-weight: 500; vertical-align: top;">Topic:</td>
-                        <td style="padding: 12px 0 0 0; color: #111827;">Document for ${data.topicRef} - <strong style="color: #d32f2f;">${supplierStatusText}</strong></td>
-                    </tr>
-                </table>
-            </div>
 
             <p style="margin: 0 0 24px 0; font-weight: 600; color: #d32f2f; background: #fef2f2; padding: 8px 12px; border-radius: 6px; display: inline-block;">** สามารถอ่านภาษาไทยด้านล่างได้ค่ะ **</p>
 
@@ -175,25 +209,8 @@ export const emailExternalSubmitGPRBTemplate = (data: MailTemplateData) => {
     return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
+        ${renderTopLogo()}
         <div style="padding: 32px;">
-            <div style="background-color: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    <tr>
-                        <td style="width: 80px; padding: 4px 0; color: #6b7280; font-weight: 500;">Email to:</td>
-                        <td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.vendorEmail}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 4px 0; color: #6b7280; font-weight: 500;">CC:</td>
-                        <td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.ccEmail}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 12px 0 0 0; color: #6b7280; font-weight: 500; vertical-align: top;">Topic:</td>
-                        <td style="padding: 12px 0 0 0; color: #111827; font-weight: 600;">
-                            [Request Submit] Please Submit register vendor follow as "${data.requestNumber}" - General Purchase Specification Form B
-                        </td>
-                    </tr>
-                </table>
-            </div>
 
             <p style="margin: 0 0 20px 0; font-size: 15px;">Dear Supplier,</p>
             
@@ -230,14 +247,8 @@ export const emailCheckerApproverGPRCTemplate = (data: MailTemplateData) => {
     return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
+        ${renderTopLogo()}
         <div style="padding: 32px;">
-            <div style="background-color: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    <tr><td style="width: 60px; padding: 4px 0; color: #6b7280; font-weight: 500;">TO:</td><td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.toEmail}</td></tr>
-                    <tr><td style="padding: 4px 0; color: #6b7280; font-weight: 500;">CC:</td><td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.ccEmail}</td></tr>
-                    <tr><td style="padding: 12px 0 0 0; color: #6b7280; font-weight: 500; vertical-align: top;">Topic:</td><td style="padding: 12px 0 0 0; color: #111827; font-weight: 600;">[Request Approve] Please approve register vendor follow as "${data.requestNumber}" - General Purchase Specification Form C</td></tr>
-                </table>
-            </div>
 
             <p style="margin: 0 0 20px 0; font-size: 15px;">Dear : &nbsp;&nbsp;&nbsp;<span style="color: #d32f2f; font-weight: 600;">${data.userName}</span></p>
             
@@ -306,13 +317,6 @@ export const emailReject1Template = (data: MailTemplateData) => {
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #dc2626; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
-            <div style="background-color: #fef2f2; border: 1px solid #fecaca; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    <tr><td style="width: 60px; padding: 4px 0; color: #6b7280; font-weight: 500;">TO:</td><td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.toEmail}</td></tr>
-                    <tr><td style="padding: 4px 0; color: #6b7280; font-weight: 500; vertical-align: top;">CC:</td><td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.ccEmailLine1}<br>${data.ccEmailLine2}</td></tr>
-                    <tr><td style="padding: 12px 0 0 0; color: #6b7280; font-weight: 500; vertical-align: top;">Topic:</td><td style="padding: 12px 0 0 0; color: #b91c1c; font-weight: 600;">[REJECT] Please recheck register vendor follow as "${data.requestNumber}" - General Purchase Specification Form B</td></tr>
-                </table>
-            </div>
 
             <p style="margin: 0 0 20px 0; font-size: 15px;">Dear : &nbsp;&nbsp;&nbsp;<span style="color: #d32f2f; font-weight: 600;">${data.recipientName || 'PO PIC'}</span></p>
             
@@ -374,13 +378,6 @@ export const emailToCheckerPICTemplate = (data: MailTemplateData) => {
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
-            <div style="background-color: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    <tr><td style="width: 60px; padding: 4px 0; color: #6b7280; font-weight: 500;">TO:</td><td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.toEmail}</td></tr>
-                    <tr><td style="padding: 4px 0; color: #6b7280; font-weight: 500;">CC:</td><td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.ccEmail}</td></tr>
-                    <tr><td style="padding: 12px 0 0 0; color: #6b7280; font-weight: 500; vertical-align: top;">Topic:</td><td style="padding: 12px 0 0 0; color: #111827; font-weight: 600;">[Request Check] Please request check register vendor follow as "${data.requestNumber}"</td></tr>
-                </table>
-            </div>
 
             <p style="margin: 0 0 20px 0; font-size: 15px;">Dear : &nbsp;&nbsp;&nbsp;<span style="color: #d32f2f; font-weight: 600;">PO CHECKER</span></p>
             
@@ -440,13 +437,6 @@ export const emailReject2Template = (data: MailTemplateData) => {
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #dc2626; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
-            <div style="background-color: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    <tr><td style="width: 60px; padding: 4px 0; color: #6b7280; font-weight: 500;">TO:</td><td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.toEmail}</td></tr>
-                    <tr><td style="padding: 4px 0; color: #6b7280; font-weight: 500;">CC:</td><td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.ccEmail}</td></tr>
-                    <tr><td style="padding: 12px 0 0 0; color: #6b7280; font-weight: 500; vertical-align: top;">Topic:</td><td style="padding: 12px 0 0 0; color: #b91c1c; font-weight: 600;">[Request Recheck] Please recheck register vendor follow as "${data.requestNumber}"</td></tr>
-                </table>
-            </div>
 
             <p style="margin: 0 0 20px 0; font-size: 15px;">Dear : &nbsp;&nbsp;&nbsp;<span style="color: #d32f2f; font-weight: 600;">${data.recipientName || 'PO PIC'}</span></p>
             
@@ -510,15 +500,8 @@ export const emailToPMMgrTemplate = (data: MailTemplateData) => `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
-            <div style="background-color: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    <tr><td style="width: 60px; padding: 4px 0; color: #6b7280; font-weight: 500;">TO:</td><td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.toEmail}</td></tr>
-                    <tr><td style="padding: 4px 0; color: #6b7280; font-weight: 500;">CC:</td><td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.ccEmail}</td></tr>
-                    <tr><td style="padding: 12px 0 0 0; color: #6b7280; font-weight: 500; vertical-align: top;">Topic:</td><td style="padding: 12px 0 0 0; color: #111827; font-weight: 600;">[Request Approval] Please approve register vendor follow as "${data.requestNumber}"</td></tr>
-                </table>
-            </div>
 
-            <p style="margin: 0 0 20px 0; font-size: 15px;">Dear : &nbsp;&nbsp;&nbsp;<span style="color: #d32f2f; font-weight: 600;">>PO Mgr<</span></p>
+            <p style="margin: 0 0 20px 0; font-size: 15px;">Dear : &nbsp;&nbsp;&nbsp;<span style="color: #d32f2f; font-weight: 600;">${data.recipientName || 'PO Mgr'}</span></p>
             
             <div style="background-color: #fef2f2; border-left: 4px solid #d32f2f; padding: 12px 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0;">
                 <p style="margin: 0 0 4px 0; font-weight: 600; color: #b91c1c;">Status: Under approval register vendor</p>
@@ -573,32 +556,25 @@ export const emailToPMMgrTemplate = (data: MailTemplateData) => `
 // 2. Email to PM GM.
 // ---------------------------------------------------------
 export const emailToPMGMTemplate = (data: MailTemplateData) =>
-    emailToPMMgrTemplate(data).replace('>PO Mgr<', '>PO GM<');
+    emailToPMMgrTemplate({ ...data, recipientName: data.recipientName || 'PO GM' });
 
 // ---------------------------------------------------------
 // 3. Email to MD.
 // ---------------------------------------------------------
 export const emailToMDTemplate = (data: MailTemplateData) =>
-    emailToPMMgrTemplate(data).replace('>PO Mgr<', '><');
+    emailToPMMgrTemplate({ ...data, recipientName: data.recipientName || 'MD' });
 
 // ---------------------------------------------------------
 // 4. Email to Account PIC
 // ---------------------------------------------------------
 export const emailToAccountPICTemplate = (data: MailTemplateData) =>
-    emailToPMMgrTemplate(data).replace('>PO Mgr<', `>${data.recipientName || 'ACC PIC'}<`);
+    emailToPMMgrTemplate({ ...data, recipientName: data.recipientName || 'ACC PIC' });
 
 export const emailCompleteTemplate = (data: MailTemplateData) => {
     return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #10b981; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
-            <div style="background-color: #ecfdf5; border: 1px solid #a7f3d0; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    <tr><td style="width: 60px; padding: 4px 0; color: #6b7280; font-weight: 500;">TO:</td><td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.toEmail}</td></tr>
-                    <tr><td style="padding: 4px 0; color: #6b7280; font-weight: 500;">CC:</td><td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.ccEmail}</td></tr>
-                    <tr><td style="padding: 12px 0 0 0; color: #6b7280; font-weight: 500; vertical-align: top;">Topic:</td><td style="padding: 12px 0 0 0; color: #047857; font-weight: 600;">[Complete] Register vendor follow as "${data.requestNumber}"</td></tr>
-                </table>
-            </div>
 
             <p style="margin: 0 0 20px 0; font-size: 15px;">Dear : &nbsp;&nbsp;&nbsp;<span style="color: #d32f2f; font-weight: 600;">${data.userName}</span></p>
             
@@ -667,13 +643,6 @@ export const emailIncompleteTemplate = (data: MailTemplateData) => {
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #dc2626; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
-            <div style="background-color: #fef2f2; border: 1px solid #fecaca; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-                <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-                    <tr><td style="width: 60px; padding: 4px 0; color: #6b7280; font-weight: 500;">TO:</td><td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.toEmail}</td></tr>
-                    <tr><td style="padding: 4px 0; color: #6b7280; font-weight: 500;">CC:</td><td style="padding: 4px 0; color: #d32f2f; font-weight: 600;">${data.ccEmail}</td></tr>
-                    <tr><td style="padding: 12px 0 0 0; color: #6b7280; font-weight: 500; vertical-align: top;">Topic:</td><td style="padding: 12px 0 0 0; color: #b91c1c; font-weight: 600;">[Incomplete] Register vendor follow as "${data.requestNumber}"</td></tr>
-                </table>
-            </div>
 
             <p style="margin: 0 0 20px 0; font-size: 15px;">Dear : &nbsp;&nbsp;&nbsp;<span style="color: #d32f2f; font-weight: 600;">${data.userName}</span></p>
             

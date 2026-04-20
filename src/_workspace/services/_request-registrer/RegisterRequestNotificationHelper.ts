@@ -1,5 +1,6 @@
 import { RowDataPacket } from 'mysql2'
 import { MySQLExecute } from '@businessData/dbExecute'
+import { RegisterRequestSQL } from '../../sql/_request-registrer/RegisterRequestSQL'
 import sendEmail from '@src/config/sendEmail'
 import {
     emailAfterCheckerApproverGPRCTemplate,
@@ -8,6 +9,7 @@ import {
     emailReject1Template,
     emailRequestRegisterVendorTemplate,
     emailToAccountPICTemplate,
+    emailToCheckerPICTemplate,
     emailToMDTemplate,
     emailToPMGMTemplate,
     emailToPMMgrTemplate,
@@ -43,18 +45,10 @@ export const getPeerCcEmailsByGroupCode = async (
     const targetCompact = targetGroup.replace(/[^A-Z0-9]/g, '')
     const excludeEmp = String(excludeEmpCode || '').trim()
 
-    const rowsSql = `
-        SELECT empcode, empEmail, group_code, group_name
-        FROM assignees_to
-        WHERE (
-            UPPER(TRIM(COALESCE(group_code, ''))) = '${targetGroup}'
-            OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_') = '${targetGroup}'
-            OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_code, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = '${targetCompact}'
-            OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = '${targetCompact}'
-        )
-          AND INUSE = 1
-        ORDER BY Assignees_id ASC
-    `
+    const rowsSql = await RegisterRequestSQL.getPeerCcRowsByNormalizedGroup({
+        target_group: targetGroup,
+        target_compact: targetCompact,
+    })
     const rows = (await MySQLExecute.search(rowsSql)) as any[]
 
     const peerEmails = mergeUniqueEmails(
@@ -81,21 +75,21 @@ export const selectApprovalNotificationByStep = (
 
     if (stepCode === 'PO_GM_APPROVAL' || nextDesc.includes('general manager')) {
         return {
-            emailHtml: emailToPMGMTemplate(baseEmailData),
+            emailHtml: emailToPMGMTemplate({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'PO GM' }),
             emailSubject: `[Request Approval] Please approve register vendor "${requestNumber}" - PO GM Step`
         }
     }
 
     if (stepCode === 'PO_MGR_APPROVAL' || nextDesc.includes('manager') || nextDesc.includes('mgr')) {
         return {
-            emailHtml: emailToPMMgrTemplate(baseEmailData),
+            emailHtml: emailToPMMgrTemplate({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'PO Mgr' }),
             emailSubject: `[Request Approval] Please approve register vendor "${requestNumber}" - PO Mgr Step`
         }
     }
 
     if (stepCode === 'MD_APPROVAL' || nextDesc.includes('md') || nextDesc.includes('director')) {
         return {
-            emailHtml: emailToMDTemplate(baseEmailData),
+            emailHtml: emailToMDTemplate({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'MD' }),
             emailSubject: `[Request Approval] Please approve register vendor "${requestNumber}" - MD Approval`
         }
     }
@@ -109,7 +103,7 @@ export const selectApprovalNotificationByStep = (
 
     if (stepCode === 'DOC_CHECK' || nextDesc.includes('checker') || nextDesc.includes('check all document') || nextDesc.includes('check document')) {
         return {
-            emailHtml: emailToPMMgrTemplate({ ...baseEmailData, recipientName: 'PO Checker' }),
+            emailHtml: emailToCheckerPICTemplate({ ...baseEmailData, recipientName: 'PO Checker' }),
             emailSubject: `[Request Check] Please check register vendor "${requestNumber}" - Document Step`
         }
     }
@@ -129,7 +123,9 @@ export const triggerCreationEmail = async (
     assigneeGroupCode?: string
 ) => {
     //ทำไม ไม่เอาจาก getUserdata ไม่รู้นึกยุ โฟค 18/04/2026
-    const requesterSql = `SELECT empName, empSurname FROM Person.MEMBER_FED WHERE empCode = '${dataItem.Request_By_EmployeeCode || ''}' LIMIT 1`
+    const requesterSql = await RegisterRequestSQL.getMemberByEmpCode({
+        empcode: dataItem.Request_By_EmployeeCode || '',
+    })
     const requesterRes = (await MySQLExecute.search(requesterSql)) as RowDataPacket[]
     const requesterData = requesterRes[0] || {}
     const requesterFullName = requesterData.empName ? `${requesterData.empName} ${requesterData.empSurname || ''}`.trim() : (dataItem.Request_By_EmployeeCode || 'Unknown')
@@ -195,24 +191,7 @@ export const sendAgreementEmail = async (dataItem: any) => {
 
 export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: string) => {
     try {
-        const vendorSql = `
-            SELECT
-                   rr.request_number,
-                   rr.CREATE_DATE,
-                   rr.assign_to,
-                   rr.cc_emails,
-                   rr.vendor_contact_id,
-                   v.company_name,
-                   v.vendor_region,
-                   v.emailmain,
-                   v.fft_vendor_code,
-                   vc_sel.email AS selected_vendor_email
-            FROM request_register_vendor rr
-            LEFT JOIN vendors v ON v.vendor_id = rr.vendor_id
-            LEFT JOIN vendor_contacts vc_sel ON vc_sel.vendor_contact_id = rr.vendor_contact_id AND vc_sel.INUSE = 1
-            WHERE rr.request_id = ${Number(requestId) || 0}
-            LIMIT 1
-        `
+        const vendorSql = await RegisterRequestSQL.getNotificationVendorContextByRequestId({ request_id: Number(requestId) || 0 })
         const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
         const vd = vendorRes[0] || {}
 
@@ -223,7 +202,7 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
 
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
 
-        const picSql = `SELECT empName, empEmail FROM assignees_to WHERE empcode = '${vd.assign_to || ''}' LIMIT 1`
+        const picSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: vd.assign_to || '' })
         const picRes = (await MySQLExecute.search(picSql)) as any[]
         const picRow = picRes[0] || {}
         const picName = picRow.empName ? `${picRow.empName}`.trim() : (vd.assign_to || 'PO PIC')
@@ -297,21 +276,11 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
 export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynamicApprover: string) => {
     try {
         const requestId = dataItem.request_id
-        const vendorSql = `
-              SELECT v.company_name, v.address, v.vendor_region, v.emailmain AS vendor_main_email,
-                   vc.contact_name, vc.email AS vendor_email, vc.tel_phone,
-                  rr.request_number, rr.CREATE_DATE,
-                  rr.assign_to, rr.supportProduct_Process, rr.purchase_frequency, rr.cc_emails,
-                   rr.Request_By_EmployeeCode
-            FROM request_register_vendor rr
-            LEFT JOIN vendors v ON v.vendor_id = rr.vendor_id
-            LEFT JOIN vendor_contacts vc ON vc.vendor_id = v.vendor_id
-            WHERE rr.request_id = ${requestId} LIMIT 1
-        `
+        const vendorSql = await RegisterRequestSQL.getNotificationVendorContextByRequestId({ request_id: requestId })
         const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
         const vd = vendorRes[0] || {}
 
-        const picSql = `SELECT empName, empEmail FROM assignees_to WHERE empcode = '${vd.assign_to || ''}' LIMIT 1`
+        const picSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: vd.assign_to || '' })
         const picRes = (await MySQLExecute.search(picSql)) as any[]
         const picRow = picRes[0] || {}
         const picName = picRow.empName ? `${picRow.empName}`.trim() : (vd.assign_to || 'PIC')
@@ -320,29 +289,42 @@ export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynami
 
         const targetApprover = dynamicApprover || nextStep?.approver_id || vd.assign_to || ''
         let approverEmail = ''
+        let approverName = ''
         if (targetApprover) {
-            const approverEmailSql = `SELECT empEmail FROM assignees_to WHERE empcode = '${targetApprover}' LIMIT 1`
+            const approverEmailSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: targetApprover })
             const approverEmailRes = (await MySQLExecute.search(approverEmailSql)) as any[]
             approverEmail = approverEmailRes[0]?.empEmail || ''
+            approverName = approverEmailRes[0]?.empName || ''
         }
 
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
         const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
+        const requesterSql = await RegisterRequestSQL.getMemberByEmpCode({ empcode: vd.Request_By_EmployeeCode || '' })
+        const requesterRes = (await MySQLExecute.search(requesterSql)) as any[]
+        const requesterEmail = requesterRes[0]?.empEmail || ''
 
         const isOversea = normalizeText(vd.vendor_region) === 'oversea'
-        const nextGroupCode = nextStep?.group_code || resolveGroupCodeForStep(nextStep, isOversea)
+        const nextStepCode = inferStepCode(nextStep)
+        const nextStepDesc = normalizeText(nextStep?.DESCRIPTION)
+        const isDocumentCheckerStep = nextStepCode === 'DOC_CHECK' || nextStepDesc.includes('checker') || nextStepDesc.includes('check all document')
+        const shouldCcRequester = ['PO_MGR_APPROVAL', 'PO_GM_APPROVAL', 'MD_APPROVAL', 'ACCOUNT_REGISTERED'].includes(nextStepCode)
+        const nextGroupCode = isDocumentCheckerStep
+            ? GROUP_CODE.PO_CHECKER_MAIN
+            : (nextStep?.group_code || resolveGroupCodeForStep(nextStep, isOversea))
         const peerApproverCc = await getPeerCcEmailsByGroupCode(nextGroupCode, targetApprover, approverEmail)
 
         const ccEmails = excludeEmails(mergeUniqueEmails(
             picEmail ? [picEmail] : [],
             parseCcEmails(vd.cc_emails),
-            peerApproverCc
+            peerApproverCc,
+            shouldCcRequester && requesterEmail ? [requesterEmail] : []
         ).filter(email => email !== normalizeEmail(approverEmail)), [vd.vendor_email, vd.vendor_main_email])
 
         const baseEmailData: MailTemplateData = {
             toEmail: approverEmail,
             ccEmail: ccEmails.join('; '),
             requestNumber,
+            recipientName: approverName || targetApprover || 'Approver',
             vendorName: vd.company_name || 'N/A',
             address: vd.address || 'N/A',
             contactPic: vd.contact_name || 'N/A',
@@ -367,28 +349,18 @@ export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynami
 export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => {
     try {
         const requestId = dataItem.request_id
-        const vendorSql = `
-              SELECT v.company_name, v.address, v.vendor_region, v.emailmain AS vendor_main_email,
-                   vc.contact_name, vc.email AS vendor_email, vc.tel_phone,
-                  rr.request_number, rr.CREATE_DATE,
-                  rr.assign_to, rr.supportProduct_Process, rr.purchase_frequency, rr.cc_emails,
-                   rr.Request_By_EmployeeCode
-            FROM request_register_vendor rr
-            LEFT JOIN vendors v ON v.vendor_id = rr.vendor_id
-            LEFT JOIN vendor_contacts vc ON vc.vendor_id = v.vendor_id
-            WHERE rr.request_id = ${requestId} LIMIT 1
-        `
+        const vendorSql = await RegisterRequestSQL.getNotificationVendorContextByRequestId({ request_id: requestId })
         const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
         const vd = vendorRes[0] || {}
 
-        const picEmailSql = `SELECT empName, empEmail FROM assignees_to WHERE empcode = '${vd.assign_to || ''}' LIMIT 1`
+        const picEmailSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: vd.assign_to || '' })
         const picRes = (await MySQLExecute.search(picEmailSql)) as any[]
         const picRow = picRes[0] || {}
         const picEmail = picRow.empEmail || ''
         const picName = picRow.empName ? `${picRow.empName}`.trim() : (vd.assign_to || 'PIC')
         const picTel = ''
 
-        const approverEmailSql = `SELECT empEmail FROM assignees_to WHERE empcode = '${currentStep?.approver_id || ''}' LIMIT 1`
+        const approverEmailSql = await RegisterRequestSQL.getAssigneeEmailByEmpCode({ empcode: currentStep?.approver_id || '' })
         const approverRes = (await MySQLExecute.search(approverEmailSql)) as any[]
         const approverEmail = approverRes[0]?.empEmail || ''
 
@@ -442,27 +414,17 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
 export const triggerCompletionEmail = async (dataItem: any) => {
     try {
         const requestId = dataItem.request_id
-        const vendorSql = `
-              SELECT v.company_name, v.address, v.emailmain AS vendor_main_email,
-                   vc.contact_name, vc.email AS vendor_email, vc.tel_phone,
-                  rr.request_number, rr.CREATE_DATE,
-                  rr.assign_to, rr.supportProduct_Process, rr.purchase_frequency, rr.cc_emails,
-                   rr.Request_By_EmployeeCode, rr.vendor_code
-            FROM request_register_vendor rr
-            LEFT JOIN vendors v ON v.vendor_id = rr.vendor_id
-            LEFT JOIN vendor_contacts vc ON vc.vendor_id = v.vendor_id
-            WHERE rr.request_id = ${requestId} LIMIT 1
-        `
+        const vendorSql = await RegisterRequestSQL.getNotificationVendorContextByRequestId({ request_id: requestId })
         const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
         const vd = vendorRes[0] || {}
 
-        const requesterSql = `SELECT empName, empSurname, empEmail FROM Person.MEMBER_FED WHERE empCode = '${vd.Request_By_EmployeeCode || ''}' LIMIT 1`
+        const requesterSql = await RegisterRequestSQL.getMemberByEmpCode({ empcode: vd.Request_By_EmployeeCode || '' })
         const requesterRes = (await MySQLExecute.search(requesterSql)) as any[]
         const req = requesterRes[0] || {}
         const requesterName = req.empName ? `${req.empName} ${req.empSurname || ''}`.trim() : vd.Request_By_EmployeeCode
         const requesterEmail = req.empEmail || ''
 
-        const picEmailSql = `SELECT empName, empEmail FROM assignees_to WHERE empcode = '${vd.assign_to || ''}' LIMIT 1`
+        const picEmailSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: vd.assign_to || '' })
         const picRes = (await MySQLExecute.search(picEmailSql)) as any[]
         const picRow = picRes[0] || {}
         const picName = picRow.empName ? `${picRow.empName}`.trim() : (vd.assign_to || 'PIC')
@@ -510,23 +472,11 @@ export const triggerVendorDisagreeEmail = async (dataItem: any) => {
         const requestId = Number(dataItem.request_id) || 0
         if (!requestId) return
 
-        const vendorSql = `
-            SELECT
-                   v.company_name,
-                   rr.request_number,
-                   rr.CREATE_DATE,
-                   rr.assign_to,
-                   rr.cc_emails,
-                   rr.Request_By_EmployeeCode
-            FROM request_register_vendor rr
-            LEFT JOIN vendors v ON v.vendor_id = rr.vendor_id
-            WHERE rr.request_id = ${requestId}
-            LIMIT 1
-        `
+        const vendorSql = await RegisterRequestSQL.getNotificationVendorContextByRequestId({ request_id: requestId })
         const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
         const vd = vendorRes[0] || {}
 
-        const requesterSql = `SELECT empName, empSurname, empEmail FROM Person.MEMBER_FED WHERE empCode = '${vd.Request_By_EmployeeCode || ''}' LIMIT 1`
+        const requesterSql = await RegisterRequestSQL.getMemberByEmpCode({ empcode: vd.Request_By_EmployeeCode || '' })
         const requesterRes = (await MySQLExecute.search(requesterSql)) as any[]
         const requester = requesterRes[0] || {}
 
@@ -536,7 +486,7 @@ export const triggerVendorDisagreeEmail = async (dataItem: any) => {
         const requesterEmail = requester.empEmail || ''
         if (!requesterEmail) return
 
-        const picSql = `SELECT empEmail FROM assignees_to WHERE empcode = '${vd.assign_to || ''}' LIMIT 1`
+        const picSql = await RegisterRequestSQL.getAssigneeEmailByEmpCode({ empcode: vd.assign_to || '' })
         const picRes = (await MySQLExecute.search(picSql)) as any[]
         const picEmail = picRes[0]?.empEmail || ''
 
