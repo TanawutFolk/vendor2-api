@@ -22,9 +22,15 @@ import {
 
 const normalizeStatusText = (value: any) => normalizeText(String(value || '').replace(/[_-]+/g, ' '))
 const isPendingAgreementStep = (step: any) => normalizeStatusText(step?.DESCRIPTION).includes('pending agreement')
+const isAgreementReachedStep = (step: any) => normalizeStatusText(step?.DESCRIPTION).includes('agreement reached')
 const isIssueGprBStep = (step: any) => normalizeStatusText(step?.DESCRIPTION).includes('issue gpr b')
 const isIssueGprCStep = (step: any) => normalizeStatusText(step?.DESCRIPTION).includes('issue gpr c')
 const isVendorDisagreedStep = (step: any) => normalizeStatusText(step?.DESCRIPTION).includes('vendor disagre')
+const isDocumentCheckStep = (step: any) => {
+    const desc = normalizeStatusText(step?.DESCRIPTION)
+    const stepCode = String(step?.step_code || '').trim().toUpperCase()
+    return stepCode === 'DOC_CHECK' || desc.includes('check all document') || desc.includes('checker')
+}
 const isDisagreedBranchStep = (step: any) => isIssueGprBStep(step) || isIssueGprCStep(step) || isVendorDisagreedStep(step)
 const isVendorDisagreeStatus = (status: any) => normalizeStatusText(status).includes('vendor disagre')
 const isIssueGprBStatus = (status: any) => normalizeStatusText(status).includes('gpr b')
@@ -208,7 +214,13 @@ export const RegisterRequestApprovalService = {
                     }
                     postCommitTasks.push(async () => triggerRejectionEmail(dataItem, currentStep))
                 } else if (currentStep) {
-                    if (requiresVendorReply(currentStep) && !hasVendorRequestLog) {
+                    const isNegotiationBranchCurrentStep =
+                        isPendingAgreementStep(currentStep)
+                        || isAgreementReachedStep(currentStep)
+                        || isIssueGprBStep(currentStep)
+                        || isIssueGprCStep(currentStep)
+
+                    if (requiresVendorReply(currentStep) && !hasVendorRequestLog && !isNegotiationBranchCurrentStep) {
                         sqlList.push(await RegisterRequestSQL.updateApprovalStep({
                             step_id: currentStep.step_id,
                             step_status: 'approved',
@@ -222,7 +234,15 @@ export const RegisterRequestApprovalService = {
                             remark: 'Vendor document request email has been sent',
                         }))
 
-                        const pendingAgreementStep = steps.find((s: any) => s.step_status === 'pending' && s.step_order > currentStep.step_order)
+                        const pendingAfterCurrent = steps
+                            .filter((s: any) => s.step_status === 'pending' && s.step_order > currentStep.step_order)
+                            .sort((a: any, b: any) => Number(a.step_order || 0) - Number(b.step_order || 0))
+
+                        const pendingAgreementStep = pendingAfterCurrent.find((s: any) => isPendingAgreementStep(s))
+                        const agreementReachedStep =
+                            pendingAfterCurrent.find((s: any) => isAgreementReachedStep(s))
+                            || pendingAfterCurrent.find((s: any) => isDocumentCheckStep(s))
+
                         if (pendingAgreementStep) {
                             const pendingAgreementApprover = await resolveStepApprover(pendingAgreementStep)
                             if (pendingAgreementApprover && pendingAgreementApprover !== pendingAgreementStep.approver_id) {
@@ -235,6 +255,31 @@ export const RegisterRequestApprovalService = {
                             }
                             sqlList.push(await RegisterRequestSQL.updateApprovalStep({
                                 step_id: pendingAgreementStep.step_id,
+                                step_status: 'completed',
+                                UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+                            }))
+
+                            sqlList.push(await RegisterRequestSQL.createApprovalLog({
+                                request_id: dataItem.request_id,
+                                step_id: pendingAgreementStep.step_id,
+                                action_by: dataItem.approve_by || dataItem.UPDATE_BY || 'SYSTEM',
+                                action_type: 'approved',
+                                remark: 'Pending Agreement auto-completed after sending vendor email',
+                            }))
+                        }
+
+                        if (agreementReachedStep) {
+                            const agreementReachedApprover = await resolveStepApprover(agreementReachedStep)
+                            if (agreementReachedApprover && agreementReachedApprover !== agreementReachedStep.approver_id) {
+                                sqlList.push(await RegisterRequestSQL.updateApprovalStepApprover({
+                                    step_id: agreementReachedStep.step_id,
+                                    approver_id: agreementReachedApprover,
+                                    assignment_mode: 'AUTO',
+                                    UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
+                                }))
+                            }
+                            sqlList.push(await RegisterRequestSQL.updateApprovalStep({
+                                step_id: agreementReachedStep.step_id,
                                 step_status: 'in_progress',
                                 UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
                             }))
@@ -255,9 +300,18 @@ export const RegisterRequestApprovalService = {
                         }
                     }
 
+                    const disagreementRequested =
+                        isVendorDisagreeStatus(newStatus) ||
+                        isIssueGprBStatus(newStatus) ||
+                        isIssueGprCStatus(newStatus)
+
+                    const currentStepStatus = isPendingAgreementStep(currentStep) && !disagreementRequested
+                        ? 'completed'
+                        : 'approved'
+
                     sqlList.push(await RegisterRequestSQL.updateApprovalStep({
                         step_id: currentStep.step_id,
-                        step_status: 'approved',
+                        step_status: currentStepStatus,
                         UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
                     }))
                     sqlList.push(await RegisterRequestSQL.createApprovalLog({
@@ -271,16 +325,14 @@ export const RegisterRequestApprovalService = {
                     const pendingAfterCurrent = steps
                         .filter((s: any) => s.step_status === 'pending' && s.step_order > currentStep.step_order)
                         .sort((a: any, b: any) => Number(a.step_order || 0) - Number(b.step_order || 0))
-
-                    const disagreementRequested =
-                        isVendorDisagreeStatus(newStatus) ||
-                        isIssueGprBStatus(newStatus) ||
-                        isIssueGprCStatus(newStatus)
+                    const pendingNonBranchAnywhere = steps
+                        .filter((s: any) => s.step_status === 'pending' && !isDisagreedBranchStep(s) && s.step_id !== currentStep.step_id)
+                        .sort((a: any, b: any) => Number(a.step_order || 0) - Number(b.step_order || 0))
 
                     let nextStep: any | undefined = pendingAfterCurrent[0]
                     let closeAsVendorDisagreed = false
 
-                    if (isPendingAgreementStep(currentStep) && !disagreementRequested) {
+                    if ((isPendingAgreementStep(currentStep) || isAgreementReachedStep(currentStep)) && !disagreementRequested) {
                         // Agreement reached: skip GPR B/C/Disagreed branch and continue to normal approval chain.
                         const branchSteps = pendingAfterCurrent.filter((s: any) => isDisagreedBranchStep(s))
                         for (const branchStep of branchSteps) {
@@ -290,8 +342,14 @@ export const RegisterRequestApprovalService = {
                                 UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
                             }))
                         }
-                        nextStep = pendingAfterCurrent.find((s: any) => !isDisagreedBranchStep(s))
-                    } else if (isPendingAgreementStep(currentStep) || isIssueGprBStep(currentStep) || isIssueGprCStep(currentStep)) {
+                        nextStep =
+                            pendingAfterCurrent.find((s: any) => isAgreementReachedStep(s))
+                            || pendingNonBranchAnywhere.find((s: any) => isAgreementReachedStep(s))
+                            || pendingAfterCurrent.find((s: any) => isDocumentCheckStep(s))
+                            || pendingNonBranchAnywhere.find((s: any) => isDocumentCheckStep(s))
+                            || pendingAfterCurrent.find((s: any) => !isDisagreedBranchStep(s))
+                            || pendingNonBranchAnywhere[0]
+                    } else if (isPendingAgreementStep(currentStep) || isAgreementReachedStep(currentStep) || isIssueGprBStep(currentStep) || isIssueGprCStep(currentStep)) {
                         // In negotiation branch: explicit disagreement moves B -> C -> Disagreed.
                         // Otherwise (vendor agreed) continue to normal approval chain.
                         if (!disagreementRequested) {
@@ -303,9 +361,15 @@ export const RegisterRequestApprovalService = {
                                     UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
                                 }))
                             }
-                            nextStep = pendingAfterCurrent.find((s: any) => !isDisagreedBranchStep(s))
+                            nextStep =
+                                pendingAfterCurrent.find((s: any) => isAgreementReachedStep(s))
+                                || pendingNonBranchAnywhere.find((s: any) => isAgreementReachedStep(s))
+                                || pendingAfterCurrent.find((s: any) => isDocumentCheckStep(s))
+                                || pendingNonBranchAnywhere.find((s: any) => isDocumentCheckStep(s))
+                                || pendingAfterCurrent.find((s: any) => !isDisagreedBranchStep(s))
+                                || pendingNonBranchAnywhere[0]
                         } else {
-                            if (isPendingAgreementStep(currentStep)) {
+                            if (isPendingAgreementStep(currentStep) || isAgreementReachedStep(currentStep)) {
                                 nextStep = pendingAfterCurrent.find((s: any) => isIssueGprBStep(s))
                                     || pendingAfterCurrent.find((s: any) => isIssueGprCStep(s))
                                     || pendingAfterCurrent.find((s: any) => isVendorDisagreedStep(s))

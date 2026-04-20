@@ -27,7 +27,7 @@ export type MailTemplateData = {
     reasons?: string[];
 };
 
-//sent to Approver PIC
+//User sent to Approver PIC
 export const emailRequestRegisterVendorTemplate = (data: MailTemplateData) => {
     return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
@@ -86,7 +86,7 @@ export const emailRequestRegisterVendorTemplate = (data: MailTemplateData) => {
     </div>
     `;
 };
-//sent to supplier/Vendor
+//PIC sent to supplier/Vendor
 export const emailVendorDocumentRequestTemplate = (data: MailTemplateData) => {
     const supplierStatusText = data.isNewSupplier
         ? "For register new supplier"
@@ -170,7 +170,7 @@ export const emailVendorDocumentRequestTemplate = (data: MailTemplateData) => {
     </div>
     `;
 };
-//If supplier/Vendor not accept the GPR Form A and request to submit GPR Form B, send this email to supplier/Vendor
+//If supplier/Vendor not accept the GPR Form A send this email to supplier/Vendor
 export const emailExternalSubmitGPRBTemplate = (data: MailTemplateData) => {
     return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
@@ -225,7 +225,7 @@ export const emailExternalSubmitGPRBTemplate = (data: MailTemplateData) => {
     </div>
     `;
 };
-//If supplier/Vendor not accept the GPR Form A and request to submit GPR Form B, send this email to Approver PIC
+//sent to Approver PIC if supplier/Vendor not accept the GPR Form A and PIC submit GPR Form B to system, but approver PIC not approve yet. This email is reminder for approver PIC to approve the register vendor. If approver PIC not approve within 7 days, the system will auto cancel the register vendor request.
 export const emailCheckerApproverGPRCTemplate = (data: MailTemplateData) => {
     return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
@@ -293,6 +293,8 @@ export const emailCheckerApproverGPRCTemplate = (data: MailTemplateData) => {
     </div>
     `;
 };
+
+
 
 // ใช้โครงสร้างเดียวกับ emailCheckerApproverGPRCTemplate แต่เปลี่ยนตัวแปรชื่อผู้รับ
 export const emailAfterCheckerApproverGPRCTemplate = (data: MailTemplateData) => {
