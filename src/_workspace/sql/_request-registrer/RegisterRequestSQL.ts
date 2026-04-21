@@ -53,6 +53,11 @@ export interface RegisterRequestDataItem {
     path?: string;
     vendor_code_selector?: string;
     completion_date?: string;
+    gpr_c_approver_name?: string;
+    gpr_c_approver_email?: string;
+    gpr_c_pc_pic_name?: string;
+    gpr_c_pc_pic_email?: string;
+    gpr_c_circular_json?: string;
     completion_date_null?: string;
     year?: string;
     total_revenue?: number | string;
@@ -280,6 +285,11 @@ export const RegisterRequestSQL = {
                                      , rr.vendor_contact_id
                                      , rr.Request_By_EmployeeCode
                                      , rr.vendor_code
+                                     , rvs.gpr_c_approver_name
+                                     , rvs.gpr_c_approver_email
+                                     , rvs.gpr_c_pc_pic_name
+                                     , rvs.gpr_c_pc_pic_email
+                                     , rvs.gpr_c_circular_json
                                      , v.company_name
                                      , v.address
                                      , v.vendor_region
@@ -294,6 +304,8 @@ export const RegisterRequestSQL = {
                                        request_register_vendor rr
                                             LEFT JOIN
                                        vendors v ON v.vendor_id = rr.vendor_id
+                                            LEFT JOIN
+                                       request_vendor_selections rvs ON rvs.request_id = rr.request_id AND rvs.INUSE = 1
                                             LEFT JOIN
                                        vendor_contacts vc ON vc.vendor_id = v.vendor_id
                                             LEFT JOIN
@@ -811,6 +823,11 @@ export const RegisterRequestSQL = {
                                        rr.vendor_id
                                      , rr.assign_to
                                      , rvs.vendor_code_selector
+                                     , rvs.gpr_c_approver_name
+                                     , rvs.gpr_c_approver_email
+                                     , rvs.gpr_c_pc_pic_name
+                                     , rvs.gpr_c_pc_pic_email
+                                     , rvs.gpr_c_circular_json
                                      , v.vendor_region
                             FROM
                                        request_register_vendor rr
@@ -1330,6 +1347,11 @@ export const RegisterRequestSQL = {
                                      , result_status
                                      , document_path
                                      , vendor_code_selector
+                                     , gpr_c_approver_name
+                                     , gpr_c_approver_email
+                                     , gpr_c_pc_pic_name
+                                     , gpr_c_pc_pic_email
+                                     , gpr_c_circular_json
                                      , completion_date
                                      , CREATE_BY
                                      , UPDATE_BY
@@ -1348,6 +1370,11 @@ export const RegisterRequestSQL = {
                                      , 'dataItem.result'
                                      , 'dataItem.path'
                                      , 'dataItem.vendor_code_selector'
+                                     , 'dataItem.gpr_c_approver_name'
+                                     , 'dataItem.gpr_c_approver_email'
+                                     , 'dataItem.gpr_c_pc_pic_name'
+                                     , 'dataItem.gpr_c_pc_pic_email'
+                                     , 'dataItem.gpr_c_circular_json'
                                      ,  dataItem.completion_date_null
                                      , 'dataItem.UPDATE_BY'
                                      , 'dataItem.UPDATE_BY'
@@ -1371,6 +1398,11 @@ export const RegisterRequestSQL = {
         sql = sql.replaceAll('dataItem.result', esc(d['result']))
         sql = sql.replaceAll('dataItem.path', esc(d['path']))
         sql = sql.replaceAll('dataItem.vendor_code_selector', esc(d['vendor_code_selector']))
+        sql = sql.replaceAll('dataItem.gpr_c_approver_name', esc(d['gpr_c_approver_name']))
+        sql = sql.replaceAll('dataItem.gpr_c_approver_email', esc(d['gpr_c_approver_email']))
+        sql = sql.replaceAll('dataItem.gpr_c_pc_pic_name', esc(d['gpr_c_pc_pic_name']))
+        sql = sql.replaceAll('dataItem.gpr_c_pc_pic_email', esc(d['gpr_c_pc_pic_email']))
+        sql = sql.replaceAll('dataItem.gpr_c_circular_json', esc(d['gpr_c_circular_json']))
         
         if (d.completion_date) {
             sql = sql.replaceAll('dataItem.completion_date_null', `'${esc(d.completion_date)}'`)
@@ -1399,6 +1431,11 @@ export const RegisterRequestSQL = {
                                      , result_status = 'dataItem.result'
                                      , document_path = 'dataItem.path'
                                      , vendor_code_selector = 'dataItem.vendor_code_selector'
+                                     , gpr_c_approver_name = 'dataItem.gpr_c_approver_name'
+                                     , gpr_c_approver_email = 'dataItem.gpr_c_approver_email'
+                                     , gpr_c_pc_pic_name = 'dataItem.gpr_c_pc_pic_name'
+                                     , gpr_c_pc_pic_email = 'dataItem.gpr_c_pc_pic_email'
+                                     , gpr_c_circular_json = 'dataItem.gpr_c_circular_json'
                                      , completion_date = dataItem.completion_date_null
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
@@ -1422,6 +1459,11 @@ export const RegisterRequestSQL = {
         sql = sql.replaceAll('dataItem.result', esc(d['result']))
         sql = sql.replaceAll('dataItem.path', esc(d['path']))
         sql = sql.replaceAll('dataItem.vendor_code_selector', esc(d['vendor_code_selector']))
+        sql = sql.replaceAll('dataItem.gpr_c_approver_name', esc(d['gpr_c_approver_name']))
+        sql = sql.replaceAll('dataItem.gpr_c_approver_email', esc(d['gpr_c_approver_email']))
+        sql = sql.replaceAll('dataItem.gpr_c_pc_pic_name', esc(d['gpr_c_pc_pic_name']))
+        sql = sql.replaceAll('dataItem.gpr_c_pc_pic_email', esc(d['gpr_c_pc_pic_email']))
+        sql = sql.replaceAll('dataItem.gpr_c_circular_json', esc(d['gpr_c_circular_json']))
 
         if (d.completion_date) {
             sql = sql.replaceAll('dataItem.completion_date_null', `'${esc(d.completion_date)}'`)

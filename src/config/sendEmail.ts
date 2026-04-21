@@ -2,6 +2,17 @@
 const axios = require('axios')
 const FormData = require('form-data')
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const INVALID_TOKENS = new Set(['-', 'n/a', 'na', 'null', 'undefined'])
+
+const isValidEmail = (value: string) => EMAIL_REGEX.test(value)
+
+const sanitizeEmail = (value: any) => {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (!normalized || INVALID_TOKENS.has(normalized)) return ''
+  return normalized
+}
+
 // const sendEmail = async (
 //   message,
 //   send_to
@@ -69,8 +80,8 @@ const normalizeCcList = (cc?: string[]) => {
   cc.forEach(item => {
     String(item || '')
       .split(/[;,]+/)
-      .map(s => s.trim().toLowerCase())
-      .filter(Boolean)
+      .map(sanitizeEmail)
+      .filter(email => email && isValidEmail(email))
       .forEach(email => {
         if (!seen.has(email)) {
           seen.add(email)
@@ -92,15 +103,20 @@ const sendEmail = async (message: string, send_to: string, subject?: string, cc?
 
   // 2. ลบ \n (Enter) ของ Code ออกให้เหลือบรรทัดเดียว (Minify) เพื่อกัน Error
   const cleanMessage = fixedMessage.replace(/[\r\n]+/g, '').trim()
+  const normalizedTo = sanitizeEmail(send_to)
+  if (!normalizedTo || !isValidEmail(normalizedTo)) {
+    console.error('[MAIL DEBUG][sendEmail] Invalid TO recipient, skip sending', { to: send_to, subject })
+    return
+  }
   const normalizedCc = normalizeCcList(cc)
   const form = new FormData()
-  form.append('To', send_to)
+  form.append('To', normalizedTo)
   form.append('CC', normalizedCc.length > 0 ? normalizedCc.join(';') : '')
   form.append('Subject', subject || '[Vendor Registration System] Vendor Registration')
   form.append('BodyHtml', cleanMessage)
 
   console.log('[MAIL DEBUG][sendEmail] Request payload', {
-    to: send_to,
+    to: normalizedTo,
     cc: normalizedCc,
     subject: subject || '[Vendor Registration System] Vendor Registration',
     ccRawInput: cc,

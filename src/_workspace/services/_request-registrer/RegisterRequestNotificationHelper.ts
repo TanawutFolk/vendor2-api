@@ -35,7 +35,7 @@ export const getPeerCcEmailsByGroupCode = async (
 ): Promise<string[]> => {
     if (!groupCode) return []
 
-    const targetGroup = String(groupCode || '')
+const targetGroup = String(groupCode || '')
         .trim()
         .toUpperCase()
         .replace(/\s+/g, '_')
@@ -63,6 +63,18 @@ export const getPeerCcEmailsByGroupCode = async (
     )
 
     return peerEmails
+}
+
+const parseStoredEmailList = (raw: any): string[] => {
+    if (!raw) return []
+
+    try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+        if (!Array.isArray(parsed)) return []
+        return parsed.map(item => normalizeEmail(item)).filter(Boolean)
+    } catch {
+        return []
+    }
 }
 
 export const selectApprovalNotificationByStep = (
@@ -196,9 +208,6 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
         const vd = vendorRes[0] || {}
 
         const vendorEmail = (vd.selected_vendor_email || vd.emailmain || '').trim()
-        if (!vendorEmail) {
-            return { sent: false, reason: 'missing vendor email' }
-        }
 
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
 
@@ -223,6 +232,95 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
         const stageHintRaw = String(stageHint || '').trim().toLowerCase()
         const isGprBStage = stageHintRaw.includes('gpr b')
         const isGprCStage = stageHintRaw.includes('gpr c')
+
+        if (isGprCStage) {
+            const checkerEmpSql = await RegisterRequestSQL.getApproverByGroupCode({ group_code: GROUP_CODE.PO_CHECKER_MAIN })
+            const checkerEmpRes = (await MySQLExecute.search(checkerEmpSql)) as any[]
+            const checkerEmpCode = checkerEmpRes[0]?.empcode || ''
+
+            let checkerEmail = ''
+            if (checkerEmpCode) {
+                const checkerContactSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: checkerEmpCode })
+                const checkerContactRes = (await MySQLExecute.search(checkerContactSql)) as any[]
+                checkerEmail = checkerContactRes[0]?.empEmail || ''
+            }
+
+            const gprCApproverEmail = normalizeEmail(vd.gpr_c_approver_email)
+            const gprCApproverName = String(vd.gpr_c_approver_name || '').trim() || 'GPR C Approver'
+            const gprCPcPicEmail = normalizeEmail(vd.gpr_c_pc_pic_email)
+            const circularEmails = parseStoredEmailList(vd.gpr_c_circular_json)
+
+            if (!checkerEmail && !gprCApproverEmail) {
+                return { sent: false, reason: 'missing GPR C checker and approver email' }
+            }
+
+            const ccEmails = excludeEmails(mergeUniqueEmails(
+                picEmail ? [picEmail] : [],
+                gprCPcPicEmail ? [gprCPcPicEmail] : [],
+                circularEmails,
+                manualCc
+            ), [vendorEmail, vd.emailmain])
+
+            if (checkerEmail) {
+                const checkerHtml = emailToCheckerPICTemplate({
+                    requestNumber,
+                    recipientName: 'PO Checker',
+                    vendorName: vd.company_name || 'N/A',
+                    address: vd.address || 'N/A',
+                    contactPic: vd.contact_name || 'N/A',
+                    email: vd.emailmain || 'N/A',
+                    tel: vd.tel_phone || 'N/A',
+                    supportProduct: vd.supportProduct_Process || 'N/A',
+                    purchaseFrequency: vd.purchase_frequency || 'N/A',
+                    systemLink: `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`,
+                    picName,
+                    picTel,
+                })
+
+                await sendEmail(
+                    checkerHtml,
+                    checkerEmail,
+                    `[Request Check] Please check ${requestNumber} - General Purchase Specification Form C`,
+                    ccEmails.filter(email => email !== checkerEmail)
+                )
+            }
+
+            if (gprCApproverEmail) {
+                const approverHtml = emailAfterCheckerApproverGPRCTemplate({
+                    toEmail: gprCApproverEmail,
+                    ccEmail: ccEmails.join('; '),
+                    requestNumber,
+                    picNextStepName: gprCApproverName,
+                    picName,
+                    picTel,
+                    vendorName: vd.company_name || 'N/A',
+                    address: vd.address || 'N/A',
+                    contactPic: vd.contact_name || 'N/A',
+                    email: vd.emailmain || 'N/A',
+                    tel: vd.tel_phone || 'N/A',
+                    supportProduct: vd.supportProduct_Process || 'N/A',
+                    purchaseFrequency: vd.purchase_frequency || 'N/A',
+                    systemLink: `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`,
+                })
+
+                await sendEmail(
+                    approverHtml,
+                    gprCApproverEmail,
+                    `[Request Approval] Please approve ${requestNumber} - General Purchase Specification Form C`,
+                    ccEmails.filter(email => email !== gprCApproverEmail)
+                )
+            }
+
+            return {
+                sent: true,
+                to: mergeUniqueEmails(checkerEmail ? [checkerEmail] : [], gprCApproverEmail ? [gprCApproverEmail] : []),
+                ccCount: ccEmails.length
+            }
+        }
+
+        if (!vendorEmail) {
+            return { sent: false, reason: 'missing vendor email' }
+        }
 
         let emailHtml = emailVendorDocumentRequestTemplate({
             vendorEmail,
@@ -307,18 +405,49 @@ export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynami
         const nextStepCode = inferStepCode(nextStep)
         const nextStepDesc = normalizeText(nextStep?.DESCRIPTION)
         const isDocumentCheckerStep = nextStepCode === 'DOC_CHECK' || nextStepDesc.includes('checker') || nextStepDesc.includes('check all document')
-        const shouldCcRequester = ['PO_MGR_APPROVAL', 'PO_GM_APPROVAL', 'MD_APPROVAL', 'ACCOUNT_REGISTERED'].includes(nextStepCode)
+
+        const picGroupCode = isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
+        const peerPicCc = await getPeerCcEmailsByGroupCode(picGroupCode, vd.assign_to, picEmail)
+        const checkerPicCc = await getPeerCcEmailsByGroupCode(GROUP_CODE.PO_CHECKER_MAIN)
+        const accPicCc = await getPeerCcEmailsByGroupCode(isOversea ? GROUP_CODE.ACC_OVERSEA_CC : GROUP_CODE.ACC_LOCAL_CC)
+
+        const isPmMgrAndAbove = ['PO_MGR_APPROVAL', 'PO_GM_APPROVAL', 'MD_APPROVAL'].includes(nextStepCode)
+        const isAccountStep = nextStepCode === 'ACCOUNT_REGISTERED'
+
         const nextGroupCode = isDocumentCheckerStep
             ? GROUP_CODE.PO_CHECKER_MAIN
             : (nextStep?.group_code || resolveGroupCodeForStep(nextStep, isOversea))
         const peerApproverCc = await getPeerCcEmailsByGroupCode(nextGroupCode, targetApprover, approverEmail)
 
-        const ccEmails = excludeEmails(mergeUniqueEmails(
-            picEmail ? [picEmail] : [],
-            parseCcEmails(vd.cc_emails),
-            peerApproverCc,
-            shouldCcRequester && requesterEmail ? [requesterEmail] : []
-        ).filter(email => email !== normalizeEmail(approverEmail)), [vd.vendor_email, vd.vendor_main_email])
+        const ccEmails = excludeEmails(
+            mergeUniqueEmails(
+                ...(isPmMgrAndAbove
+                    ? [
+                        checkerPicCc,
+                        requesterEmail ? [requesterEmail] : [],
+                        picEmail ? [picEmail] : [],
+                        peerPicCc,
+                    ]
+                    : []),
+                ...(isAccountStep
+                    ? [
+                        accPicCc,
+                        checkerPicCc,
+                        requesterEmail ? [requesterEmail] : [],
+                        picEmail ? [picEmail] : [],
+                        peerPicCc,
+                    ]
+                    : []),
+                ...(!isPmMgrAndAbove && !isAccountStep
+                    ? [
+                        picEmail ? [picEmail] : [],
+                        peerApproverCc,
+                    ]
+                    : []),
+                parseCcEmails(vd.cc_emails)
+            ).filter(email => email !== normalizeEmail(approverEmail)),
+            [vd.vendor_email, vd.vendor_main_email]
+        )
 
         const baseEmailData: MailTemplateData = {
             toEmail: approverEmail,
@@ -430,11 +559,29 @@ export const triggerCompletionEmail = async (dataItem: any) => {
         const picName = picRow.empName ? `${picRow.empName}`.trim() : (vd.assign_to || 'PIC')
         const picEmail = picRow.empEmail || ''
         const picTel = ''
+        const picNextStepEmail = normalizeEmail(dataItem.pic_next_step_email || dataItem.PIC_Email || '')
 
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
         const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
 
-        const finalCcEmails = excludeEmails(picEmail ? [picEmail] : [], [vd.vendor_email, vd.vendor_main_email])
+        const isOversea = normalizeText(vd.vendor_region) === 'oversea'
+        const picGroupCode = isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
+        const peerPicCc = await getPeerCcEmailsByGroupCode(picGroupCode, vd.assign_to, picEmail)
+        const checkerPicCc = await getPeerCcEmailsByGroupCode(GROUP_CODE.PO_CHECKER_MAIN)
+        const accPicCc = await getPeerCcEmailsByGroupCode(isOversea ? GROUP_CODE.ACC_OVERSEA_CC : GROUP_CODE.ACC_LOCAL_CC)
+
+        const finalCcEmails = excludeEmails(
+            mergeUniqueEmails(
+                accPicCc,
+                checkerPicCc,
+                requesterEmail ? [requesterEmail] : [],
+                picEmail ? [picEmail] : [],
+                peerPicCc,
+                picNextStepEmail ? [picNextStepEmail] : [],
+                parseCcEmails(vd.cc_emails)
+            ),
+            [vd.vendor_email, vd.vendor_main_email]
+        )
         if (!requesterEmail) return
 
         const completionData: MailTemplateData = {

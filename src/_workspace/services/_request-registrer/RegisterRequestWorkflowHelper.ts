@@ -6,7 +6,9 @@ export const GROUP_CODE = {
     PO_MGR: 'PO_MGR',
     PO_GM: 'PO_GM',
     ACC_LOCAL_MAIN: 'ACC_LOCAL_MAIN',
-    ACC_OVERSEA_MAIN: 'ACC_OVERSEA_MAIN'
+    ACC_OVERSEA_MAIN: 'ACC_OVERSEA_MAIN',
+    ACC_LOCAL_CC: 'ACC_LOCAL_CC',
+    ACC_OVERSEA_CC: 'ACC_OVERSEA_CC'
 } as const
 
 export const normalizeText = (value: any) => String(value || '').trim().toLowerCase()
@@ -128,7 +130,16 @@ export const resolveRequestNumber = (requestNumberFromDb: any, requestId: number
     return normalizeRequestNumber(requestNumberFromDb, requestId, baseDate)
 }
 
-export const normalizeEmail = (value: any) => String(value || '').trim().toLowerCase()
+const INVALID_EMAIL_TOKENS = new Set(['-', 'n/a', 'na', 'null', 'undefined'])
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export const normalizeEmail = (value: any) => {
+    const email = String(value || '').trim().toLowerCase()
+    if (!email || INVALID_EMAIL_TOKENS.has(email)) return ''
+    return email
+}
+
+export const isValidEmail = (value: any) => EMAIL_REGEX.test(normalizeEmail(value))
 
 export const mergeUniqueEmails = (...sources: any[][]): string[] => {
     const seen = new Set<string>()
@@ -137,7 +148,7 @@ export const mergeUniqueEmails = (...sources: any[][]): string[] => {
     for (const source of sources) {
         for (const raw of source || []) {
             const email = normalizeEmail(raw)
-            if (!email || seen.has(email)) continue
+            if (!email || !isValidEmail(email) || seen.has(email)) continue
             seen.add(email)
             result.push(email)
         }
@@ -155,12 +166,13 @@ export const parseCcEmails = (rawCc: any): string[] => {
         if (!Array.isArray(parsed)) return []
 
         return parsed
-            .map((entry: any) => {
-                if (typeof entry === 'string') return entry
-                if (entry && typeof entry.email === 'string') return entry.email
-                return ''
+            .flatMap((entry: any) => {
+                if (typeof entry === 'string') return entry.split(/[;,]+/)
+                if (entry && typeof entry.email === 'string') return entry.email.split(/[;,]+/)
+                return []
             })
-            .filter(Boolean)
+            .map(normalizeEmail)
+            .filter(email => email && isValidEmail(email))
     } catch {
         return []
     }

@@ -9,7 +9,12 @@ export const RegisterRequestGprService = {
 
             const formData = typeof dataItem.gpr_data === 'string' ? JSON.parse(dataItem.gpr_data) : (dataItem.gpr_data || {})
             formData.request_id = reqId
-            formData.UPDATE_BY = dataItem.UPDATE_BY || 'พังแล้วพี่น้อง'
+            formData.UPDATE_BY = dataItem.UPDATE_BY || 'SYSTEM'
+            formData.gpr_c_circular_json = JSON.stringify(
+                Array.isArray(formData.gpr_c_circular_list)
+                    ? formData.gpr_c_circular_list.map((email: any) => String(email || '').trim()).filter(Boolean)
+                    : []
+            )
 
             const sqlList = []
             const checkSql = await RegisterRequestSQL.checkSelectionExists(formData)

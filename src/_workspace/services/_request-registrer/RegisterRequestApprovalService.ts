@@ -110,6 +110,7 @@ export const RegisterRequestApprovalService = {
             const vendor_id = checkRes[0]?.vendor_id
             const assign_to = checkRes[0]?.assign_to
             const selectedVendorCode = checkRes[0]?.vendor_code_selector || ''
+            const gprCApproverEmail = String(checkRes[0]?.gpr_c_approver_email || '').trim()
             const isOversea = (checkRes[0]?.vendor_region || '').toLowerCase() === 'oversea'
 
             const getApproverByGroup = async (groupCode: string) => {
@@ -384,6 +385,10 @@ export const RegisterRequestApprovalService = {
                             }
                         }
 
+                        if (nextStep && isIssueGprCStep(nextStep) && !gprCApproverEmail) {
+                            throw new Error('GPR C approver email is required before sending this request to GPR C.')
+                        }
+
                         if (disagreementRequested && nextStep && isVendorDisagreedStep(nextStep)) {
                             closeAsVendorDisagreed = true
 
@@ -633,6 +638,12 @@ export const RegisterRequestApprovalService = {
 
             sqlList.push(await RegisterRequestSQL.completeRegistration(dataItem))
             const resultData = await MySQLExecute.executeList(sqlList)
+
+            try {
+                await triggerCompletionEmail(dataItem)
+            } catch (mailErr: any) {
+                console.error('[completeRegistration] Completion email failed:', mailErr?.message)
+            }
 
             return {
                 Status: true,
