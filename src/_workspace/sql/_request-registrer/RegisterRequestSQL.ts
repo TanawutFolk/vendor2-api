@@ -566,6 +566,28 @@ export const RegisterRequestSQL = {
                                                 JSON_ARRAY()
                                        ) AS approval_logs
 
+                                     -- GPR Criteria (inline JSON for pass/fail evaluation)
+                                     , IFNULL(
+                                                (
+                                                           SELECT
+                                                                      JSON_ARRAYAGG(
+                                                                           JSON_OBJECT(
+                                                                               'no', vsc.criteria_no,
+                                                                               'criteria', vsc.criteria_value,
+                                                                               'uploaded_file', vsc.uploaded_file_path,
+                                                                               'uploaded_name', vsc.uploaded_file_name
+                                                                           )
+                                                                      )
+                                                           FROM
+                                                                      request_vendor_selections rvs2
+                                                                           JOIN
+                                                                      vendor_selection_criteria vsc ON vsc.selection_id = rvs2.selection_id
+                                                           WHERE
+                                                                      rvs2.request_id = rr.request_id AND rvs2.INUSE = 1
+                                                ),
+                                                JSON_ARRAY()
+                                       ) AS gpr_criteria
+
                             FROM
                                        request_register_vendor rr
                                             LEFT JOIN
@@ -748,6 +770,28 @@ export const RegisterRequestSQL = {
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS approval_logs
+
+                                     -- GPR Criteria (inline JSON for pass/fail evaluation)
+                                     , IFNULL(
+                                                (
+                                                           SELECT
+                                                                      JSON_ARRAYAGG(
+                                                                           JSON_OBJECT(
+                                                                               'no', vsc.criteria_no,
+                                                                               'criteria', vsc.criteria_value,
+                                                                               'uploaded_file', vsc.uploaded_file_path,
+                                                                               'uploaded_name', vsc.uploaded_file_name
+                                                                           )
+                                                                      )
+                                                           FROM
+                                                                      request_vendor_selections rvs2
+                                                                           JOIN
+                                                                      vendor_selection_criteria vsc ON vsc.selection_id = rvs2.selection_id
+                                                           WHERE
+                                                                      rvs2.request_id = rr.request_id AND rvs2.INUSE = 1
+                                                ),
+                                                JSON_ARRAY()
+                                       ) AS gpr_criteria
 
                             FROM
                                        request_register_vendor rr

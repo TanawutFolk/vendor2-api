@@ -38,6 +38,34 @@ const isVendorDisagreeStatus = (status: any) => normalizeStatusText(status).incl
 const isIssueGprBStatus = (status: any) => normalizeStatusText(status).includes('gpr b')
 const isIssueGprCStatus = (status: any) => normalizeStatusText(status).includes('gpr c')
 
+const NEED_CRITERIA = new Set(['4.1', '4.2', '4.3', '4.4', '4.5'])
+const OPTIONAL_CRITERIA = new Set(['4.6', '4.7', '4.8', '4.9', '4.10', '4.11', '4.12', '4.13'])
+
+const evaluateGprCriteria = (criteriaRows: any[]) => {
+    const rows = Array.isArray(criteriaRows) ? criteriaRows : []
+    const normalizedRows = rows.map((row: any) => ({
+        no: String(row?.no || row?.criteria_no || '').trim(),
+        uploaded_file: String(row?.uploaded_file || row?.uploaded_file_path || '').trim(),
+    }))
+
+    const needRows = normalizedRows.filter(row => NEED_CRITERIA.has(row.no))
+    const optionalRows = normalizedRows.filter(row => OPTIONAL_CRITERIA.has(row.no))
+
+    const needPassed = NEED_CRITERIA.size > 0
+        && needRows.length === NEED_CRITERIA.size
+        && needRows.every(row => !!row.uploaded_file)
+
+    const optionalUploaded = optionalRows.filter(row => !!row.uploaded_file).length
+    const optionalPassed = optionalUploaded >= 4
+
+    return {
+        hasCriteria: normalizedRows.length > 0,
+        needPassed,
+        optionalPassed,
+        passed: needPassed && optionalPassed,
+    }
+}
+
 const buildActionRequiredRemark = (dataItem: any) => {
     const owner = String(
         dataItem?.action_required_owner
@@ -202,6 +230,39 @@ export const RegisterRequestApprovalService = {
                         throw new Error('Approval blocked: You must open the GPR Form and specify the "Vendor Code" before approving this step.')
                     }
                     dataItem.vendor_code_extracted = extractedVendorCode
+                }
+
+                const requiresGprDecision = isPendingAgreementStep(currentStep) || isAgreementReachedStep(currentStep)
+                if (requiresGprDecision && !isExplicitReject && explicitAction !== WORKFLOW_ACTION.ACTION_REQUIRED) {
+                    const attemptingDisagree =
+                        explicitAction === WORKFLOW_ACTION.DISAGREE
+                        || isVendorDisagreeStatus(newStatus)
+                        || isIssueGprBStatus(newStatus)
+                        || isIssueGprCStatus(newStatus)
+                    const attemptingApprove = !attemptingDisagree
+
+                    const selectionSql = await RegisterRequestSQL.getSelection({ request_id: dataItem.request_id })
+                    const selectionRes = (await MySQLExecute.search(selectionSql)) as any[]
+                    const selection = selectionRes[0]
+                    if (!selection?.selection_id) {
+                        throw new Error('Approval blocked: Please fill GPR form before proceeding.')
+                    }
+
+                    const criteriaSql = await RegisterRequestSQL.getCriteria({ selection_id: selection.selection_id })
+                    const criteriaRes = (await MySQLExecute.search(criteriaSql)) as any[]
+                    const gprEval = evaluateGprCriteria(criteriaRes)
+
+                    if (!gprEval.hasCriteria) {
+                        throw new Error('Approval blocked: Please fill GPR form before proceeding.')
+                    }
+
+                    if (attemptingApprove && !gprEval.passed) {
+                        throw new Error('Approval blocked: GPR form does not pass criteria (4.1-4.5 need all files and 4.6-4.13 need at least 4 files).')
+                    }
+
+                    if (attemptingDisagree && gprEval.passed) {
+                        throw new Error('Action blocked: GPR form already passes criteria. Please use Approve flow.')
+                    }
                 }
             }
 
