@@ -243,7 +243,7 @@ export const emailExternalSubmitGPRBTemplate = (data: MailTemplateData) => {
     `;
 };
 //sent to Approver PIC if supplier/Vendor not accept the GPR Form A and PIC submit GPR Form B to system, but approver PIC not approve yet. This email is reminder for approver PIC to approve the register vendor. If approver PIC not approve within 7 days, the system will auto cancel the register vendor request.
-export const emailCheckerApproverGPRCTemplate = (data: MailTemplateData) => {
+export const emailUserCheckerApproverGPRCTemplate = (data: MailTemplateData) => {
     return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
@@ -307,9 +307,9 @@ export const emailCheckerApproverGPRCTemplate = (data: MailTemplateData) => {
 
 
 
-// ใช้โครงสร้างเดียวกับ emailCheckerApproverGPRCTemplate แต่เปลี่ยนตัวแปรชื่อผู้รับ
+// ใช้โครงสร้างเดียวกับ emailUserCheckerApproverGPRCTemplate แต่เปลี่ยนตัวแปรชื่อผู้รับ
 export const emailAfterCheckerApproverGPRCTemplate = (data: MailTemplateData) => {
-    return emailCheckerApproverGPRCTemplate({...data, userName: data.picNextStepName});
+    return emailUserCheckerApproverGPRCTemplate({...data, userName: data.picNextStepName});
 };
 
 export const emailReject1Template = (data: MailTemplateData) => {

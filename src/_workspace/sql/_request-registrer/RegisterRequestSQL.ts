@@ -1329,6 +1329,21 @@ export const RegisterRequestSQL = {
         return sql
     },
 
+    getRequesterByRequestId: (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            SELECT
+                                       Request_By_EmployeeCode
+                            FROM
+                                       request_register_vendor
+                            WHERE
+                                       request_id = dataItem.request_id
+                            LIMIT
+                                       1
+        `
+        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+        return sql
+    },
+
     // 2A. Insert selection
     insertSelection: (dataItem: RegisterRequestDataItem) => {
         let sql = `
@@ -1472,6 +1487,34 @@ export const RegisterRequestSQL = {
         }
 
         sql = sql.replaceAll('dataItem.UPDATE_BY', esc(d['UPDATE_BY'] || 'SYSTEM'))
+        return sql
+    },
+
+    updateSelectionGprCOnly: (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            UPDATE request_vendor_selections SET
+                                       gpr_c_approver_name = 'dataItem.gpr_c_approver_name'
+                                     , gpr_c_approver_email = 'dataItem.gpr_c_approver_email'
+                                     , gpr_c_pc_pic_name = 'dataItem.gpr_c_pc_pic_name'
+                                     , gpr_c_pc_pic_email = 'dataItem.gpr_c_pc_pic_email'
+                                     , gpr_c_circular_json = 'dataItem.gpr_c_circular_json'
+                                     , UPDATE_BY = 'dataItem.UPDATE_BY'
+                                     , UPDATE_DATE = NOW()
+                            WHERE
+                                       selection_id = dataItem.selection_id
+        `
+
+        const d = dataItem
+        const esc = (str: any) => String(str || '').replace(/'/g, "\\'")
+
+        sql = sql.replaceAll('dataItem.selection_id', (d['selection_id'] || 0).toString())
+        sql = sql.replaceAll('dataItem.gpr_c_approver_name', esc(d['gpr_c_approver_name']))
+        sql = sql.replaceAll('dataItem.gpr_c_approver_email', esc(d['gpr_c_approver_email']))
+        sql = sql.replaceAll('dataItem.gpr_c_pc_pic_name', esc(d['gpr_c_pc_pic_name']))
+        sql = sql.replaceAll('dataItem.gpr_c_pc_pic_email', esc(d['gpr_c_pc_pic_email']))
+        sql = sql.replaceAll('dataItem.gpr_c_circular_json', esc(d['gpr_c_circular_json']))
+        sql = sql.replaceAll('dataItem.UPDATE_BY', esc(d['UPDATE_BY'] || 'SYSTEM'))
+
         return sql
     },
 

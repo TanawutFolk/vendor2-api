@@ -76,6 +76,9 @@ registerRequestRoutes.post('/completeRegistration', RegisterRequestController.co
 // POST /register-request/saveGprForm
 registerRequestRoutes.post('/saveGprForm', RegisterRequestController.saveGprForm)
 
+// POST /register-request/saveGprCNotification
+registerRequestRoutes.post('/saveGprCNotification', RegisterRequestController.saveGprCNotification)
+
 // POST /register-request/getGprForm
 registerRequestRoutes.post('/getGprForm', RegisterRequestController.getGprForm)
 

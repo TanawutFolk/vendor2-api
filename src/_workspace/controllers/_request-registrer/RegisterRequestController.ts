@@ -694,6 +694,41 @@ export const RegisterRequestController = {
         }
     },
 
+    // Save requester-only GPR C notification setup
+    saveGprCNotification: async (req: Request, res: Response) => {
+        let dataItem
+
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
+        try {
+            const request_id = parseInt(dataItem.request_id as string)
+            if (!request_id || isNaN(request_id)) {
+                return res.status(400).json({
+                    Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                    MethodOnDb: 'Save GPR C Notification', Message: 'Invalid request_id'
+                } as ResponseI)
+            }
+
+            const result = await RegisterRequestModel.saveGprCNotification({
+                request_id,
+                gpr_c_data: dataItem.gpr_c_data || {},
+                UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
+            })
+
+            res.status(200).json(result as ResponseI)
+        } catch (error: any) {
+            console.error('Save GPR C Notification Error:', error)
+            res.status(200).json({
+                Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                MethodOnDb: 'Save GPR C Notification', Message: error?.message || 'Failed to save GPR C notification'
+            } as ResponseI)
+        }
+    },
+
     // Get GPR form data (Supplier / Outsourcing Selection Sheet)
     getGprForm: async (req: Request, res: Response) => {
         let dataItem

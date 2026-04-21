@@ -284,6 +284,10 @@ export const RegisterRequestService = {
         return RegisterRequestGprService.saveGprForm(dataItem)
     },
 
+    saveGprCNotification: async (dataItem: any) => {
+        return RegisterRequestGprService.saveGprCNotification(dataItem)
+    },
+
     getGprForm: async (dataItem: any) => {
         return RegisterRequestGprService.getGprForm(dataItem)
     },

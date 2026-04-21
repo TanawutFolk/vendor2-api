@@ -18,5 +18,6 @@ export const RegisterRequestModel = {
     reassignAssignment: async (dataItem: any) => RegisterRequestService.reassignAssignment(dataItem),
     completeRegistration: async (dataItem: any) => RegisterRequestService.completeRegistration(dataItem),
     saveGprForm: async (dataItem: any) => RegisterRequestService.saveGprForm(dataItem),
+    saveGprCNotification: async (dataItem: any) => RegisterRequestService.saveGprCNotification(dataItem),
     getGprForm: async (request_id: number) => RegisterRequestService.getGprForm({ request_id }),
 }

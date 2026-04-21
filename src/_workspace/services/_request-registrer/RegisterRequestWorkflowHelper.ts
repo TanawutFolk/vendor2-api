@@ -11,7 +11,38 @@ export const GROUP_CODE = {
     ACC_OVERSEA_CC: 'ACC_OVERSEA_CC'
 } as const
 
+export const WORKFLOW_ACTION = {
+    APPROVE: 'APPROVE',
+    DISAGREE: 'DISAGREE',
+    ACTION_REQUIRED: 'ACTION_REQUIRED',
+    REJECT: 'REJECT',
+} as const
+
 export const normalizeText = (value: any) => String(value || '').trim().toLowerCase()
+
+const normalizeActionToken = (value: any) => normalizeText(String(value || '').replace(/[-\s]+/g, '_'))
+
+export const resolveWorkflowAction = (dataItem: any) => {
+    const token = normalizeActionToken(
+        dataItem?.workflow_action || dataItem?.action_type || dataItem?.negotiation_action || ''
+    )
+
+    if (!token) return ''
+    if (['approve', 'approved', 'agree', 'agreed', 'vendor_agreed', 'continue'].includes(token)) {
+        return WORKFLOW_ACTION.APPROVE
+    }
+    if (['disagree', 'vendor_disagreed', 'not_approve', 'notapproved'].includes(token)) {
+        return WORKFLOW_ACTION.DISAGREE
+    }
+    if (['action_required', 'need_action', 'escalate'].includes(token)) {
+        return WORKFLOW_ACTION.ACTION_REQUIRED
+    }
+    if (['reject', 'rejected'].includes(token)) {
+        return WORKFLOW_ACTION.REJECT
+    }
+
+    return ''
+}
 
 export const inferStepCode = (step: any) => {
     if (step?.step_code) return String(step.step_code).trim().toUpperCase()

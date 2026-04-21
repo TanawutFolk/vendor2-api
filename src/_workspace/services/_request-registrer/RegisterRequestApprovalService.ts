@@ -10,7 +10,9 @@ import {
     normalizeText,
     requiresVendorCode,
     requiresVendorReply,
+    resolveWorkflowAction,
     resolveGroupCodeForStep,
+    WORKFLOW_ACTION,
 } from './RegisterRequestWorkflowHelper'
 import {
     triggerApprovalEmails,
@@ -35,6 +37,36 @@ const isDisagreedBranchStep = (step: any) => isIssueGprBStep(step) || isIssueGpr
 const isVendorDisagreeStatus = (status: any) => normalizeStatusText(status).includes('vendor disagre')
 const isIssueGprBStatus = (status: any) => normalizeStatusText(status).includes('gpr b')
 const isIssueGprCStatus = (status: any) => normalizeStatusText(status).includes('gpr c')
+
+const buildActionRequiredRemark = (dataItem: any) => {
+    const owner = String(
+        dataItem?.action_required_owner
+        || dataItem?.action_required_owner_empcode
+        || ''
+    ).trim()
+    const dueDate = String(
+        dataItem?.action_required_due_date
+        || dataItem?.due_date
+        || ''
+    ).trim()
+    const note = String(
+        dataItem?.action_required_note
+        || dataItem?.approver_remark
+        || ''
+    ).trim()
+    const actor = String(dataItem?.approve_by || dataItem?.UPDATE_BY || 'SYSTEM').trim()
+
+    const metadata = {
+        type: 'action_required',
+        owner,
+        due_date: dueDate,
+        note,
+        actor,
+        captured_at: new Date().toISOString(),
+    }
+
+    return `Action Required | ${JSON.stringify(metadata)}`
+}
 
 export const RegisterRequestApprovalService = {
     updateRequest: async (dataItem: any) => {
@@ -91,6 +123,8 @@ export const RegisterRequestApprovalService = {
     updateStatus: async (dataItem: any) => {
         try {
             const newStatus = dataItem.request_status || ''
+            const explicitAction = resolveWorkflowAction(dataItem)
+            const isExplicitReject = explicitAction === WORKFLOW_ACTION.REJECT
             const stepsSql = await RegisterRequestSQL.getApprovalSteps({ request_id: dataItem.request_id })
             const steps = (await MySQLExecute.search(stepsSql)) as RowDataPacket[]
             const currentStep = steps.find((s: any) => s.step_status === 'in_progress')
@@ -110,7 +144,6 @@ export const RegisterRequestApprovalService = {
             const vendor_id = checkRes[0]?.vendor_id
             const assign_to = checkRes[0]?.assign_to
             const selectedVendorCode = checkRes[0]?.vendor_code_selector || ''
-            const gprCApproverEmail = String(checkRes[0]?.gpr_c_approver_email || '').trim()
             const isOversea = (checkRes[0]?.vendor_region || '').toLowerCase() === 'oversea'
 
             const getApproverByGroup = async (groupCode: string) => {
@@ -163,7 +196,7 @@ export const RegisterRequestApprovalService = {
                     throw new Error(`Unauthorized: only the assigned PIC [${assign_to}] can action this step`)
                 }
 
-                if (requiresVendorCode(currentStep) && !isRejectedStatus(newStatus)) {
+                if (requiresVendorCode(currentStep) && !isRejectedStatus(newStatus) && !isExplicitReject) {
                     const extractedVendorCode = String(selectedVendorCode || '').trim()
                     if (!extractedVendorCode.trim()) {
                         throw new Error('Approval blocked: You must open the GPR Form and specify the "Vendor Code" before approving this step.')
@@ -190,7 +223,7 @@ export const RegisterRequestApprovalService = {
             }
 
             if (steps.length > 0) {
-                if (isRejectedStatus(newStatus)) {
+                if (isRejectedStatus(newStatus) || isExplicitReject) {
                     if (vendor_id) {
                         sqlList.push(await RegisterRequestSQL.updateVendorFftStatus({ vendor_id, fft_status: 2 }))
                     }
@@ -304,10 +337,23 @@ export const RegisterRequestApprovalService = {
                         }
                     }
 
+                    const actionRequiredRequested = explicitAction === WORKFLOW_ACTION.ACTION_REQUIRED
                     const disagreementRequested =
+                        explicitAction === WORKFLOW_ACTION.DISAGREE ||
                         isVendorDisagreeStatus(newStatus) ||
                         isIssueGprBStatus(newStatus) ||
                         isIssueGprCStatus(newStatus)
+
+                    const approvalActionType =
+                        explicitAction === WORKFLOW_ACTION.ACTION_REQUIRED
+                            ? 'action_required'
+                            : explicitAction === WORKFLOW_ACTION.DISAGREE
+                                ? 'vendor_disagreed'
+                                : 'approved'
+                    const approvalRemark =
+                        explicitAction === WORKFLOW_ACTION.ACTION_REQUIRED
+                            ? buildActionRequiredRemark(dataItem)
+                            : (dataItem.approver_remark || '')
 
                     const currentStepStatus = isPendingAgreementStep(currentStep) && !disagreementRequested
                         ? 'completed'
@@ -322,8 +368,8 @@ export const RegisterRequestApprovalService = {
                         request_id: dataItem.request_id,
                         step_id: currentStep.step_id,
                         action_by: dataItem.approve_by || dataItem.UPDATE_BY || 'SYSTEM',
-                        action_type: 'approved',
-                        remark: dataItem.approver_remark || '',
+                        action_type: approvalActionType,
+                        remark: approvalRemark,
                     }))
 
                     const pendingAfterCurrent = steps
@@ -355,8 +401,9 @@ export const RegisterRequestApprovalService = {
                             || pendingNonBranchAnywhere[0]
                     } else if (isPendingAgreementStep(currentStep) || isAgreementReachedStep(currentStep) || isIssueGprBStep(currentStep) || isIssueGprCStep(currentStep)) {
                         // In negotiation branch: explicit disagreement moves B -> C -> Disagreed.
+                        // ACTION_REQUIRED is treated as additional flow and must continue main flow.
                         // Otherwise (vendor agreed) continue to normal approval chain.
-                        if (!disagreementRequested) {
+                        if (!disagreementRequested || actionRequiredRequested) {
                             const branchSteps = pendingAfterCurrent.filter((s: any) => isDisagreedBranchStep(s))
                             for (const branchStep of branchSteps) {
                                 sqlList.push(await RegisterRequestSQL.updateApprovalStep({
@@ -383,10 +430,6 @@ export const RegisterRequestApprovalService = {
                             } else if (isIssueGprCStep(currentStep)) {
                                 nextStep = pendingAfterCurrent.find((s: any) => isVendorDisagreedStep(s))
                             }
-                        }
-
-                        if (nextStep && isIssueGprCStep(nextStep) && !gprCApproverEmail) {
-                            throw new Error('GPR C approver email is required before sending this request to GPR C.')
                         }
 
                         if (disagreementRequested && nextStep && isVendorDisagreedStep(nextStep)) {

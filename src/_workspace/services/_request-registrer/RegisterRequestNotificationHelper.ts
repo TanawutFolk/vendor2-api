@@ -71,7 +71,10 @@ const parseStoredEmailList = (raw: any): string[] => {
     try {
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
         if (!Array.isArray(parsed)) return []
-        return parsed.map(item => normalizeEmail(item)).filter(Boolean)
+        return parsed
+            .map(item => normalizeEmail(item))
+            .filter(Boolean)
+            .slice(0, 6)
     } catch {
         return []
     }
@@ -234,87 +237,57 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
         const isGprCStage = stageHintRaw.includes('gpr c')
 
         if (isGprCStage) {
-            const checkerEmpSql = await RegisterRequestSQL.getApproverByGroupCode({ group_code: GROUP_CODE.PO_CHECKER_MAIN })
-            const checkerEmpRes = (await MySQLExecute.search(checkerEmpSql)) as any[]
-            const checkerEmpCode = checkerEmpRes[0]?.empcode || ''
-
-            let checkerEmail = ''
-            if (checkerEmpCode) {
-                const checkerContactSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: checkerEmpCode })
-                const checkerContactRes = (await MySQLExecute.search(checkerContactSql)) as any[]
-                checkerEmail = checkerContactRes[0]?.empEmail || ''
-            }
+            const requesterSql = await RegisterRequestSQL.getMemberByEmpCode({ empcode: vd.Request_By_EmployeeCode || '' })
+            const requesterRes = (await MySQLExecute.search(requesterSql)) as any[]
+            const requesterEmail = normalizeEmail(requesterRes[0]?.empEmail || '')
+            const requesterName = requesterRes[0]?.empName
+                ? `${requesterRes[0]?.empName} ${requesterRes[0]?.empSurname || ''}`.trim()
+                : (vd.Request_By_EmployeeCode || 'Requester')
 
             const gprCApproverEmail = normalizeEmail(vd.gpr_c_approver_email)
-            const gprCApproverName = String(vd.gpr_c_approver_name || '').trim() || 'GPR C Approver'
             const gprCPcPicEmail = normalizeEmail(vd.gpr_c_pc_pic_email)
             const circularEmails = parseStoredEmailList(vd.gpr_c_circular_json)
 
-            if (!checkerEmail && !gprCApproverEmail) {
-                return { sent: false, reason: 'missing GPR C checker and approver email' }
+            if (!requesterEmail) {
+                return { sent: false, reason: 'missing requester email for GPR C approval' }
             }
 
-            const ccEmails = excludeEmails(mergeUniqueEmails(
+            const gprCCcEmails = excludeEmails(mergeUniqueEmails(
                 picEmail ? [picEmail] : [],
+                gprCApproverEmail ? [gprCApproverEmail] : [],
                 gprCPcPicEmail ? [gprCPcPicEmail] : [],
                 circularEmails,
                 manualCc
             ), [vendorEmail, vd.emailmain])
 
-            if (checkerEmail) {
-                const checkerHtml = emailToCheckerPICTemplate({
-                    requestNumber,
-                    recipientName: 'PO Checker',
-                    vendorName: vd.company_name || 'N/A',
-                    address: vd.address || 'N/A',
-                    contactPic: vd.contact_name || 'N/A',
-                    email: vd.emailmain || 'N/A',
-                    tel: vd.tel_phone || 'N/A',
-                    supportProduct: vd.supportProduct_Process || 'N/A',
-                    purchaseFrequency: vd.purchase_frequency || 'N/A',
-                    systemLink: `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`,
-                    picName,
-                    picTel,
-                })
+            const requesterApprovalHtml = emailAfterCheckerApproverGPRCTemplate({
+                toEmail: requesterEmail,
+                ccEmail: gprCCcEmails.join('; '),
+                requestNumber,
+                picNextStepName: requesterName,
+                picName,
+                picTel,
+                vendorName: vd.company_name || 'N/A',
+                address: vd.address || 'N/A',
+                contactPic: vd.contact_name || 'N/A',
+                email: vd.emailmain || 'N/A',
+                tel: vd.tel_phone || 'N/A',
+                supportProduct: vd.supportProduct_Process || 'N/A',
+                purchaseFrequency: vd.purchase_frequency || 'N/A',
+                systemLink: `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`,
+            })
 
-                await sendEmail(
-                    checkerHtml,
-                    checkerEmail,
-                    `[Request Check] Please check ${requestNumber} - General Purchase Specification Form C`,
-                    ccEmails.filter(email => email !== checkerEmail)
-                )
-            }
-
-            if (gprCApproverEmail) {
-                const approverHtml = emailAfterCheckerApproverGPRCTemplate({
-                    toEmail: gprCApproverEmail,
-                    ccEmail: ccEmails.join('; '),
-                    requestNumber,
-                    picNextStepName: gprCApproverName,
-                    picName,
-                    picTel,
-                    vendorName: vd.company_name || 'N/A',
-                    address: vd.address || 'N/A',
-                    contactPic: vd.contact_name || 'N/A',
-                    email: vd.emailmain || 'N/A',
-                    tel: vd.tel_phone || 'N/A',
-                    supportProduct: vd.supportProduct_Process || 'N/A',
-                    purchaseFrequency: vd.purchase_frequency || 'N/A',
-                    systemLink: `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`,
-                })
-
-                await sendEmail(
-                    approverHtml,
-                    gprCApproverEmail,
-                    `[Request Approval] Please approve ${requestNumber} - General Purchase Specification Form C`,
-                    ccEmails.filter(email => email !== gprCApproverEmail)
-                )
-            }
+            await sendEmail(
+                requesterApprovalHtml,
+                requesterEmail,
+                `[Request Approval] Please approve ${requestNumber} - General Purchase Specification Form C`,
+                gprCCcEmails.filter(email => email !== requesterEmail)
+            )
 
             return {
                 sent: true,
-                to: mergeUniqueEmails(checkerEmail ? [checkerEmail] : [], gprCApproverEmail ? [gprCApproverEmail] : []),
-                ccCount: ccEmails.length
+                to: requesterEmail,
+                ccCount: gprCCcEmails.length
             }
         }
 
@@ -341,25 +314,6 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
                 picTel,
             })
             emailSubject = `[Request Submit] Please submit ${requestNumber} - General Purchase Specification Form B`
-        } else if (isGprCStage) {
-            // Reuse existing Form C template available in the project.
-            emailHtml = emailAfterCheckerApproverGPRCTemplate({
-                toEmail: vendorEmail,
-                ccEmail: ccEmails.join('; '),
-                requestNumber,
-                picNextStepName: 'Supplier',
-                picName,
-                picTel,
-                vendorName: vd.company_name || 'N/A',
-                address: vd.address || 'N/A',
-                contactPic: vd.contact_name || 'N/A',
-                email: vd.emailmain || 'N/A',
-                tel: vd.tel_phone || 'N/A',
-                supportProduct: vd.supportProduct_Process || 'N/A',
-                purchaseFrequency: vd.purchase_frequency || 'N/A',
-                systemLink: `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`,
-            })
-            emailSubject = `[Request Submit] Please submit ${requestNumber} - General Purchase Specification Form C`
         }
 
         await sendEmail(emailHtml, vendorEmail, emailSubject, ccEmails)
