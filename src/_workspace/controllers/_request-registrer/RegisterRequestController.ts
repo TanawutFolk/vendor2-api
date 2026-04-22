@@ -141,6 +141,9 @@ export const RegisterRequestController = {
                     if (queueStepCode === 'ACCOUNT_REGISTERED') {
                         return `(UPPER(IFNULL(ras.step_code, '')) = 'ACCOUNT_REGISTERED' OR LOWER(IFNULL(ras.description, '')) LIKE '%account%')`
                     }
+                    if (queueStepCode === 'ISSUE_GPR_C') {
+                        return `(UPPER(IFNULL(ras.step_code, '')) = 'ISSUE_GPR_C' OR LOWER(IFNULL(ras.description, '')) LIKE '%issue gpr c%')`
+                    }
                     return `UPPER(IFNULL(ras.step_code, '')) = '${queueStepCode}'`
                 })()
 

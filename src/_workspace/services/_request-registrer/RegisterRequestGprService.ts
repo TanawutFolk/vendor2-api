@@ -21,6 +21,7 @@ export const RegisterRequestGprService = {
             formData.gpr_c_circular_json = JSON.stringify(
                 circularList.slice(0, 6)
             )
+            formData.action_required_json = JSON.stringify(formData.action_required_setup || {})
 
             const sqlList = []
             const checkSql = await RegisterRequestSQL.checkSelectionExists(formData)

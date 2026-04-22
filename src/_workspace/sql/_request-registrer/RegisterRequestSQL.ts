@@ -58,6 +58,7 @@ export interface RegisterRequestDataItem {
     gpr_c_pc_pic_name?: string;
     gpr_c_pc_pic_email?: string;
     gpr_c_circular_json?: string;
+    action_required_json?: string;
     completion_date_null?: string;
     year?: string;
     total_revenue?: number | string;
@@ -290,6 +291,7 @@ export const RegisterRequestSQL = {
                                      , rvs.gpr_c_pc_pic_name
                                      , rvs.gpr_c_pc_pic_email
                                      , rvs.gpr_c_circular_json
+                                     , rvs.action_required_json
                                      , v.company_name
                                      , v.address
                                      , v.vendor_region
@@ -434,6 +436,12 @@ export const RegisterRequestSQL = {
                                      , rr.approver_remark
                                      , rr.vendor_code
                                      , rr.cc_emails
+                                     , rvs.gpr_c_approver_name
+                                     , rvs.gpr_c_approver_email
+                                     , rvs.gpr_c_pc_pic_name
+                                     , rvs.gpr_c_pc_pic_email
+                                     , rvs.gpr_c_circular_json
+                                     , rvs.action_required_json
                                      , rr.Request_By_EmployeeCode AS EMPLOYEE_CODE
                                      , CONCAT(m.empName, ' ', m.empSurname) AS FULL_NAME
                                      , m.empDept AS EMPLOYEE_DEPT
@@ -591,6 +599,8 @@ export const RegisterRequestSQL = {
                             FROM
                                        request_register_vendor rr
                                             LEFT JOIN
+                                       request_vendor_selections rvs ON rvs.request_id = rr.request_id AND rvs.INUSE = 1
+                                            LEFT JOIN
                                        vendors v ON v.vendor_id = rr.vendor_id
                                             LEFT JOIN
                                        master_vendor_types vt ON vt.vendor_type_id = v.vendor_type_id
@@ -643,6 +653,12 @@ export const RegisterRequestSQL = {
                                      , CONCAT(m.empName, ' ', m.empSurname) AS FULL_NAME
                                      , m.empDept AS EMPLOYEE_DEPT
                                      , rr.CREATE_DATE
+                                     , rvs.gpr_c_approver_name
+                                     , rvs.gpr_c_approver_email
+                                     , rvs.gpr_c_pc_pic_name
+                                     , rvs.gpr_c_pc_pic_email
+                                     , rvs.gpr_c_circular_json
+                                     , rvs.action_required_json
 
                                      -- Vendor Info
                                      , v.company_name
@@ -796,6 +812,8 @@ export const RegisterRequestSQL = {
                             FROM
                                        request_register_vendor rr
                                             LEFT JOIN
+                                       request_vendor_selections rvs ON rvs.request_id = rr.request_id AND rvs.INUSE = 1
+                                            LEFT JOIN
                                        vendors v ON v.vendor_id = rr.vendor_id
                                             LEFT JOIN
                                        master_vendor_types vt ON vt.vendor_type_id = v.vendor_type_id
@@ -872,6 +890,7 @@ export const RegisterRequestSQL = {
                                      , rvs.gpr_c_pc_pic_name
                                      , rvs.gpr_c_pc_pic_email
                                      , rvs.gpr_c_circular_json
+                                     , rvs.action_required_json
                                      , v.vendor_region
                             FROM
                                        request_register_vendor rr
@@ -1411,6 +1430,7 @@ export const RegisterRequestSQL = {
                                      , gpr_c_pc_pic_name
                                      , gpr_c_pc_pic_email
                                      , gpr_c_circular_json
+                                     , action_required_json
                                      , completion_date
                                      , CREATE_BY
                                      , UPDATE_BY
@@ -1434,6 +1454,7 @@ export const RegisterRequestSQL = {
                                      , 'dataItem.gpr_c_pc_pic_name'
                                      , 'dataItem.gpr_c_pc_pic_email'
                                      , 'dataItem.gpr_c_circular_json'
+                                     , 'dataItem.action_required_json'
                                      ,  dataItem.completion_date_null
                                      , 'dataItem.UPDATE_BY'
                                      , 'dataItem.UPDATE_BY'
@@ -1462,6 +1483,7 @@ export const RegisterRequestSQL = {
         sql = sql.replaceAll('dataItem.gpr_c_pc_pic_name', esc(d['gpr_c_pc_pic_name']))
         sql = sql.replaceAll('dataItem.gpr_c_pc_pic_email', esc(d['gpr_c_pc_pic_email']))
         sql = sql.replaceAll('dataItem.gpr_c_circular_json', esc(d['gpr_c_circular_json']))
+        sql = sql.replaceAll('dataItem.action_required_json', esc(d['action_required_json']))
         
         if (d.completion_date) {
             sql = sql.replaceAll('dataItem.completion_date_null', `'${esc(d.completion_date)}'`)
@@ -1495,6 +1517,7 @@ export const RegisterRequestSQL = {
                                      , gpr_c_pc_pic_name = 'dataItem.gpr_c_pc_pic_name'
                                      , gpr_c_pc_pic_email = 'dataItem.gpr_c_pc_pic_email'
                                      , gpr_c_circular_json = 'dataItem.gpr_c_circular_json'
+                                     , action_required_json = 'dataItem.action_required_json'
                                      , completion_date = dataItem.completion_date_null
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
@@ -1523,6 +1546,7 @@ export const RegisterRequestSQL = {
         sql = sql.replaceAll('dataItem.gpr_c_pc_pic_name', esc(d['gpr_c_pc_pic_name']))
         sql = sql.replaceAll('dataItem.gpr_c_pc_pic_email', esc(d['gpr_c_pc_pic_email']))
         sql = sql.replaceAll('dataItem.gpr_c_circular_json', esc(d['gpr_c_circular_json']))
+        sql = sql.replaceAll('dataItem.action_required_json', esc(d['action_required_json']))
 
         if (d.completion_date) {
             sql = sql.replaceAll('dataItem.completion_date_null', `'${esc(d.completion_date)}'`)

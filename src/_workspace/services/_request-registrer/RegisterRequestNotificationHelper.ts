@@ -6,6 +6,7 @@ import {
     emailAfterCheckerApproverGPRCTemplate,
     emailExternalSubmitGPRBTemplate,
     emailCompleteTemplate,
+    emailIncompleteTemplate,
     emailReject1Template,
     emailRequestRegisterVendorTemplate,
     emailToAccountPICTemplate,
@@ -13,6 +14,7 @@ import {
     emailToMDTemplate,
     emailToPMGMTemplate,
     emailToPMMgrTemplate,
+    emailUserCheckerApproverGPRCTemplate,
     emailVendorDocumentRequestTemplate,
     type MailTemplateData
 } from '@src/config/mailTemplate'
@@ -79,6 +81,65 @@ const parseStoredEmailList = (raw: any): string[] => {
         return []
     }
 }
+
+const parseStoredObject = (raw: any): Record<string, any> => {
+    if (!raw) return {}
+
+    try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+        return parsed && typeof parsed === 'object' ? parsed : {}
+    } catch {
+        return {}
+    }
+}
+
+const resolveActionRequiredStage = (step: any) => {
+    const desc = normalizeText(step?.DESCRIPTION)
+    if (desc.includes('engineer')) return 'engineer'
+    if (desc.includes('emr')) return 'emr'
+    if (desc.includes('qms')) return 'qms'
+    if (desc.includes('pm manager') || desc.includes('manager approval')) return 'pm_manager'
+    return ''
+}
+
+const renderActionRequiredEmail = (data: {
+    stageLabel: string
+    recipientName: string
+    requestNumber: string
+    vendorName: string
+    supportProduct: string
+    systemLink: string
+    note: string
+    picName: string
+    picTel: string
+}) => `
+    <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 760px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #dbeafe;">
+        <div style="background-color: #0284c7; height: 6px; width: 100%;"></div>
+        <div style="padding: 32px;">
+            <p style="margin: 0 0 16px 0;">Dear ${data.recipientName || 'PIC'},</p>
+            <div style="background-color: #eff6ff; border-left: 4px solid #0284c7; padding: 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0;">
+                <p style="margin: 0 0 8px 0; font-weight: 700; color: #0f172a;">Action Required</p>
+                <p style="margin: 0; color: #1e3a8a;">
+                    ${data.stageLabel} requires your action for request <strong>${data.requestNumber}</strong>.
+                </p>
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 20px;">
+                <tr style="border-bottom: 1px solid #f1f5f9;"><td style="width: 220px; padding: 10px 0; color: #64748b;">Vendor Name</td><td style="padding: 10px 0; font-weight: 600; color: #0f172a;">${data.vendorName}</td></tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 10px 0; color: #64748b;">Support Product / Process</td><td style="padding: 10px 0; font-weight: 600; color: #0f172a;">${data.supportProduct}</td></tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 10px 0; color: #64748b;">Stage</td><td style="padding: 10px 0; font-weight: 600; color: #0f172a;">${data.stageLabel}</td></tr>
+                <tr><td style="padding: 10px 0; color: #64748b;">Note</td><td style="padding: 10px 0; font-weight: 600; color: #0f172a;">${data.note || '-'}</td></tr>
+            </table>
+            <p style="margin: 0 0 24px 0;">
+                Open the system here:
+                <a href="${data.systemLink}" style="color: #0284c7; text-decoration: underline; font-weight: 600;">${data.systemLink}</a>
+            </p>
+            <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                <p style="margin: 0 0 4px 0; font-weight: 600; color: #111827;">Best regards,</p>
+                <p style="margin: 0; color: #0f172a;">${data.picName} ${data.picTel ? `(#Tel. ${data.picTel})` : ''}</p>
+            </div>
+        </div>
+    </div>
+`
 
 export const selectApprovalNotificationByStep = (
     step: any,
@@ -237,34 +298,32 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
         const isGprCStage = stageHintRaw.includes('gpr c')
 
         if (isGprCStage) {
-            const requesterSql = await RegisterRequestSQL.getMemberByEmpCode({ empcode: vd.Request_By_EmployeeCode || '' })
-            const requesterRes = (await MySQLExecute.search(requesterSql)) as any[]
-            const requesterEmail = normalizeEmail(requesterRes[0]?.empEmail || '')
-            const requesterName = requesterRes[0]?.empName
-                ? `${requesterRes[0]?.empName} ${requesterRes[0]?.empSurname || ''}`.trim()
-                : (vd.Request_By_EmployeeCode || 'Requester')
-
             const gprCApproverEmail = normalizeEmail(vd.gpr_c_approver_email)
+            const gprCApproverName = String(vd.gpr_c_approver_name || 'Approver PIC').trim()
             const gprCPcPicEmail = normalizeEmail(vd.gpr_c_pc_pic_email)
             const circularEmails = parseStoredEmailList(vd.gpr_c_circular_json)
+            const checkerEmails = await getPeerCcEmailsByGroupCode(GROUP_CODE.PO_CHECKER_MAIN)
+            const primaryCheckerEmail = checkerEmails[0] || ''
 
-            if (!requesterEmail) {
-                return { sent: false, reason: 'missing requester email for GPR C approval' }
+            const primaryRecipient = gprCApproverEmail || primaryCheckerEmail
+            if (!primaryRecipient) {
+                return { sent: false, reason: 'missing GPR C approver/checker email' }
             }
 
             const gprCCcEmails = excludeEmails(mergeUniqueEmails(
                 picEmail ? [picEmail] : [],
+                checkerEmails,
                 gprCApproverEmail ? [gprCApproverEmail] : [],
                 gprCPcPicEmail ? [gprCPcPicEmail] : [],
                 circularEmails,
                 manualCc
-            ), [vendorEmail, vd.emailmain])
+            ).filter(email => email !== primaryRecipient), [vendorEmail, vd.emailmain])
 
-            const requesterApprovalHtml = emailAfterCheckerApproverGPRCTemplate({
-                toEmail: requesterEmail,
+            const gprCApprovalHtml = emailUserCheckerApproverGPRCTemplate({
+                toEmail: primaryRecipient,
                 ccEmail: gprCCcEmails.join('; '),
                 requestNumber,
-                picNextStepName: requesterName,
+                userName: gprCApproverName,
                 picName,
                 picTel,
                 vendorName: vd.company_name || 'N/A',
@@ -278,15 +337,15 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
             })
 
             await sendEmail(
-                requesterApprovalHtml,
-                requesterEmail,
+                gprCApprovalHtml,
+                primaryRecipient,
                 `[Request Approval] Please approve ${requestNumber} - General Purchase Specification Form C`,
-                gprCCcEmails.filter(email => email !== requesterEmail)
+                gprCCcEmails
             )
 
             return {
                 sent: true,
-                to: requesterEmail,
+                to: primaryRecipient,
                 ccCount: gprCCcEmails.length
             }
         }
@@ -426,6 +485,143 @@ export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynami
         await sendEmail(emailHtml, approverEmail, emailSubject, ccEmails)
     } catch (err: any) {
         console.error('[triggerApprovalEmails] Failed:', err?.message)
+    }
+}
+
+export const triggerActionRequiredEmail = async (dataItem: any, currentStep: any) => {
+    try {
+        const requestId = dataItem.request_id
+        const vendorSql = await RegisterRequestSQL.getNotificationVendorContextByRequestId({ request_id: requestId })
+        const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
+        const vd = vendorRes[0] || {}
+
+        const stageKey = resolveActionRequiredStage(currentStep)
+        if (!stageKey) return
+
+        const setup = parseStoredObject(vd.action_required_json)
+        const stageConfig = setup?.[stageKey] || {}
+        const recipientEmail = normalizeEmail(stageConfig?.pic_email)
+        if (!recipientEmail) return
+
+        const recipientName = String(stageConfig?.pic_name || 'PIC').trim()
+        const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
+        const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
+
+        const picSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: vd.assign_to || '' })
+        const picRes = (await MySQLExecute.search(picSql)) as any[]
+        const picRow = picRes[0] || {}
+        const picName = picRow.empName ? `${picRow.empName}`.trim() : (vd.assign_to || 'PO PIC')
+        const picEmail = picRow.empEmail || ''
+        const picTel = ''
+
+        const ccEmails = excludeEmails(
+            mergeUniqueEmails(
+                picEmail ? [picEmail] : [],
+                parseCcEmails(vd.cc_emails)
+            ).filter(email => email !== recipientEmail),
+            [vd.vendor_email, vd.vendor_main_email]
+        )
+
+        const stageLabel =
+            stageKey === 'engineer' ? 'Engineer Judgement'
+                : stageKey === 'emr' ? 'EMR Judgement'
+                    : stageKey === 'qms' ? 'QMS Judgement'
+                        : 'PM Manager Approval'
+
+        const emailHtml = renderActionRequiredEmail({
+            stageLabel,
+            recipientName,
+            requestNumber,
+            vendorName: vd.company_name || 'N/A',
+            supportProduct: vd.supportProduct_Process || 'N/A',
+            systemLink,
+            note: String(dataItem?.approver_remark || '').trim(),
+            picName,
+            picTel,
+        })
+
+        await sendEmail(
+            emailHtml,
+            recipientEmail,
+            `[Action Required] ${stageLabel} for ${requestNumber}`,
+            ccEmails
+        )
+    } catch (err: any) {
+        console.error('[triggerActionRequiredEmail] Failed:', err?.message)
+    }
+}
+
+export const triggerAfterGprCApprovedEmail = async (dataItem: any) => {
+    try {
+        const requestId = Number(dataItem.request_id) || 0
+        if (!requestId) return
+
+        const vendorSql = await RegisterRequestSQL.getNotificationVendorContextByRequestId({ request_id: requestId })
+        const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
+        const vd = vendorRes[0] || {}
+
+        const requesterSql = await RegisterRequestSQL.getMemberByEmpCode({ empcode: vd.Request_By_EmployeeCode || '' })
+        const requesterRes = (await MySQLExecute.search(requesterSql)) as any[]
+        const requester = requesterRes[0] || {}
+        const requesterEmail = normalizeEmail(requester?.empEmail || '')
+        const requesterName = requester?.empName
+            ? `${requester.empName} ${requester.empSurname || ''}`.trim()
+            : (vd.Request_By_EmployeeCode || 'Requester')
+
+        if (!requesterEmail) return
+
+        const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
+        const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
+
+        const picSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: vd.assign_to || '' })
+        const picRes = (await MySQLExecute.search(picSql)) as any[]
+        const picRow = picRes[0] || {}
+        const picName = picRow.empName ? `${picRow.empName}`.trim() : (vd.assign_to || 'PO PIC')
+        const picEmail = normalizeEmail(picRow.empEmail || '')
+        const picTel = ''
+
+        const checkerEmails = await getPeerCcEmailsByGroupCode(GROUP_CODE.PO_CHECKER_MAIN)
+        const gprCApproverEmail = normalizeEmail(vd.gpr_c_approver_email)
+        const gprCPcPicEmail = normalizeEmail(vd.gpr_c_pc_pic_email)
+        const circularEmails = parseStoredEmailList(vd.gpr_c_circular_json)
+
+        const ccEmails = excludeEmails(
+            mergeUniqueEmails(
+                picEmail ? [picEmail] : [],
+                checkerEmails,
+                gprCApproverEmail ? [gprCApproverEmail] : [],
+                gprCPcPicEmail ? [gprCPcPicEmail] : [],
+                circularEmails,
+                parseCcEmails(vd.cc_emails)
+            ).filter(email => email !== requesterEmail),
+            [vd.vendor_email, vd.vendor_main_email]
+        )
+
+        const emailHtml = emailAfterCheckerApproverGPRCTemplate({
+            toEmail: requesterEmail,
+            ccEmail: ccEmails.join('; '),
+            requestNumber,
+            picNextStepName: requesterName,
+            picName,
+            picTel,
+            vendorName: vd.company_name || 'N/A',
+            address: vd.address || 'N/A',
+            contactPic: vd.contact_name || 'N/A',
+            email: vd.vendor_email || vd.emailmain || 'N/A',
+            tel: vd.tel_phone || 'N/A',
+            supportProduct: vd.supportProduct_Process || 'N/A',
+            purchaseFrequency: vd.purchase_frequency || 'N/A',
+            systemLink,
+        })
+
+        await sendEmail(
+            emailHtml,
+            requesterEmail,
+            `[Request Update] ${requestNumber} - General Purchase Specification Form C approved`,
+            ccEmails
+        )
+    } catch (err: any) {
+        console.error('[triggerAfterGprCApprovedEmail] Failed:', err?.message)
     }
 }
 
@@ -600,24 +796,39 @@ export const triggerVendorDisagreeEmail = async (dataItem: any) => {
         ).filter(email => email !== normalizeEmail(requesterEmail))
 
         const safeRemark = String(dataItem.approver_remark || '').trim()
-        const emailHtml = `
-            <div style="font-family:Arial,sans-serif;line-height:1.6;color:#1f2937;">
-                <h3 style="margin:0 0 12px;">Vendor Registration Request Closed</h3>
-                <p style="margin:0 0 8px;">Dear ${requesterName},</p>
-                <p style="margin:0 0 8px;">
-                    Request <strong>${requestNumber}</strong> for vendor <strong>${vd.company_name || 'N/A'}</strong>
-                    has been closed because the vendor did not agree after GPR negotiation rounds.
-                </p>
-                ${safeRemark ? `<p style="margin:0 0 8px;"><strong>Remark:</strong> ${safeRemark}</p>` : ''}
-                <p style="margin:0 0 8px;">Please review details in the system: <a href="${systemLink}">${systemLink}</a></p>
-                <p style="margin:0;">Best regards,<br/>Vendor Registration System</p>
-            </div>
-        `
+        const reasons = [
+            'Vendor disagreed after GPR negotiation rounds',
+            ...(safeRemark ? [safeRemark] : []),
+        ]
+
+        const picContactSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: vd.assign_to || '' })
+        const picContactRes = (await MySQLExecute.search(picContactSql)) as any[]
+        const picRow = picContactRes[0] || {}
+        const picName = picRow.empName ? `${picRow.empName}`.trim() : (vd.assign_to || 'PO PIC')
+        const picTel = ''
+
+        const emailHtml = emailIncompleteTemplate({
+            toEmail: requesterEmail,
+            ccEmail: ccEmails.join('; '),
+            requestNumber,
+            userName: requesterName,
+            vendorName: vd.company_name || 'N/A',
+            address: vd.address || 'N/A',
+            contactPic: vd.contact_name || 'N/A',
+            email: vd.vendor_email || vd.emailmain || 'N/A',
+            tel: vd.tel_phone || 'N/A',
+            supportProduct: vd.supportProduct_Process || 'N/A',
+            purchaseFrequency: vd.purchase_frequency || 'N/A',
+            systemLink,
+            picName,
+            picTel,
+            reasons,
+        })
 
         await sendEmail(
             emailHtml,
             requesterEmail,
-            `[Closed] Register vendor "${requestNumber}" ended as Vendor Disagreed`,
+            `[Incomplete] Register vendor "${requestNumber}" ended as Vendor Disagreed`,
             ccEmails
         )
     } catch (err: any) {

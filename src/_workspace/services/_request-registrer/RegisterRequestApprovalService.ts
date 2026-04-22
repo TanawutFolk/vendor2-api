@@ -16,6 +16,8 @@ import {
 } from './RegisterRequestWorkflowHelper'
 import {
     triggerApprovalEmails,
+    triggerActionRequiredEmail,
+    triggerAfterGprCApprovedEmail,
     triggerCompletionEmail,
     triggerRejectionEmail,
     triggerVendorDisagreeEmail,
@@ -37,6 +39,23 @@ const isDisagreedBranchStep = (step: any) => isIssueGprBStep(step) || isIssueGpr
 const isVendorDisagreeStatus = (status: any) => normalizeStatusText(status).includes('vendor disagre')
 const isIssueGprBStatus = (status: any) => normalizeStatusText(status).includes('gpr b')
 const isIssueGprCStatus = (status: any) => normalizeStatusText(status).includes('gpr c')
+const resolveActionRequiredStage = (step: any) => {
+    const desc = normalizeStatusText(step?.DESCRIPTION)
+    if (desc.includes('engineer')) return 'engineer'
+    if (desc.includes('emr')) return 'emr'
+    if (desc.includes('qms')) return 'qms'
+    if (desc.includes('pm manager') || desc.includes('manager approval')) return 'pm_manager'
+    return ''
+}
+const parseStoredObject = (raw: any): Record<string, any> => {
+    if (!raw) return {}
+    try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+        return parsed && typeof parsed === 'object' ? parsed : {}
+    } catch {
+        return {}
+    }
+}
 
 const NEED_CRITERIA = new Set(['4.1', '4.2', '4.3', '4.4', '4.5'])
 const OPTIONAL_CRITERIA = new Set(['4.6', '4.7', '4.8', '4.9', '4.10', '4.11', '4.12', '4.13'])
@@ -72,6 +91,10 @@ const buildActionRequiredRemark = (dataItem: any) => {
         || dataItem?.action_required_owner_empcode
         || ''
     ).trim()
+    const ownerEmail = String(
+        dataItem?.action_required_owner_email
+        || ''
+    ).trim()
     const dueDate = String(
         dataItem?.action_required_due_date
         || dataItem?.due_date
@@ -87,8 +110,10 @@ const buildActionRequiredRemark = (dataItem: any) => {
     const metadata = {
         type: 'action_required',
         owner,
+        owner_email: ownerEmail,
         due_date: dueDate,
         note,
+        stage: String(dataItem?.action_required_stage || '').trim(),
         actor,
         captured_at: new Date().toISOString(),
     }
@@ -264,6 +289,29 @@ export const RegisterRequestApprovalService = {
                         throw new Error('Action blocked: GPR form already passes criteria. Please use Approve flow.')
                     }
                 }
+
+                if (explicitAction === WORKFLOW_ACTION.ACTION_REQUIRED) {
+                    const stageKey = resolveActionRequiredStage(currentStep)
+                    if (!stageKey) {
+                        throw new Error('Action Required is only available for Engineer / EMR / QMS / PM Manager stages.')
+                    }
+
+                    const selectionSql = await RegisterRequestSQL.getSelection({ request_id: dataItem.request_id })
+                    const selectionRes = (await MySQLExecute.search(selectionSql)) as any[]
+                    const selection = selectionRes[0]
+                    const actionRequiredSetup = parseStoredObject(selection?.action_required_json)
+                    const stageConfig = actionRequiredSetup?.[stageKey] || {}
+                    const ownerName = String(stageConfig?.pic_name || '').trim()
+                    const ownerEmail = String(stageConfig?.pic_email || '').trim()
+
+                    if (!ownerEmail) {
+                        throw new Error(`Action Required blocked: please configure PIC email for ${stageKey} in the GPR form.`)
+                    }
+
+                    dataItem.action_required_stage = stageKey
+                    dataItem.action_required_owner = ownerName || ownerEmail
+                    dataItem.action_required_owner_email = ownerEmail
+                }
             }
 
             const sqlList = []
@@ -416,9 +464,12 @@ export const RegisterRequestApprovalService = {
                             ? buildActionRequiredRemark(dataItem)
                             : (dataItem.approver_remark || '')
 
-                    const currentStepStatus = isPendingAgreementStep(currentStep) && !disagreementRequested
-                        ? 'completed'
-                        : 'approved'
+                    const currentStepStatus =
+                        isPendingAgreementStep(currentStep) && !disagreementRequested
+                            ? 'completed'
+                            : isAgreementReachedStep(currentStep) && disagreementRequested
+                                ? 'pending'
+                                : 'approved'
 
                     sqlList.push(await RegisterRequestSQL.updateApprovalStep({
                         step_id: currentStep.step_id,
@@ -561,11 +612,20 @@ export const RegisterRequestApprovalService = {
                         } else {
                             postCommitTasks.push(async () => triggerApprovalEmails(dataItem, nextStep, nextStepApprover))
                         }
+                        if (isIssueGprCStep(currentStep) && !disagreementRequested && !actionRequiredRequested) {
+                            postCommitTasks.push(async () => triggerAfterGprCApprovedEmail(dataItem))
+                        }
+                        if (actionRequiredRequested) {
+                            postCommitTasks.push(async () => triggerActionRequiredEmail(dataItem, currentStep))
+                        }
                     } else if (!closeAsVendorDisagreed) {
                         sqlList.push(await RegisterRequestSQL.markRequestCompleted({
                             request_id: dataItem.request_id,
                             UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
                         }))
+                        if (actionRequiredRequested) {
+                            postCommitTasks.push(async () => triggerActionRequiredEmail(dataItem, currentStep))
+                        }
                         postCommitTasks.push(async () => triggerCompletionEmail(dataItem))
                     }
                 }
