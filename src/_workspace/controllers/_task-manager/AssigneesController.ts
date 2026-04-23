@@ -3,6 +3,30 @@ import { AssigneesService } from '../../services/_task-manager/AssigneesService'
 import { ResponseI } from '@src/types/ResponseI'
 
 export const AssigneesController = {
+    getGroups: async (req: Request, res: Response) => {
+        const dataItem = (!req.body || Object.entries(req.body).length === 0) ? req.query : req.body
+
+        try {
+            const result = await AssigneesService.getGroups(dataItem)
+            return res.status(200).json({
+                Status: true,
+                ResultOnDb: result,
+                TotalCountOnDb: result.length,
+                MethodOnDb: 'Get Assignee Groups',
+                Message: 'Success'
+            } as ResponseI)
+        } catch (error: any) {
+            console.error('Get Assignee Groups Error:', error)
+            return res.status(200).json({
+                Status: false,
+                ResultOnDb: [],
+                TotalCountOnDb: 0,
+                MethodOnDb: 'Get Assignee Groups',
+                Message: error?.message || 'Failed to load groups'
+            } as ResponseI)
+        }
+    },
+
     search: async (req: Request, res: Response) => {
         let dataItem
 
@@ -45,11 +69,11 @@ export const AssigneesController = {
         try {
             const result = await AssigneesService.save(dataItem)
             return res.status(200).json({
-                Status: true,
+                Status: result?.Status ?? true,
                 ResultOnDb: result,
-                TotalCountOnDb: 1,
-                MethodOnDb: 'Save Assignee',
-                Message: 'Success'
+                TotalCountOnDb: result?.TotalCountOnDb ?? 1,
+                MethodOnDb: result?.MethodOnDb || 'Save Assignee',
+                Message: result?.Message || 'Success'
             } as ResponseI)
         } catch (error: any) {
             console.error('Save Assignee Error:', error)
@@ -59,29 +83,6 @@ export const AssigneesController = {
                 TotalCountOnDb: 0,
                 MethodOnDb: 'Save Assignee',
                 Message: error?.message || 'Failed to save assignee'
-            } as ResponseI)
-        }
-    },
-
-    delete: async (req: Request, res: Response) => {
-        try {
-            const id = Number(req.params.id)
-            const result = await AssigneesService.delete(id)
-            return res.status(200).json({
-                Status: true,
-                ResultOnDb: result,
-                TotalCountOnDb: 1,
-                MethodOnDb: 'Delete Assignee',
-                Message: 'Success'
-            } as ResponseI)
-        } catch (error: any) {
-            console.error('Delete Assignee Error:', error)
-            return res.status(200).json({
-                Status: false,
-                ResultOnDb: {},
-                TotalCountOnDb: 0,
-                MethodOnDb: 'Delete Assignee',
-                Message: error?.message || 'Failed to delete assignee'
             } as ResponseI)
         }
     }

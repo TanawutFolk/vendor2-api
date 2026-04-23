@@ -1,4 +1,3 @@
-import { RowDataPacket } from 'mysql2'
 import { MySQLExecute } from '@businessData/dbExecute'
 import { RegisterRequestSQL } from '../../sql/_request-registrer/RegisterRequestSQL'
 import sendEmail from '@src/config/sendEmail'
@@ -30,6 +29,118 @@ import {
     resolveRequestNumber,
 } from './RegisterRequestWorkflowHelper'
 
+type EmployeeProfile = {
+    empCode: string
+    fullName: string
+    email: string
+}
+
+const employeeProfileCache = new Map<string, EmployeeProfile | null>()
+const assigneeEmailCache = new Map<string, string>()
+
+const buildFullName = (row: any) =>
+    [String(row?.empName || '').trim(), String(row?.empSurname || '').trim()]
+        .filter(Boolean)
+        .join(' ')
+
+const resolveEmployeeProfile = async (empCodeRaw: unknown): Promise<EmployeeProfile | null> => {
+    const empCode = String(empCodeRaw || '').trim()
+    if (!empCode) return null
+
+    if (employeeProfileCache.has(empCode)) {
+        return employeeProfileCache.get(empCode) || null
+    }
+
+    const sql = await RegisterRequestSQL.getMemberByEmpCode({ empcode: empCode })
+    const rows = (await MySQLExecute.search(sql)) as any[]
+    const row = rows[0]
+
+    if (!row) {
+        employeeProfileCache.set(empCode, null)
+        return null
+    }
+
+    const profile: EmployeeProfile = {
+        empCode,
+        fullName: buildFullName(row),
+        email: normalizeEmail(row?.empEmail),
+    }
+
+    employeeProfileCache.set(empCode, profile)
+    return profile
+}
+
+const resolveAssignedEmail = async (empCodeRaw: unknown) => {
+    const empCode = String(empCodeRaw || '').trim()
+    if (!empCode) return ''
+
+    if (assigneeEmailCache.has(empCode)) {
+        return assigneeEmailCache.get(empCode) || ''
+    }
+
+    const sql = await RegisterRequestSQL.getAssigneeEmailByEmpCode({ empcode: empCode })
+    const rows = (await MySQLExecute.search(sql)) as any[]
+    const email = normalizeEmail(rows[0]?.empEmail)
+    assigneeEmailCache.set(empCode, email)
+    return email
+}
+
+const getPeerCcEmailsByExactGroupCode = async (
+    groupCode: string,
+    excludeEmpCode?: string,
+    excludeEmail?: string
+): Promise<string[]> => {
+    const safeGroupCode = String(groupCode || '').trim()
+    if (!safeGroupCode) return []
+
+    const excludeEmp = String(excludeEmpCode || '').trim()
+    const rowsSql = await RegisterRequestSQL.getActiveAssigneesByGroupCode({ group_code: safeGroupCode })
+    const rows = (await MySQLExecute.search(rowsSql)) as any[]
+
+    return mergeUniqueEmails(
+        rows
+            .map((row: any) => {
+                const rowEmpCode = String(row?.empcode || '').trim()
+                if (excludeEmp && rowEmpCode === excludeEmp) return ''
+                return normalizeEmail(row?.empEmail)
+            })
+            .filter((email: string) => email && email !== normalizeEmail(excludeEmail))
+    )
+}
+
+const inspectGroupRecipients = async (
+    groupCode: string,
+    excludeEmpCode?: string,
+    excludeEmail?: string
+) => {
+    const safeGroupCode = String(groupCode || '').trim()
+    if (!safeGroupCode) return []
+
+    const excludeEmp = String(excludeEmpCode || '').trim()
+    const normalizedExcludeEmail = normalizeEmail(excludeEmail)
+    const rowsSql = await RegisterRequestSQL.getActiveAssigneesByGroupCode({ group_code: safeGroupCode })
+    const rows = (await MySQLExecute.search(rowsSql)) as any[]
+
+    return rows.map((row: any) => {
+        const empCode = String(row?.empcode || '').trim()
+        const rawEmail = String(row?.empEmail || '').trim()
+        const normalizedEmail = normalizeEmail(rawEmail)
+        const isPrimary = !!excludeEmp && empCode === excludeEmp
+        const excludedByPrimaryEmail = !!normalizedExcludeEmail && normalizedEmail === normalizedExcludeEmail
+        const valid = !!normalizedEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)
+
+        return {
+            empCode,
+            rawEmail,
+            normalizedEmail,
+            isPrimary,
+            excludedByPrimaryEmail,
+            valid,
+            includedAsCc: !isPrimary && !excludedByPrimaryEmail && valid,
+        }
+    })
+}
+
 export const getPeerCcEmailsByGroupCode = async (
     groupCode: string,
     excludeEmpCode?: string,
@@ -37,7 +148,7 @@ export const getPeerCcEmailsByGroupCode = async (
 ): Promise<string[]> => {
     if (!groupCode) return []
 
-const targetGroup = String(groupCode || '')
+    const targetGroup = String(groupCode || '')
         .trim()
         .toUpperCase()
         .replace(/\s+/g, '_')
@@ -55,31 +166,59 @@ const targetGroup = String(groupCode || '')
 
     const peerEmails = mergeUniqueEmails(
         rows
-            .filter((row: any) => {
+            .map((row: any) => {
                 const rowEmpCode = String(row?.empcode || '').trim()
-                if (excludeEmp && rowEmpCode === excludeEmp) return false
-                return true
+                if (excludeEmp && rowEmpCode === excludeEmp) return ''
+                return normalizeEmail(row?.empEmail)
             })
-            .map((row: any) => normalizeEmail(row?.empEmail))
             .filter((email: string) => email && email !== normalizeEmail(excludeEmail))
     )
 
     return peerEmails
 }
 
-const parseStoredEmailList = (raw: any): string[] => {
+const parseStoredCircularMembers = (raw: any) => {
     if (!raw) return []
 
     try {
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
         if (!Array.isArray(parsed)) return []
+
         return parsed
-            .map(item => normalizeEmail(item))
-            .filter(Boolean)
+            .map(item => {
+                if (typeof item === 'string') {
+                    return { empcode: '', email: normalizeEmail(item) }
+                }
+
+                return {
+                    empcode: String(item?.empcode || '').trim(),
+                    email: normalizeEmail(item?.email),
+                }
+            })
+            .filter(item => item.empcode || item.email)
             .slice(0, 6)
     } catch {
         return []
     }
+}
+
+const resolveCircularAssignedEmails = async (raw: any): Promise<string[]> => {
+    const members = parseStoredCircularMembers(raw)
+    if (!members.length) return []
+
+    const resolved = await Promise.all(
+        members.map(async member => {
+            if (!member.empcode) return ''
+            return resolveAssignedEmail(member.empcode)
+        })
+    )
+
+    return mergeUniqueEmails(resolved)
+}
+
+const getGprCSetupMeta = (raw: any) => {
+    const setup = parseStoredObject(raw)
+    return parseStoredObject(setup?._meta)
 }
 
 const parseStoredObject = (raw: any): Record<string, any> => {
@@ -91,6 +230,95 @@ const parseStoredObject = (raw: any): Record<string, any> => {
     } catch {
         return {}
     }
+}
+
+const GPR_DETAIL_BY_NO: Record<string, string> = {
+    '4.1': 'Compliant of the law',
+    '4.2': 'Anti-Bribery Policy Communication',
+    '4.3': 'General Purchase Specification Requirement',
+    '4.4': 'Manufacture location survey',
+    '4.5': 'Company Environmental and Energy Policy',
+    '4.6': 'Quality Management Certification',
+    '4.7': 'Environmental Certification such as RoHS, REACH, etc.',
+    '4.8': 'Environmental Management Certification',
+    '4.9': 'History reliability',
+    '4.10': 'Reliable performance',
+    '4.11': 'Advised by Customer, Parent Company or Manager up',
+    '4.12': 'Low Price',
+    '4.13': 'Document to request for Automatic Account Transfer',
+    '4.14': 'Other',
+}
+
+const NEED_GPR_CRITERIA = new Set(['4.1', '4.2', '4.3', '4.4', '4.5'])
+const OPTIONAL_GPR_CRITERIA = new Set(['4.6', '4.7', '4.8', '4.9', '4.10', '4.11', '4.12', '4.13'])
+
+const hasUploadedFile = (value: any) => String(value || '').trim().length > 0
+const normalizeRemark = (value: any) => String(value || '').trim().toLowerCase()
+const isExplicitNotAccept = (remark: string) =>
+    ['not accept', 'not accepted', 'disagree', 'rejected'].some(token => remark.includes(token))
+const isExplicitAccept = (remark: string) =>
+    ['accept', 'accepted', 'agree', 'agreed'].some(token => remark.includes(token))
+
+const buildGprConditionReasonLines = (criteriaRows: any[]) => {
+    const rows = Array.isArray(criteriaRows) ? criteriaRows : []
+    const normalizedRows = rows.map((row: any) => ({
+        no: String(row?.no || row?.criteria_no || '').trim(),
+        detail: String(row?.detail || GPR_DETAIL_BY_NO[String(row?.no || row?.criteria_no || '').trim()] || '').trim(),
+        remark: String(row?.remark || '').trim(),
+        remarkNormalized: normalizeRemark(row?.remark),
+        uploadedFile: hasUploadedFile(row?.uploaded_file || row?.uploaded_file_path),
+    }))
+
+    const optionalRows = normalizedRows.filter(row => OPTIONAL_GPR_CRITERIA.has(row.no))
+    const optionalUploadedCount = optionalRows.filter(row => row.uploadedFile).length
+    const optionalShortfall = Math.max(0, 4 - optionalUploadedCount)
+
+    const lines: string[] = []
+
+    normalizedRows
+        .filter(row => NEED_GPR_CRITERIA.has(row.no))
+        .forEach(row => {
+            const explicitReject = isExplicitNotAccept(row.remarkNormalized)
+            const explicitAccept = isExplicitAccept(row.remarkNormalized)
+            const passes = row.no === '4.3'
+                ? ((row.uploadedFile || explicitAccept) && !explicitReject)
+                : (row.uploadedFile && !explicitReject)
+
+            if (passes) return
+
+            const reason = explicitReject
+                ? 'Vendor marked this condition as Not Accept.'
+                : (row.no === '4.3'
+                    ? 'Vendor acceptance for this requirement is still not confirmed.'
+                    : 'Required supporting document is still missing from vendor response.')
+
+            lines.push(`${row.no} ${row.detail || 'Selection Sheet condition'}: ${reason}`)
+        })
+
+    if (optionalShortfall > 0) {
+        optionalRows
+            .filter(row => !row.uploadedFile || isExplicitNotAccept(row.remarkNormalized))
+            .forEach(row => {
+                const explicitReject = isExplicitNotAccept(row.remarkNormalized)
+                const reason = explicitReject
+                    ? 'Vendor marked this condition as Not Accept.'
+                    : `Optional supporting document is still missing. Current optional count is ${optionalUploadedCount}/4.`
+                lines.push(`${row.no} ${row.detail || 'Selection Sheet condition'}: ${reason}`)
+            })
+    }
+
+    return lines
+}
+
+const resolveDisplayName = (options: Array<unknown>, fallbackLabel: string) => {
+    for (const option of options) {
+        const value = String(option || '').trim()
+        if (!value) continue
+        if (/^[A-Z]\d{3,}$/i.test(value)) continue
+        return value
+    }
+
+    return fallbackLabel
 }
 
 const resolveActionRequiredStage = (step: any) => {
@@ -141,16 +369,96 @@ const renderActionRequiredEmail = (data: {
     </div>
 `
 
+const previewRecipientList = (emails: string[] = []) =>
+    emails
+        .map(email => normalizeEmail(email))
+        .filter(Boolean)
+        .slice(0, 10)
+
+const logTemplateEvent = (
+    phase: 'sent' | 'failed',
+    payload: {
+        templateName: string
+        toEmail?: string
+        ccEmails?: string[]
+        subject?: string
+        requestId?: number | string
+        requestNumber?: string
+        extra?: Record<string, any>
+        error?: any
+    }
+) => {
+    const logPayload = {
+        templateName: payload.templateName,
+        toEmail: normalizeEmail(payload.toEmail),
+        ccEmails: previewRecipientList(payload.ccEmails || []),
+        ccCount: payload.ccEmails?.length || 0,
+        subject: payload.subject || '',
+        requestId: payload.requestId ?? '',
+        requestNumber: payload.requestNumber || '',
+        ...(payload.extra || {}),
+    }
+
+    if (phase === 'failed') {
+        console.error(`[MAIL TEMPLATE][${phase}]`, {
+            ...logPayload,
+            error: payload.error?.message || payload.error || 'unknown error',
+        })
+        return
+    }
+
+    console.log(`[MAIL TEMPLATE][${phase}]`, logPayload)
+}
+
+const sendTemplatedEmail = async (payload: {
+    templateName: string
+    emailHtml: string
+    toEmail: string
+    subject: string
+    ccEmails?: string[]
+    requestId?: number | string
+    requestNumber?: string
+    extra?: Record<string, any>
+}) => {
+    const ccEmails = payload.ccEmails || []
+
+    try {
+        await sendEmail(payload.emailHtml, payload.toEmail, payload.subject, ccEmails)
+        logTemplateEvent('sent', {
+            templateName: payload.templateName,
+            toEmail: payload.toEmail,
+            ccEmails,
+            subject: payload.subject,
+            requestId: payload.requestId,
+            requestNumber: payload.requestNumber,
+            extra: payload.extra,
+        })
+    } catch (error: any) {
+        logTemplateEvent('failed', {
+            templateName: payload.templateName,
+            toEmail: payload.toEmail,
+            ccEmails,
+            subject: payload.subject,
+            requestId: payload.requestId,
+            requestNumber: payload.requestNumber,
+            extra: payload.extra,
+            error,
+        })
+        throw error
+    }
+}
+
 export const selectApprovalNotificationByStep = (
     step: any,
     baseEmailData: MailTemplateData,
     requestNumber: string
-): { emailHtml: string; emailSubject: string } => {
+): { templateName: string; emailHtml: string; emailSubject: string } => {
     const stepCode = inferStepCode(step)
     const nextDesc = normalizeText(step?.DESCRIPTION)
 
     if (stepCode === 'PO_GM_APPROVAL' || nextDesc.includes('general manager')) {
         return {
+            templateName: 'emailToPMGMTemplate',
             emailHtml: emailToPMGMTemplate({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'PO GM' }),
             emailSubject: `[Request Approval] Please approve register vendor "${requestNumber}" - PO GM Step`
         }
@@ -158,6 +466,7 @@ export const selectApprovalNotificationByStep = (
 
     if (stepCode === 'PO_MGR_APPROVAL' || nextDesc.includes('manager') || nextDesc.includes('mgr')) {
         return {
+            templateName: 'emailToPMMgrTemplate',
             emailHtml: emailToPMMgrTemplate({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'PO Mgr' }),
             emailSubject: `[Request Approval] Please approve register vendor "${requestNumber}" - PO Mgr Step`
         }
@@ -165,6 +474,7 @@ export const selectApprovalNotificationByStep = (
 
     if (stepCode === 'MD_APPROVAL' || nextDesc.includes('md') || nextDesc.includes('director')) {
         return {
+            templateName: 'emailToMDTemplate',
             emailHtml: emailToMDTemplate({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'MD' }),
             emailSubject: `[Request Approval] Please approve register vendor "${requestNumber}" - MD Approval`
         }
@@ -172,6 +482,7 @@ export const selectApprovalNotificationByStep = (
 
     if (stepCode === 'ACCOUNT_REGISTERED' || nextDesc.includes('account')) {
         return {
+            templateName: 'emailToAccountPICTemplate',
             emailHtml: emailToAccountPICTemplate({ ...baseEmailData, recipientName: 'Account PIC' }),
             emailSubject: `[Request Action] Please process register vendor "${requestNumber}" - Account Step`
         }
@@ -179,12 +490,14 @@ export const selectApprovalNotificationByStep = (
 
     if (stepCode === 'DOC_CHECK' || nextDesc.includes('checker') || nextDesc.includes('check all document') || nextDesc.includes('check document')) {
         return {
+            templateName: 'emailToCheckerPICTemplate',
             emailHtml: emailToCheckerPICTemplate({ ...baseEmailData, recipientName: 'PO Checker' }),
             emailSubject: `[Request Check] Please check register vendor "${requestNumber}" - Document Step`
         }
     }
 
     return {
+        templateName: 'emailToPMMgrTemplate',
         emailHtml: emailToPMMgrTemplate({ ...baseEmailData, recipientName: 'Approver' }),
         emailSubject: `[Request Approval] Please process register vendor "${requestNumber}"`
     }
@@ -199,31 +512,38 @@ export const triggerCreationEmail = async (
     assigneeGroupCode?: string
 ) => {
     //ทำไม ไม่เอาจาก getUserdata ไม่รู้นึกยุ โฟค 18/04/2026
-    const requesterSql = await RegisterRequestSQL.getMemberByEmpCode({
-        empcode: dataItem.Request_By_EmployeeCode || '',
-    })
-    const requesterRes = (await MySQLExecute.search(requesterSql)) as RowDataPacket[]
-    const requesterData = requesterRes[0] || {}
-    const requesterFullName = requesterData.empName ? `${requesterData.empName} ${requesterData.empSurname || ''}`.trim() : (dataItem.Request_By_EmployeeCode || 'Unknown')
+    const requesterProfile = await resolveEmployeeProfile(dataItem.Request_By_EmployeeCode)
+    const requesterFullName = resolveDisplayName([
+        requesterProfile?.fullName,
+    ], 'Requester')
+    const nextAssigneeProfile = await resolveEmployeeProfile(nextAssignee.empCode)
+    const nextAssigneeEmail = await resolveAssignedEmail(nextAssignee.empCode)
 
     const requestNumber = resolveRequestNumber(persistedRequestNumber, insertedId)
     const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
 
-    if (nextAssignee.empEmail) {
-        const manualCc = excludeEmails(parseCcEmails(dataItem.cc_emails), [vendorData.email, vendorData.emailmain])
-        const peerCc = await getPeerCcEmailsByGroupCode(
+    if (nextAssigneeEmail) {
+        const manualCc = parseCcEmails(dataItem.cc_emails)
+        const groupRecipientInspection = await inspectGroupRecipients(
             assigneeGroupCode || '',
             nextAssignee.empCode,
-            nextAssignee.empEmail
+            nextAssigneeEmail
+        )
+        const peerCc = await getPeerCcEmailsByExactGroupCode(
+            assigneeGroupCode || '',
+            nextAssignee.empCode,
+            nextAssigneeEmail
         )
         const ccEmails = excludeEmails(
-            mergeUniqueEmails(manualCc, peerCc).filter(email => email !== normalizeEmail(nextAssignee.empEmail)),
-            [vendorData.email, vendorData.emailmain]
+            mergeUniqueEmails(manualCc, peerCc).filter(email => email !== nextAssigneeEmail),
+            []
         )
 
         const emailHtml = emailRequestRegisterVendorTemplate({
             requestNumber,
-            recipientName: nextAssignee.empName || 'PO PIC',
+            recipientName: resolveDisplayName([
+                nextAssigneeProfile?.fullName,
+            ], 'PO PIC'),
             vendorName: vendorData.company_name || 'Error Connection',
             address: vendorData.address || 'Error Connection',
             contactPic: vendorData.contact_name || 'Error Connection',
@@ -236,7 +556,24 @@ export const triggerCreationEmail = async (
             userTel: ''
         })
         const emailSubject = `[Request Check] Please request check register vendor follow as "${requestNumber}"`
-        await sendEmail(emailHtml, nextAssignee.empEmail, emailSubject, ccEmails)
+        await sendTemplatedEmail({
+            templateName: 'emailRequestRegisterVendorTemplate',
+            emailHtml,
+            toEmail: nextAssigneeEmail,
+            subject: emailSubject,
+            ccEmails,
+            requestId: insertedId,
+            requestNumber,
+            extra: {
+                flow: 'triggerCreationEmail',
+                assigneeEmpCode: nextAssignee.empCode || '',
+                assigneeGroupCode: assigneeGroupCode || '',
+                manualCc,
+                peerCc,
+                finalCcEmails: ccEmails,
+                groupRecipientInspection,
+            },
+        })
     }
 }
 
@@ -255,12 +592,16 @@ export const sendAgreementEmail = async (dataItem: any) => {
         picTel: dataItem.pic_tel || '',
     })
 
-    await sendEmail(
+    await sendTemplatedEmail({
+        templateName: 'emailVendorDocumentRequestTemplate',
         emailHtml,
-        recipientEmail,
-        dataItem.email_subject || `[Request Submit] Document for ${dataItem.request_number || 'vendor registration'}`,
-        []
-    )
+        toEmail: recipientEmail,
+        subject: dataItem.email_subject || `[Request Submit] Document for ${dataItem.request_number || 'vendor registration'}`,
+        ccEmails: [],
+        requestId: dataItem.request_id,
+        requestNumber: dataItem.request_number,
+        extra: { flow: 'sendAgreementEmail' },
+    })
 
     return { sent_to: recipientEmail }
 }
@@ -275,11 +616,11 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
 
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
 
-        const picSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: vd.assign_to || '' })
-        const picRes = (await MySQLExecute.search(picSql)) as any[]
-        const picRow = picRes[0] || {}
-        const picName = picRow.empName ? `${picRow.empName}`.trim() : (vd.assign_to || 'PO PIC')
-        const picEmail = picRow.empEmail || ''
+        const picProfile = await resolveEmployeeProfile(vd.assign_to)
+        const picName = resolveDisplayName([
+            picProfile?.fullName,
+        ], 'PO PIC')
+        const picEmail = await resolveAssignedEmail(vd.assign_to)
         const picTel = ''
 
         const isOversea = normalizeText(vd.vendor_region) === 'oversea'
@@ -298,21 +639,38 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
         const isGprCStage = stageHintRaw.includes('gpr c')
 
         if (isGprCStage) {
-            const gprCApproverEmail = normalizeEmail(vd.gpr_c_approver_email)
-            const gprCApproverName = String(vd.gpr_c_approver_name || 'Approver PIC').trim()
+            const gprCMeta = getGprCSetupMeta(vd.action_required_json)
+            const gprCApproverEmpCode = String(gprCMeta?.gpr_c_approver_empcode || '').trim()
+            const gprCApproverProfile = await resolveEmployeeProfile(gprCApproverEmpCode)
+            const gprCApproverEmail = await resolveAssignedEmail(gprCApproverEmpCode)
+            const gprCApproverName = resolveDisplayName([
+                gprCApproverProfile?.fullName,
+                vd.gpr_c_approver_name,
+            ], 'Approver PIC')
             const gprCPcPicEmail = normalizeEmail(vd.gpr_c_pc_pic_email)
-            const circularEmails = parseStoredEmailList(vd.gpr_c_circular_json)
-            const checkerEmails = await getPeerCcEmailsByGroupCode(GROUP_CODE.PO_CHECKER_MAIN)
-            const primaryCheckerEmail = checkerEmails[0] || ''
+            const circularEmails = await resolveCircularAssignedEmails(vd.gpr_c_circular_json)
+            const requesterProfile = await resolveEmployeeProfile(vd.Request_By_EmployeeCode)
+            const requesterEmail = normalizeEmail(requesterProfile?.email || '')
+            const requesterName = resolveDisplayName([requesterProfile?.fullName], 'Requester')
+            let gprConditionReasons: string[] = []
 
-            const primaryRecipient = gprCApproverEmail || primaryCheckerEmail
+            const selectionSql = await RegisterRequestSQL.getSelection({ request_id: Number(requestId) || 0 })
+            const selectionRes = (await MySQLExecute.search(selectionSql)) as any[]
+            const selection = selectionRes[0]
+            if (selection?.selection_id) {
+                const criteriaSql = await RegisterRequestSQL.getCriteria({ selection_id: selection.selection_id })
+                const criteriaRes = (await MySQLExecute.search(criteriaSql)) as any[]
+                gprConditionReasons = buildGprConditionReasonLines(criteriaRes)
+            }
+
+            const primaryRecipient = gprCApproverEmail || requesterEmail
             if (!primaryRecipient) {
-                return { sent: false, reason: 'missing GPR C approver/checker email' }
+                return { sent: false, reason: 'missing GPR C approver/requester email' }
             }
 
             const gprCCcEmails = excludeEmails(mergeUniqueEmails(
+                requesterEmail ? [requesterEmail] : [],
                 picEmail ? [picEmail] : [],
-                checkerEmails,
                 gprCApproverEmail ? [gprCApproverEmail] : [],
                 gprCPcPicEmail ? [gprCPcPicEmail] : [],
                 circularEmails,
@@ -323,7 +681,7 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
                 toEmail: primaryRecipient,
                 ccEmail: gprCCcEmails.join('; '),
                 requestNumber,
-                userName: gprCApproverName,
+                userName: primaryRecipient === requesterEmail ? requesterName : gprCApproverName,
                 picName,
                 picTel,
                 vendorName: vd.company_name || 'N/A',
@@ -334,14 +692,26 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
                 supportProduct: vd.supportProduct_Process || 'N/A',
                 purchaseFrequency: vd.purchase_frequency || 'N/A',
                 systemLink: `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`,
+                reasons: gprConditionReasons,
             })
 
-            await sendEmail(
-                gprCApprovalHtml,
-                primaryRecipient,
-                `[Request Approval] Please approve ${requestNumber} - General Purchase Specification Form C`,
-                gprCCcEmails
-            )
+            await sendTemplatedEmail({
+                templateName: 'emailUserCheckerApproverGPRCTemplate',
+                emailHtml: gprCApprovalHtml,
+                toEmail: primaryRecipient,
+                subject: `[Request Approval] Please approve ${requestNumber} - General Purchase Specification Form C`,
+                ccEmails: gprCCcEmails,
+                requestId,
+                requestNumber,
+                extra: {
+                    flow: 'triggerVendorDocumentEmail',
+                    stageHint: stageHint || 'GPR C',
+                    requesterEmail,
+                    requesterName,
+                    gprCApproverEmpCode,
+                    gprConditionReasonCount: gprConditionReasons.length,
+                },
+            })
 
             return {
                 sent: true,
@@ -375,7 +745,16 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
             emailSubject = `[Request Submit] Please submit ${requestNumber} - General Purchase Specification Form B`
         }
 
-        await sendEmail(emailHtml, vendorEmail, emailSubject, ccEmails)
+        await sendTemplatedEmail({
+            templateName: isGprBStage ? 'emailExternalSubmitGPRBTemplate' : 'emailVendorDocumentRequestTemplate',
+            emailHtml,
+            toEmail: vendorEmail,
+            subject: emailSubject,
+            ccEmails,
+            requestId,
+            requestNumber,
+            extra: { flow: 'triggerVendorDocumentEmail', stageHint: stageHint || '' },
+        })
 
         return { sent: true, to: vendorEmail, ccCount: ccEmails.length }
     } catch (err: any) {
@@ -391,28 +770,25 @@ export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynami
         const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
         const vd = vendorRes[0] || {}
 
-        const picSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: vd.assign_to || '' })
-        const picRes = (await MySQLExecute.search(picSql)) as any[]
-        const picRow = picRes[0] || {}
-        const picName = picRow.empName ? `${picRow.empName}`.trim() : (vd.assign_to || 'PIC')
-        const picEmail = picRow.empEmail || ''
+        const picProfile = await resolveEmployeeProfile(vd.assign_to)
+        const picName = resolveDisplayName([
+            picProfile?.fullName,
+        ], 'PIC')
+        const picEmail = await resolveAssignedEmail(vd.assign_to)
         const picTel = ''
 
         const targetApprover = dynamicApprover || nextStep?.approver_id || vd.assign_to || ''
         let approverEmail = ''
         let approverName = ''
         if (targetApprover) {
-            const approverEmailSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: targetApprover })
-            const approverEmailRes = (await MySQLExecute.search(approverEmailSql)) as any[]
-            approverEmail = approverEmailRes[0]?.empEmail || ''
-            approverName = approverEmailRes[0]?.empName || ''
+            const approverProfile = await resolveEmployeeProfile(targetApprover)
+            approverEmail = await resolveAssignedEmail(targetApprover)
+            approverName = resolveDisplayName([approverProfile?.fullName], '')
         }
 
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
         const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
-        const requesterSql = await RegisterRequestSQL.getMemberByEmpCode({ empcode: vd.Request_By_EmployeeCode || '' })
-        const requesterRes = (await MySQLExecute.search(requesterSql)) as any[]
-        const requesterEmail = requesterRes[0]?.empEmail || ''
+        const requesterEmail = normalizeEmail((await resolveEmployeeProfile(vd.Request_By_EmployeeCode))?.email)
 
         const isOversea = normalizeText(vd.vendor_region) === 'oversea'
         const nextStepCode = inferStepCode(nextStep)
@@ -466,7 +842,7 @@ export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynami
             toEmail: approverEmail,
             ccEmail: ccEmails.join('; '),
             requestNumber,
-            recipientName: approverName || targetApprover || 'Approver',
+            recipientName: resolveDisplayName([approverName], 'Approver'),
             vendorName: vd.company_name || 'N/A',
             address: vd.address || 'N/A',
             contactPic: vd.contact_name || 'N/A',
@@ -481,8 +857,21 @@ export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynami
 
         if (!approverEmail) return
 
-        const { emailHtml, emailSubject } = selectApprovalNotificationByStep(nextStep, baseEmailData, requestNumber)
-        await sendEmail(emailHtml, approverEmail, emailSubject, ccEmails)
+        const { templateName, emailHtml, emailSubject } = selectApprovalNotificationByStep(nextStep, baseEmailData, requestNumber)
+        await sendTemplatedEmail({
+            templateName,
+            emailHtml,
+            toEmail: approverEmail,
+            subject: emailSubject,
+            ccEmails,
+            requestId,
+            requestNumber,
+            extra: {
+                flow: 'triggerApprovalEmails',
+                stepCode: inferStepCode(nextStep),
+                approverEmpCode: targetApprover || '',
+            },
+        })
     } catch (err: any) {
         console.error('[triggerApprovalEmails] Failed:', err?.message)
     }
@@ -507,11 +896,11 @@ export const triggerActionRequiredEmail = async (dataItem: any, currentStep: any
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
         const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
 
-        const picSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: vd.assign_to || '' })
-        const picRes = (await MySQLExecute.search(picSql)) as any[]
-        const picRow = picRes[0] || {}
-        const picName = picRow.empName ? `${picRow.empName}`.trim() : (vd.assign_to || 'PO PIC')
-        const picEmail = picRow.empEmail || ''
+        const picProfile = await resolveEmployeeProfile(vd.assign_to)
+        const picName = resolveDisplayName([
+            picProfile?.fullName,
+        ], 'PO PIC')
+        const picEmail = await resolveAssignedEmail(vd.assign_to)
         const picTel = ''
 
         const ccEmails = excludeEmails(
@@ -522,11 +911,13 @@ export const triggerActionRequiredEmail = async (dataItem: any, currentStep: any
             [vd.vendor_email, vd.vendor_main_email]
         )
 
-        const stageLabel =
-            stageKey === 'engineer' ? 'Engineer Judgement'
+        const stageLabel = String(
+            stageConfig?.stage_label
+            || (stageKey === 'engineer' ? 'Engineer Judgement'
                 : stageKey === 'emr' ? 'EMR Judgement'
                     : stageKey === 'qms' ? 'QMS Judgement'
-                        : 'PM Manager Approval'
+                        : 'PM Manager Approval')
+        ).trim()
 
         const emailHtml = renderActionRequiredEmail({
             stageLabel,
@@ -540,12 +931,16 @@ export const triggerActionRequiredEmail = async (dataItem: any, currentStep: any
             picTel,
         })
 
-        await sendEmail(
+        await sendTemplatedEmail({
+            templateName: 'renderActionRequiredEmail',
             emailHtml,
-            recipientEmail,
-            `[Action Required] ${stageLabel} for ${requestNumber}`,
-            ccEmails
-        )
+            toEmail: recipientEmail,
+            subject: `[Action Required] ${stageLabel} for ${requestNumber}`,
+            ccEmails,
+            requestId,
+            requestNumber,
+            extra: { flow: 'triggerActionRequiredEmail', stageKey, stageLabel },
+        })
     } catch (err: any) {
         console.error('[triggerActionRequiredEmail] Failed:', err?.message)
     }
@@ -560,35 +955,33 @@ export const triggerAfterGprCApprovedEmail = async (dataItem: any) => {
         const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
         const vd = vendorRes[0] || {}
 
-        const requesterSql = await RegisterRequestSQL.getMemberByEmpCode({ empcode: vd.Request_By_EmployeeCode || '' })
-        const requesterRes = (await MySQLExecute.search(requesterSql)) as any[]
-        const requester = requesterRes[0] || {}
-        const requesterEmail = normalizeEmail(requester?.empEmail || '')
-        const requesterName = requester?.empName
-            ? `${requester.empName} ${requester.empSurname || ''}`.trim()
-            : (vd.Request_By_EmployeeCode || 'Requester')
+        const requesterProfile = await resolveEmployeeProfile(vd.Request_By_EmployeeCode)
+        const requesterEmail = normalizeEmail(requesterProfile?.email || '')
+        const requesterName = resolveDisplayName([
+            requesterProfile?.fullName,
+        ], 'Requester')
 
         if (!requesterEmail) return
 
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
         const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
 
-        const picSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: vd.assign_to || '' })
-        const picRes = (await MySQLExecute.search(picSql)) as any[]
-        const picRow = picRes[0] || {}
-        const picName = picRow.empName ? `${picRow.empName}`.trim() : (vd.assign_to || 'PO PIC')
-        const picEmail = normalizeEmail(picRow.empEmail || '')
+        const picProfile = await resolveEmployeeProfile(vd.assign_to)
+        const picName = resolveDisplayName([
+            picProfile?.fullName,
+        ], 'PO PIC')
+        const picEmail = await resolveAssignedEmail(vd.assign_to)
         const picTel = ''
 
-        const checkerEmails = await getPeerCcEmailsByGroupCode(GROUP_CODE.PO_CHECKER_MAIN)
-        const gprCApproverEmail = normalizeEmail(vd.gpr_c_approver_email)
+        const gprCMeta = getGprCSetupMeta(vd.action_required_json)
+        const gprCApproverEmpCode = String(gprCMeta?.gpr_c_approver_empcode || '').trim()
+        const gprCApproverEmail = await resolveAssignedEmail(gprCApproverEmpCode)
         const gprCPcPicEmail = normalizeEmail(vd.gpr_c_pc_pic_email)
-        const circularEmails = parseStoredEmailList(vd.gpr_c_circular_json)
+        const circularEmails = await resolveCircularAssignedEmails(vd.gpr_c_circular_json)
 
         const ccEmails = excludeEmails(
             mergeUniqueEmails(
                 picEmail ? [picEmail] : [],
-                checkerEmails,
                 gprCApproverEmail ? [gprCApproverEmail] : [],
                 gprCPcPicEmail ? [gprCPcPicEmail] : [],
                 circularEmails,
@@ -614,12 +1007,16 @@ export const triggerAfterGprCApprovedEmail = async (dataItem: any) => {
             systemLink,
         })
 
-        await sendEmail(
+        await sendTemplatedEmail({
+            templateName: 'emailAfterCheckerApproverGPRCTemplate',
             emailHtml,
-            requesterEmail,
-            `[Request Update] ${requestNumber} - General Purchase Specification Form C approved`,
-            ccEmails
-        )
+            toEmail: requesterEmail,
+            subject: `[Request Update] ${requestNumber} - General Purchase Specification Form C approved`,
+            ccEmails,
+            requestId,
+            requestNumber,
+            extra: { flow: 'triggerAfterGprCApprovedEmail' },
+        })
     } catch (err: any) {
         console.error('[triggerAfterGprCApprovedEmail] Failed:', err?.message)
     }
@@ -632,16 +1029,14 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
         const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
         const vd = vendorRes[0] || {}
 
-        const picEmailSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: vd.assign_to || '' })
-        const picRes = (await MySQLExecute.search(picEmailSql)) as any[]
-        const picRow = picRes[0] || {}
-        const picEmail = picRow.empEmail || ''
-        const picName = picRow.empName ? `${picRow.empName}`.trim() : (vd.assign_to || 'PIC')
+        const picProfile = await resolveEmployeeProfile(vd.assign_to)
+        const picEmail = await resolveAssignedEmail(vd.assign_to)
+        const picName = resolveDisplayName([
+            picProfile?.fullName,
+        ], 'PIC')
         const picTel = ''
 
-        const approverEmailSql = await RegisterRequestSQL.getAssigneeEmailByEmpCode({ empcode: currentStep?.approver_id || '' })
-        const approverRes = (await MySQLExecute.search(approverEmailSql)) as any[]
-        const approverEmail = approverRes[0]?.empEmail || ''
+        const approverEmail = await resolveAssignedEmail(currentStep?.approver_id)
 
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
         const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
@@ -679,12 +1074,16 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
             picTel,
         })
 
-        await sendEmail(
+        await sendTemplatedEmail({
+            templateName: 'emailReject1Template',
             emailHtml,
-            picEmail,
-            `[REJECT] Register vendor "${requestNumber}" has been rejected`,
-            ccEmails
-        )
+            toEmail: picEmail,
+            subject: `[REJECT] Register vendor "${requestNumber}" has been rejected`,
+            ccEmails,
+            requestId,
+            requestNumber,
+            extra: { flow: 'triggerRejectionEmail', approverEmpCode: currentStep?.approver_id || '' },
+        })
     } catch (err: any) {
         console.error('[triggerRejectionEmail] Failed:', err?.message)
     }
@@ -697,19 +1096,18 @@ export const triggerCompletionEmail = async (dataItem: any) => {
         const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
         const vd = vendorRes[0] || {}
 
-        const requesterSql = await RegisterRequestSQL.getMemberByEmpCode({ empcode: vd.Request_By_EmployeeCode || '' })
-        const requesterRes = (await MySQLExecute.search(requesterSql)) as any[]
-        const req = requesterRes[0] || {}
-        const requesterName = req.empName ? `${req.empName} ${req.empSurname || ''}`.trim() : vd.Request_By_EmployeeCode
-        const requesterEmail = req.empEmail || ''
+        const requesterProfile = await resolveEmployeeProfile(vd.Request_By_EmployeeCode)
+        const requesterName = resolveDisplayName([
+            requesterProfile?.fullName,
+        ], 'Requester')
+        const requesterEmail = normalizeEmail(requesterProfile?.email || '')
 
-        const picEmailSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: vd.assign_to || '' })
-        const picRes = (await MySQLExecute.search(picEmailSql)) as any[]
-        const picRow = picRes[0] || {}
-        const picName = picRow.empName ? `${picRow.empName}`.trim() : (vd.assign_to || 'PIC')
-        const picEmail = picRow.empEmail || ''
+        const picProfile = await resolveEmployeeProfile(vd.assign_to)
+        const picName = resolveDisplayName([
+            picProfile?.fullName,
+        ], 'PIC')
+        const picEmail = await resolveAssignedEmail(vd.assign_to)
         const picTel = ''
-        const picNextStepEmail = normalizeEmail(dataItem.pic_next_step_email || dataItem.PIC_Email || '')
 
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
         const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
@@ -727,7 +1125,6 @@ export const triggerCompletionEmail = async (dataItem: any) => {
                 requesterEmail ? [requesterEmail] : [],
                 picEmail ? [picEmail] : [],
                 peerPicCc,
-                picNextStepEmail ? [picNextStepEmail] : [],
                 parseCcEmails(vd.cc_emails)
             ),
             [vd.vendor_email, vd.vendor_main_email]
@@ -753,12 +1150,16 @@ export const triggerCompletionEmail = async (dataItem: any) => {
         }
 
         const emailHtml = emailCompleteTemplate(completionData)
-        await sendEmail(
+        await sendTemplatedEmail({
+            templateName: 'emailCompleteTemplate',
             emailHtml,
-            requesterEmail,
-            `[Complete] Register vendor "${requestNumber}" is now completed`,
-            finalCcEmails
-        )
+            toEmail: requesterEmail,
+            subject: `[Complete] Register vendor "${requestNumber}" is now completed`,
+            ccEmails: finalCcEmails,
+            requestId,
+            requestNumber,
+            extra: { flow: 'triggerCompletionEmail', vendorCode: dataItem.vendor_code || vd.vendor_code || '' },
+        })
     } catch (err: any) {
         console.error('[triggerCompletionEmail] Failed:', err?.message)
     }
@@ -773,19 +1174,14 @@ export const triggerVendorDisagreeEmail = async (dataItem: any) => {
         const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
         const vd = vendorRes[0] || {}
 
-        const requesterSql = await RegisterRequestSQL.getMemberByEmpCode({ empcode: vd.Request_By_EmployeeCode || '' })
-        const requesterRes = (await MySQLExecute.search(requesterSql)) as any[]
-        const requester = requesterRes[0] || {}
-
-        const requesterName = requester.empName
-            ? `${requester.empName} ${requester.empSurname || ''}`.trim()
-            : (vd.Request_By_EmployeeCode || 'Requester')
-        const requesterEmail = requester.empEmail || ''
+        const requesterProfile = await resolveEmployeeProfile(vd.Request_By_EmployeeCode)
+        const requesterName = resolveDisplayName([
+            requesterProfile?.fullName,
+        ], 'Requester')
+        const requesterEmail = normalizeEmail(requesterProfile?.email || '')
         if (!requesterEmail) return
 
-        const picSql = await RegisterRequestSQL.getAssigneeEmailByEmpCode({ empcode: vd.assign_to || '' })
-        const picRes = (await MySQLExecute.search(picSql)) as any[]
-        const picEmail = picRes[0]?.empEmail || ''
+        const picEmail = await resolveAssignedEmail(vd.assign_to)
 
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
         const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
@@ -801,10 +1197,10 @@ export const triggerVendorDisagreeEmail = async (dataItem: any) => {
             ...(safeRemark ? [safeRemark] : []),
         ]
 
-        const picContactSql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: vd.assign_to || '' })
-        const picContactRes = (await MySQLExecute.search(picContactSql)) as any[]
-        const picRow = picContactRes[0] || {}
-        const picName = picRow.empName ? `${picRow.empName}`.trim() : (vd.assign_to || 'PO PIC')
+        const picProfile = await resolveEmployeeProfile(vd.assign_to)
+        const picName = resolveDisplayName([
+            picProfile?.fullName,
+        ], 'PO PIC')
         const picTel = ''
 
         const emailHtml = emailIncompleteTemplate({
@@ -825,12 +1221,16 @@ export const triggerVendorDisagreeEmail = async (dataItem: any) => {
             reasons,
         })
 
-        await sendEmail(
+        await sendTemplatedEmail({
+            templateName: 'emailIncompleteTemplate',
             emailHtml,
-            requesterEmail,
-            `[Incomplete] Register vendor "${requestNumber}" ended as Vendor Disagreed`,
-            ccEmails
-        )
+            toEmail: requesterEmail,
+            subject: `[Incomplete] Register vendor "${requestNumber}" ended as Vendor Disagreed`,
+            ccEmails,
+            requestId,
+            requestNumber,
+            extra: { flow: 'triggerVendorDisagreeEmail' },
+        })
     } catch (err: any) {
         console.error('[triggerVendorDisagreeEmail] Failed:', err?.message)
     }

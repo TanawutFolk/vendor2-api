@@ -168,6 +168,13 @@ export const FindVendorService = {
         return resultData
     },
 
+    // Get prones raw data for testing (Oracle)
+    getPronesRawTest: async (dataItem: any) => {
+        const sql = await FindVendorSQL.getPronesRawTest(dataItem)
+        const resultData = (await OracleExecute.searchOracle(sql, 'PRONES')) as RowDataPacket[]
+        return resultData
+    },
+
     // Get all vendor names
     getAllVendorNames: async (dataItem: any) => {
         const sql = await FindVendorSQL.getAllVendorNames(dataItem)

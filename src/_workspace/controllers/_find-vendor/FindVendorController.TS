@@ -19,17 +19,23 @@ export const FindVendorController = {
 
         // Intercept Order for SQL fallback (Removed: status_check is now natively supported in SQL)
 
-        // Translate 'status' frontend filter ID to 'status_check' table column
+        // Translate 'status' frontend filter ID to backend filter logic
         if (dataItem.SearchFilters && Array.isArray(dataItem.SearchFilters)) {
             const statusIdx = dataItem.SearchFilters.findIndex((item: any) => item.id === 'status');
             if (statusIdx > -1) {
                 const val = dataItem.SearchFilters[statusIdx].value;
                 if (val === '1' || val === 1) {
-                    dataItem.SearchFilters[statusIdx] = { id: 'status_check', value: 'Registered' };
+                    dataItem.pronesStatusFilter = 'Registered';
+                    dataItem.SearchFilters.splice(statusIdx, 1);
                 } else if (val === '0' || val === 0) {
-                    dataItem.SearchFilters[statusIdx] = { id: 'status_check', value: 'Not Registered' };
+                    dataItem.pronesStatusFilter = 'Not Registered';
+                    dataItem.SearchFilters.splice(statusIdx, 1);
+                } else if (val === 'In Progress') {
+                    dataItem.pronesStatusFilter = 'In Progress';
+                    dataItem.SearchFilters.splice(statusIdx, 1);
                 } else if (val === 'Cannot Register') {
-                    dataItem.SearchFilters[statusIdx] = { id: 'fft_status', value: 2 };
+                    dataItem.pronesStatusFilter = 'Cannot Register';
+                    dataItem.SearchFilters.splice(statusIdx, 1);
                 } else {
                     dataItem.SearchFilters.splice(statusIdx, 1);
                 }
@@ -62,7 +68,6 @@ export const FindVendorController = {
             { table: 'vc', id: 'UPDATE_BY', Fns: 'LIKE' },
             { table: 'vc', id: 'CREATE_DATE', Fns: '=' },
             { table: 'vc', id: 'UPDATE_DATE', Fns: '=' },
-            { table: 'vmr', id: 'status_check', Fns: '=' },
             { table: 'vmr', id: 'prones_code', Fns: 'LIKE' },
         ]
 
@@ -88,6 +93,25 @@ export const FindVendorController = {
             if (sqlWhere) {
                 sqlWhere = ` AND ${sqlWhere}`
             }
+        }
+
+        if (dataItem.pronesStatusFilter) {
+            const statusValue = String(dataItem.pronesStatusFilter).replace(/'/g, "\\'")
+            sqlWhere += `
+                AND (
+                    CASE
+                        WHEN v.fft_status = 2 THEN 'Cannot Register'
+                        WHEN EXISTS (
+                            SELECT 1
+                            FROM request_register_vendor rrv_ip
+                            WHERE rrv_ip.vendor_id = v.vendor_id
+                              AND rrv_ip.INUSE = 1
+                              AND rrv_ip.request_status NOT IN ('Completed', 'Rejected', 'Vendor Disagreed', 'Cancelled')
+                        ) THEN 'In Progress'
+                        ELSE IFNULL(vmr.status_check, 'Not Registered')
+                    END
+                ) = '${statusValue}'
+            `
         }
 
         dataItem['sqlWhereColumnFilter'] = '' // No longer needed as it's merged into sqlWhere
@@ -968,6 +992,35 @@ export const FindVendorController = {
                 TotalCountOnDb: 0,
                 MethodOnDb: 'Get Prones Data All',
                 Message: error?.message || 'Failed to get prones data'
+            } as ResponseI)
+        }
+    },
+    getPronesRawTest: async (req: Request, res: Response) => {
+        try {
+            let dataItem
+
+            if (!req.body || Object.entries(req.body).length === 0) {
+                dataItem = req.query
+            } else {
+                dataItem = req.body
+            }
+
+            const resultData = await FindVendorModel.getPronesRawTest(dataItem)
+            res.status(200).json({
+                Status: true,
+                ResultOnDb: resultData,
+                TotalCountOnDb: resultData.length,
+                MethodOnDb: 'Get Prones Raw Test',
+                Message: 'Get Prones Raw Test Success'
+            } as ResponseI)
+        } catch (error: any) {
+            console.error('Get Prones Raw Test Error:', error)
+            res.status(200).json({
+                Status: false,
+                ResultOnDb: [],
+                TotalCountOnDb: 0,
+                MethodOnDb: 'Get Prones Raw Test',
+                Message: error?.message || 'Failed to get raw prones data'
             } as ResponseI)
         }
     }

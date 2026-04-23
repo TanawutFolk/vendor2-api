@@ -1,6 +1,3 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-
 export type MailTemplateData = {
     toEmail?: string;
     ccEmail?: string;
@@ -30,59 +27,13 @@ export type MailTemplateData = {
     reasons?: string[];
 };
 
-const readLogoAsDataUri = () => {
-    const candidates = [
-        path.resolve(process.cwd(), '../vendor2-app/src/_workspace/utils/fitelLogo.png'),
-        path.resolve(process.cwd(), 'vendor2-app/src/_workspace/utils/fitelLogo.png'),
-    ];
-
-    for (const logoPath of candidates) {
-        try {
-            if (!fs.existsSync(logoPath)) continue;
-            const b64 = fs.readFileSync(logoPath).toString('base64');
-            if (b64) return `data:image/png;base64,${b64}`;
-        } catch {
-            // Ignore and try next candidate path.
-        }
-    }
-
-    return '';
-};
-
-const EMAIL_LOGO_DATA_URI = readLogoAsDataUri();
-
-const resolveLogoUrlFromEnv = () => {
-    const raw = String(process.env.MAIL_LOGO_URL || process.env.LEAVE_SYSTEM_ORIGIN || '').trim();
-    if (!raw) return '';
-
-    // Accept full image URL directly, e.g. https://cdn.example.com/fitelLogo.png
-    if (/\.(png|jpg|jpeg|gif|webp|svg)(\?.*)?$/i.test(raw) || raw.startsWith('vendor2-app\public\fitelLogo.png')) {
-        return raw;
-    }
-
-    // Otherwise treat as origin/base path and append default logo filename.
-    return `${raw.replace(/\/$/, '')}/fitelLogo.png`;
-};
-    
-const EMAIL_LOGO_SRC = resolveLogoUrlFromEnv() || EMAIL_LOGO_DATA_URI;
-
-const renderTopLogo = () => {
-    if (!EMAIL_LOGO_SRC) return '';
-
-    return `
-        <div style="padding: 20px 32px 0 32px; text-align: left;">
-            <img src="${EMAIL_LOGO_SRC}" alt="Fitel Logo" style="height: 38px; width: auto; max-width: 220px; display: block;" />
-        </div>
-    `;
-};
-
 //User sent to Approver PIC
 export const emailRequestRegisterVendorTemplate = (data: MailTemplateData) => {
     return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
-            <p style="margin: 0 0 20px 0; font-size: 15px;">Dear : &nbsp;&nbsp;&nbsp;<span style="color: #d32f2f; font-weight: 600;">${data.recipientName || 'Error Connection PLEAS Report '}</span></p>
+            <p style="margin: 0 0 20px 0; font-size: 15px;">Dear  &nbsp;&nbsp;&nbsp;<span style="color: #d32f2f; font-weight: 600;">${data.recipientName || 'Error Connection PLEAS Report '}</span></p>
             
             <div style="background-color: #fef2f2; border-left: 4px solid #d32f2f; padding: 12px 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0;">
                 <p style="margin: 0 0 4px 0; font-weight: 600; color: #b91c1c;">Status: Under request register vendor</p>
@@ -98,12 +49,12 @@ export const emailRequestRegisterVendorTemplate = (data: MailTemplateData) => {
             </table>
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px;">
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">For support product/process :</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency :</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">For support product / process :</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency / Year :</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <p style="margin: 0 0 24px 0;">
-                You can access the system through this link: <a href="${data.systemLink}" style="color: #d32f2f; text-decoration: underline; font-weight: 500;">${data.systemLink}</a>
+                You can access the system through this link : <a href="${data.systemLink}" style="color: #d32f2f; text-decoration: underline; font-weight: 500;">${data.systemLink}</a>
             </p>
 
             <hr style="border: none; border-top: 1px dashed #fee2e2; margin: 32px 0;">
@@ -122,8 +73,8 @@ export const emailRequestRegisterVendorTemplate = (data: MailTemplateData) => {
             </table>
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 32px;">
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">สำหรับสนับสนุนผลิตภัณฑ์/กระบวนการ</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">ความถี่ในการสั่งซื้อต่อปี(โดยประมาณ):</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">สำหรับสนับสนุนผลิตภัณฑ์/กระบวนการ:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">ความถี่ในการสั่งซื้อต่อปี:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #fee2e2; font-size: 14px;">
@@ -144,7 +95,6 @@ export const emailVendorDocumentRequestTemplate = (data: MailTemplateData) => {
     return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
-        ${renderTopLogo()}
         <div style="padding: 32px;">
 
             <p style="margin: 0 0 24px 0; font-weight: 600; color: #d32f2f; background: #fef2f2; padding: 8px 12px; border-radius: 6px; display: inline-block;">** สามารถอ่านภาษาไทยด้านล่างได้ค่ะ **</p>
@@ -152,16 +102,16 @@ export const emailVendorDocumentRequestTemplate = (data: MailTemplateData) => {
             <p style="margin: 0 0 16px 0; font-size: 15px;">Dear Supplier,</p>
             
             <p style="margin: 0 0 16px 0;">
-                As Furukawa FITEL (Thailand) Co., Ltd. has never contacted or used the service from your company, it is necessary to request more information to register a new supplier. Including informing about company policies such as Environmental Policy, Quality Policy and Export Control Policy. Therefore, we kindly request the following documents:
+                As <strong>Furukawa <span style="color: #d32f2f;">FITEL</span> (Thailand) Co., Ltd.</strong> has never contacted or used the service from your company, it is necessary to <strong>request more information to register a new supplier</strong>. Including informing about company policies such as Environmental Policy, Quality Policy and Export Control Policy. Therefore, we kindly request the following documents:
             </p>
             
             <ol style="margin: 0 0 24px 0; padding-left: 24px; color: #111827;">
-                <li style="margin-bottom: 8px;">Company certificate (Limited Company or Public Company Limited) and Vat License (Por Por 20)</li>
-                <li style="margin-bottom: 8px;">Company profile</li>
-                <li style="margin-bottom: 8px;">Other certifications, such as ISO9001, ISO14000, catalog main product, etc.</li>
-                <li style="margin-bottom: 8px;">Copy of Book banking</li>
-                <li style="margin-bottom: 8px;">Reply to <strong>"MFG survey document"</strong> in Excel file format within 7 days.</li>
-                <li style="margin-bottom: 8px;">Reply to <strong>"Reply Form document"</strong> in Pdf file format within 7 days.</li>
+                <li style="margin-bottom: 8px;"><strong>Company certificate</strong> (Limited Company or Public Company Limited) and <strong>Vat License</strong> (Por Por 20)</li>
+                <li style="margin-bottom: 8px;"><strong>Company profile</strong></li>
+                <li style="margin-bottom: 8px;"><strong>Other certifications</strong>, such as ISO9001, ISO14000, catalog main product, etc.</li>
+                <li style="margin-bottom: 8px;"><strong>Copy of Book banking</strong></li>
+                <li style="margin-bottom: 8px;">Reply to <strong>"MFG survey document"</strong> in Excel file format <strong>within 7 days</strong>.</li>
+                <li style="margin-bottom: 8px;">Reply to <strong>"Reply Form document"</strong> in Pdf file format <strong>within 7 days</strong>.</li>
             </ol>
 
             <p style="margin: 0 0 24px 0; background-color: #f9fafb; padding: 12px; border-left: 3px solid #9ca3af;">
@@ -179,16 +129,16 @@ export const emailVendorDocumentRequestTemplate = (data: MailTemplateData) => {
             <p style="margin: 0 0 16px 0; font-weight: 600; font-size: 15px; color: #111827;">เรียน ผู้ผลิตและผู้จัดจำหน่าย</p>
             
             <p style="margin: 0 0 16px 0;">
-                เนื่องด้วยทางบริษัท ฟูรูกาวา ไฟเทล (ประเทศไทย) จำกัด ยังไม่เคยติดต่อใช้บริการร่วมกับบริษัทของคุณ จึงจำเป็นต้องมีการร้องขอข้อมูลที่จำเป็นเพื่อใช้ในการลงทะเบียนผู้ผลิต / ผู้จัดจำหน่ายใหม่ รวมถึงการแจ้งข้อมูลเกี่ยวกับนโยบายของบริษัท ได้แก่ นโยบายด้านสิ่งแวดล้อม ด้านคุณภาพ และด้านการควบคุมการส่งออก ดังนั้นทางเราจึงรบกวนขอเอกสารต่าง ๆ ดังนี้
+                เนื่องด้วยทาง <strong>บริษัท ฟูรูกาวา <span style="color: #d32f2f;">ไฟเทล</span> (ประเทศไทย) จำกัด</strong> ยังไม่เคยติดต่อใช้บริการร่วมกับบริษัทของคุณ จึงจำเป็นต้องมีการ<strong>ร้องขอข้อมูลที่จำเป็นเพื่อใช้ในการลงทะเบียนผู้ผลิต / ผู้จัดจำหน่ายใหม่</strong> รวมถึงการแจ้งข้อมูลเกี่ยวกับนโยบายของบริษัท ได้แก่ นโยบายด้านสิ่งแวดล้อม ด้านคุณภาพ และด้านการควบคุมการส่งออก ดังนั้นทางเราจึงรบกวนขอเอกสารต่าง ๆ ดังนี้
             </p>
             
             <ol style="margin: 0 0 24px 0; padding-left: 24px; color: #111827;">
-                <li style="margin-bottom: 8px;">หนังสือรับรองนิติบุคคล, ภพ.20</li>
-                <li style="margin-bottom: 8px;">Company profile</li>
-                <li style="margin-bottom: 8px;">เอกสารรับรองอื่นๆ เช่น ISO9001, ISO14000, แคตตาล็อค ฯลฯ</li>
-                <li style="margin-bottom: 8px;">สำเนาหน้า Book banking</li>
-                <li style="margin-bottom: 8px;">ตอบกลับเอกสาร <strong>"MFG survey"</strong> ในรูปแบบไฟล์ Excel ภายใน 7 วัน</li>
-                <li style="margin-bottom: 8px;">ตอบกลับเอกสาร <strong>"Reply Form"</strong> ในรูปแบบไฟล์ pdf ภายใน 7 วัน</li>
+                <li style="margin-bottom: 8px;"><strong>หนังสือรับรองนิติบุคคล, ภพ.20</strong></li>
+                <li style="margin-bottom: 8px;"><strong>Company profile</strong></li>
+                <li style="margin-bottom: 8px;"><strong>เอกสารรับรองอื่นๆ</strong> เช่น ISO9001, ISO14000, แคตตาล็อค ฯลฯ</li>
+                <li style="margin-bottom: 8px;"><strong>สำเนาหน้า Book banking</strong></li>
+                <li style="margin-bottom: 8px;">ตอบกลับเอกสาร <strong>"MFG survey"</strong> ในรูปแบบไฟล์ Excel <strong>ภายใน 7 วัน</strong></li>
+                <li style="margin-bottom: 8px;">ตอบกลับเอกสาร <strong>"Reply Form"</strong> ในรูปแบบไฟล์ pdf <strong>ภายใน 7 วัน</strong></li>
             </ol>
 
             <p style="margin: 0 0 32px 0; background-color: #f9fafb; padding: 12px; border-left: 3px solid #9ca3af;">
@@ -209,7 +159,6 @@ export const emailExternalSubmitGPRBTemplate = (data: MailTemplateData) => {
     return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
-        ${renderTopLogo()}
         <div style="padding: 32px;">
 
             <p style="margin: 0 0 20px 0; font-size: 15px;">Dear Supplier,</p>
@@ -242,21 +191,29 @@ export const emailExternalSubmitGPRBTemplate = (data: MailTemplateData) => {
     </div>
     `;
 };
-//sent to Approver PIC if supplier/Vendor not accept the GPR Form A and PIC submit GPR Form B to system, but approver PIC not approve yet. This email is reminder for approver PIC to approve the register vendor. If approver PIC not approve within 7 days, the system will auto cancel the register vendor request.
+// sent to requester head approver after PIC confirms vendor accepted the GPR B conditions.
 export const emailUserCheckerApproverGPRCTemplate = (data: MailTemplateData) => {
     return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
-        ${renderTopLogo()}
         <div style="padding: 32px;">
 
             <p style="margin: 0 0 20px 0; font-size: 15px;">Dear : &nbsp;&nbsp;&nbsp;<span style="color: #d32f2f; font-weight: 600;">${data.userName}</span></p>
             
             <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0;">
-                <p style="margin: 0 0 4px 0; font-weight: 600; color: #92400e;">Status: Under Approve register vendor</p>
-                <p style="margin: 0; color: #b45309;">Please approve register vendor follow as <strong>"${data.requestNumber}"</strong> . General Purchase Specification Form C</p>
-                <p style="margin: 8px 0 0 0; color: #d32f2f; font-weight: 500; font-size: 13px;">* The vendor has not accepted the General Purchase Specification Form A. Please review and approve.</p>
+                <p style="margin: 0 0 4px 0; font-weight: 600; color: #92400e;">Status: Requester acknowledgment / requester head approval</p>
+                <p style="margin: 0; color: #b45309;">Please review and approve <strong>"${data.requestNumber}"</strong> for General Purchase Specification Form C.</p>
+                <p style="margin: 8px 0 0 0; color: #d32f2f; font-weight: 500; font-size: 13px;">* PIC confirmed the vendor can accept the updated conditions from GPR B. After your approval, PIC will continue the request to Doc Checker.</p>
             </div>
+
+            ${Array.isArray(data.reasons) && data.reasons.length > 0 ? `
+            <div style="background-color: #fff7ed; border: 1px solid #fdba74; padding: 16px; margin-bottom: 24px; border-radius: 10px;">
+                <p style="margin: 0 0 10px 0; font-weight: 700; color: #9a3412;">Conditions requiring your review</p>
+                <ul style="margin: 0; padding-left: 18px; color: #7c2d12;">
+                    ${data.reasons.map(reason => `<li style="margin-bottom: 6px;">${reason}</li>`).join('')}
+                </ul>
+            </div>
+            ` : ''}
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px;">
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">Vendor Name:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.vendorName}</td></tr>

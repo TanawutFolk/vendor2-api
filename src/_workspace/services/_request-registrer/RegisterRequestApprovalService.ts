@@ -57,6 +57,12 @@ const parseStoredObject = (raw: any): Record<string, any> => {
     }
 }
 
+const getGprCApproverEmpCodeFromSelection = (selection: any) => {
+    const actionRequiredSetup = parseStoredObject(selection?.action_required_json)
+    const meta = parseStoredObject(actionRequiredSetup?._meta)
+    return String(meta?.gpr_c_approver_empcode || '').trim()
+}
+
 const NEED_CRITERIA = new Set(['4.1', '4.2', '4.3', '4.4', '4.5'])
 const OPTIONAL_CRITERIA = new Set(['4.6', '4.7', '4.8', '4.9', '4.10', '4.11', '4.12', '4.13'])
 
@@ -198,6 +204,11 @@ export const RegisterRequestApprovalService = {
             const assign_to = checkRes[0]?.assign_to
             const selectedVendorCode = checkRes[0]?.vendor_code_selector || ''
             const isOversea = (checkRes[0]?.vendor_region || '').toLowerCase() === 'oversea'
+            const picGroupCode = isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
+            const requesterSql = await RegisterRequestSQL.getRequesterByRequestId({ request_id: dataItem.request_id })
+            const requesterRes = (await MySQLExecute.search(requesterSql)) as any[]
+            const requesterCode = String(requesterRes[0]?.Request_By_EmployeeCode || '').trim()
+            let selectionCache: any | null | undefined
 
             const getApproverByGroup = async (groupCode: string) => {
                 if (!groupCode) return ''
@@ -206,12 +217,49 @@ export const RegisterRequestApprovalService = {
                 return approverRes[0]?.empcode || ''
             }
 
+            const isActiveAssigneeInGroup = async (empCode: string, groupCode: string) => {
+                const safeEmpCode = String(empCode || '').trim()
+                const safeGroupCode = String(groupCode || '').trim().toUpperCase()
+                if (!safeEmpCode || !safeGroupCode) return false
+
+                const assigneeSql = await RegisterRequestSQL.getActiveAssigneeByEmpCodeAndGroupCode({
+                    empcode: safeEmpCode,
+                    group_code: safeGroupCode,
+                })
+                const assigneeRes = (await MySQLExecute.search(assigneeSql)) as any[]
+                return assigneeRes.length > 0
+            }
+
+            const getSelectionRecord = async () => {
+                if (selectionCache !== undefined) return selectionCache
+                const selectionSql = await RegisterRequestSQL.getSelection({ request_id: dataItem.request_id })
+                const selectionRes = (await MySQLExecute.search(selectionSql)) as any[]
+                selectionCache = selectionRes[0] || null
+                return selectionCache
+            }
+
             const resolveStepApprover = async (step: any) => {
                 if (!step) return ''
-                if (step.approver_id) return String(step.approver_id)
-                if (isPicStep(step)) return String(assign_to || '')
+                if (isPicStep(step)) {
+                    const currentPic = String(assign_to || '').trim()
+                    const picStepGroupCode = resolveGroupCodeForStep(step, isOversea) || picGroupCode
+                    if (currentPic && await isActiveAssigneeInGroup(currentPic, picStepGroupCode)) {
+                        return currentPic
+                    }
+                    return await getApproverByGroup(picStepGroupCode)
+                }
+                if (isIssueGprCStep(step)) {
+                    const selection = await getSelectionRecord()
+                    return getGprCApproverEmpCodeFromSelection(selection) || requesterCode
+                }
 
                 const stepGroupCode = resolveGroupCodeForStep(step, isOversea)
+                if (step.approver_id && stepGroupCode && await isActiveAssigneeInGroup(String(step.approver_id), stepGroupCode)) {
+                    return String(step.approver_id)
+                }
+                if (step.approver_id && !stepGroupCode) {
+                    return String(step.approver_id)
+                }
                 const stepCode = inferStepCode(step)
                 const desc = (step.DESCRIPTION || '').toLowerCase()
 
@@ -266,9 +314,7 @@ export const RegisterRequestApprovalService = {
                         || isIssueGprCStatus(newStatus)
                     const attemptingApprove = !attemptingDisagree
 
-                    const selectionSql = await RegisterRequestSQL.getSelection({ request_id: dataItem.request_id })
-                    const selectionRes = (await MySQLExecute.search(selectionSql)) as any[]
-                    const selection = selectionRes[0]
+                    const selection = await getSelectionRecord()
                     if (!selection?.selection_id) {
                         throw new Error('Approval blocked: Please fill GPR form before proceeding.')
                     }
@@ -303,9 +349,10 @@ export const RegisterRequestApprovalService = {
                     const stageConfig = actionRequiredSetup?.[stageKey] || {}
                     const ownerName = String(stageConfig?.pic_name || '').trim()
                     const ownerEmail = String(stageConfig?.pic_email || '').trim()
+                    const stageLabel = String(stageConfig?.stage_label || stageKey).trim()
 
                     if (!ownerEmail) {
-                        throw new Error(`Action Required blocked: please configure PIC email for ${stageKey} in the GPR form.`)
+                        throw new Error(`Action Required blocked: please configure PIC email for ${stageLabel} in the GPR form.`)
                     }
 
                     dataItem.action_required_stage = stageKey
@@ -452,6 +499,60 @@ export const RegisterRequestApprovalService = {
                         isVendorDisagreeStatus(newStatus) ||
                         isIssueGprBStatus(newStatus) ||
                         isIssueGprCStatus(newStatus)
+                    const actionBy = String(dataItem.approve_by || dataItem.UPDATE_BY || '').trim()
+                    const isRequesterGprCPhase =
+                        isIssueGprCStep(currentStep)
+                        && !!requesterCode
+                        && String(currentStep.approver_id || '').trim() === requesterCode
+                        && actionBy === requesterCode
+
+                    if (isRequesterGprCPhase && !disagreementRequested && !actionRequiredRequested) {
+                        const selection = await getSelectionRecord()
+                        const requesterHeadEmpCode = getGprCApproverEmpCodeFromSelection(selection)
+
+                        if (!requesterHeadEmpCode) {
+                            throw new Error('Requester must complete GPR C setup before submitting to requester head approval.')
+                        }
+
+                        if (requesterHeadEmpCode === requesterCode) {
+                            throw new Error('GPR C approver must be different from requester.')
+                        }
+
+                        dataItem.request_status = currentStep.DESCRIPTION || 'Issue GPR C'
+
+                        sqlList.push(await RegisterRequestSQL.updateApprovalStepApprover({
+                            step_id: currentStep.step_id,
+                            approver_id: requesterHeadEmpCode,
+                            assignment_mode: 'AUTO',
+                            UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+                        }))
+                        sqlList.push(await RegisterRequestSQL.updateApprovalStep({
+                            step_id: currentStep.step_id,
+                            step_status: 'in_progress',
+                            UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+                        }))
+                        sqlList.push(await RegisterRequestSQL.createApprovalLog({
+                            request_id: dataItem.request_id,
+                            step_id: currentStep.step_id,
+                            action_by: actionBy || 'SYSTEM',
+                            action_type: 'submitted_to_requester_head',
+                            remark: dataItem.approver_remark || 'Requester submitted GPR C to requester head approval',
+                        }))
+
+                        const resultData = await MySQLExecute.executeList(sqlList)
+                        postCommitTasks.push(async () => {
+                            await triggerVendorDocumentEmail(dataItem.request_id, currentStep?.DESCRIPTION || 'Issue GPR C')
+                        })
+                        for (const task of postCommitTasks) task().catch(console.error)
+
+                        return {
+                            Status: true,
+                            Message: 'GPR C submitted to requester head approval successfully',
+                            ResultOnDb: resultData,
+                            MethodOnDb: 'Update Status Success',
+                            TotalCountOnDb: sqlList.length
+                        }
+                    }
 
                     const approvalActionType =
                         explicitAction === WORKFLOW_ACTION.ACTION_REQUIRED
@@ -493,6 +594,10 @@ export const RegisterRequestApprovalService = {
 
                     let nextStep: any | undefined = pendingAfterCurrent[0]
                     let closeAsVendorDisagreed = false
+                    const agreementReachedStepAny =
+                        steps
+                            .filter((s: any) => s.step_id !== currentStep.step_id && isAgreementReachedStep(s))
+                            .sort((a: any, b: any) => Number(a.step_order || 0) - Number(b.step_order || 0))[0]
 
                     if ((isPendingAgreementStep(currentStep) || isAgreementReachedStep(currentStep)) && !disagreementRequested) {
                         // Agreement reached: skip GPR B/C/Disagreed branch and continue to normal approval chain.
@@ -516,6 +621,9 @@ export const RegisterRequestApprovalService = {
                         // ACTION_REQUIRED is treated as additional flow and must continue main flow.
                         // Otherwise (vendor agreed) continue to normal approval chain.
                         if (!disagreementRequested || actionRequiredRequested) {
+                            if (isIssueGprCStep(currentStep) && !actionRequiredRequested) {
+                                nextStep = agreementReachedStepAny
+                            }
                             const branchSteps = pendingAfterCurrent.filter((s: any) => isDisagreedBranchStep(s))
                             for (const branchStep of branchSteps) {
                                 sqlList.push(await RegisterRequestSQL.updateApprovalStep({
@@ -525,7 +633,8 @@ export const RegisterRequestApprovalService = {
                                 }))
                             }
                             nextStep =
-                                pendingAfterCurrent.find((s: any) => isAgreementReachedStep(s))
+                                nextStep
+                                || pendingAfterCurrent.find((s: any) => isAgreementReachedStep(s))
                                 || pendingNonBranchAnywhere.find((s: any) => isAgreementReachedStep(s))
                                 || pendingAfterCurrent.find((s: any) => isDocumentCheckStep(s))
                                 || pendingNonBranchAnywhere.find((s: any) => isDocumentCheckStep(s))
@@ -591,7 +700,17 @@ export const RegisterRequestApprovalService = {
                     }
 
                     if (nextStep) {
+                        if (isIssueGprCStep(currentStep) && !disagreementRequested && !actionRequiredRequested && isAgreementReachedStep(nextStep)) {
+                            sqlList.push(await RegisterRequestSQL.updateApprovalStep({
+                                step_id: nextStep.step_id,
+                                step_status: 'pending',
+                                UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+                            }))
+                        }
                         const nextStepApprover = await resolveStepApprover(nextStep)
+                        if (isIssueGprCStep(nextStep) && !nextStepApprover) {
+                            throw new Error('GPR C approver is not configured. Please set GPR C Approver before sending GPR C.')
+                        }
                         if (nextStepApprover && nextStepApprover !== nextStep.approver_id) {
                             sqlList.push(await RegisterRequestSQL.updateApprovalStepApprover({
                                 step_id: nextStep.step_id,

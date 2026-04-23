@@ -32,7 +32,7 @@ export const RegisterRequestController = {
             // req.files is populated by multer upload.array() middleware in the route
             const files = (req.files as any[]) || []
 
-            const insertedId = await RegisterRequestModel.createRequest({
+            const createResult = await RegisterRequestModel.createRequest({
                 vendor_id,
                 vendor_contact_id: dataItem.vendor_contact_id || null,
                 Request_By_EmployeeCode: dataItem.Request_By_EmployeeCode || '',
@@ -43,6 +43,28 @@ export const RegisterRequestController = {
                 CREATE_BY: dataItem.CREATE_BY || 'ถ้าเห็นข้อความนี้แจ้งS524ด่วนๆ',
                 // assign_to is resolved by the service via round-robin logic (do NOT set here)
             })
+
+            if (!createResult?.Status) {
+                return res.status(200).json({
+                    Status: false,
+                    ResultOnDb: {},
+                    TotalCountOnDb: 0,
+                    MethodOnDb: 'Create Registration Request',
+                    Message: createResult?.Message || 'Failed to create registration request'
+                } as ResponseI)
+            }
+
+            const insertedId = Number(createResult?.ResultOnDb?.insertedId || 0)
+
+            if (!insertedId || Number.isNaN(insertedId)) {
+                return res.status(200).json({
+                    Status: false,
+                    ResultOnDb: {},
+                    TotalCountOnDb: 0,
+                    MethodOnDb: 'Create Registration Request',
+                    Message: 'Create request succeeded but request_id was not returned correctly'
+                } as ResponseI)
+            }
 
             // Insert each uploaded file into the request_register_document table
             if (files.length > 0) {
@@ -130,6 +152,7 @@ export const RegisterRequestController = {
 
             // Manually add root-level filters (frontend passes these directly instead of via SearchFilters)
             const manualFilters: string[] = []
+            const actorFilters: string[] = []
             if (dataItem.approver_id) {
                 const queueStepCode = String(dataItem.queue_step_code || '').trim().toUpperCase().replace(/[^A-Z0-9_]/g, '')
 
@@ -153,15 +176,19 @@ export const RegisterRequestController = {
                 // The Approve/Reject buttons are hidden on the frontend when step_status is not 'in_progress'.
                 if (queueStepCondition) {
                     // Queue view: keep actionable + action history for this queue step.
-                    manualFilters.push(`EXISTS (SELECT 1 FROM request_approval_step ras WHERE ras.request_id = rr.request_id AND ras.approver_id = '${dataItem.approver_id}' AND ras.step_status IN ('in_progress', 'approved', 'rejected') AND ${queueStepCondition} AND ras.INUSE = 1)`)
+                    actorFilters.push(`EXISTS (SELECT 1 FROM request_approval_step ras WHERE ras.request_id = rr.request_id AND ras.approver_id = '${dataItem.approver_id}' AND ras.step_status IN ('in_progress', 'approved', 'rejected') AND ${queueStepCondition} AND ras.INUSE = 1)`)
                 } else {
                     // Fallback (legacy): include in-progress and action history for this approver.
-                    manualFilters.push(`EXISTS (SELECT 1 FROM request_approval_step ras WHERE ras.request_id = rr.request_id AND ras.approver_id = '${dataItem.approver_id}' AND ras.step_status IN ('in_progress', 'approved', 'rejected') AND ras.INUSE = 1)`)
+                    actorFilters.push(`EXISTS (SELECT 1 FROM request_approval_step ras WHERE ras.request_id = rr.request_id AND ras.approver_id = '${dataItem.approver_id}' AND ras.step_status IN ('in_progress', 'approved', 'rejected') AND ras.INUSE = 1)`)
                 }
-            } else if (dataItem.assign_to) {
+            }
+            if (dataItem.assign_to) {
                 // PIC dashboard: show requests assigned to PIC only.
                 // Excludes approver step records so PIC doesn't see MD/GM/Mgr queues.
-                manualFilters.push(`rr.assign_to = '${dataItem.assign_to}'`)
+                actorFilters.push(`rr.assign_to = '${dataItem.assign_to}'`)
+            }
+            if (actorFilters.length > 0) {
+                manualFilters.push(`(${actorFilters.join(' OR ')})`)
             }
             if (dataItem.Request_By_EmployeeCode) {
                 manualFilters.push(`rr.Request_By_EmployeeCode = '${dataItem.Request_By_EmployeeCode}'`)
@@ -792,7 +819,7 @@ export const RegisterRequestController = {
                 } as ResponseI)
             }
             const file_name = Buffer.from(file.originalname, 'latin1').toString('utf8')
-            const document_id = await RegisterRequestModel.createDocument({
+            const createDocumentResult = await RegisterRequestModel.createDocument({
                 request_id: reqId,
                 file_name:  file_name || path.basename(file.path),
                 file_path:  file.filename || path.basename(file.path),
@@ -800,6 +827,23 @@ export const RegisterRequestController = {
                 file_type:  file.mimetype || '',
                 CREATE_BY:  CREATE_BY || 'SYSTEM',
             })
+
+            if (!createDocumentResult?.Status) {
+                return res.status(200).json({
+                    Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                    MethodOnDb: 'Add Document', Message: createDocumentResult?.Message || 'Failed to add document'
+                } as ResponseI)
+            }
+
+            const document_id = Number(createDocumentResult?.ResultOnDb?.document_id || 0)
+
+            if (!document_id || Number.isNaN(document_id)) {
+                return res.status(200).json({
+                    Status: false, ResultOnDb: {}, TotalCountOnDb: 0,
+                    MethodOnDb: 'Add Document', Message: 'Document was created but document_id was not returned correctly'
+                } as ResponseI)
+            }
+
             res.status(200).json({
                 Status: true,
                 ResultOnDb: {

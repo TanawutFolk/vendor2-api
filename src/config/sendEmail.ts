@@ -115,13 +115,6 @@ const sendEmail = async (message: string, send_to: string, subject?: string, cc?
   form.append('Subject', subject || '[Vendor Registration System] Vendor Registration')
   form.append('BodyHtml', cleanMessage)
 
-  console.log('[MAIL DEBUG][sendEmail] Request payload', {
-    to: normalizedTo,
-    cc: normalizedCc,
-    subject: subject || '[Vendor Registration System] Vendor Registration',
-    ccRawInput: cc,
-  })
-
   try {
     // console.log("กำลังส่งข้อมูล...", formData.toString()); // Log ดูข้อมูลที่จะส่ง
 
@@ -130,11 +123,6 @@ const sendEmail = async (message: string, send_to: string, subject?: string, cc?
       headers: {
         ...form.getHeaders(), // สำคัญมาก! บรรทัดนี้จะบอก Server ว่าเป็น multipart
       },
-    })
-
-    console.log('[MAIL DEBUG][sendEmail] API response', {
-      status: response.status,
-      data: response.data,
     })
 
     if (response.status === 200) {

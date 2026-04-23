@@ -32,6 +32,19 @@ export interface FindVendorDataItem {
 export const FindVendorSQL = {
     // Search vendors with contacts
     search: (dataItem: FindVendorDataItem, sqlWhere: string = '') => {
+        const statusCheckExpression = `
+            CASE
+                WHEN v.fft_status = 2 THEN 'Cannot Register'
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM request_register_vendor rrv_ip
+                    WHERE rrv_ip.vendor_id = v.vendor_id
+                      AND rrv_ip.INUSE = 1
+                      AND rrv_ip.request_status NOT IN ('Completed', 'Rejected', 'Vendor Disagreed', 'Cancelled')
+                ) THEN 'In Progress'
+                ELSE IFNULL(vmr.status_check, 'Not Registered')
+            END
+        `
         // Count query
         let sqlCount = `
                             SELECT
@@ -87,7 +100,7 @@ export const FindVendorSQL = {
                                      , v.INUSE
                                      
                                      -- Prones Matching Data
-                                     , IF(v.fft_status = 2, 'Cannot Register', IFNULL(vmr.status_check, 'Not Registered')) AS status_check
+                                     , dataItem.statusCheckExpression AS status_check
                                      , IFNULL(vmr.prones_code, v.fft_vendor_code) AS prones_code
                                      , vmr.prones_name AS prones_name_en
                                      , vmr.match_method
@@ -171,9 +184,11 @@ export const FindVendorSQL = {
         `
 
         // Replace placeholders
+        sqlCount = sqlCount.replaceAll('dataItem.statusCheckExpression', statusCheckExpression)
         sqlCount = sqlCount.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
         sqlCount = sqlCount.replaceAll('dataItem.sqlWhere', sqlWhere)
 
+        sqlData = sqlData.replaceAll('dataItem.statusCheckExpression', statusCheckExpression)
         sqlData = sqlData.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
         sqlData = sqlData.replaceAll('dataItem.sqlWhere', sqlWhere)
         sqlData = sqlData.replaceAll('dataItem.Order', dataItem['Order'] || 'v.vendor_id DESC')
@@ -185,6 +200,19 @@ export const FindVendorSQL = {
 
     // Get vendor by ID
     getById: (dataItem: { vendor_id: number | string }) => {
+        const statusCheckExpression = `
+            CASE
+                WHEN v.fft_status = 2 THEN 'Cannot Register'
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM request_register_vendor rrv_ip
+                    WHERE rrv_ip.vendor_id = v.vendor_id
+                      AND rrv_ip.INUSE = 1
+                      AND rrv_ip.request_status NOT IN ('Completed', 'Rejected', 'Vendor Disagreed', 'Cancelled')
+                ) THEN 'In Progress'
+                ELSE IFNULL(vmr.status_check, 'Not Registered')
+            END
+        `
         let sql = `
                             SELECT
                                        v.vendor_id
@@ -207,7 +235,7 @@ export const FindVendorSQL = {
                                      , v.INUSE
                                      
                                      -- Prones Matching Data
-                                     , IF(v.fft_status = 2, 'Cannot Register', IFNULL(vmr.status_check, 'Not Registered')) AS status_check
+                                     , dataItem.statusCheckExpression AS status_check
                                      , IFNULL(vmr.prones_code, v.fft_vendor_code) AS prones_code
                                      , vmr.prones_name AS prones_name_en
                                      , vmr.match_method
@@ -267,6 +295,7 @@ export const FindVendorSQL = {
                             WHERE
                                        v.vendor_id = dataItem.vendor_id
         `
+        sql = sql.replaceAll('dataItem.statusCheckExpression', statusCheckExpression)
         sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
         return sql
     },
@@ -515,6 +544,19 @@ export const FindVendorSQL = {
 
     // Search all vendors for export (no pagination limit)
     searchAllForExport: (dataItem: FindVendorDataItem, sqlWhere: string = '') => {
+        const statusCheckExpression = `
+            CASE
+                WHEN v.fft_status = 2 THEN 'Cannot Register'
+                WHEN EXISTS (
+                    SELECT 1
+                    FROM request_register_vendor rrv_ip
+                    WHERE rrv_ip.vendor_id = v.vendor_id
+                      AND rrv_ip.INUSE = 1
+                      AND rrv_ip.request_status NOT IN ('Completed', 'Rejected', 'Vendor Disagreed', 'Cancelled')
+                ) THEN 'In Progress'
+                ELSE IFNULL(vmr.status_check, 'Not Registered')
+            END
+        `
         let sqlData = `
                             SELECT
                                        v.vendor_id
@@ -546,7 +588,7 @@ export const FindVendorSQL = {
                                      , v.INUSE
 
                                      -- Prones Matching Data
-                                     , IF(v.fft_status = 2, 'Cannot Register', IFNULL(vmr.status_check, 'Not Registered')) AS status_check
+                                     , dataItem.statusCheckExpression AS status_check
                                      , IFNULL(vmr.prones_code, v.fft_vendor_code) AS prones_code
                                      , vmr.prones_name AS prones_name_en
                                      , vmr.match_method
@@ -591,6 +633,7 @@ export const FindVendorSQL = {
                                        dataItem.Order
         `
 
+        sqlData = sqlData.replaceAll('dataItem.statusCheckExpression', statusCheckExpression)
         sqlData = sqlData.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
         sqlData = sqlData.replaceAll('dataItem.sqlWhere', sqlWhere)
         sqlData = sqlData.replaceAll('dataItem.Order', dataItem['Order'] || 'v.vendor_id DESC')
@@ -645,7 +688,35 @@ export const FindVendorSQL = {
                             FROM
                                        FFT.T_TRADE_MS
                             WHERE  
-                                       I_DL_CD LIKE '%%'
+                                       (
+                                           I_DL_CD LIKE '20030%'
+                                        OR I_DL_CD LIKE '20031%'
+                                        OR I_DL_CD = '20030FEC01'
+                                        OR I_DL_CD = '20020FTC03'
+                                       )
+        `
+        return sql
+    },
+
+    // prones raw test
+    getPronesRawTest: (dataItem?: any) => {
+        let sql = `
+                            SELECT
+                                       RTRIM(I_DL_CD) Customer_code
+                                     , RTRIM(I_DL_ARG_DESC) Customer_name
+                                     , RTRIM(I_ADDRESS1) Customer_Address1
+                                     , RTRIM(I_ADDRESS2) Customer_Address2
+                                     , RTRIM(I_ADDRESS3) Customer_Address3
+                                     , RTRIM(I_TEL) Customer_tel
+                            FROM
+                                       FFT.T_TRADE_MS
+                            WHERE
+                                       (
+                                           I_DL_CD LIKE '20030%'
+                                        OR I_DL_CD LIKE '20031%'
+                                        OR I_DL_CD = '20030FEC01'
+                                        OR I_DL_CD = '20020FTC03'
+                                       )
         `
         return sql
     },

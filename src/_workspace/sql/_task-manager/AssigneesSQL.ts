@@ -10,7 +10,22 @@ export interface AssigneesDataItem {
     in_use?: string | number;
 }
 
+const esc = (value: any) => String(value || '').replace(/'/g, "\\'")
+
 export const AssigneesSQL = {
+    getGroups: (dataItem: { keyword?: string }) => {
+        let sql = `
+                            SELECT
+                                    group_code
+                            FROM 
+                                    assignees_to
+                            WHERE
+                                       1 = 1
+                            `
+
+        return sql
+    },
+
     search: (dataItem: AssigneesDataItem) => {
         let sql = `
                             SELECT 
@@ -77,11 +92,11 @@ export const AssigneesSQL = {
                                      ,  dataItem.INUSE
                             )
         `
-        sql = sql.replaceAll('dataItem.empcode', dataItem.empcode || '')
-        sql = sql.replaceAll('dataItem.empName', dataItem.empName || '')
-        sql = sql.replaceAll('dataItem.empEmail', dataItem.empEmail || '')
-        sql = sql.replaceAll('dataItem.group_code', dataItem.group_code || '')
-        sql = sql.replaceAll('dataItem.group_name', dataItem.group_name || '')
+        sql = sql.replaceAll('dataItem.empcode', esc(dataItem.empcode))
+        sql = sql.replaceAll('dataItem.empName', esc(dataItem.empName))
+        sql = sql.replaceAll('dataItem.empEmail', esc(dataItem.empEmail))
+        sql = sql.replaceAll('dataItem.group_code', esc(dataItem.group_code))
+        sql = sql.replaceAll('dataItem.group_name', esc(dataItem.group_name))
         sql = sql.replaceAll('dataItem.INUSE', (dataItem.INUSE !== undefined ? dataItem.INUSE : 1).toString())
 
         return sql
@@ -99,25 +114,41 @@ export const AssigneesSQL = {
                             WHERE
                                        Assignees_id = dataItem.Assignees_id
         `
-        sql = sql.replaceAll('dataItem.empcode', dataItem.empcode || '')
-        sql = sql.replaceAll('dataItem.empName', dataItem.empName || '')
-        sql = sql.replaceAll('dataItem.empEmail', dataItem.empEmail || '')
-        sql = sql.replaceAll('dataItem.group_code', dataItem.group_code || '')
-        sql = sql.replaceAll('dataItem.group_name', dataItem.group_name || '')
+        sql = sql.replaceAll('dataItem.empcode', esc(dataItem.empcode))
+        sql = sql.replaceAll('dataItem.empName', esc(dataItem.empName))
+        sql = sql.replaceAll('dataItem.empEmail', esc(dataItem.empEmail))
+        sql = sql.replaceAll('dataItem.group_code', esc(dataItem.group_code))
+        sql = sql.replaceAll('dataItem.group_name', esc(dataItem.group_name))
         sql = sql.replaceAll('dataItem.INUSE', (dataItem.INUSE !== undefined ? dataItem.INUSE : 1).toString())
         sql = sql.replaceAll('dataItem.Assignees_id', (dataItem.Assignees_id || 0).toString())
 
         return sql
     },
 
-    delete: (dataItem: { Assignees_id: number | string }) => {
+    findDuplicate: (dataItem: AssigneesDataItem) => {
         let sql = `
-                            DELETE FROM
+                            SELECT
+                                       Assignees_id
+                                     , empcode
+                                     , group_code
+                                     , INUSE
+                            FROM
                                        assignees_to
                             WHERE
-                                       Assignees_id = dataItem.Assignees_id
+                                       empcode = 'dataItem.empcode'
+                                       AND group_code = 'dataItem.group_code'
+                                       dataItem.excludeIdSql
+                            LIMIT
+                                       1
         `
-        sql = sql.replaceAll('dataItem.Assignees_id', (dataItem.Assignees_id || 0).toString())
+        const excludeIdSql = dataItem.Assignees_id
+            ? ` AND Assignees_id <> ${Number(dataItem.Assignees_id) || 0}`
+            : ''
+
+        sql = sql.replaceAll('dataItem.empcode', esc(dataItem.empcode))
+        sql = sql.replaceAll('dataItem.group_code', esc(dataItem.group_code))
+        sql = sql.replaceAll('dataItem.excludeIdSql', excludeIdSql)
+
         return sql
     }
 }

@@ -3,8 +3,8 @@ import { AssigneesController } from '../../controllers/_task-manager/AssigneesCo
 
 const router = Router()
 
+router.post('/groups', AssigneesController.getGroups)
 router.post('/search', AssigneesController.search)
 router.post('/save', AssigneesController.save)
-router.delete('/:id', AssigneesController.delete)
 
 export default router

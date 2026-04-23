@@ -370,6 +370,11 @@ export const RegisterRequestSQL = {
     },
 
     createDocument: async (dataItem: RegisterRequestDataItem) => {
+        const requestId = Number(dataItem['request_id'] || 0)
+        if (!requestId || Number.isNaN(requestId)) {
+            throw new Error(`Invalid request_id for createDocument: ${String(dataItem['request_id'])}`)
+        }
+
         let sql = `
                             INSERT INTO request_register_document (
                                        request_id
@@ -390,7 +395,7 @@ export const RegisterRequestSQL = {
                             )
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+        sql = sql.replaceAll('dataItem.request_id', requestId.toString())
         sql = sql.replaceAll('dataItem.file_name', dataItem['file_name'] || '')
         sql = sql.replaceAll('dataItem.file_path', dataItem['file_path'] || '')
         sql = sql.replaceAll('dataItem.file_size', (dataItem['file_size'] || 0).toString())
@@ -1020,6 +1025,32 @@ export const RegisterRequestSQL = {
         return sql
     },
 
+    getActiveAssigneeByEmpCodeAndGroupCode: async (dataItem: RegisterRequestDataItem) => {
+        let sql = `
+                            SELECT
+                                       Assignees_id
+                                     , empcode
+                                     , empName
+                                     , empEmail
+                                     , group_code
+                                     , group_name
+                                     , INUSE
+                            FROM
+                                       assignees_to
+                            WHERE
+                                       empcode = 'dataItem.empcode'
+                                       AND group_code = 'dataItem.group_code'
+                                       AND INUSE = 1
+                            LIMIT
+                                       1
+        `
+
+        sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
+        sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
+
+        return sql
+    },
+
     updateRequestPicAssignee: async (dataItem: RegisterRequestDataItem) => {
         let sql = `
                             UPDATE request_register_vendor SET
@@ -1566,6 +1597,7 @@ export const RegisterRequestSQL = {
                                      , gpr_c_pc_pic_name = 'dataItem.gpr_c_pc_pic_name'
                                      , gpr_c_pc_pic_email = 'dataItem.gpr_c_pc_pic_email'
                                      , gpr_c_circular_json = 'dataItem.gpr_c_circular_json'
+                                     , action_required_json = 'dataItem.action_required_json'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
@@ -1581,6 +1613,7 @@ export const RegisterRequestSQL = {
         sql = sql.replaceAll('dataItem.gpr_c_pc_pic_name', esc(d['gpr_c_pc_pic_name']))
         sql = sql.replaceAll('dataItem.gpr_c_pc_pic_email', esc(d['gpr_c_pc_pic_email']))
         sql = sql.replaceAll('dataItem.gpr_c_circular_json', esc(d['gpr_c_circular_json']))
+        sql = sql.replaceAll('dataItem.action_required_json', esc(d['action_required_json']))
         sql = sql.replaceAll('dataItem.UPDATE_BY', esc(d['UPDATE_BY'] || 'SYSTEM'))
 
         return sql

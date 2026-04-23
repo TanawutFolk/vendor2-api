@@ -10,6 +10,7 @@ export const FindVendorModel = {
     searchAllForExport: async (dataItem: any) => FindVendorService.searchAllForExport(dataItem),
     // streamAllForExport is omitted as it does not exist on FindVendorService
     getPronesData: async (dataItem: any = {}) => FindVendorService.getPronesData(dataItem),
+    getPronesRawTest: async (dataItem: any = {}) => FindVendorService.getPronesRawTest(dataItem),
     getAllVendorNames: async (dataItem: any = {}) => FindVendorService.getAllVendorNames(dataItem),
     deleteVendorContact: async (dataItem: any) => FindVendorService.deleteVendorContact(dataItem),
     deleteVendorProduct: async (dataItem: any) => FindVendorService.deleteVendorProduct(dataItem),

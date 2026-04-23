@@ -1,6 +1,78 @@
 import { MySQLExecute } from '@businessData/dbExecute'
 import { RegisterRequestSQL } from '../../sql/_request-registrer/RegisterRequestSQL'
 
+const normalizeValue = (value: any) => String(value || '').trim()
+
+const parseStoredObject = (raw: any): Record<string, any> => {
+    if (!raw) return {}
+
+    try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+        return parsed && typeof parsed === 'object' ? parsed : {}
+    } catch {
+        return {}
+    }
+}
+
+const parseCircularMembers = (raw: any) => {
+    if (!raw) return []
+
+    try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+        if (!Array.isArray(parsed)) return []
+
+        return parsed
+            .map(item => {
+                if (typeof item === 'string') {
+                    return { empcode: '', name: '', email: normalizeValue(item) }
+                }
+
+                return {
+                    empcode: normalizeValue(item?.empcode),
+                    name: normalizeValue(item?.name),
+                    email: normalizeValue(item?.email),
+                }
+            })
+            .filter(item => item.empcode || item.name || item.email)
+            .slice(0, 6)
+    } catch {
+        return []
+    }
+}
+
+const resolveMemberByEmpCode = async (empcode: string) => {
+    const safeEmpCode = normalizeValue(empcode)
+    if (!safeEmpCode) return null
+
+    const memberSql = await RegisterRequestSQL.getMemberByEmpCode({ empcode: safeEmpCode })
+    const memberRes = (await MySQLExecute.search(memberSql)) as any[]
+    const member = memberRes[0]
+
+    if (!member) {
+        throw new Error(`Employee code not found in person.member_fed: ${safeEmpCode}`)
+    }
+
+    const name = [member.empName, member.empSurname].map(normalizeValue).filter(Boolean).join(' ')
+    const email = normalizeValue(member.empEmail)
+
+    if (!email) {
+        throw new Error(`Employee code has no email in person.member_fed: ${safeEmpCode}`)
+    }
+
+    return {
+        empcode: safeEmpCode,
+        name,
+        email,
+    }
+}
+
+const buildActionRequiredMeta = (existingActionRequired: any, meta: Record<string, any>) => ({
+    ...Object.fromEntries(
+        Object.entries(existingActionRequired || {}).filter(([key]) => key !== '_meta')
+    ),
+    _meta: meta,
+})
+
 export const RegisterRequestGprService = {
     saveGprForm: async (dataItem: any) => {
         try {
@@ -97,22 +169,38 @@ export const RegisterRequestGprService = {
                 throw new Error('Only requester can update GPR C notification setup')
             }
 
-            const circularList = Array.isArray(gprCData.gpr_c_circular_list)
-                ? gprCData.gpr_c_circular_list.map((email: any) => String(email || '').trim()).filter(Boolean)
+            const approverEmpCode = normalizeValue(gprCData.gpr_c_approver_empcode)
+            const approverMember = approverEmpCode ? await resolveMemberByEmpCode(approverEmpCode) : null
+
+            const circularEmpcodes = Array.isArray(gprCData.gpr_c_circular_empcodes)
+                ? gprCData.gpr_c_circular_empcodes.map((item: any) => normalizeValue(item)).filter(Boolean)
                 : []
 
-            if (circularList.length > 6) {
+            if (circularEmpcodes.length > 6) {
                 throw new Error('Circular list supports a maximum of 6 persons')
             }
+
+            const circularMembers = []
+            for (const empcode of circularEmpcodes) {
+                const member = await resolveMemberByEmpCode(empcode)
+                if (member) circularMembers.push(member)
+            }
+
+            const actionRequiredSetup = parseStoredObject(gprCData.action_required_setup)
+            const actionRequiredPayload = buildActionRequiredMeta(actionRequiredSetup, {
+                gpr_c_approver_empcode: approverMember?.empcode || '',
+                gpr_c_circular_members: circularMembers,
+            })
 
             const formData: any = {
                 request_id: reqId,
                 UPDATE_BY: updater,
-                gpr_c_approver_name: String(gprCData.gpr_c_approver_name || '').trim(),
-                gpr_c_approver_email: String(gprCData.gpr_c_approver_email || '').trim(),
+                gpr_c_approver_name: approverMember?.name || '',
+                gpr_c_approver_email: approverMember?.email || '',
                 gpr_c_pc_pic_name: String(gprCData.gpr_c_pc_pic_name || '').trim(),
                 gpr_c_pc_pic_email: String(gprCData.gpr_c_pc_pic_email || '').trim(),
-                gpr_c_circular_json: JSON.stringify(circularList.slice(0, 6)),
+                gpr_c_circular_json: JSON.stringify(circularMembers),
+                action_required_json: JSON.stringify(actionRequiredPayload),
             }
 
             const checkSql = await RegisterRequestSQL.checkSelectionExists(formData)
@@ -187,8 +275,16 @@ export const RegisterRequestGprService = {
             MySQLExecute.search(critSql) as Promise<any[]>
         ])
 
+        const actionRequiredSetup = parseStoredObject(selRes[0]?.action_required_json)
+        const meta = parseStoredObject(actionRequiredSetup?._meta)
+        const circularMembers = parseCircularMembers(selRes[0]?.gpr_c_circular_json)
+
         return {
             ...selRes[0],
+            action_required_json: JSON.stringify(actionRequiredSetup),
+            gpr_c_approver_empcode: normalizeValue(meta.gpr_c_approver_empcode),
+            gpr_c_circular_empcodes: circularMembers.map(item => item.empcode).filter(Boolean),
+            gpr_c_circular_members: circularMembers,
             sales_profit: finRes,
             criteria: critRes
         }
