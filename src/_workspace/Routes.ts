@@ -53,6 +53,7 @@ import LocRoutes from './routes/loc/LocRoutes'
 import YieldRateGoStraightRateProcessForSctRoutes from './routes/yield-rate/YieldRateGoStraightRateProcessForSctRoutes'
 import YieldRateGoStraightRateTotalForSctRoutes from './routes/yield-rate/YieldRateGoStraightRateTotalForSctRoutes'
 import addVendorRoutes from './routes/_add-vendor/AddVendorRoutes'
+import blacklistRoutes from './routes/_black-list/BlacklistRoute'
 import findVendorRoutes from './routes/_find-vendor/FindVendorRoute'
 import registerRequestRoutes from './routes/_request-registrer/RegisterRequestRoute'
 import assigneesRoutes from './routes/_task-manager/AssigneesRoutes'
@@ -120,6 +121,9 @@ Routers.use('/yield-rate-go-straight-rate-total-for-sct', YieldRateGoStraightRat
 
 // ? Add Vendor Routes
 Routers.use('/add-vendor', addVendorRoutes)
+
+// ? Blacklist Routes
+Routers.use('/black-list', blacklistRoutes)
 
 // ? Find Vendor Routes
 Routers.use('/find-vendor', findVendorRoutes)

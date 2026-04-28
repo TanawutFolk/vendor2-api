@@ -23,6 +23,7 @@ import {
     triggerVendorDisagreeEmail,
     triggerVendorDocumentEmail,
 } from './RegisterRequestNotificationHelper'
+import { RegisterRequestGprCFlowService } from './RegisterRequestGprCFlowService'
 
 const normalizeStatusText = (value: any) => normalizeText(String(value || '').replace(/[_-]+/g, ' '))
 const isPendingAgreementStep = (step: any) => normalizeStatusText(step?.DESCRIPTION).includes('pending agreement')
@@ -319,20 +320,21 @@ export const RegisterRequestApprovalService = {
                         throw new Error('Approval blocked: Please fill GPR form before proceeding.')
                     }
 
-                    const criteriaSql = await RegisterRequestSQL.getCriteria({ selection_id: selection.selection_id })
-                    const criteriaRes = (await MySQLExecute.search(criteriaSql)) as any[]
-                    const gprEval = evaluateGprCriteria(criteriaRes)
+                    // GPR criteria 4.1-4.13 are used only for the initial GPR A approval path.
+                    // Once the flow moves into the disagreement escalation branch (GPR B / GPR C),
+                    // we should not block the user based on those criteria.
+                    if (attemptingApprove) {
+                        const criteriaSql = await RegisterRequestSQL.getCriteria({ selection_id: selection.selection_id })
+                        const criteriaRes = (await MySQLExecute.search(criteriaSql)) as any[]
+                        const gprEval = evaluateGprCriteria(criteriaRes)
 
-                    if (!gprEval.hasCriteria) {
-                        throw new Error('Approval blocked: Please fill GPR form before proceeding.')
-                    }
+                        if (!gprEval.hasCriteria) {
+                            throw new Error('Approval blocked: Please fill GPR form before proceeding.')
+                        }
 
-                    if (attemptingApprove && !gprEval.passed) {
-                        throw new Error('Approval blocked: GPR form does not pass criteria (4.1-4.5 need all files and 4.6-4.13 need at least 4 files).')
-                    }
-
-                    if (attemptingDisagree && gprEval.passed) {
-                        throw new Error('Action blocked: GPR form already passes criteria. Please use Approve flow.')
+                        if (!gprEval.passed) {
+                            throw new Error('Approval blocked: GPR form does not pass criteria (4.1-4.5 need all files and 4.6-4.13 need at least 4 files).')
+                        }
                     }
                 }
 
@@ -724,9 +726,16 @@ export const RegisterRequestApprovalService = {
                             step_status: 'in_progress',
                             UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
                         }))
-                        if (isIssueGprBStep(nextStep) || isIssueGprCStep(nextStep)) {
+                        if (isIssueGprBStep(nextStep)) {
                             postCommitTasks.push(async () => {
                                 await triggerVendorDocumentEmail(dataItem.request_id, nextStep?.DESCRIPTION)
+                            })
+                        } else if (isIssueGprCStep(nextStep)) {
+                            postCommitTasks.push(async () => {
+                                await RegisterRequestGprCFlowService.createOrGetFlow({
+                                    request_id: dataItem.request_id,
+                                    UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+                                })
                             })
                         } else {
                             postCommitTasks.push(async () => triggerApprovalEmails(dataItem, nextStep, nextStepApprover))

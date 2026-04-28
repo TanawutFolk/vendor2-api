@@ -19,6 +19,7 @@ import {
 } from './RegisterRequestNotificationHelper'
 import { RegisterRequestApprovalService } from './RegisterRequestApprovalService'
 import { RegisterRequestGprService } from './RegisterRequestGprService'
+import { RegisterRequestGprCFlowService } from './RegisterRequestGprCFlowService'
 
 export const RegisterRequestService = {
     createRequest: async (dataItem: any) => {
@@ -284,8 +285,44 @@ export const RegisterRequestService = {
         return RegisterRequestGprService.saveGprForm(dataItem)
     },
 
+    resolveEmployeeProfile: async (dataItem: any) => {
+        return RegisterRequestGprService.resolveEmployeeProfile(dataItem)
+    },
+
     saveGprCNotification: async (dataItem: any) => {
         return RegisterRequestGprService.saveGprCNotification(dataItem)
+    },
+
+    gprCGetFlow: async (dataItem: any) => {
+        return RegisterRequestGprCFlowService.getFlow(dataItem)
+    },
+
+    gprCSubmitSetup: async (dataItem: any) => {
+        return RegisterRequestGprCFlowService.submitSetup(dataItem)
+    },
+
+    gprCApproveStep: async (dataItem: any) => {
+        return RegisterRequestGprCFlowService.approveStep(dataItem)
+    },
+
+    gprCRejectStep: async (dataItem: any) => {
+        return RegisterRequestGprCFlowService.rejectStep(dataItem)
+    },
+
+    gprCActionRequired: async (dataItem: any) => {
+        return RegisterRequestGprCFlowService.actionRequired(dataItem)
+    },
+
+    gprCRecordActionResult: async (dataItem: any) => {
+        return RegisterRequestGprCFlowService.recordActionResult(dataItem)
+    },
+
+    gprCQueue: async (dataItem: any) => {
+        return RegisterRequestGprCFlowService.getQueue(dataItem)
+    },
+
+    gprCActionRequiredQueue: async (dataItem: any) => {
+        return RegisterRequestGprCFlowService.getActionRequiredQueue(dataItem)
     },
 
     getGprForm: async (dataItem: any) => {

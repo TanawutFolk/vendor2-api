@@ -25,6 +25,8 @@ export type MailTemplateData = {
     remarkEN?: string;
     remarkTH?: string;
     reasons?: string[];
+    stageLabel?: string;
+    note?: string;
 };
 
 //User sent to Approver PIC
@@ -651,6 +653,37 @@ export const emailIncompleteTemplate = (data: MailTemplateData) => {
             <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #fee2e2; font-size: 14px;">
                 <p style="margin: 0 0 4px 0; font-weight: 600; color: #111827;">Thank you & Best regards,</p>
                 <p style="margin: 0 0 4px 0; color: #d32f2f; font-weight: 600;">${data.picName} <span style="color: #6b7280; font-weight: normal;">(#Tel. ${data.picTel})</span></p>
+            </div>
+        </div>
+    </div>
+    `;
+};
+
+export const emailActionRequiredTemplate = (data: MailTemplateData) => {
+    return `
+    <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 760px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #dbeafe;">
+        <div style="background-color: #0284c7; height: 6px; width: 100%;"></div>
+        <div style="padding: 32px;">
+            <p style="margin: 0 0 16px 0;">Dear ${data.recipientName || 'PIC'},</p>
+            <div style="background-color: #eff6ff; border-left: 4px solid #0284c7; padding: 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0;">
+                <p style="margin: 0 0 8px 0; font-weight: 700; color: #0f172a;">Action Required</p>
+                <p style="margin: 0; color: #1e3a8a;">
+                    ${data.stageLabel || 'Action Required'} requires your action for request <strong>${data.requestNumber}</strong>.
+                </p>
+            </div>
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 20px;">
+                <tr style="border-bottom: 1px solid #f1f5f9;"><td style="width: 220px; padding: 10px 0; color: #64748b;">Vendor Name</td><td style="padding: 10px 0; font-weight: 600; color: #0f172a;">${data.vendorName}</td></tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 10px 0; color: #64748b;">Support Product / Process</td><td style="padding: 10px 0; font-weight: 600; color: #0f172a;">${data.supportProduct}</td></tr>
+                <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 10px 0; color: #64748b;">Stage</td><td style="padding: 10px 0; font-weight: 600; color: #0f172a;">${data.stageLabel || '-'}</td></tr>
+                <tr><td style="padding: 10px 0; color: #64748b;">Note</td><td style="padding: 10px 0; font-weight: 600; color: #0f172a;">${data.note || '-'}</td></tr>
+            </table>
+            <p style="margin: 0 0 24px 0;">
+                Open the system here:
+                <a href="${data.systemLink}" style="color: #0284c7; text-decoration: underline; font-weight: 600;">${data.systemLink}</a>
+            </p>
+            <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                <p style="margin: 0 0 4px 0; font-weight: 600; color: #111827;">Best regards,</p>
+                <p style="margin: 0; color: #0f172a;">${data.picName} ${data.picTel ? `(#Tel. ${data.picTel})` : ''}</p>
             </div>
         </div>
     </div>

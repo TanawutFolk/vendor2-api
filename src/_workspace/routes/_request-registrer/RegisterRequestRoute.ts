@@ -79,6 +79,33 @@ registerRequestRoutes.post('/saveGprForm', RegisterRequestController.saveGprForm
 // POST /register-request/saveGprCNotification
 registerRequestRoutes.post('/saveGprCNotification', RegisterRequestController.saveGprCNotification)
 
+// POST /register-request/gpr-c/get-flow
+registerRequestRoutes.post('/gpr-c/get-flow', RegisterRequestController.gprCGetFlow)
+
+// POST /register-request/gpr-c/submit-setup
+registerRequestRoutes.post('/gpr-c/submit-setup', RegisterRequestController.gprCSubmitSetup)
+
+// POST /register-request/gpr-c/approve-step
+registerRequestRoutes.post('/gpr-c/approve-step', RegisterRequestController.gprCApproveStep)
+
+// POST /register-request/gpr-c/reject-step
+registerRequestRoutes.post('/gpr-c/reject-step', RegisterRequestController.gprCRejectStep)
+
+// POST /register-request/gpr-c/action-required
+registerRequestRoutes.post('/gpr-c/action-required', RegisterRequestController.gprCActionRequired)
+
+// POST /register-request/gpr-c/record-action-result
+registerRequestRoutes.post('/gpr-c/record-action-result', RegisterRequestController.gprCRecordActionResult)
+
+// POST /register-request/gpr-c/queue
+registerRequestRoutes.post('/gpr-c/queue', RegisterRequestController.gprCQueue)
+
+// POST /register-request/gpr-c/action-required-queue
+registerRequestRoutes.post('/gpr-c/action-required-queue', RegisterRequestController.gprCActionRequiredQueue)
+
+// POST /register-request/resolveEmployeeProfile
+registerRequestRoutes.post('/resolveEmployeeProfile', RegisterRequestController.resolveEmployeeProfile)
+
 // POST /register-request/getGprForm
 registerRequestRoutes.post('/getGprForm', RegisterRequestController.getGprForm)
 

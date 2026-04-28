@@ -2,11 +2,13 @@ import { MySQLExecute } from '@businessData/dbExecute'
 import { RegisterRequestSQL } from '../../sql/_request-registrer/RegisterRequestSQL'
 import sendEmail from '@src/config/sendEmail'
 import {
+    emailActionRequiredTemplate,
     emailAfterCheckerApproverGPRCTemplate,
     emailExternalSubmitGPRBTemplate,
     emailCompleteTemplate,
     emailIncompleteTemplate,
     emailReject1Template,
+    emailReject2Template,
     emailRequestRegisterVendorTemplate,
     emailToAccountPICTemplate,
     emailToCheckerPICTemplate,
@@ -329,45 +331,6 @@ const resolveActionRequiredStage = (step: any) => {
     if (desc.includes('pm manager') || desc.includes('manager approval')) return 'pm_manager'
     return ''
 }
-
-const renderActionRequiredEmail = (data: {
-    stageLabel: string
-    recipientName: string
-    requestNumber: string
-    vendorName: string
-    supportProduct: string
-    systemLink: string
-    note: string
-    picName: string
-    picTel: string
-}) => `
-    <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 760px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #dbeafe;">
-        <div style="background-color: #0284c7; height: 6px; width: 100%;"></div>
-        <div style="padding: 32px;">
-            <p style="margin: 0 0 16px 0;">Dear ${data.recipientName || 'PIC'},</p>
-            <div style="background-color: #eff6ff; border-left: 4px solid #0284c7; padding: 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0;">
-                <p style="margin: 0 0 8px 0; font-weight: 700; color: #0f172a;">Action Required</p>
-                <p style="margin: 0; color: #1e3a8a;">
-                    ${data.stageLabel} requires your action for request <strong>${data.requestNumber}</strong>.
-                </p>
-            </div>
-            <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 20px;">
-                <tr style="border-bottom: 1px solid #f1f5f9;"><td style="width: 220px; padding: 10px 0; color: #64748b;">Vendor Name</td><td style="padding: 10px 0; font-weight: 600; color: #0f172a;">${data.vendorName}</td></tr>
-                <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 10px 0; color: #64748b;">Support Product / Process</td><td style="padding: 10px 0; font-weight: 600; color: #0f172a;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f1f5f9;"><td style="padding: 10px 0; color: #64748b;">Stage</td><td style="padding: 10px 0; font-weight: 600; color: #0f172a;">${data.stageLabel}</td></tr>
-                <tr><td style="padding: 10px 0; color: #64748b;">Note</td><td style="padding: 10px 0; font-weight: 600; color: #0f172a;">${data.note || '-'}</td></tr>
-            </table>
-            <p style="margin: 0 0 24px 0;">
-                Open the system here:
-                <a href="${data.systemLink}" style="color: #0284c7; text-decoration: underline; font-weight: 600;">${data.systemLink}</a>
-            </p>
-            <div style="margin-top: 24px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
-                <p style="margin: 0 0 4px 0; font-weight: 600; color: #111827;">Best regards,</p>
-                <p style="margin: 0; color: #0f172a;">${data.picName} ${data.picTel ? `(#Tel. ${data.picTel})` : ''}</p>
-            </div>
-        </div>
-    </div>
-`
 
 const previewRecipientList = (emails: string[] = []) =>
     emails
@@ -919,7 +882,7 @@ export const triggerActionRequiredEmail = async (dataItem: any, currentStep: any
                         : 'PM Manager Approval')
         ).trim()
 
-        const emailHtml = renderActionRequiredEmail({
+        const emailHtml = emailActionRequiredTemplate({
             stageLabel,
             recipientName,
             requestNumber,
@@ -932,7 +895,7 @@ export const triggerActionRequiredEmail = async (dataItem: any, currentStep: any
         })
 
         await sendTemplatedEmail({
-            templateName: 'renderActionRequiredEmail',
+            templateName: 'emailActionRequiredTemplate',
             emailHtml,
             toEmail: recipientEmail,
             subject: `[Action Required] ${stageLabel} for ${requestNumber}`,
@@ -1054,7 +1017,16 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
         if (!picEmail) return
 
         const rejectRemark = dataItem.approver_remark || ''
-        const emailHtml = emailReject1Template({
+        const currentStepCode = inferStepCode(currentStep)
+        const currentStepDesc = normalizeText(currentStep?.DESCRIPTION)
+        const isCheckerReject =
+            currentStepCode === 'DOC_CHECK'
+            || currentStepDesc.includes('checker')
+            || currentStepDesc.includes('check document')
+            || currentStepDesc.includes('check all document')
+        const rejectTemplateName = isCheckerReject ? 'emailReject2Template' : 'emailReject1Template'
+        const rejectTemplate = isCheckerReject ? emailReject2Template : emailReject1Template
+        const emailHtml = rejectTemplate({
             toEmail: picEmail,
             recipientName: picName,
             ccEmailLine1: approverEmail,
@@ -1075,14 +1047,20 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
         })
 
         await sendTemplatedEmail({
-            templateName: 'emailReject1Template',
+            templateName: rejectTemplateName,
             emailHtml,
             toEmail: picEmail,
-            subject: `[REJECT] Register vendor "${requestNumber}" has been rejected`,
+            subject: isCheckerReject
+                ? `[RECHECK] Register vendor "${requestNumber}" requires recheck`
+                : `[REJECT] Register vendor "${requestNumber}" has been rejected`,
             ccEmails,
             requestId,
             requestNumber,
-            extra: { flow: 'triggerRejectionEmail', approverEmpCode: currentStep?.approver_id || '' },
+            extra: {
+                flow: 'triggerRejectionEmail',
+                approverEmpCode: currentStep?.approver_id || '',
+                stepCode: currentStepCode,
+            },
         })
     } catch (err: any) {
         console.error('[triggerRejectionEmail] Failed:', err?.message)

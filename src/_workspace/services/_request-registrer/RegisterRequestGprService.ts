@@ -1,5 +1,6 @@
 import { MySQLExecute } from '@businessData/dbExecute'
 import { RegisterRequestSQL } from '../../sql/_request-registrer/RegisterRequestSQL'
+import { RegisterRequestGprCFlowService } from './RegisterRequestGprCFlowService'
 
 const normalizeValue = (value: any) => String(value || '').trim()
 
@@ -74,6 +75,24 @@ const buildActionRequiredMeta = (existingActionRequired: any, meta: Record<strin
 })
 
 export const RegisterRequestGprService = {
+    resolveEmployeeProfile: async (dataItem: any) => {
+        const empcode = normalizeValue(dataItem?.empcode)
+
+        if (!empcode) {
+            throw new Error('Missing empcode')
+        }
+
+        const member = await resolveMemberByEmpCode(empcode)
+
+        return {
+            Status: true,
+            Message: 'Employee profile resolved successfully',
+            ResultOnDb: member || {},
+            MethodOnDb: 'Resolve Employee Profile',
+            TotalCountOnDb: member ? 1 : 0
+        }
+    },
+
     saveGprForm: async (dataItem: any) => {
         try {
             const reqId = dataItem.request_id
@@ -233,10 +252,20 @@ export const RegisterRequestGprService = {
                 await MySQLExecute.execute(insertSql)
             }
 
+            const flowResult = await RegisterRequestGprCFlowService.submitSetup({
+                request_id: reqId,
+                gpr_c_data: gprCData,
+                UPDATE_BY: updater,
+            })
+
+            if (!flowResult?.Status) {
+                return flowResult
+            }
+
             return {
                 Status: true,
                 Message: 'GPR C notification setup saved successfully',
-                ResultOnDb: { request_id: reqId },
+                ResultOnDb: flowResult.ResultOnDb || { request_id: reqId },
                 MethodOnDb: 'Save GPR C Notification',
                 TotalCountOnDb: 1
             }
