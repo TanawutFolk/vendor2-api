@@ -88,7 +88,7 @@ export const emailRequestRegisterVendorTemplate = (data: MailTemplateData) => {
     </div>
     `;
 };
-//PIC sent to supplier/Vendor
+//PIC sent GPR (A) to supplier/Vendor
 export const emailVendorDocumentRequestTemplate = (data: MailTemplateData) => {
     const supplierStatusText = data.isNewSupplier
         ? "For register new supplier"
@@ -194,6 +194,41 @@ export const emailExternalSubmitGPRBTemplate = (data: MailTemplateData) => {
     `;
 };
 // sent to requester head approver after PIC confirms vendor accepted the GPR B conditions.
+export const emailGprCRequesterSetupTemplate = (data: MailTemplateData) => {
+    return `
+    <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
+        <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
+        <div style="padding: 32px;">
+            <p style="margin: 0 0 20px 0; font-size: 15px;">Dear : &nbsp;&nbsp;&nbsp;<span style="color: #d32f2f; font-weight: 600;">${data.userName || data.recipientName || 'Requester'}</span></p>
+
+            <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 12px 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0;">
+                <p style="margin: 0 0 4px 0; font-weight: 600; color: #92400e;">Status: GPR C setup required</p>
+                <p style="margin: 0; color: #b45309;">Please setup GPR C Approver, PC PIC, and Circular List for request <strong>"${data.requestNumber}"</strong>.</p>
+            </div>
+
+            <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px;">
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">Vendor Name:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.vendorName}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Address:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.address}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Contact PIC:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.contactPic}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Email:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.email}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Tel:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.tel}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Support Product / Process:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
+                <tr><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+            </table>
+
+            <p style="margin: 0 0 24px 0;">
+                You can access the system through this link: <a href="${data.systemLink}" style="color: #d32f2f; text-decoration: underline; font-weight: 500;">${data.systemLink}</a>
+            </p>
+
+            <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #fee2e2; font-size: 14px;">
+                <p style="margin: 0 0 4px 0; font-weight: 600; color: #111827;">Thank you & Best regards,</p>
+                <p style="margin: 0 0 4px 0; color: #d32f2f; font-weight: 600;">${data.picName || 'PO PIC'} ${data.picTel ? `<span style="color: #6b7280; font-weight: normal;">(#Tel. ${data.picTel})</span>` : ''}</p>
+            </div>
+        </div>
+    </div>
+    `;
+};
+
 export const emailUserCheckerApproverGPRCTemplate = (data: MailTemplateData) => {
     return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">

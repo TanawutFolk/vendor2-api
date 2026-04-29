@@ -93,7 +93,47 @@ const normalizeCcList = (cc?: string[]) => {
   return emails
 }
 
-const sendEmail = async (message: string, send_to: string, subject?: string, cc?: string[]) => {
+type MailLogMeta = {
+  templateName?: string
+  requestId?: string | number
+  requestNumber?: string
+  flow?: string
+}
+
+type MailSendResult = {
+  success: boolean
+  skipped?: boolean
+  reason?: string
+}
+
+const buildMailLogPayload = (params: {
+  templateName?: string
+  toEmail?: string
+  ccEmails?: string[]
+  subject?: string
+  requestId?: string | number
+  requestNumber?: string
+  flow?: string
+  bodyLength?: number
+}) => ({
+  templateName: params.templateName || 'unknown-template',
+  toEmail: params.toEmail || '',
+  ccEmails: params.ccEmails || [],
+  ccCount: params.ccEmails?.length || 0,
+  subject: params.subject || '',
+  requestId: params.requestId ?? '',
+  requestNumber: params.requestNumber || '',
+  flow: params.flow || '',
+  bodyLength: params.bodyLength || 0,
+})
+
+const sendEmail = async (
+  message: string,
+  send_to: string,
+  subject?: string,
+  cc?: string[],
+  meta: MailLogMeta = {}
+): Promise<MailSendResult> => {
   // URL ของ API (เอามาจากบรรทัด API_URL ในรูป Python ของคุณ)
   const API_URL = 'http://192.168.0.250:9002/api/mail/send'
 
@@ -104,18 +144,36 @@ const sendEmail = async (message: string, send_to: string, subject?: string, cc?
   // 2. ลบ \n (Enter) ของ Code ออกให้เหลือบรรทัดเดียว (Minify) เพื่อกัน Error
   const cleanMessage = fixedMessage.replace(/[\r\n]+/g, '').trim()
   const normalizedTo = sanitizeEmail(send_to)
-  if (!normalizedTo || !isValidEmail(normalizedTo)) {
-    console.error('[MAIL DEBUG][sendEmail] Invalid TO recipient, skip sending', { to: send_to, subject })
-    return
-  }
   const normalizedCc = normalizeCcList(cc)
+  const resolvedSubject = subject || '[Vendor Registration System] Vendor Registration'
+  const logPayload = buildMailLogPayload({
+    templateName: meta.templateName,
+    toEmail: normalizedTo || String(send_to || '').trim(),
+    ccEmails: normalizedCc,
+    subject: resolvedSubject,
+    requestId: meta.requestId,
+    requestNumber: meta.requestNumber,
+    flow: meta.flow,
+    bodyLength: cleanMessage.length,
+  })
+
+  if (!normalizedTo || !isValidEmail(normalizedTo)) {
+    console.error('[MAIL TEMPLATE][skipped]', {
+      ...logPayload,
+      reason: 'Invalid TO recipient',
+      rawToEmail: send_to,
+    })
+    return { success: false, skipped: true, reason: 'Invalid TO recipient' }
+  }
   const form = new FormData()
   form.append('To', normalizedTo)
   form.append('CC', normalizedCc.length > 0 ? normalizedCc.join(';') : '')
-  form.append('Subject', subject || '[Vendor Registration System] Vendor Registration')
+  form.append('Subject', resolvedSubject)
   form.append('BodyHtml', cleanMessage)
 
   try {
+    console.log('[MAIL TEMPLATE][sending]', logPayload)
+
     // console.log("กำลังส่งข้อมูล...", formData.toString()); // Log ดูข้อมูลที่จะส่ง
 
     // 3. ส่งข้อมูลด้วย axios (มันจะรู้เองว่าเป็น Form เพราะเราใช้ URLSearchParams)
@@ -128,8 +186,15 @@ const sendEmail = async (message: string, send_to: string, subject?: string, cc?
     if (response.status === 200) {
       // console.log(`ส่งเมลหา ${send_to} สำเร็จ!`);
     }
+    console.log('[MAIL TEMPLATE][sent]', {
+      ...logPayload,
+      status: response.status,
+    })
+
+    return { success: true }
   } catch (error: any) {
-    console.error('[MAIL DEBUG][sendEmail] API error', {
+    console.error('[MAIL TEMPLATE][failed]', {
+      ...logPayload,
       message: error?.message,
       status: error?.response?.status,
       data: error?.response?.data,
@@ -139,6 +204,7 @@ const sendEmail = async (message: string, send_to: string, subject?: string, cc?
       // ดูว่า Server ตอบ error อะไรกลับมา (ช่วย debug ได้ดีมาก)
       // console.error("Response Data:", error.response.data);
     }
+    return { success: false, reason: error?.message || 'Mail API error' }
   }
 }
 

@@ -3,7 +3,9 @@ import { ResultSetHeader, RowDataPacket } from 'mysql2'
 import sendEmail from '@src/config/sendEmail'
 import {
     emailActionRequiredTemplate,
-    emailToPMMgrTemplate,
+    emailAfterCheckerApproverGPRCTemplate,
+    emailGprCRequesterSetupTemplate,
+    emailUserCheckerApproverGPRCTemplate,
 } from '@src/config/mailTemplate'
 import { RegisterRequestSQL } from '../../sql/_request-registrer/RegisterRequestSQL'
 import { RegisterRequestGprCFlowSQL } from '../../sql/_request-registrer/RegisterRequestGprCFlowSQL'
@@ -21,16 +23,6 @@ const getValue = (row: any, ...keys: string[]) => {
         if (row && row[key] !== undefined && row[key] !== null) return row[key]
     }
     return ''
-}
-
-const parseJsonArray = (raw: any): any[] => {
-    if (!raw) return []
-    try {
-        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
-        return Array.isArray(parsed) ? parsed : []
-    } catch {
-        return []
-    }
 }
 
 const normalizeGroupToken = (value: string) =>
@@ -55,6 +47,16 @@ const mapMember = (empcode: string, row: any) => ({
     email: normalizeEmail(row?.empEmail),
 })
 
+const MOCK_REQUESTER_EMAIL = 'tanawut.patrawan@furukawaelectric.com'
+
+const getRequesterProfile = async (empcodeRaw: any) => {
+    const profile = await getMemberProfile(empcodeRaw)
+    return {
+        ...profile,
+        email: normalizeEmail(MOCK_REQUESTER_EMAIL),
+    }
+}
+
 const isActionRequiredStep = (stepCode: string) =>
     ['EMR_CHECKER', 'EMR_APPROVER', 'QMS_CHECKER', 'QMS_APPROVER', 'PM_MANAGER_CHECKER', 'PM_MANAGER_APPROVER'].includes(stepCode)
 
@@ -76,7 +78,7 @@ const response = (Status: boolean, Message: string, ResultOnDb: any, MethodOnDb:
     TotalCountOnDb: Status ? TotalCountOnDb : 0,
 })
 
-const getEmployeeProfile = async (empcodeRaw: any) => {
+const getMemberProfile = async (empcodeRaw: any) => {
     const empcode = normalizeValue(empcodeRaw)
     if (!empcode) throw new Error('Missing employee code')
 
@@ -87,6 +89,20 @@ const getEmployeeProfile = async (empcodeRaw: any) => {
 
     const profile = mapMember(empcode, row)
     if (!profile.email) throw new Error(`Employee code has no email: ${empcode}`)
+    return profile
+}
+
+const getAssigneeProfile = async (empcodeRaw: any) => {
+    const empcode = normalizeValue(empcodeRaw)
+    if (!empcode) throw new Error('Missing assignee code')
+
+    const sql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode })
+    const rows = (await MySQLExecute.search(sql)) as RowDataPacket[]
+    const row = rows[0]
+    if (!row) throw new Error(`Assignee code not found: ${empcode}`)
+
+    const profile = mapMember(empcode, row)
+    if (!profile.email) throw new Error(`Assignee code has no email: ${empcode}`)
     return profile
 }
 
@@ -107,6 +123,52 @@ const getAssigneeByGroup = async (groupCode: string) => {
         email: normalizeEmail(row.empEmail),
         group_code: normalizeValue(row.group_code),
         group_name: normalizeValue(row.group_name),
+    }
+}
+
+const getGroupEmails = async (
+    groupCode: string,
+    excludeEmpCode?: string,
+    excludeEmail?: string
+) => {
+    const targetGroup = normalizeGroupToken(groupCode)
+    const targetCompact = compactGroupToken(groupCode)
+    if (!targetGroup) return []
+
+    const sql = await RegisterRequestSQL.getPeerCcRowsByNormalizedGroup({
+        target_group: targetGroup,
+        target_compact: targetCompact,
+    })
+    const rows = (await MySQLExecute.search(sql)) as RowDataPacket[]
+    const excludedEmp = normalizeValue(excludeEmpCode)
+    const excludedEmail = normalizeEmail(excludeEmail)
+
+    return mergeUniqueEmails(
+        rows.map((row: any) => {
+            if (excludedEmp && normalizeValue(row.empcode) === excludedEmp) return ''
+            const email = normalizeEmail(row.empEmail)
+            if (excludedEmail && email === excludedEmail) return ''
+            return email
+        })
+    )
+}
+
+const isOverseaRegion = (vendorRegion: any) => normalizeValue(vendorRegion).toLowerCase() === 'oversea'
+
+const getPoPicMailContext = async (summary: any) => {
+    const picEmpcode = normalizeValue(summary.assign_to || summary.ASSIGN_TO)
+    const pic = picEmpcode ? await getAssigneeProfile(picEmpcode).catch(() => null) : null
+    const picEmail = normalizeEmail(pic?.email)
+    const groupCode = isOverseaRegion(summary.vendor_region || summary.VENDOR_REGION)
+        ? GROUP_CODE.OVERSEA_PO_PIC
+        : GROUP_CODE.LOCAL_PO_PIC
+    const peerPicCc = await getGroupEmails(groupCode, picEmpcode, picEmail)
+
+    return {
+        picName: pic?.name || 'PO PIC',
+        picEmail,
+        peerPicCc,
+        allPoPicEmails: mergeUniqueEmails(picEmail ? [picEmail] : [], peerPicCc),
     }
 }
 
@@ -168,13 +230,13 @@ const buildCircularMembers = async (empcodesRaw: any[]) => {
 
     const members = []
     for (const empcode of empcodes) {
-        members.push(await getEmployeeProfile(empcode))
+        members.push(await getAssigneeProfile(empcode))
     }
     return members
 }
 
 const resolveStepApprovers = async (requesterApprover: any) => {
-    const requesterApproverProfile = await getEmployeeProfile(requesterApprover)
+    const requesterApproverProfile = await getAssigneeProfile(requesterApprover)
     const result = []
 
     for (const stepDef of GPR_C_STEP_DEFS) {
@@ -199,7 +261,25 @@ const sendGprCEmail = async (payload: {
     requestNumber: string
     html: string
 }) => {
-    await sendEmail(payload.html, payload.toEmail, payload.subject, payload.ccEmails || [])
+    const mailResult = await sendEmail(payload.html, payload.toEmail, payload.subject, payload.ccEmails || [], {
+        templateName: payload.templateName,
+        requestId: payload.requestId,
+        requestNumber: payload.requestNumber,
+        flow: 'GPR C',
+    })
+    if (!mailResult.success) {
+        console.error('[GPR C MAIL][failed]', {
+            templateName: payload.templateName,
+            toEmail: payload.toEmail,
+            ccCount: payload.ccEmails?.length || 0,
+            subject: payload.subject,
+            requestId: payload.requestId,
+            requestNumber: payload.requestNumber,
+            reason: mailResult.reason || 'sendEmail returned failed',
+        })
+        return
+    }
+
     console.log('[GPR C MAIL][sent]', {
         templateName: payload.templateName,
         toEmail: payload.toEmail,
@@ -232,21 +312,24 @@ const notifyRequesterSetup = async (requestId: number, updateBy: string) => {
     const summary = await getRequestSummary(requestId)
     const requesterEmpcode = normalizeValue(summary.Request_By_EmployeeCode || summary.REQUEST_BY_EMPLOYEECODE)
     if (!requesterEmpcode) return
-    const requester = await getEmployeeProfile(requesterEmpcode)
+    const requester = await getRequesterProfile(requesterEmpcode)
     const mailData = buildBaseMailData(summary, requestId, requester.name)
+    const poPicContext = await getPoPicMailContext(summary)
+    const ccEmails = mergeUniqueEmails(poPicContext.allPoPicEmails).filter(email => email !== requester.email)
 
     await sendGprCEmail({
-        templateName: 'emailToPMMgrTemplate',
+        templateName: 'emailGprCRequesterSetupTemplate',
         toEmail: requester.email,
-        ccEmails: [],
+        ccEmails,
         subject: `[GPR C Setup] Please setup GPR C approver for ${mailData.requestNumber}`,
         requestId,
         requestNumber: mailData.requestNumber,
-        html: emailToPMMgrTemplate({
+        html: emailGprCRequesterSetupTemplate({
             ...mailData,
+            userName: requester.name,
             recipientName: requester.name,
             systemLink: `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-history`,
-            picName: updateBy,
+            picName: poPicContext.picName || updateBy,
         }),
     })
 }
@@ -257,19 +340,44 @@ const notifyStepApprover = async (requestId: number, step: any, ccEmails: string
     const approverEmail = normalizeEmail(step.APPROVER_EMAIL || step.approver_email)
     if (!approverEmail) return
     const mailData = buildBaseMailData(summary, requestId, approverName)
+    const stepCode = normalizeValue(step.STEP_CODE || step.step_code)
+    const requesterEmpcode = normalizeValue(summary.Request_By_EmployeeCode || summary.REQUEST_BY_EMPLOYEECODE)
+    const requester = requesterEmpcode ? await getRequesterProfile(requesterEmpcode).catch(() => null) : null
+    const poPicContext = await getPoPicMailContext(summary)
+    const finalCcEmails = mergeUniqueEmails(
+        poPicContext.allPoPicEmails,
+        ...(stepCode === 'REQUESTER_APPROVER'
+            ? [
+                requester?.email ? [requester.email] : [],
+                ccEmails,
+            ]
+            : [])
+    ).filter(email => email !== approverEmail)
+    const templateName = stepCode === 'REQUESTER_APPROVER'
+        ? 'emailUserCheckerApproverGPRCTemplate'
+        : 'emailAfterCheckerApproverGPRCTemplate'
+    const emailHtml = stepCode === 'REQUESTER_APPROVER'
+        ? emailUserCheckerApproverGPRCTemplate({
+            ...mailData,
+            userName: approverName,
+            recipientName: approverName,
+            picName: poPicContext.picName,
+        })
+        : emailAfterCheckerApproverGPRCTemplate({
+            ...mailData,
+            picNextStepName: approverName,
+            recipientName: approverName,
+            picName: poPicContext.picName,
+        })
 
     await sendGprCEmail({
-        templateName: 'emailToPMMgrTemplate',
+        templateName,
         toEmail: approverEmail,
-        ccEmails,
+        ccEmails: finalCcEmails,
         subject: `[GPR C Approval] ${mailData.requestNumber} - ${step.STEP_NAME || step.step_name}`,
         requestId,
         requestNumber: mailData.requestNumber,
-        html: emailToPMMgrTemplate({
-            ...mailData,
-            recipientName: approverName,
-            picName: 'GPR C Workflow',
-        }),
+        html: emailHtml,
     })
 }
 
@@ -579,7 +687,7 @@ export const RegisterRequestGprCFlowService = {
                     UPDATE_BY: actionBy,
                 }))
                 await MySQLExecute.executeList(sqlList)
-                await notifyStepApprover(requestId, nextStep, parseJsonArray(flow.CIRCULAR_JSON || flow.circular_json).map(item => item.email)).catch(console.error)
+                await notifyStepApprover(requestId, nextStep).catch(console.error)
             } else {
                 sqlList.push(RegisterRequestGprCFlowSQL.updateFlowStatus({
                     gpr_c_flow_id: flowId,

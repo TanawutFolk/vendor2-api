@@ -5,6 +5,7 @@ import {
     emailActionRequiredTemplate,
     emailAfterCheckerApproverGPRCTemplate,
     emailExternalSubmitGPRBTemplate,
+    emailGprCRequesterSetupTemplate,
     emailCompleteTemplate,
     emailIncompleteTemplate,
     emailReject1Template,
@@ -15,7 +16,6 @@ import {
     emailToMDTemplate,
     emailToPMGMTemplate,
     emailToPMMgrTemplate,
-    emailUserCheckerApproverGPRCTemplate,
     emailVendorDocumentRequestTemplate,
     type MailTemplateData
 } from '@src/config/mailTemplate'
@@ -39,6 +39,7 @@ type EmployeeProfile = {
 
 const employeeProfileCache = new Map<string, EmployeeProfile | null>()
 const assigneeEmailCache = new Map<string, string>()
+const assigneeProfileCache = new Map<string, EmployeeProfile | null>()
 
 const buildFullName = (row: any) =>
     [String(row?.empName || '').trim(), String(row?.empSurname || '').trim()]
@@ -85,6 +86,33 @@ const resolveAssignedEmail = async (empCodeRaw: unknown) => {
     const email = normalizeEmail(rows[0]?.empEmail)
     assigneeEmailCache.set(empCode, email)
     return email
+}
+
+const resolveAssigneeProfile = async (empCodeRaw: unknown): Promise<EmployeeProfile | null> => {
+    const empCode = String(empCodeRaw || '').trim()
+    if (!empCode) return null
+
+    if (assigneeProfileCache.has(empCode)) {
+        return assigneeProfileCache.get(empCode) || null
+    }
+
+    const sql = await RegisterRequestSQL.getAssigneeByEmpCodeContact({ empcode: empCode })
+    const rows = (await MySQLExecute.search(sql)) as any[]
+    const row = rows[0]
+
+    if (!row) {
+        assigneeProfileCache.set(empCode, null)
+        return null
+    }
+
+    const profile: EmployeeProfile = {
+        empCode,
+        fullName: buildFullName(row) || String(row?.empName || '').trim(),
+        email: normalizeEmail(row?.empEmail),
+    }
+
+    assigneeProfileCache.set(empCode, profile)
+    return profile
 }
 
 const getPeerCcEmailsByExactGroupCode = async (
@@ -179,6 +207,30 @@ export const getPeerCcEmailsByGroupCode = async (
     return peerEmails
 }
 
+const resolvePrimaryAssigneeByGroupCode = async (groupCode: string) => {
+    const targetGroup = String(groupCode || '')
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, '_')
+        .replace(/[^A-Z0-9_]/g, '')
+    if (!targetGroup) return null
+
+    const targetCompact = targetGroup.replace(/[^A-Z0-9]/g, '')
+    const rowsSql = await RegisterRequestSQL.getPeerCcRowsByNormalizedGroup({
+        target_group: targetGroup,
+        target_compact: targetCompact,
+    })
+    const rows = (await MySQLExecute.search(rowsSql)) as any[]
+    const row = rows.find((item: any) => normalizeEmail(item?.empEmail))
+    if (!row) return null
+
+    return {
+        empCode: String(row?.empcode || '').trim(),
+        fullName: buildFullName(row) || String(row?.empName || row?.empcode || '').trim(),
+        email: normalizeEmail(row?.empEmail),
+    }
+}
+
 const parseStoredCircularMembers = (raw: any) => {
     if (!raw) return []
 
@@ -234,84 +286,6 @@ const parseStoredObject = (raw: any): Record<string, any> => {
     }
 }
 
-const GPR_DETAIL_BY_NO: Record<string, string> = {
-    '4.1': 'Compliant of the law',
-    '4.2': 'Anti-Bribery Policy Communication',
-    '4.3': 'General Purchase Specification Requirement',
-    '4.4': 'Manufacture location survey',
-    '4.5': 'Company Environmental and Energy Policy',
-    '4.6': 'Quality Management Certification',
-    '4.7': 'Environmental Certification such as RoHS, REACH, etc.',
-    '4.8': 'Environmental Management Certification',
-    '4.9': 'History reliability',
-    '4.10': 'Reliable performance',
-    '4.11': 'Advised by Customer, Parent Company or Manager up',
-    '4.12': 'Low Price',
-    '4.13': 'Document to request for Automatic Account Transfer',
-    '4.14': 'Other',
-}
-
-const NEED_GPR_CRITERIA = new Set(['4.1', '4.2', '4.3', '4.4', '4.5'])
-const OPTIONAL_GPR_CRITERIA = new Set(['4.6', '4.7', '4.8', '4.9', '4.10', '4.11', '4.12', '4.13'])
-
-const hasUploadedFile = (value: any) => String(value || '').trim().length > 0
-const normalizeRemark = (value: any) => String(value || '').trim().toLowerCase()
-const isExplicitNotAccept = (remark: string) =>
-    ['not accept', 'not accepted', 'disagree', 'rejected'].some(token => remark.includes(token))
-const isExplicitAccept = (remark: string) =>
-    ['accept', 'accepted', 'agree', 'agreed'].some(token => remark.includes(token))
-
-const buildGprConditionReasonLines = (criteriaRows: any[]) => {
-    const rows = Array.isArray(criteriaRows) ? criteriaRows : []
-    const normalizedRows = rows.map((row: any) => ({
-        no: String(row?.no || row?.criteria_no || '').trim(),
-        detail: String(row?.detail || GPR_DETAIL_BY_NO[String(row?.no || row?.criteria_no || '').trim()] || '').trim(),
-        remark: String(row?.remark || '').trim(),
-        remarkNormalized: normalizeRemark(row?.remark),
-        uploadedFile: hasUploadedFile(row?.uploaded_file || row?.uploaded_file_path),
-    }))
-
-    const optionalRows = normalizedRows.filter(row => OPTIONAL_GPR_CRITERIA.has(row.no))
-    const optionalUploadedCount = optionalRows.filter(row => row.uploadedFile).length
-    const optionalShortfall = Math.max(0, 4 - optionalUploadedCount)
-
-    const lines: string[] = []
-
-    normalizedRows
-        .filter(row => NEED_GPR_CRITERIA.has(row.no))
-        .forEach(row => {
-            const explicitReject = isExplicitNotAccept(row.remarkNormalized)
-            const explicitAccept = isExplicitAccept(row.remarkNormalized)
-            const passes = row.no === '4.3'
-                ? ((row.uploadedFile || explicitAccept) && !explicitReject)
-                : (row.uploadedFile && !explicitReject)
-
-            if (passes) return
-
-            const reason = explicitReject
-                ? 'Vendor marked this condition as Not Accept.'
-                : (row.no === '4.3'
-                    ? 'Vendor acceptance for this requirement is still not confirmed.'
-                    : 'Required supporting document is still missing from vendor response.')
-
-            lines.push(`${row.no} ${row.detail || 'Selection Sheet condition'}: ${reason}`)
-        })
-
-    if (optionalShortfall > 0) {
-        optionalRows
-            .filter(row => !row.uploadedFile || isExplicitNotAccept(row.remarkNormalized))
-            .forEach(row => {
-                const explicitReject = isExplicitNotAccept(row.remarkNormalized)
-                const reason = explicitReject
-                    ? 'Vendor marked this condition as Not Accept.'
-                    : `Optional supporting document is still missing. Current optional count is ${optionalUploadedCount}/4.`
-                lines.push(`${row.no} ${row.detail || 'Selection Sheet condition'}: ${reason}`)
-            })
-    }
-
-    return lines
-}
-
 const resolveDisplayName = (options: Array<unknown>, fallbackLabel: string) => {
     for (const option of options) {
         const value = String(option || '').trim()
@@ -337,6 +311,51 @@ const previewRecipientList = (emails: string[] = []) =>
         .map(email => normalizeEmail(email))
         .filter(Boolean)
         .slice(0, 10)
+
+const MOCK_REQUESTER_EMAIL = 'tanawut.patrawan@furukawaelectric.com'
+
+const resolveRequesterEmailForMail = (_profile?: EmployeeProfile | null) => {
+    return normalizeEmail(MOCK_REQUESTER_EMAIL)
+}
+
+const isOverseaRegion = (vendorRegion: any) => normalizeText(vendorRegion) === 'oversea'
+
+const resolveRequesterMailProfile = async (requestContext: any) => {
+    const requesterProfile = await resolveEmployeeProfile(
+        requestContext?.Request_By_EmployeeCode
+        || requestContext?.REQUEST_BY_EMPLOYEECODE
+        || requestContext?.request_by_employeecode
+    )
+    return {
+        profile: requesterProfile,
+        email: resolveRequesterEmailForMail(requesterProfile),
+        name: resolveDisplayName([requesterProfile?.fullName], 'Requester'),
+    }
+}
+
+const getPoPicAndSubPicCc = async (
+    vendorRegion: any,
+    assignedPicEmpCode: any,
+    assignedPicEmail?: string
+) => {
+    const picEmail = normalizeEmail(assignedPicEmail) || await resolveAssignedEmail(assignedPicEmpCode)
+    const picGroupCode = isOverseaRegion(vendorRegion) ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
+    const peerPicCc = await getPeerCcEmailsByGroupCode(picGroupCode, assignedPicEmpCode, picEmail)
+
+    return {
+        picEmail,
+        peerPicCc,
+        allPoPicEmails: mergeUniqueEmails(picEmail ? [picEmail] : [], peerPicCc),
+        picGroupCode,
+    }
+}
+
+const getPoCheckerMainEmails = async () => getPeerCcEmailsByGroupCode(GROUP_CODE.PO_CHECKER_MAIN)
+
+const getPoMgrEmails = async () => getPeerCcEmailsByGroupCode(GROUP_CODE.PO_MGR)
+
+const getAccountCcByRegion = async (vendorRegion: any) =>
+    getPeerCcEmailsByGroupCode(isOverseaRegion(vendorRegion) ? GROUP_CODE.ACC_OVERSEA_CC : GROUP_CODE.ACC_LOCAL_CC)
 
 const logTemplateEvent = (
     phase: 'sent' | 'failed',
@@ -386,7 +405,27 @@ const sendTemplatedEmail = async (payload: {
     const ccEmails = payload.ccEmails || []
 
     try {
-        await sendEmail(payload.emailHtml, payload.toEmail, payload.subject, ccEmails)
+        const mailResult = await sendEmail(payload.emailHtml, payload.toEmail, payload.subject, ccEmails, {
+            templateName: payload.templateName,
+            requestId: payload.requestId,
+            requestNumber: payload.requestNumber,
+            flow: String(payload.extra?.flow || ''),
+        })
+
+        if (!mailResult.success) {
+            logTemplateEvent('failed', {
+                templateName: payload.templateName,
+                toEmail: payload.toEmail,
+                ccEmails,
+                subject: payload.subject,
+                requestId: payload.requestId,
+                requestNumber: payload.requestNumber,
+                extra: payload.extra,
+                error: mailResult.reason || 'sendEmail returned failed',
+            })
+            return
+        }
+
         logTemplateEvent('sent', {
             templateName: payload.templateName,
             toEmail: payload.toEmail,
@@ -475,18 +514,14 @@ export const triggerCreationEmail = async (
     assigneeGroupCode?: string
 ) => {
     //ทำไม ไม่เอาจาก getUserdata ไม่รู้นึกยุ โฟค 18/04/2026
-    const requesterProfile = await resolveEmployeeProfile(dataItem.Request_By_EmployeeCode)
-    const requesterFullName = resolveDisplayName([
-        requesterProfile?.fullName,
-    ], 'Requester')
-    const nextAssigneeProfile = await resolveEmployeeProfile(nextAssignee.empCode)
+    const requester = await resolveRequesterMailProfile(dataItem)
+    const nextAssigneeProfile = await resolveAssigneeProfile(nextAssignee.empCode)
     const nextAssigneeEmail = await resolveAssignedEmail(nextAssignee.empCode)
 
     const requestNumber = resolveRequestNumber(persistedRequestNumber, insertedId)
     const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
 
     if (nextAssigneeEmail) {
-        const manualCc = parseCcEmails(dataItem.cc_emails)
         const groupRecipientInspection = await inspectGroupRecipients(
             assigneeGroupCode || '',
             nextAssignee.empCode,
@@ -498,7 +533,7 @@ export const triggerCreationEmail = async (
             nextAssigneeEmail
         )
         const ccEmails = excludeEmails(
-            mergeUniqueEmails(manualCc, peerCc).filter(email => email !== nextAssigneeEmail),
+            mergeUniqueEmails(requester.email ? [requester.email] : [], peerCc).filter(email => email !== nextAssigneeEmail),
             []
         )
 
@@ -515,7 +550,7 @@ export const triggerCreationEmail = async (
             supportProduct: dataItem.supportProduct_Process || 'Error Connection',
             purchaseFrequency: dataItem.purchase_frequency || 'Error Connection',
             systemLink,
-            userName: requesterFullName,
+            userName: requester.name,
             userTel: ''
         })
         const emailSubject = `[Request Check] Please request check register vendor follow as "${requestNumber}"`
@@ -531,8 +566,8 @@ export const triggerCreationEmail = async (
                 flow: 'triggerCreationEmail',
                 assigneeEmpCode: nextAssignee.empCode || '',
                 assigneeGroupCode: assigneeGroupCode || '',
-                manualCc,
                 peerCc,
+                requesterEmail: requester.email,
                 finalCcEmails: ccEmails,
                 groupRecipientInspection,
             },
@@ -541,14 +576,34 @@ export const triggerCreationEmail = async (
 }
 
 export const sendAgreementEmail = async (dataItem: any) => {
-    const recipientEmail = String(dataItem.emailmain || '').trim()
+    let contextVendor: any = {}
+    if (dataItem.request_id) {
+        const vendorSql = await RegisterRequestSQL.getNotificationVendorContextByRequestId({ request_id: Number(dataItem.request_id) || 0 })
+        const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
+        contextVendor = vendorRes[0] || {}
+    }
+
+    const recipientEmail = String(dataItem.emailmain || contextVendor.selected_vendor_email || contextVendor.emailmain || '').trim()
     if (!recipientEmail) {
         throw new Error('Vendor emailmain is required')
     }
 
+    let ccEmails: string[] = []
+    if (dataItem.request_id) {
+        const picProfile = await resolveAssigneeProfile(contextVendor.assign_to)
+        const picEmail = await resolveAssignedEmail(contextVendor.assign_to)
+        const poPicContext = await getPoPicAndSubPicCc(contextVendor.vendor_region, contextVendor.assign_to, picEmail)
+        ccEmails = excludeEmails(
+            mergeUniqueEmails(poPicContext.allPoPicEmails),
+            [recipientEmail, contextVendor.emailmain, contextVendor.vendor_email, contextVendor.vendor_main_email]
+        )
+
+        dataItem.pic_name = dataItem.pic_name || resolveDisplayName([picProfile?.fullName], 'PO PIC')
+    }
+
     const emailHtml = emailVendorDocumentRequestTemplate({
         vendorEmail: recipientEmail,
-        ccEmail: '',
+        ccEmail: ccEmails.join('; '),
         topicRef: dataItem.request_number || '-',
         isNewSupplier: !dataItem.fft_vendor_code,
         picName: dataItem.pic_name || 'PO PIC',
@@ -560,7 +615,7 @@ export const sendAgreementEmail = async (dataItem: any) => {
         emailHtml,
         toEmail: recipientEmail,
         subject: dataItem.email_subject || `[Request Submit] Document for ${dataItem.request_number || 'vendor registration'}`,
-        ccEmails: [],
+        ccEmails,
         requestId: dataItem.request_id,
         requestNumber: dataItem.request_number,
         extra: { flow: 'sendAgreementEmail' },
@@ -579,22 +634,17 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
 
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
 
-        const picProfile = await resolveEmployeeProfile(vd.assign_to)
+        const picProfile = await resolveAssigneeProfile(vd.assign_to)
         const picName = resolveDisplayName([
             picProfile?.fullName,
         ], 'PO PIC')
         const picEmail = await resolveAssignedEmail(vd.assign_to)
         const picTel = ''
 
-        const isOversea = normalizeText(vd.vendor_region) === 'oversea'
-        const picGroupCode = isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
-        const peerPicCc = await getPeerCcEmailsByGroupCode(picGroupCode, vd.assign_to, picEmail)
-        const manualCc = parseCcEmails(vd.cc_emails)
+        const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
 
         const ccEmails = excludeEmails(mergeUniqueEmails(
-            picEmail ? [picEmail] : [],
-            peerPicCc,
-            manualCc
+            poPicContext.allPoPicEmails
         ).filter(email => email !== normalizeEmail(vendorEmail)), [vendorEmail, vd.emailmain])
 
         const stageHintRaw = String(stageHint || '').trim().toLowerCase()
@@ -602,49 +652,20 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
         const isGprCStage = stageHintRaw.includes('gpr c')
 
         if (isGprCStage) {
-            const gprCMeta = getGprCSetupMeta(vd.action_required_json)
-            const gprCApproverEmpCode = String(gprCMeta?.gpr_c_approver_empcode || '').trim()
-            const gprCApproverProfile = await resolveEmployeeProfile(gprCApproverEmpCode)
-            const gprCApproverEmail = await resolveAssignedEmail(gprCApproverEmpCode)
-            const gprCApproverName = resolveDisplayName([
-                gprCApproverProfile?.fullName,
-                vd.gpr_c_approver_name,
-            ], 'Approver PIC')
-            const gprCPcPicEmail = normalizeEmail(vd.gpr_c_pc_pic_email)
-            const circularEmails = await resolveCircularAssignedEmails(vd.gpr_c_circular_json)
-            const requesterProfile = await resolveEmployeeProfile(vd.Request_By_EmployeeCode)
-            const requesterEmail = normalizeEmail(requesterProfile?.email || '')
-            const requesterName = resolveDisplayName([requesterProfile?.fullName], 'Requester')
-            let gprConditionReasons: string[] = []
-
-            const selectionSql = await RegisterRequestSQL.getSelection({ request_id: Number(requestId) || 0 })
-            const selectionRes = (await MySQLExecute.search(selectionSql)) as any[]
-            const selection = selectionRes[0]
-            if (selection?.selection_id) {
-                const criteriaSql = await RegisterRequestSQL.getCriteria({ selection_id: selection.selection_id })
-                const criteriaRes = (await MySQLExecute.search(criteriaSql)) as any[]
-                gprConditionReasons = buildGprConditionReasonLines(criteriaRes)
-            }
-
-            const primaryRecipient = gprCApproverEmail || requesterEmail
-            if (!primaryRecipient) {
-                return { sent: false, reason: 'missing GPR C approver/requester email' }
+            const requester = await resolveRequesterMailProfile(vd)
+            if (!requester.email) {
+                return { sent: false, reason: 'missing requester email for GPR C setup' }
             }
 
             const gprCCcEmails = excludeEmails(mergeUniqueEmails(
-                requesterEmail ? [requesterEmail] : [],
-                picEmail ? [picEmail] : [],
-                gprCApproverEmail ? [gprCApproverEmail] : [],
-                gprCPcPicEmail ? [gprCPcPicEmail] : [],
-                circularEmails,
-                manualCc
-            ).filter(email => email !== primaryRecipient), [vendorEmail, vd.emailmain])
+                poPicContext.allPoPicEmails
+            ).filter(email => email !== requester.email), [vendorEmail, vd.emailmain])
 
-            const gprCApprovalHtml = emailUserCheckerApproverGPRCTemplate({
-                toEmail: primaryRecipient,
+            const gprCApprovalHtml = emailGprCRequesterSetupTemplate({
+                toEmail: requester.email,
                 ccEmail: gprCCcEmails.join('; '),
                 requestNumber,
-                userName: primaryRecipient === requesterEmail ? requesterName : gprCApproverName,
+                userName: requester.name,
                 picName,
                 picTel,
                 vendorName: vd.company_name || 'N/A',
@@ -654,31 +675,28 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
                 tel: vd.tel_phone || 'N/A',
                 supportProduct: vd.supportProduct_Process || 'N/A',
                 purchaseFrequency: vd.purchase_frequency || 'N/A',
-                systemLink: `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`,
-                reasons: gprConditionReasons,
+                systemLink: `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-history`,
             })
 
             await sendTemplatedEmail({
-                templateName: 'emailUserCheckerApproverGPRCTemplate',
+                templateName: 'emailGprCRequesterSetupTemplate',
                 emailHtml: gprCApprovalHtml,
-                toEmail: primaryRecipient,
-                subject: `[Request Approval] Please approve ${requestNumber} - General Purchase Specification Form C`,
+                toEmail: requester.email,
+                subject: `[GPR C Setup] Please setup GPR C approver for ${requestNumber}`,
                 ccEmails: gprCCcEmails,
                 requestId,
                 requestNumber,
                 extra: {
                     flow: 'triggerVendorDocumentEmail',
                     stageHint: stageHint || 'GPR C',
-                    requesterEmail,
-                    requesterName,
-                    gprCApproverEmpCode,
-                    gprConditionReasonCount: gprConditionReasons.length,
+                    requesterEmail: requester.email,
+                    requesterName: requester.name,
                 },
             })
 
             return {
                 sent: true,
-                to: primaryRecipient,
+                to: requester.email,
                 ccCount: gprCCcEmails.length
             }
         }
@@ -733,35 +751,35 @@ export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynami
         const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
         const vd = vendorRes[0] || {}
 
-        const picProfile = await resolveEmployeeProfile(vd.assign_to)
+        const picProfile = await resolveAssigneeProfile(vd.assign_to)
         const picName = resolveDisplayName([
             picProfile?.fullName,
         ], 'PIC')
         const picEmail = await resolveAssignedEmail(vd.assign_to)
         const picTel = ''
 
-        const targetApprover = dynamicApprover || nextStep?.approver_id || vd.assign_to || ''
+        let targetApprover = dynamicApprover || nextStep?.approver_id || ''
         let approverEmail = ''
         let approverName = ''
         if (targetApprover) {
-            const approverProfile = await resolveEmployeeProfile(targetApprover)
+            const approverProfile = await resolveAssigneeProfile(targetApprover)
             approverEmail = await resolveAssignedEmail(targetApprover)
             approverName = resolveDisplayName([approverProfile?.fullName], '')
         }
 
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
         const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
-        const requesterEmail = normalizeEmail((await resolveEmployeeProfile(vd.Request_By_EmployeeCode))?.email)
+        const requester = await resolveRequesterMailProfile(vd)
 
-        const isOversea = normalizeText(vd.vendor_region) === 'oversea'
+        const isOversea = isOverseaRegion(vd.vendor_region)
         const nextStepCode = inferStepCode(nextStep)
         const nextStepDesc = normalizeText(nextStep?.DESCRIPTION)
         const isDocumentCheckerStep = nextStepCode === 'DOC_CHECK' || nextStepDesc.includes('checker') || nextStepDesc.includes('check all document')
 
-        const picGroupCode = isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
-        const peerPicCc = await getPeerCcEmailsByGroupCode(picGroupCode, vd.assign_to, picEmail)
-        const checkerPicCc = await getPeerCcEmailsByGroupCode(GROUP_CODE.PO_CHECKER_MAIN)
-        const accPicCc = await getPeerCcEmailsByGroupCode(isOversea ? GROUP_CODE.ACC_OVERSEA_CC : GROUP_CODE.ACC_LOCAL_CC)
+        const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
+        const checkerPicCc = await getPoCheckerMainEmails()
+        const poMgrCc = await getPoMgrEmails()
+        const accPicCc = await getAccountCcByRegion(vd.vendor_region)
 
         const isPmMgrAndAbove = ['PO_MGR_APPROVAL', 'PO_GM_APPROVAL', 'MD_APPROVAL'].includes(nextStepCode)
         const isAccountStep = nextStepCode === 'ACCOUNT_REGISTERED'
@@ -769,34 +787,46 @@ export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynami
         const nextGroupCode = isDocumentCheckerStep
             ? GROUP_CODE.PO_CHECKER_MAIN
             : (nextStep?.group_code || resolveGroupCodeForStep(nextStep, isOversea))
+        if (!approverEmail && nextGroupCode) {
+            const primaryAssignee = await resolvePrimaryAssigneeByGroupCode(nextGroupCode)
+            if (primaryAssignee?.email) {
+                targetApprover = primaryAssignee.empCode
+                approverEmail = primaryAssignee.email
+                approverName = primaryAssignee.fullName
+            }
+        }
         const peerApproverCc = await getPeerCcEmailsByGroupCode(nextGroupCode, targetApprover, approverEmail)
 
         const ccEmails = excludeEmails(
             mergeUniqueEmails(
+                ...(isDocumentCheckerStep
+                    ? [
+                        requester.email ? [requester.email] : [],
+                        poPicContext.allPoPicEmails,
+                        poMgrCc,
+                    ]
+                    : []),
                 ...(isPmMgrAndAbove
                     ? [
                         checkerPicCc,
-                        requesterEmail ? [requesterEmail] : [],
-                        picEmail ? [picEmail] : [],
-                        peerPicCc,
+                        requester.email ? [requester.email] : [],
+                        poPicContext.allPoPicEmails,
                     ]
                     : []),
                 ...(isAccountStep
                     ? [
                         accPicCc,
                         checkerPicCc,
-                        requesterEmail ? [requesterEmail] : [],
-                        picEmail ? [picEmail] : [],
-                        peerPicCc,
+                        requester.email ? [requester.email] : [],
+                        poPicContext.allPoPicEmails,
                     ]
                     : []),
-                ...(!isPmMgrAndAbove && !isAccountStep
+                ...(!isDocumentCheckerStep && !isPmMgrAndAbove && !isAccountStep
                     ? [
-                        picEmail ? [picEmail] : [],
+                        poPicContext.allPoPicEmails,
                         peerApproverCc,
                     ]
                     : []),
-                parseCcEmails(vd.cc_emails)
             ).filter(email => email !== normalizeEmail(approverEmail)),
             [vd.vendor_email, vd.vendor_main_email]
         )
@@ -859,7 +889,7 @@ export const triggerActionRequiredEmail = async (dataItem: any, currentStep: any
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
         const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
 
-        const picProfile = await resolveEmployeeProfile(vd.assign_to)
+        const picProfile = await resolveAssigneeProfile(vd.assign_to)
         const picName = resolveDisplayName([
             picProfile?.fullName,
         ], 'PO PIC')
@@ -919,7 +949,7 @@ export const triggerAfterGprCApprovedEmail = async (dataItem: any) => {
         const vd = vendorRes[0] || {}
 
         const requesterProfile = await resolveEmployeeProfile(vd.Request_By_EmployeeCode)
-        const requesterEmail = normalizeEmail(requesterProfile?.email || '')
+        const requesterEmail = resolveRequesterEmailForMail(requesterProfile)
         const requesterName = resolveDisplayName([
             requesterProfile?.fullName,
         ], 'Requester')
@@ -929,7 +959,7 @@ export const triggerAfterGprCApprovedEmail = async (dataItem: any) => {
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
         const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
 
-        const picProfile = await resolveEmployeeProfile(vd.assign_to)
+        const picProfile = await resolveAssigneeProfile(vd.assign_to)
         const picName = resolveDisplayName([
             picProfile?.fullName,
         ], 'PO PIC')
@@ -992,7 +1022,7 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
         const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
         const vd = vendorRes[0] || {}
 
-        const picProfile = await resolveEmployeeProfile(vd.assign_to)
+        const picProfile = await resolveAssigneeProfile(vd.assign_to)
         const picEmail = await resolveAssignedEmail(vd.assign_to)
         const picName = resolveDisplayName([
             picProfile?.fullName,
@@ -1000,19 +1030,13 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
         const picTel = ''
 
         const approverEmail = await resolveAssignedEmail(currentStep?.approver_id)
+        const requester = await resolveRequesterMailProfile(vd)
 
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
         const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
 
-        const isOversea = normalizeText(vd.vendor_region) === 'oversea'
-        const picGroupCode = isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
-        const peerPicCc = await getPeerCcEmailsByGroupCode(picGroupCode, vd.assign_to, picEmail)
-
-        const ccEmails = excludeEmails(mergeUniqueEmails(
-            approverEmail ? [approverEmail] : [],
-            parseCcEmails(vd.cc_emails),
-            peerPicCc
-        ).filter(email => email !== normalizeEmail(picEmail)), [vd.vendor_email, vd.vendor_main_email])
+        const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
+        const checkerPicCc = await getPoCheckerMainEmails()
 
         if (!picEmail) return
 
@@ -1024,6 +1048,20 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
             || currentStepDesc.includes('checker')
             || currentStepDesc.includes('check document')
             || currentStepDesc.includes('check all document')
+        const rejectCcSources = isCheckerReject
+            ? [
+                checkerPicCc,
+                requester.email ? [requester.email] : [],
+                poPicContext.peerPicCc,
+            ]
+            : [
+                poPicContext.peerPicCc,
+                requester.email ? [requester.email] : [],
+                approverEmail ? [approverEmail] : [],
+            ]
+        const ccEmails = excludeEmails(mergeUniqueEmails(
+            ...rejectCcSources
+        ).filter(email => email !== normalizeEmail(picEmail)), [vd.vendor_email, vd.vendor_main_email])
         const rejectTemplateName = isCheckerReject ? 'emailReject2Template' : 'emailReject1Template'
         const rejectTemplate = isCheckerReject ? emailReject2Template : emailReject1Template
         const emailHtml = rejectTemplate({
@@ -1074,13 +1112,9 @@ export const triggerCompletionEmail = async (dataItem: any) => {
         const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
         const vd = vendorRes[0] || {}
 
-        const requesterProfile = await resolveEmployeeProfile(vd.Request_By_EmployeeCode)
-        const requesterName = resolveDisplayName([
-            requesterProfile?.fullName,
-        ], 'Requester')
-        const requesterEmail = normalizeEmail(requesterProfile?.email || '')
+        const requester = await resolveRequesterMailProfile(vd)
 
-        const picProfile = await resolveEmployeeProfile(vd.assign_to)
+        const picProfile = await resolveAssigneeProfile(vd.assign_to)
         const picName = resolveDisplayName([
             picProfile?.fullName,
         ], 'PIC')
@@ -1090,27 +1124,22 @@ export const triggerCompletionEmail = async (dataItem: any) => {
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
         const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
 
-        const isOversea = normalizeText(vd.vendor_region) === 'oversea'
-        const picGroupCode = isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
-        const peerPicCc = await getPeerCcEmailsByGroupCode(picGroupCode, vd.assign_to, picEmail)
-        const checkerPicCc = await getPeerCcEmailsByGroupCode(GROUP_CODE.PO_CHECKER_MAIN)
-        const accPicCc = await getPeerCcEmailsByGroupCode(isOversea ? GROUP_CODE.ACC_OVERSEA_CC : GROUP_CODE.ACC_LOCAL_CC)
+        const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
+        const checkerPicCc = await getPoCheckerMainEmails()
+        const accPicCc = await getAccountCcByRegion(vd.vendor_region)
 
         const finalCcEmails = excludeEmails(
             mergeUniqueEmails(
                 accPicCc,
                 checkerPicCc,
-                requesterEmail ? [requesterEmail] : [],
-                picEmail ? [picEmail] : [],
-                peerPicCc,
-                parseCcEmails(vd.cc_emails)
-            ),
+                poPicContext.allPoPicEmails,
+            ).filter(email => email !== requester.email),
             [vd.vendor_email, vd.vendor_main_email]
         )
-        if (!requesterEmail) return
+        if (!requester.email) return
 
         const completionData: MailTemplateData = {
-            toEmail: requesterEmail,
+            toEmail: requester.email,
             ccEmail: finalCcEmails.join('; '),
             requestNumber,
             vendorName: vd.company_name || 'N/A',
@@ -1124,14 +1153,14 @@ export const triggerCompletionEmail = async (dataItem: any) => {
             picName,
             picTel,
             vendorCode: dataItem.vendor_code || vd.vendor_code || 'Pending',
-            userName: requesterName || 'Requester',
+            userName: requester.name || 'Requester',
         }
 
         const emailHtml = emailCompleteTemplate(completionData)
         await sendTemplatedEmail({
             templateName: 'emailCompleteTemplate',
             emailHtml,
-            toEmail: requesterEmail,
+            toEmail: requester.email,
             subject: `[Complete] Register vendor "${requestNumber}" is now completed`,
             ccEmails: finalCcEmails,
             requestId,
@@ -1152,22 +1181,26 @@ export const triggerVendorDisagreeEmail = async (dataItem: any) => {
         const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
         const vd = vendorRes[0] || {}
 
-        const requesterProfile = await resolveEmployeeProfile(vd.Request_By_EmployeeCode)
-        const requesterName = resolveDisplayName([
-            requesterProfile?.fullName,
-        ], 'Requester')
-        const requesterEmail = normalizeEmail(requesterProfile?.email || '')
-        if (!requesterEmail) return
+        const requester = await resolveRequesterMailProfile(vd)
+        if (!requester.email) return
 
         const picEmail = await resolveAssignedEmail(vd.assign_to)
 
         const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
         const systemLink = `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-register`
 
-        const ccEmails = mergeUniqueEmails(
-            picEmail ? [picEmail] : [],
-            parseCcEmails(vd.cc_emails)
-        ).filter(email => email !== normalizeEmail(requesterEmail))
+        const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
+        const checkerPicCc = await getPoCheckerMainEmails()
+        const accPicCc = await getAccountCcByRegion(vd.vendor_region)
+
+        const ccEmails = excludeEmails(
+            mergeUniqueEmails(
+                accPicCc,
+                checkerPicCc,
+                poPicContext.allPoPicEmails,
+            ).filter(email => email !== requester.email),
+            [vd.vendor_email, vd.vendor_main_email]
+        )
 
         const safeRemark = String(dataItem.approver_remark || '').trim()
         const reasons = [
@@ -1175,17 +1208,17 @@ export const triggerVendorDisagreeEmail = async (dataItem: any) => {
             ...(safeRemark ? [safeRemark] : []),
         ]
 
-        const picProfile = await resolveEmployeeProfile(vd.assign_to)
+        const picProfile = await resolveAssigneeProfile(vd.assign_to)
         const picName = resolveDisplayName([
             picProfile?.fullName,
         ], 'PO PIC')
         const picTel = ''
 
         const emailHtml = emailIncompleteTemplate({
-            toEmail: requesterEmail,
+            toEmail: requester.email,
             ccEmail: ccEmails.join('; '),
             requestNumber,
-            userName: requesterName,
+            userName: requester.name,
             vendorName: vd.company_name || 'N/A',
             address: vd.address || 'N/A',
             contactPic: vd.contact_name || 'N/A',
@@ -1202,7 +1235,7 @@ export const triggerVendorDisagreeEmail = async (dataItem: any) => {
         await sendTemplatedEmail({
             templateName: 'emailIncompleteTemplate',
             emailHtml,
-            toEmail: requesterEmail,
+            toEmail: requester.email,
             subject: `[Incomplete] Register vendor "${requestNumber}" ended as Vendor Disagreed`,
             ccEmails,
             requestId,

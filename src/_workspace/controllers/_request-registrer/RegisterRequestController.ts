@@ -87,7 +87,7 @@ export const RegisterRequestController = {
                 ResultOnDb: { request_id: insertedId },
                 TotalCountOnDb: 1,
                 MethodOnDb: 'Create Registration Request',
-                Message: 'Create Data Success'
+                Message: 'Create Request Register Success'
             } as ResponseI)
         } catch (error: any) {
             console.error('Create Registration Request Error:', error);
@@ -385,13 +385,13 @@ export const RegisterRequestController = {
         }
 
         try {
-            if (!dataItem.emailmain) {
+            if (!dataItem.emailmain && !dataItem.request_id) {
                 return res.status(400).json({
                     Status: false,
                     ResultOnDb: {},
                     TotalCountOnDb: 0,
                     MethodOnDb: 'Send Agreement Email',
-                    Message: 'Vendor emailmain is required'
+                    Message: 'Vendor emailmain or request_id is required'
                 } as ResponseI)
             }
 
@@ -1061,11 +1061,11 @@ export const RegisterRequestController = {
             const file_name = Buffer.from(file.originalname, 'latin1').toString('utf8')
             const createDocumentResult = await RegisterRequestModel.createDocument({
                 request_id: reqId,
-                file_name:  file_name || path.basename(file.path),
-                file_path:  file.filename || path.basename(file.path),
-                file_size:  file.size || 0,
-                file_type:  file.mimetype || '',
-                CREATE_BY:  CREATE_BY || 'SYSTEM',
+                file_name: file_name || path.basename(file.path),
+                file_path: file.filename || path.basename(file.path),
+                file_size: file.size || 0,
+                file_type: file.mimetype || '',
+                CREATE_BY: CREATE_BY || 'SYSTEM',
             })
 
             if (!createDocumentResult?.Status) {
@@ -1088,8 +1088,8 @@ export const RegisterRequestController = {
                 Status: true,
                 ResultOnDb: {
                     document_id,
-                    file_path:  file.filename || path.basename(file.path),
-                    file_name:  file_name || path.basename(file.path),
+                    file_path: file.filename || path.basename(file.path),
+                    file_name: file_name || path.basename(file.path),
                 },
                 TotalCountOnDb: 1,
                 MethodOnDb: 'Add Document',
