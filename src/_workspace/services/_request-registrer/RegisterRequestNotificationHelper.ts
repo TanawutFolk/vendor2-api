@@ -1,9 +1,11 @@
 import { MySQLExecute } from '@businessData/dbExecute'
 import { RegisterRequestSQL } from '../../sql/_request-registrer/RegisterRequestSQL'
-import sendEmail from '@src/config/sendEmail'
+import sendEmail, { type MailAttachment } from '@src/config/sendEmail'
+import fs from 'fs'
+import path from 'path'
 import {
     emailActionRequiredTemplate,
-    emailAfterCheckerApproverGPRCTemplate,
+    emailGprCStepApprovalTemplate,
     emailExternalSubmitGPRBTemplate,
     emailGprCRequesterSetupTemplate,
     emailCompleteTemplate,
@@ -40,6 +42,11 @@ type EmployeeProfile = {
 const employeeProfileCache = new Map<string, EmployeeProfile | null>()
 const assigneeEmailCache = new Map<string, string>()
 const assigneeProfileCache = new Map<string, EmployeeProfile | null>()
+
+const VENDOR_DOCUMENT_LOCAL_PATH = process.env.VENDOR_DOCUMENT_LOCAL_PATH || 'C:\\VendorTest\\01.New (Full)\\Local\\00.Sending'
+const VENDOR_DOCUMENT_OVERSEA_PATH = process.env.VENDOR_DOCUMENT_OVERSEA_PATH || 'C:\\VendorTest\\01.New (Full)\\Oversea\\00.Sending'
+const VENDOR_DOCUMENT_FORM_B_PATH = process.env.VENDOR_DOCUMENT_FORM_B_PATH || 'C:\\VendorTest\\00.Purchase Form\\FORM B.xlsx'
+const VENDOR_DOCUMENT_ATTACHMENT_EXTENSIONS = new Set(['.pdf', '.xlsx', '.xls', '.doc', '.docx'])
 
 const buildFullName = (row: any) =>
     [String(row?.empName || '').trim(), String(row?.empSurname || '').trim()]
@@ -320,6 +327,26 @@ const resolveRequesterEmailForMail = (_profile?: EmployeeProfile | null) => {
 
 const isOverseaRegion = (vendorRegion: any) => normalizeText(vendorRegion) === 'oversea'
 
+const buildVendorDocumentAttachments = (vendorRegion: any, isGprBStage = false): MailAttachment[] => {
+    if (isGprBStage) {
+        return fs.existsSync(VENDOR_DOCUMENT_FORM_B_PATH)
+            ? [{ path: VENDOR_DOCUMENT_FORM_B_PATH, filename: path.basename(VENDOR_DOCUMENT_FORM_B_PATH) }]
+            : []
+    }
+
+    const basePath = isOverseaRegion(vendorRegion) ? VENDOR_DOCUMENT_OVERSEA_PATH : VENDOR_DOCUMENT_LOCAL_PATH
+    if (!fs.existsSync(basePath)) return []
+
+    return fs.readdirSync(basePath, { withFileTypes: true })
+        .filter(entry => entry.isFile())
+        .map(entry => path.join(basePath, entry.name))
+        .filter(filePath => VENDOR_DOCUMENT_ATTACHMENT_EXTENSIONS.has(path.extname(filePath).toLowerCase()))
+        .map(filePath => ({
+            path: filePath,
+            filename: path.basename(filePath),
+        }))
+}
+
 const resolveRequesterMailProfile = async (requestContext: any) => {
     const requesterProfile = await resolveEmployeeProfile(
         requestContext?.Request_By_EmployeeCode
@@ -400,9 +427,11 @@ const sendTemplatedEmail = async (payload: {
     ccEmails?: string[]
     requestId?: number | string
     requestNumber?: string
+    attachments?: MailAttachment[]
     extra?: Record<string, any>
 }) => {
     const ccEmails = payload.ccEmails || []
+    const attachments = payload.attachments || []
 
     try {
         const mailResult = await sendEmail(payload.emailHtml, payload.toEmail, payload.subject, ccEmails, {
@@ -410,7 +439,7 @@ const sendTemplatedEmail = async (payload: {
             requestId: payload.requestId,
             requestNumber: payload.requestNumber,
             flow: String(payload.extra?.flow || ''),
-        })
+        }, attachments)
 
         if (!mailResult.success) {
             logTemplateEvent('failed', {
@@ -420,7 +449,7 @@ const sendTemplatedEmail = async (payload: {
                 subject: payload.subject,
                 requestId: payload.requestId,
                 requestNumber: payload.requestNumber,
-                extra: payload.extra,
+                extra: { ...(payload.extra || {}), attachmentCount: attachments.length },
                 error: mailResult.reason || 'sendEmail returned failed',
             })
             return
@@ -433,7 +462,7 @@ const sendTemplatedEmail = async (payload: {
             subject: payload.subject,
             requestId: payload.requestId,
             requestNumber: payload.requestNumber,
-            extra: payload.extra,
+            extra: { ...(payload.extra || {}), attachmentCount: attachments.length },
         })
     } catch (error: any) {
         logTemplateEvent('failed', {
@@ -443,7 +472,7 @@ const sendTemplatedEmail = async (payload: {
             subject: payload.subject,
             requestId: payload.requestId,
             requestNumber: payload.requestNumber,
-            extra: payload.extra,
+            extra: { ...(payload.extra || {}), attachmentCount: attachments.length },
             error,
         })
         throw error
@@ -618,6 +647,7 @@ export const sendAgreementEmail = async (dataItem: any) => {
         ccEmails,
         requestId: dataItem.request_id,
         requestNumber: dataItem.request_number,
+        attachments: buildVendorDocumentAttachments(contextVendor.vendor_region || dataItem.vendor_region, false),
         extra: { flow: 'sendAgreementEmail' },
     })
 
@@ -734,6 +764,7 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
             ccEmails,
             requestId,
             requestNumber,
+            attachments: buildVendorDocumentAttachments(vd.vendor_region, isGprBStage),
             extra: { flow: 'triggerVendorDocumentEmail', stageHint: stageHint || '' },
         })
 
@@ -983,7 +1014,7 @@ export const triggerAfterGprCApprovedEmail = async (dataItem: any) => {
             [vd.vendor_email, vd.vendor_main_email]
         )
 
-        const emailHtml = emailAfterCheckerApproverGPRCTemplate({
+        const emailHtml = emailGprCStepApprovalTemplate({
             toEmail: requesterEmail,
             ccEmail: ccEmails.join('; '),
             requestNumber,
@@ -1001,7 +1032,7 @@ export const triggerAfterGprCApprovedEmail = async (dataItem: any) => {
         })
 
         await sendTemplatedEmail({
-            templateName: 'emailAfterCheckerApproverGPRCTemplate',
+            templateName: 'emailGprCStepApprovalTemplate',
             emailHtml,
             toEmail: requesterEmail,
             subject: `[Request Update] ${requestNumber} - General Purchase Specification Form C approved`,

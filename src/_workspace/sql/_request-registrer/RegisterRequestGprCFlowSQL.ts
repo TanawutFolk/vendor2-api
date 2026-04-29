@@ -358,6 +358,68 @@ export const RegisterRequestGprCFlowSQL = {
         `
     },
 
+    getTaskManagerQueue: () => {
+        return `
+            SELECT
+                f.GPR_C_FLOW_ID,
+                f.REQUEST_ID,
+                f.FLOW_STATUS,
+                f.CURRENT_STEP_CODE,
+                s.GPR_C_STEP_ID,
+                s.STEP_ORDER,
+                s.STEP_CODE,
+                s.STEP_NAME,
+                s.APPROVER_EMPCODE,
+                s.APPROVER_NAME,
+                s.APPROVER_EMAIL,
+                s.STEP_STATUS,
+                rr.request_number,
+                rr.request_status,
+                rr.supportProduct_Process,
+                rr.purchase_frequency,
+                rr.Request_By_EmployeeCode,
+                rr.CREATE_DATE AS REQUEST_CREATE_DATE,
+                v.company_name,
+                v.vendor_region
+            FROM REQUEST_VENDOR_GPR_C_FLOWS f
+                JOIN REQUEST_VENDOR_GPR_C_STEPS s
+                    ON s.GPR_C_FLOW_ID = f.GPR_C_FLOW_ID
+                    AND s.STEP_STATUS = 'IN_PROGRESS'
+                    AND s.INUSE = 1
+                JOIN request_register_vendor rr
+                    ON rr.request_id = f.REQUEST_ID
+                    AND rr.INUSE = 1
+                LEFT JOIN vendors v
+                    ON v.vendor_id = rr.vendor_id
+            WHERE f.INUSE = 1
+              AND f.FLOW_STATUS = 'IN_PROGRESS'
+            ORDER BY f.GPR_C_FLOW_ID DESC
+        `
+    },
+
+    getStepById: (dataItem: GprCFlowDataItem) => {
+        return `
+            SELECT *
+            FROM REQUEST_VENDOR_GPR_C_STEPS
+            WHERE GPR_C_STEP_ID = ${num(dataItem.gpr_c_step_id)}
+              AND INUSE = 1
+            LIMIT 1
+        `
+    },
+
+    updateStepApprover: (dataItem: GprCFlowDataItem) => {
+        return `
+            UPDATE REQUEST_VENDOR_GPR_C_STEPS SET
+                APPROVER_EMPCODE = '${esc(dataItem.approver_empcode)}',
+                APPROVER_NAME = '${esc(dataItem.approver_name)}',
+                APPROVER_EMAIL = '${esc(dataItem.approver_email)}',
+                UPDATE_BY = '${esc(dataItem.UPDATE_BY || 'SYSTEM')}',
+                UPDATE_DATE = NOW()
+            WHERE GPR_C_STEP_ID = ${num(dataItem.gpr_c_step_id)}
+              AND INUSE = 1
+        `
+    },
+
     getRequestSummary: (dataItem: GprCFlowDataItem) => {
         return `
             SELECT

@@ -80,6 +80,7 @@ export interface RegisterRequestDataItem {
     empcode?: string;
     target_group?: string;
     target_compact?: string;
+    group_compact?: string;
     is_oversea?: boolean | number | string;
 }
 
@@ -1039,7 +1040,12 @@ export const RegisterRequestSQL = {
                                        assignees_to
                             WHERE
                                        empcode = 'dataItem.empcode'
-                                       AND group_code = 'dataItem.group_code'
+                                       AND (
+                                           UPPER(TRIM(COALESCE(group_code, ''))) = 'dataItem.group_code'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_') = 'dataItem.group_code'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_code, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.group_compact'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.group_compact'
+                                       )
                                        AND INUSE = 1
                             LIMIT
                                        1
@@ -1047,6 +1053,7 @@ export const RegisterRequestSQL = {
 
         sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
         sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
+        sql = sql.replaceAll('dataItem.group_compact', dataItem['group_compact'] || '')
 
         return sql
     },

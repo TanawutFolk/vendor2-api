@@ -100,6 +100,9 @@ registerRequestRoutes.post('/gpr-c/record-action-result', RegisterRequestControl
 // POST /register-request/gpr-c/queue
 registerRequestRoutes.post('/gpr-c/queue', RegisterRequestController.gprCQueue)
 
+// POST /register-request/gpr-c/task-manager-queue
+registerRequestRoutes.post('/gpr-c/task-manager-queue', RegisterRequestController.gprCTaskManagerQueue)
+
 // POST /register-request/gpr-c/action-required-queue
 registerRequestRoutes.post('/gpr-c/action-required-queue', RegisterRequestController.gprCActionRequiredQueue)
 

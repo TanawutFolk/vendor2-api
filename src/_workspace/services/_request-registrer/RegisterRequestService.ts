@@ -321,6 +321,10 @@ export const RegisterRequestService = {
         return RegisterRequestGprCFlowService.getQueue(dataItem)
     },
 
+    gprCTaskManagerQueue: async () => {
+        return RegisterRequestGprCFlowService.getTaskManagerQueue()
+    },
+
     gprCActionRequiredQueue: async (dataItem: any) => {
         return RegisterRequestGprCFlowService.getActionRequiredQueue(dataItem)
     },

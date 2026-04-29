@@ -790,8 +790,12 @@ export const RegisterRequestApprovalService = {
             const reason = dataItem.reason || ''
 
             if (!requestId) throw new Error('Missing request_id')
-            if (!['REQUEST_PIC', 'CURRENT_STEP'].includes(scope)) throw new Error('Invalid reassign scope')
+            if (!['REQUEST_PIC', 'CURRENT_STEP', 'GPR_C_STEP'].includes(scope)) throw new Error('Invalid reassign scope')
             if (!toEmpCode) throw new Error('Missing to_empcode')
+
+            if (scope === 'GPR_C_STEP') {
+                return RegisterRequestGprCFlowService.reassignStep(dataItem)
+            }
 
             const requestSql = await RegisterRequestSQL.getById({ request_id: requestId })
             const requestRes = (await MySQLExecute.search(requestSql)) as RowDataPacket[]
@@ -803,19 +807,21 @@ export const RegisterRequestApprovalService = {
             const currentStep = steps.find((step: any) => step.step_status === 'in_progress')
             if (!currentStep) throw new Error('No in-progress step found for this request')
 
-            const assigneeSql = await RegisterRequestSQL.getAssigneeByEmpCode({ to_empcode: toEmpCode })
-            const assigneeRes = (await MySQLExecute.search(assigneeSql)) as RowDataPacket[]
-            const targetAssignee = assigneeRes[0] || null
-            if (!targetAssignee || Number(targetAssignee.INUSE) !== 1) throw new Error('Target assignee is not active')
-
             const isOversea = normalizeText(request.vendor_region) === 'oversea'
             const picGroupCode = isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
             const currentStepGroupCode = resolveGroupCodeForStep(currentStep, isOversea)
             const expectedGroupCode = scope === 'REQUEST_PIC' ? picGroupCode : currentStepGroupCode
 
-            if (expectedGroupCode && targetAssignee.group_code && String(targetAssignee.group_code).trim().toUpperCase() !== expectedGroupCode) {
-                throw new Error(`Target assignee must belong to group ${expectedGroupCode}`)
-            }
+            const assigneeSql = expectedGroupCode
+                ? await RegisterRequestSQL.getActiveAssigneeByEmpCodeAndGroupCode({
+                    empcode: toEmpCode,
+                    group_code: expectedGroupCode,
+                    group_compact: expectedGroupCode.replace(/[^A-Z0-9]/g, ''),
+                })
+                : await RegisterRequestSQL.getAssigneeByEmpCode({ to_empcode: toEmpCode })
+            const assigneeRes = (await MySQLExecute.search(assigneeSql)) as RowDataPacket[]
+            const targetAssignee = assigneeRes[0] || null
+            if (!targetAssignee || Number(targetAssignee.INUSE) !== 1) throw new Error(`Target assignee must belong to group ${expectedGroupCode || 'active assignees'}`)
 
             const sqlList = []
             let fromEmpcode = currentStep.approver_id || ''

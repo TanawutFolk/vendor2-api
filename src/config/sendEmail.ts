@@ -1,6 +1,8 @@
 // const nodemailer = require('nodemailer')
 const axios = require('axios')
 const FormData = require('form-data')
+const fs = require('fs')
+const path = require('path')
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const INVALID_TOKENS = new Set(['-', 'n/a', 'na', 'null', 'undefined'])
@@ -100,6 +102,11 @@ type MailLogMeta = {
   flow?: string
 }
 
+export type MailAttachment = {
+  filename?: string
+  path: string
+}
+
 type MailSendResult = {
   success: boolean
   skipped?: boolean
@@ -115,6 +122,7 @@ const buildMailLogPayload = (params: {
   requestNumber?: string
   flow?: string
   bodyLength?: number
+  attachments?: MailAttachment[]
 }) => ({
   templateName: params.templateName || 'unknown-template',
   toEmail: params.toEmail || '',
@@ -125,6 +133,11 @@ const buildMailLogPayload = (params: {
   requestNumber: params.requestNumber || '',
   flow: params.flow || '',
   bodyLength: params.bodyLength || 0,
+  attachments: (params.attachments || []).map(item => ({
+    filename: item.filename || path.basename(item.path || ''),
+    path: item.path || '',
+  })),
+  attachmentCount: params.attachments?.length || 0,
 })
 
 const sendEmail = async (
@@ -132,12 +145,12 @@ const sendEmail = async (
   send_to: string,
   subject?: string,
   cc?: string[],
-  meta: MailLogMeta = {}
+  meta: MailLogMeta = {},
+  attachments: MailAttachment[] = []
 ): Promise<MailSendResult> => {
-  // URL ของ API (เอามาจากบรรทัด API_URL ในรูป Python ของคุณ)
+  //API 
   const API_URL = 'http://192.168.0.250:9002/api/mail/send'
 
-  // เตรียมข้อมูลที่จะส่ง (Mapping ให้ตรงกับตัวแปร data ใน Python)
   // 1. แปลง \n ใน HTML ให้เป็น <br> เพื่อให้ขึ้นบรรทัดใหม่สวยงาม
   let fixedMessage = message.replace(/\\n/g, '<br>')
 
@@ -155,6 +168,7 @@ const sendEmail = async (
     requestNumber: meta.requestNumber,
     flow: meta.flow,
     bodyLength: cleanMessage.length,
+    attachments,
   })
 
   if (!normalizedTo || !isValidEmail(normalizedTo)) {
@@ -171,8 +185,29 @@ const sendEmail = async (
   form.append('Subject', resolvedSubject)
   form.append('BodyHtml', cleanMessage)
 
+  const readableAttachments = attachments.filter(item => item?.path && fs.existsSync(item.path))
+  const missingAttachments = attachments.filter(item => !item?.path || !fs.existsSync(item.path))
+
+  missingAttachments.forEach(item => {
+    console.error('[MAIL TEMPLATE][attachment skipped]', {
+      ...logPayload,
+      filename: item?.filename || path.basename(item?.path || ''),
+      path: item?.path || '',
+      reason: 'Attachment file not found',
+    })
+  })
+
+  readableAttachments.forEach(item => {
+    form.append('Attachments', fs.createReadStream(item.path), {
+      filename: item.filename || path.basename(item.path),
+    })
+  })
+
   try {
-    console.log('[MAIL TEMPLATE][sending]', logPayload)
+    console.log('[MAIL TEMPLATE][sending]', {
+      ...logPayload,
+      attachmentCount: readableAttachments.length,
+    })
 
     // console.log("กำลังส่งข้อมูล...", formData.toString()); // Log ดูข้อมูลที่จะส่ง
 

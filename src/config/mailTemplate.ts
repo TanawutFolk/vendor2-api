@@ -213,7 +213,7 @@ export const emailGprCRequesterSetupTemplate = (data: MailTemplateData) => {
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Email:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.email}</td></tr>
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Tel:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.tel}</td></tr>
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Support Product / Process:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency / year :</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <p style="margin: 0 0 24px 0;">
@@ -243,14 +243,10 @@ export const emailUserCheckerApproverGPRCTemplate = (data: MailTemplateData) => 
                 <p style="margin: 8px 0 0 0; color: #d32f2f; font-weight: 500; font-size: 13px;">* PIC confirmed the vendor can accept the updated conditions from GPR B. After your approval, PIC will continue the request to Doc Checker.</p>
             </div>
 
-            ${Array.isArray(data.reasons) && data.reasons.length > 0 ? `
             <div style="background-color: #fff7ed; border: 1px solid #fdba74; padding: 16px; margin-bottom: 24px; border-radius: 10px;">
-                <p style="margin: 0 0 10px 0; font-weight: 700; color: #9a3412;">Conditions requiring your review</p>
-                <ul style="margin: 0; padding-left: 18px; color: #7c2d12;">
-                    ${data.reasons.map(reason => `<li style="margin-bottom: 6px;">${reason}</li>`).join('')}
-                </ul>
+                <p style="margin: 0 0 8px 0; font-weight: 700; color: #9a3412;">Vendor Form B document attached</p>
+                <p style="margin: 0; color: #7c2d12;">Please review the Vendor completed Form B PDF attached to this email before approving this GPR C step.</p>
             </div>
-            ` : ''}
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px;">
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">Vendor Name:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.vendorName}</td></tr>
@@ -262,7 +258,7 @@ export const emailUserCheckerApproverGPRCTemplate = (data: MailTemplateData) => 
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px;">
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">For support product / process:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency / year :</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <p style="margin: 0 0 24px 0;">
@@ -287,7 +283,7 @@ export const emailUserCheckerApproverGPRCTemplate = (data: MailTemplateData) => 
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 32px;">
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">สำหรับสนับสนุนผลิตภัณฑ์/กระบวนการ:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">ความถี่ในการสั่งซื้อ:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">ความถี่ในการสั่งซื้อต่อปี:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #fee2e2; font-size: 14px;">
@@ -301,8 +297,8 @@ export const emailUserCheckerApproverGPRCTemplate = (data: MailTemplateData) => 
 
 
 
-// ใช้โครงสร้างเดียวกับ emailUserCheckerApproverGPRCTemplate แต่เปลี่ยนตัวแปรชื่อผู้รับ
-export const emailAfterCheckerApproverGPRCTemplate = (data: MailTemplateData) => {
+// GPR C approval email for next workflow steps such as EMR, QMS, and PO Manager.
+export const emailGprCStepApprovalTemplate = (data: MailTemplateData) => {
     return emailUserCheckerApproverGPRCTemplate({...data, userName: data.picNextStepName});
 };
 
@@ -315,7 +311,7 @@ export const emailReject1Template = (data: MailTemplateData) => {
             <p style="margin: 0 0 20px 0; font-size: 15px;">Dear : &nbsp;&nbsp;&nbsp;<span style="color: #d32f2f; font-weight: 600;">${data.recipientName || 'PO PIC'}</span></p>
             
             <div style="background-color: #fff1f2; border-left: 4px solid #e11d48; padding: 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0;">
-                <p style="margin: 0 0 8px 0; font-weight: 600; color: #be123c; font-size: 16px;">❌ Status: [REJECT] register vendor</p>
+                <p style="margin: 0 0 8px 0; font-weight: 600; color: #be123c; font-size: 16px;">Status: [REJECT] register vendor</p>
                 <p style="margin: 0 0 8px 0; color: #881337;">Please recheck register vendor follow as <strong>"${data.requestNumber}"</strong> . General Purchase Specification Form B</p>
                 <p style="margin: 0; background: #ffe4e6; padding: 8px; border-radius: 4px; color: #9f1239; font-weight: 500;">Reason: ${data.remarkEN}</p>
             </div>
@@ -330,7 +326,7 @@ export const emailReject1Template = (data: MailTemplateData) => {
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px;">
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">For support product/process:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency / year :</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <p style="margin: 0 0 24px 0;">
@@ -340,7 +336,7 @@ export const emailReject1Template = (data: MailTemplateData) => {
             <hr style="border: none; border-top: 1px dashed #fee2e2; margin: 32px 0;">
 
             <div style="background-color: #fff1f2; border-left: 4px solid #e11d48; padding: 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0;">
-                <p style="margin: 0 0 8px 0; font-weight: 600; color: #be123c; font-size: 16px;">❌ สถานะ : [ปฏิเสธการตรวจสอบ] การลงทะเบียนผู้ขาย</p>
+                <p style="margin: 0 0 8px 0; font-weight: 600; color: #be123c; font-size: 16px;">สถานะ : [ปฏิเสธการตรวจสอบ] การลงทะเบียนผู้ขาย</p>
                 <p style="margin: 0 0 8px 0; color: #881337;">โปรดตรวจสอบลงทะเบียนผู้ขายตามหมายเลข <strong>"${data.requestNumber}"</strong>. เอกสาร General Purchase Specification Form B. อีกครั้ง</p>
                 <p style="margin: 0; background: #ffe4e6; padding: 8px; border-radius: 4px; color: #9f1239; font-weight: 500;">สาเหตุ: ${data.remarkTH}</p>
             </div>
@@ -355,7 +351,7 @@ export const emailReject1Template = (data: MailTemplateData) => {
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 32px;">
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">สำหรับสนับสนุนผลิตภัณฑ์/กระบวนการ:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">ความถี่ในการสั่งซื้อ:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">ความถี่ในการสั่งซื้อต่อปี:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #fee2e2; font-size: 14px;">
@@ -390,7 +386,7 @@ export const emailToCheckerPICTemplate = (data: MailTemplateData) => {
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px;">
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">For support product/process:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency / year :</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <p style="margin: 0 0 24px 0;">
@@ -414,7 +410,7 @@ export const emailToCheckerPICTemplate = (data: MailTemplateData) => {
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 32px;">
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">สำหรับสนับสนุนผลิตภัณฑ์/กระบวนการ:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">ความถี่ในการสั่งซื้อ:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">ความถี่ในการสั่งซื้อต่อปี:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #fee2e2; font-size: 14px;">
@@ -450,7 +446,7 @@ export const emailReject2Template = (data: MailTemplateData) => {
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px;">
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">For support product/process:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency / year :</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <p style="margin: 0 0 24px 0;">
@@ -475,7 +471,7 @@ export const emailReject2Template = (data: MailTemplateData) => {
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 32px;">
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">สำหรับสนับสนุนผลิตภัณฑ์/กระบวนการ:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">ความถี่ในการสั่งซื้อ:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">ความถี่ในการสั่งซื้อต่อปี:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #fee2e2; font-size: 14px;">
@@ -512,7 +508,7 @@ export const emailToPMMgrTemplate = (data: MailTemplateData) => `
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px;">
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">For support product/process:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency / year :</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <p style="margin: 0 0 24px 0;">
@@ -536,7 +532,7 @@ export const emailToPMMgrTemplate = (data: MailTemplateData) => `
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 32px;">
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">สำหรับสนับสนุนผลิตภัณฑ์/กระบวนการ:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">ความถี่ในการสั่งซื้อ:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">ความถี่ในการสั่งซื้อต่อปี:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #fee2e2; font-size: 14px;">
@@ -573,7 +569,7 @@ export const emailCompleteTemplate = (data: MailTemplateData) => {
             <p style="margin: 0 0 20px 0; font-size: 15px;">Dear : &nbsp;&nbsp;&nbsp;<span style="color: #d32f2f; font-weight: 600;">${data.userName}</span></p>
             
             <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0;">
-                <p style="margin: 0 0 4px 0; font-weight: 600; color: #047857; font-size: 16px;">✅ Status: Complete register vendor.</p>
+                <p style="margin: 0 0 4px 0; font-weight: 600; color: #047857; font-size: 16px;">Status: Complete register vendor.</p>
                 <p style="margin: 0; color: #065f46;">Complete register vendor follow as <strong>"${data.requestNumber}"</strong></p>
             </div>
 
@@ -587,7 +583,7 @@ export const emailCompleteTemplate = (data: MailTemplateData) => {
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px;">
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">For support product/process:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency / year :</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <div style="background-color: #f9fafb; padding: 16px; border-radius: 8px; margin-bottom: 24px; text-align: center; border: 1px dashed #d1d5db;">
@@ -602,7 +598,7 @@ export const emailCompleteTemplate = (data: MailTemplateData) => {
             <hr style="border: none; border-top: 1px dashed #fee2e2; margin: 32px 0;">
 
             <div style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0;">
-                <p style="margin: 0 0 4px 0; font-weight: 600; color: #047857; font-size: 16px;">✅ สถานะ : การลงทะเบียนผู้ขายสำเร็จ</p>
+                <p style="margin: 0 0 4px 0; font-weight: 600; color: #047857; font-size: 16px;">สถานะ : การลงทะเบียนผู้ขายสำเร็จ</p>
                 <p style="margin: 0; color: #065f46;">การลงทะเบียนผู้ขายตามหมายเลข <strong>"${data.requestNumber}"</strong> สำเร็จเรียบร้อยแล้ว</p>
             </div>
 
@@ -616,7 +612,7 @@ export const emailCompleteTemplate = (data: MailTemplateData) => {
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 32px;">
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">สำหรับสนับสนุนผลิตภัณฑ์/กระบวนการ:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">ความถี่ในการสั่งซื้อ:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">ความถี่ในการสั่งซื้อต่อปี:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #fee2e2; font-size: 14px;">
@@ -641,7 +637,7 @@ export const emailIncompleteTemplate = (data: MailTemplateData) => {
             <p style="margin: 0 0 20px 0; font-size: 15px;">Dear : &nbsp;&nbsp;&nbsp;<span style="color: #d32f2f; font-weight: 600;">${data.userName}</span></p>
             
             <div style="background-color: #fff1f2; border-left: 4px solid #e11d48; padding: 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0;">
-                <p style="margin: 0 0 8px 0; font-weight: 600; color: #be123c; font-size: 16px;">❌ Status: Incomplete register vendor</p>
+                <p style="margin: 0 0 8px 0; font-weight: 600; color: #be123c; font-size: 16px;">Status: Incomplete register vendor</p>
                 <p style="margin: 0 0 12px 0; color: #881337;">Incomplete register vendor follow as <strong>"${data.requestNumber}"</strong></p>
                 
                 <p style="margin: 0 0 8px 0; font-weight: 600; color: #9f1239; font-size: 13px;">Reason(s):</p>
@@ -658,7 +654,7 @@ export const emailIncompleteTemplate = (data: MailTemplateData) => {
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 24px;">
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">For support product/process:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">Purchase Frequency / year :</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <p style="margin: 0 0 24px 0;">
@@ -668,7 +664,7 @@ export const emailIncompleteTemplate = (data: MailTemplateData) => {
             <hr style="border: none; border-top: 1px dashed #fee2e2; margin: 32px 0;">
 
             <div style="background-color: #fff1f2; border-left: 4px solid #e11d48; padding: 16px; margin-bottom: 24px; border-radius: 0 8px 8px 0;">
-                <p style="margin: 0 0 8px 0; font-weight: 600; color: #be123c; font-size: 16px;">❌ สถานะ : การลงทะเบียนผู้ขายไม่สำเร็จ</p>
+                <p style="margin: 0 0 8px 0; font-weight: 600; color: #be123c; font-size: 16px;">สถานะ : การลงทะเบียนผู้ขายไม่สำเร็จ</p>
                 <p style="margin: 0; color: #881337;">การลงทะเบียนผู้ขายตามหมายเลข <strong>"${data.requestNumber}"</strong> ไม่สำเร็จ</p>
             </div>
 
@@ -682,7 +678,7 @@ export const emailIncompleteTemplate = (data: MailTemplateData) => {
 
             <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 32px;">
                 <tr style="border-bottom: 1px solid #f3f4f6;"><td style="width: 240px; padding: 10px 0; color: #6b7280;">สำหรับสนับสนุนผลิตภัณฑ์/กระบวนการ:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.supportProduct}</td></tr>
-                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">ความถี่ในการสั่งซื้อ:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
+                <tr style="border-bottom: 1px solid #f3f4f6;"><td style="padding: 10px 0; color: #6b7280;">ความถี่ในการสั่งซื้อต่อปี:</td><td style="padding: 10px 0; font-weight: 500; color: #111827;">${data.purchaseFrequency}</td></tr>
             </table>
 
             <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #fee2e2; font-size: 14px;">

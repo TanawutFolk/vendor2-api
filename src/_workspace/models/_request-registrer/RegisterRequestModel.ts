@@ -27,6 +27,7 @@ export const RegisterRequestModel = {
     gprCActionRequired: async (dataItem: any) => RegisterRequestService.gprCActionRequired(dataItem),
     gprCRecordActionResult: async (dataItem: any) => RegisterRequestService.gprCRecordActionResult(dataItem),
     gprCQueue: async (dataItem: any) => RegisterRequestService.gprCQueue(dataItem),
+    gprCTaskManagerQueue: async () => RegisterRequestService.gprCTaskManagerQueue(),
     gprCActionRequiredQueue: async (dataItem: any) => RegisterRequestService.gprCActionRequiredQueue(dataItem),
     getGprForm: async (request_id: number) => RegisterRequestService.getGprForm({ request_id }),
 }

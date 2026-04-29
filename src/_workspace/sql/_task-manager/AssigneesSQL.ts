@@ -56,7 +56,12 @@ export const AssigneesSQL = {
 
         let groupSql = ''
         if (dataItem.group_code) {
-            groupSql = ` AND group_code = 'dataItem.group_code'`
+            groupSql = ` AND (
+                UPPER(TRIM(COALESCE(group_code, ''))) = 'dataItem.group_code'
+                OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_') = 'dataItem.group_code'
+                OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_code, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.group_compact'
+                OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.group_compact'
+            )`
         }
 
         let inUseSql = ''
@@ -67,7 +72,8 @@ export const AssigneesSQL = {
         sql = sql.replaceAll('dataItem.keywordSql', keywordSql)
         sql = sql.replaceAll('dataItem.groupSql', groupSql)
         sql = sql.replaceAll('dataItem.inUseSql', inUseSql)
-        sql = sql.replaceAll('dataItem.group_code', dataItem.group_code || '')
+        sql = sql.replaceAll('dataItem.group_code', String(dataItem.group_code || '').trim().toUpperCase())
+        sql = sql.replaceAll('dataItem.group_compact', String(dataItem.group_code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, ''))
         sql = sql.replaceAll('dataItem.in_use', (dataItem.in_use || 0).toString())
 
         return sql

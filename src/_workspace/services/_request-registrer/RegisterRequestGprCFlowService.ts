@@ -3,7 +3,7 @@ import { ResultSetHeader, RowDataPacket } from 'mysql2'
 import sendEmail from '@src/config/sendEmail'
 import {
     emailActionRequiredTemplate,
-    emailAfterCheckerApproverGPRCTemplate,
+    emailGprCStepApprovalTemplate,
     emailGprCRequesterSetupTemplate,
     emailUserCheckerApproverGPRCTemplate,
 } from '@src/config/mailTemplate'
@@ -35,6 +35,13 @@ const compactGroupToken = (value: string) =>
     normalizeValue(value)
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, '')
+
+const resolveManagedGroupForGprCStep = (stepCodeRaw: any) => {
+    const stepCode = normalizeValue(stepCodeRaw).toUpperCase()
+    if (['EMR_CHECKER', 'EMR_APPROVER', 'QMS_CHECKER', 'QMS_APPROVER'].includes(stepCode)) return stepCode
+    if (['PM_MANAGER_CHECKER', 'PM_MANAGER_APPROVER'].includes(stepCode)) return GROUP_CODE.PO_MGR
+    return ''
+}
 
 const buildDisplayName = (row: any) =>
     [normalizeValue(row?.empName), normalizeValue(row?.empSurname)]
@@ -230,13 +237,13 @@ const buildCircularMembers = async (empcodesRaw: any[]) => {
 
     const members = []
     for (const empcode of empcodes) {
-        members.push(await getAssigneeProfile(empcode))
+        members.push(await getMemberProfile(empcode))
     }
     return members
 }
 
 const resolveStepApprovers = async (requesterApprover: any) => {
-    const requesterApproverProfile = await getAssigneeProfile(requesterApprover)
+    const requesterApproverProfile = await getMemberProfile(requesterApprover)
     const result = []
 
     for (const stepDef of GPR_C_STEP_DEFS) {
@@ -355,7 +362,7 @@ const notifyStepApprover = async (requestId: number, step: any, ccEmails: string
     ).filter(email => email !== approverEmail)
     const templateName = stepCode === 'REQUESTER_APPROVER'
         ? 'emailUserCheckerApproverGPRCTemplate'
-        : 'emailAfterCheckerApproverGPRCTemplate'
+        : 'emailGprCStepApprovalTemplate'
     const emailHtml = stepCode === 'REQUESTER_APPROVER'
         ? emailUserCheckerApproverGPRCTemplate({
             ...mailData,
@@ -363,7 +370,7 @@ const notifyStepApprover = async (requestId: number, step: any, ccEmails: string
             recipientName: approverName,
             picName: poPicContext.picName,
         })
-        : emailAfterCheckerApproverGPRCTemplate({
+        : emailGprCStepApprovalTemplate({
             ...mailData,
             picNextStepName: approverName,
             recipientName: approverName,
@@ -552,6 +559,62 @@ export const RegisterRequestGprCFlowService = {
         }
     },
 
+    getTaskManagerQueue: async () => {
+        try {
+            const sql = RegisterRequestGprCFlowSQL.getTaskManagerQueue()
+            const rows = (await MySQLExecute.search(sql)) as RowDataPacket[]
+            return response(true, 'GPR C task manager queue loaded', rows, 'Get GPR C Task Manager Queue', rows.length)
+        } catch (error: any) {
+            return response(false, error?.message || 'Failed to get GPR C task manager queue', [], 'Get GPR C Task Manager Queue Failed', 0)
+        }
+    },
+
+    reassignStep: async (dataItem: any) => {
+        try {
+            const requestId = Number(dataItem.request_id)
+            const stepId = Number(dataItem.gpr_c_step_id)
+            const toEmpcode = normalizeValue(dataItem.to_empcode)
+            const updateBy = normalizeValue(dataItem.UPDATE_BY || dataItem.changed_by) || 'SYSTEM'
+
+            if (!requestId) throw new Error('Missing request_id')
+            if (!stepId) throw new Error('Missing gpr_c_step_id')
+            if (!toEmpcode) throw new Error('Missing to_empcode')
+
+            const stepSql = RegisterRequestGprCFlowSQL.getStepById({ gpr_c_step_id: stepId })
+            const stepRows = (await MySQLExecute.search(stepSql)) as RowDataPacket[]
+            const step = stepRows[0]
+            if (!step) throw new Error('GPR C step not found')
+            if (Number(step.REQUEST_ID || step.request_id) !== requestId) throw new Error('GPR C step does not belong to this request')
+            if (normalizeValue(step.STEP_STATUS || step.step_status).toUpperCase() !== 'IN_PROGRESS') {
+                throw new Error('Only in-progress GPR C step can be reassigned')
+            }
+
+            const expectedGroupCode = resolveManagedGroupForGprCStep(step.STEP_CODE || step.step_code)
+            if (!expectedGroupCode) throw new Error('This GPR C step is not managed by assignees_to')
+
+            const assigneeSql = await RegisterRequestSQL.getActiveAssigneeByEmpCodeAndGroupCode({
+                empcode: toEmpcode,
+                group_code: normalizeGroupToken(expectedGroupCode),
+                group_compact: compactGroupToken(expectedGroupCode),
+            })
+            const assigneeRows = (await MySQLExecute.search(assigneeSql)) as RowDataPacket[]
+            const targetAssignee = assigneeRows[0]
+            if (!targetAssignee) throw new Error(`Target assignee must belong to group ${expectedGroupCode}`)
+
+            await MySQLExecute.execute(RegisterRequestGprCFlowSQL.updateStepApprover({
+                gpr_c_step_id: stepId,
+                approver_empcode: targetAssignee.empcode,
+                approver_name: targetAssignee.empName,
+                approver_email: targetAssignee.empEmail,
+                UPDATE_BY: updateBy,
+            }))
+
+            return response(true, 'GPR C step reassigned successfully', { gpr_c_step_id: stepId }, 'Reassign GPR C Step')
+        } catch (error: any) {
+            return response(false, error?.message || 'Failed to reassign GPR C step', [], 'Reassign GPR C Step Failed', 0)
+        }
+    },
+
     getActionRequiredQueue: async (dataItem: any) => {
         try {
             const picEmail = normalizeEmail(dataItem.pic_email)
@@ -585,8 +648,10 @@ export const RegisterRequestGprCFlowService = {
 
             const stepApprovers = await resolveStepApprovers(approverEmpcode)
             const circularMembers = await buildCircularMembers(gprCData.gpr_c_circular_empcodes || [])
-            const pcPicName = normalizeValue(gprCData.gpr_c_pc_pic_name)
-            const pcPicEmail = normalizeEmail(gprCData.gpr_c_pc_pic_email)
+            const pcPicEmpcode = normalizeValue(gprCData.gpr_c_pc_pic_empcode)
+            const pcPicProfile = pcPicEmpcode ? await getMemberProfile(pcPicEmpcode) : null
+            const pcPicName = normalizeValue(pcPicProfile?.name || gprCData.gpr_c_pc_pic_name)
+            const pcPicEmail = normalizeEmail(pcPicProfile?.email || gprCData.gpr_c_pc_pic_email)
             const ccEmails = mergeUniqueEmails(
                 pcPicEmail ? [pcPicEmail] : [],
                 circularMembers.map(item => item.email)
