@@ -4,11 +4,35 @@ import { BlacklistModel } from '@src/_workspace/models/_black-list/BlacklistMode
 import { BlacklistUSModel } from '@src/_workspace/models/_black-list/BlacklistModel'
 import { BlacklistCNModel } from '@src/_workspace/models/_black-list/BlacklistModel'
 
+const getRequestDataItem = (req: Request) => {
+    let dataItem
+
+    if (!req.body || Object.entries(req.body).length === 0) {
+        dataItem = req.query
+    } else {
+        dataItem = req.body
+    }
+
+    if (typeof dataItem.dataItem === 'string') {
+        try {
+            return JSON.parse(dataItem.dataItem)
+        } catch {
+            return dataItem
+        }
+    }
+
+    if (dataItem.dataItem && typeof dataItem.dataItem === 'object') {
+        return dataItem.dataItem
+    }
+
+    return dataItem
+}
+
 // ─── US ─────────────────────────────────────────────────────────────────────
 
 export const BlacklistController = {
     search: async (req: Request, res: Response) => {
-        const dataItem = (!req.body || Object.entries(req.body).length === 0) ? req.query : req.body
+        const dataItem = getRequestDataItem(req)
 
         try {
             const result = await BlacklistModel.search(dataItem)
@@ -34,7 +58,7 @@ export const BlacklistController = {
 
 export const BlacklistUSController = {
     search: async (req: Request, res: Response) => {
-        const dataItem = (!req.body || Object.entries(req.body).length === 0) ? req.query : req.body
+        const dataItem = getRequestDataItem(req)
 
         try {
             const result = await BlacklistUSModel.search(dataItem)
@@ -58,12 +82,11 @@ export const BlacklistUSController = {
     },
 
     importFile: async (req: Request, res: Response) => {
-        const dataItem = (!req.body || Object.entries(req.body).length === 0) ? req.query : req.body
+        const dataItem = getRequestDataItem(req)
 
         try {
             const result = await BlacklistUSModel.importFile({
-                CREATE_BY: dataItem.CREATE_BY,
-                UPDATE_BY: dataItem.UPDATE_BY,
+                ...dataItem,
                 file: req.file,
             })
 
@@ -91,7 +114,7 @@ export const BlacklistUSController = {
 
 export const BlacklistCNController = {
     search: async (req: Request, res: Response) => {
-        const dataItem = (!req.body || Object.entries(req.body).length === 0) ? req.query : req.body
+        const dataItem = getRequestDataItem(req)
 
         try {
             const result = await BlacklistCNModel.search(dataItem)
@@ -115,12 +138,11 @@ export const BlacklistCNController = {
     },
 
     importFile: async (req: Request, res: Response) => {
-        const dataItem = (!req.body || Object.entries(req.body).length === 0) ? req.query : req.body
+        const dataItem = getRequestDataItem(req)
 
         try {
             const result = await BlacklistCNModel.importFile({
-                CREATE_BY: dataItem.CREATE_BY,
-                UPDATE_BY: dataItem.UPDATE_BY,
+                ...dataItem,
                 file: req.file,
             })
 
