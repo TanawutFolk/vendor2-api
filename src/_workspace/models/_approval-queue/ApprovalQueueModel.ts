@@ -1,8 +1,8 @@
 import { ApprovalQueueService } from '../../services/_approval-queue/ApprovalQueueService'
 
 export const ApprovalQueueModel = {
-    getAllRequests: ApprovalQueueService.getAllRequests,
-    updateStatus: ApprovalQueueService.updateStatus,
-    getStatusOptions: ApprovalQueueService.getStatusOptions,
-    reassignAssignment: ApprovalQueueService.reassignAssignment,
+    getAllRequests: async (dataItem: any, sqlWhere: string = '') => ApprovalQueueService.getAllRequests(dataItem, sqlWhere),
+    updateStatus: async (dataItem: any) => ApprovalQueueService.updateStatus(dataItem),
+    getStatusOptions: async (dataItem: any = {}) => ApprovalQueueService.getStatusOptions(dataItem),
+    reassignAssignment: async (dataItem: any) => ApprovalQueueService.reassignAssignment(dataItem),
 }
