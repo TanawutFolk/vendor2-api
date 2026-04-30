@@ -53,10 +53,14 @@ import LocRoutes from './routes/loc/LocRoutes'
 import YieldRateGoStraightRateProcessForSctRoutes from './routes/yield-rate/YieldRateGoStraightRateProcessForSctRoutes'
 import YieldRateGoStraightRateTotalForSctRoutes from './routes/yield-rate/YieldRateGoStraightRateTotalForSctRoutes'
 import addVendorRoutes from './routes/_add-vendor/AddVendorRoutes'
+import accRegisterRoutes from './routes/_Acc-register/AccRegisterRoutes'
+import gprCApprovalRoutes from './routes/_approval-GPRC/GprCApprovalRoutes'
 import blacklistRoutes from './routes/_black-list/BlacklistRoute'
 import findVendorRoutes from './routes/_find-vendor/FindVendorRoute'
-import registerRequestRoutes from './routes/_request-registrer/RegisterRequestRoute'
-import assigneesRoutes from './routes/_task-manager/AssigneesRoutes'
+import createApprovalQueueRoutes from './routes/_approval-queue/ApprovalQueueRoutes'
+import registerRequestRoutes from './routes/_request-register/RegisterRequestRoute'
+import assigneesRoutes from './routes/_Employee-manager/AssigneesRoutes'
+import taskManagerRequestRoutes from './routes/_task-manager/TaskManagerRequestRoutes'
 
 const Routers = Router()
 
@@ -130,6 +134,16 @@ Routers.use('/find-vendor', findVendorRoutes)
 
 // ? Register Request Routes
 Routers.use('/register-request', registerRequestRoutes)
+
+// ? Page-aligned Vendor Workflow Route Aliases
+Routers.use('/acc-register', accRegisterRoutes)
+Routers.use('/approval-gprc', gprCApprovalRoutes)
+Routers.use('/approval-queue', createApprovalQueueRoutes())
+Routers.use('/check-document', createApprovalQueueRoutes('DOC_CHECK'))
+Routers.use('/md-approval', createApprovalQueueRoutes('MD_APPROVAL'))
+Routers.use('/po-gm-approval', createApprovalQueueRoutes('PO_GM_APPROVAL'))
+Routers.use('/po-mgr-approval', createApprovalQueueRoutes('PO_MGR_APPROVAL'))
+Routers.use('/task-manager', taskManagerRequestRoutes)
 
 // ? Assignees Configuration Routes
 Routers.use('/assignees', assigneesRoutes)
