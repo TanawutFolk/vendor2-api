@@ -44,7 +44,7 @@ export const startPronesSyncScheduler = () => {
     const hours = Math.floor(msUntilFirst / 1000 / 60 / 60)
     const minutes = Math.floor((msUntilFirst / 1000 / 60) % 60)
 
-    console.log(`[Prones Sync] Scheduler registered — จะ sync ครั้งถัดไปใน ${hours}h ${minutes}m (ทุกวัน 12:30 น.)`)
+    console.log(`[Prones Sync] Scheduler registered — จะ sync ครั้งถัดไปใน ${hours}h ${minutes}m (ทุกวัน 12:00 น.)`)
 
     // รอจนถึง 18:00 น. แล้วค่อยรันครั้งแรก
     setTimeout(() => {

@@ -3,6 +3,7 @@ import { TaskManagerRequestController } from '@src/_workspace/controllers/_task-
 
 const taskManagerRequestRoutes = Router()
 
+taskManagerRequestRoutes.post('/SearchAllTask', TaskManagerRequestController.searchAllTask)
 taskManagerRequestRoutes.post('/gpr-c/task-manager-queue', TaskManagerRequestController.gprCTaskManagerQueue)
 
 export default taskManagerRequestRoutes
