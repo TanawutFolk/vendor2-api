@@ -1,15 +1,15 @@
 import { AddVendorService } from '@src/_workspace/services/_add-vendor/AddVendorService'
 
 export const AddVendorModel = {
-    checkDuplicateVendor: async (dataItem: any) => AddVendorService.checkDuplicateVendor(dataItem),
+  checkDuplicateVendor: async (dataItem: any) => AddVendorService.checkDuplicateVendor(dataItem),
 
-    checkBlacklist: async (dataItem: any) => AddVendorService.checkBlacklist(dataItem),
+  checkBlacklist: async (dataItem: any) => AddVendorService.checkBlacklist(dataItem),
 
-    createVendor: async (dataItem: any) => AddVendorService.createVendor(dataItem),
+  createVendor: async (dataItem: any) => AddVendorService.createVendor(dataItem),
 
-    getVendorTypes: async () => AddVendorService.getVendorTypes(),
+  getVendorTypes: async () => AddVendorService.getVendorTypes(),
 
-    getProductGroups: async () => AddVendorService.getProductGroups(),
+  getProductGroups: async () => AddVendorService.getProductGroups(),
 
-    createProductGroup: async (dataItem: any) => AddVendorService.createProductGroup(dataItem),
+  createProductGroup: async (dataItem: any) => AddVendorService.createProductGroup(dataItem),
 }

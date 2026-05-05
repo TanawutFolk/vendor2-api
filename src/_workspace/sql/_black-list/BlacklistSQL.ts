@@ -1,92 +1,97 @@
-const esc = (value: any) => String(value ?? '').replaceAll('\\', '\\\\').replaceAll("'", "\\'")
+const esc = (value: any) =>
+  String(value ?? '')
+    .replaceAll('\\', '\\\\')
+    .replaceAll("'", "\\'")
 
 export interface BlacklistSearchDataItem {
-    vendor_name?: string
-    group_code?: 'ALL' | 'US' | 'CN' | string
+  vendor_name?: string
+  group_code?: 'ALL' | 'US' | 'CN' | string
 }
 
 export interface BlacklistSearchAgGridDataItem {
-    sqlWhere?: string
-    Order?: string
-    Limit?: number | string
-    Offset?: number | string
+  sqlWhere?: string
+  Order?: string
+  Limit?: number | string
+  Offset?: number | string
 }
 
 export interface BlacklistUsInsertDataItem {
-    source?: string | null
-    entity_number?: string | null
-    entity_type?: string | null
-    programs?: string | null
-    name: string
-    title?: string | null
-    addresses?: string | null
-    federal_register_notice?: string | null
-    start_date?: string | null
-    end_date?: string | null
-    standard_order?: string | null
-    license_requirement?: string | null
-    license_policy?: string | null
-    vessel_information?: string | null
-    remarks?: string | null
-    source_list_url?: string | null
-    alt_names?: string | null
-    citizenships?: string | null
-    dates_of_birth?: string | null
-    nationalities?: string | null
-    places_of_birth?: string | null
-    source_information_url?: string | null
-    description?: string | null
-    CREATE_BY: string
-    UPDATE_BY?: string | null
-    INUSE?: number
+  source?: string | null
+  entity_number?: string | null
+  entity_type?: string | null
+  programs?: string | null
+  name: string
+  title?: string | null
+  addresses?: string | null
+  federal_register_notice?: string | null
+  start_date?: string | null
+  end_date?: string | null
+  standard_order?: string | null
+  license_requirement?: string | null
+  license_policy?: string | null
+  vessel_information?: string | null
+  remarks?: string | null
+  source_list_url?: string | null
+  alt_names?: string | null
+  citizenships?: string | null
+  dates_of_birth?: string | null
+  nationalities?: string | null
+  places_of_birth?: string | null
+  source_information_url?: string | null
+  description?: string | null
+  CREATE_BY: string
+  UPDATE_BY?: string | null
+  INUSE?: number
 }
 
 export interface BlacklistCnInsertDataItem {
-    source_name?: string | null
-    entity_number?: string | null
-    entity_type?: string | null
-    programs?: string | null
-    country?: string | null
-    primary_name: string
-    normalized_name: string
-    wmd_type?: string | null
-    raw_payload?: string | null
-    DESCRIPTION?: string | null
-    CREATE_BY: string
-    UPDATE_BY?: string | null
-    INUSE?: number
+  source_name?: string | null
+  entity_number?: string | null
+  entity_type?: string | null
+  programs?: string | null
+  country?: string | null
+  primary_name: string
+  normalized_name: string
+  wmd_type?: string | null
+  raw_payload?: string | null
+  DESCRIPTION?: string | null
+  CREATE_BY: string
+  UPDATE_BY?: string | null
+  INUSE?: number
 }
 
 export interface BlacklistAliasInsertDataItem {
-    vendor_id: number
-    alias_name: string
-    normalized_alias_name: string
-    CREATE_BY: string
-    UPDATE_BY?: string | null
-    DESCRIPTION?: string | null
-    INUSE?: number
+  vendor_id: number
+  alias_name: string
+  normalized_alias_name: string
+  CREATE_BY: string
+  UPDATE_BY?: string | null
+  DESCRIPTION?: string | null
+  INUSE?: number
 }
 
 export const BlacklistSQL = {
-    search: (dataItem: BlacklistSearchDataItem) => {
-        const groupCode = String(dataItem.group_code || '').trim().toUpperCase()
-        const keyword = String(dataItem.vendor_name || '').trim()
+  search: (dataItem: BlacklistSearchDataItem) => {
+    const groupCode = String(dataItem.group_code || '')
+      .trim()
+      .toUpperCase()
+    const keyword = String(dataItem.vendor_name || '').trim()
 
-        const escapedKeyword = esc(keyword)
-        const escapedKeywordUpper = esc(keyword.toUpperCase())
+    const escapedKeyword = esc(keyword)
+    const escapedKeywordUpper = esc(keyword.toUpperCase())
 
-        let usKeywordSql = keyword
-            ? ` AND (
+    let usKeywordSql = keyword
+      ? ` AND (
                    bu.NAME LIKE '%dataItem.keywordVal%'
                 OR bu.ALT_NAMES LIKE '%dataItem.keywordVal%'
                 OR bu.SOURCE LIKE '%dataItem.keywordVal%'
             )`
-            : ''
+      : ''
 
-        usKeywordSql = usKeywordSql.replaceAll('dataItem.keywordVal', escapedKeyword)
+    usKeywordSql = usKeywordSql.replaceAll('dataItem.keywordVal', escapedKeyword)
 
-        let cnKeywordSql = keyword
-            ? ` AND (
+    let cnKeywordSql = keyword
+      ? ` AND (
                    bc.primary_name LIKE '%dataItem.keywordVal%'
                 OR bc.normalized_name LIKE '%dataItem.keywordUpperVal%'
                 OR EXISTS (
@@ -100,12 +105,12 @@ export const BlacklistSQL = {
                       )
                 )
             )`
-            : ''
+      : ''
 
-        cnKeywordSql = cnKeywordSql.replaceAll('dataItem.keywordUpperVal', escapedKeywordUpper)
-        cnKeywordSql = cnKeywordSql.replaceAll('dataItem.keywordVal', escapedKeyword)
+    cnKeywordSql = cnKeywordSql.replaceAll('dataItem.keywordUpperVal', escapedKeywordUpper)
+    cnKeywordSql = cnKeywordSql.replaceAll('dataItem.keywordVal', escapedKeyword)
 
-        let usSql = `
+    let usSql = `
             SELECT
                   bu.ID AS blacklist_id
                 , 'US' AS group_code
@@ -130,9 +135,9 @@ export const BlacklistSQL = {
                 dataItem.usKeywordSql
         `
 
-        usSql = usSql.replaceAll('dataItem.usKeywordSql', usKeywordSql)
+    usSql = usSql.replaceAll('dataItem.usKeywordSql', usKeywordSql)
 
-        let cnSql = `
+    let cnSql = `
             SELECT
                   bc.id AS blacklist_id
                 , 'CN' AS group_code
@@ -162,47 +167,49 @@ export const BlacklistSQL = {
                 dataItem.cnKeywordSql
         `
 
-        cnSql = cnSql.replaceAll('dataItem.cnKeywordSql', cnKeywordSql)
+    cnSql = cnSql.replaceAll('dataItem.cnKeywordSql', cnKeywordSql)
 
-        if (groupCode === 'US') {
-            let sql = `
+    if (groupCode === 'US') {
+      let sql = `
                 dataItem.usSql
                 ORDER BY vendor_name ASC
             `
 
-            sql = sql.replaceAll('dataItem.usSql', usSql)
+      sql = sql.replaceAll('dataItem.usSql', usSql)
 
-            return sql
-        }
+      return sql
+    }
 
-        if (groupCode === 'CN') {
-            let sql = `
+    if (groupCode === 'CN') {
+      let sql = `
                 dataItem.cnSql
                 ORDER BY vendor_name ASC
             `
 
-            sql = sql.replaceAll('dataItem.cnSql', cnSql)
+      sql = sql.replaceAll('dataItem.cnSql', cnSql)
 
-            return sql
-        }
+      return sql
+    }
 
-        let sql = `
+    let sql = `
             (dataItem.usSql)
             UNION ALL
             (dataItem.cnSql)
             ORDER BY vendor_name ASC
         `
 
-        sql = sql.replaceAll('dataItem.usSql', usSql)
-        sql = sql.replaceAll('dataItem.cnSql', cnSql)
+    sql = sql.replaceAll('dataItem.usSql', usSql)
+    sql = sql.replaceAll('dataItem.cnSql', cnSql)
 
-        return sql
-    },
+    return sql
+  },
 
-    searchAgGrid: (dataItem: BlacklistSearchAgGridDataItem) => {
-        const sqlWhereClause = String(dataItem.sqlWhere || '').trim().replace(/^WHERE\s+/i, 'AND ')
+  searchAgGrid: (dataItem: BlacklistSearchAgGridDataItem) => {
+    const sqlWhereClause = String(dataItem.sqlWhere || '')
+      .trim()
+      .replace(/^WHERE\s+/i, 'AND ')
 
-        const baseSql = `
+    const baseSql = `
             SELECT
                   bu.ID AS blacklist_id
                 , 'US' AS group_code
@@ -251,7 +258,7 @@ export const BlacklistSQL = {
                 blacklist_cn bc
         `
 
-        let sqlCount = `
+    let sqlCount = `
             SELECT
                 COUNT(*) AS TOTAL_COUNT
             FROM (
@@ -262,7 +269,7 @@ export const BlacklistSQL = {
                 dataItem.sqlWhere
         `
 
-        let sqlData = `
+    let sqlData = `
             SELECT
                 *
             FROM (
@@ -277,23 +284,23 @@ export const BlacklistSQL = {
                 dataItem.Limit OFFSET dataItem.Offset
         `
 
-        sqlCount = sqlCount.replaceAll('dataItem.baseSql', baseSql)
-        sqlCount = sqlCount.replaceAll('dataItem.sqlWhere', sqlWhereClause)
+    sqlCount = sqlCount.replaceAll('dataItem.baseSql', baseSql)
+    sqlCount = sqlCount.replaceAll('dataItem.sqlWhere', sqlWhereClause)
 
-        sqlData = sqlData.replaceAll('dataItem.baseSql', baseSql)
-        sqlData = sqlData.replaceAll('dataItem.sqlWhere', sqlWhereClause)
-        sqlData = sqlData.replaceAll('dataItem.Order', dataItem.Order || 'bl.updated_date DESC')
-        sqlData = sqlData.replaceAll('dataItem.Limit', String(dataItem.Limit || 20))
-        sqlData = sqlData.replaceAll('dataItem.Offset', String(dataItem.Offset || 0))
+    sqlData = sqlData.replaceAll('dataItem.baseSql', baseSql)
+    sqlData = sqlData.replaceAll('dataItem.sqlWhere', sqlWhereClause)
+    sqlData = sqlData.replaceAll('dataItem.Order', dataItem.Order || 'bl.updated_date DESC')
+    sqlData = sqlData.replaceAll('dataItem.Limit', String(dataItem.Limit || 20))
+    sqlData = sqlData.replaceAll('dataItem.Offset', String(dataItem.Offset || 0))
 
-        return [sqlCount, sqlData]
-    },
+    return [sqlCount, sqlData]
+  },
 
-    deleteUs: () => 'DELETE FROM blacklist_us',
-    deleteCn: () => 'DELETE FROM blacklist_cn',
+  deleteUs: () => 'DELETE FROM blacklist_us',
+  deleteCn: () => 'DELETE FROM blacklist_cn',
 
-    insertUs: (dataItem: BlacklistUsInsertDataItem) => {
-        let sql = `
+  insertUs: (dataItem: BlacklistUsInsertDataItem) => {
+    let sql = `
         INSERT INTO blacklist_us (
               SOURCE
             , ENTITY_NUMBER
@@ -351,40 +358,40 @@ export const BlacklistSQL = {
         )
     `
 
-        // ⚠️  Order matters: replace longer keys BEFORE shorter ones that share a prefix
-        //    e.g. 'dataItem.source_list_url' must come before 'dataItem.source'
-        sql = sql.replaceAll('dataItem.source_list_url', dataItem.source_list_url ? `'${esc(dataItem.source_list_url)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.source_information_url', dataItem.source_information_url ? `'${esc(dataItem.source_information_url)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.source', dataItem.source ? `'${esc(dataItem.source)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.entity_number', dataItem.entity_number ? `'${esc(dataItem.entity_number)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.entity_type', dataItem.entity_type ? `'${esc(dataItem.entity_type)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.programs', dataItem.programs ? `'${esc(dataItem.programs)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.name', esc(dataItem.name))
-        sql = sql.replaceAll('dataItem.title', dataItem.title ? `'${esc(dataItem.title)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.addresses', dataItem.addresses ? `'${esc(dataItem.addresses)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.federal_register_notice', dataItem.federal_register_notice ? `'${esc(dataItem.federal_register_notice)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.start_date', dataItem.start_date ? `'${esc(dataItem.start_date)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.end_date', dataItem.end_date ? `'${esc(dataItem.end_date)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.standard_order', dataItem.standard_order ? `'${esc(dataItem.standard_order)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.license_requirement', dataItem.license_requirement ? `'${esc(dataItem.license_requirement)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.license_policy', dataItem.license_policy ? `'${esc(dataItem.license_policy)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.vessel_information', dataItem.vessel_information ? `'${esc(dataItem.vessel_information)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.remarks', dataItem.remarks ? `'${esc(dataItem.remarks)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.alt_names', dataItem.alt_names ? `'${esc(dataItem.alt_names)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.citizenships', dataItem.citizenships ? `'${esc(dataItem.citizenships)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.dates_of_birth', dataItem.dates_of_birth ? `'${esc(dataItem.dates_of_birth)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.nationalities', dataItem.nationalities ? `'${esc(dataItem.nationalities)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.places_of_birth', dataItem.places_of_birth ? `'${esc(dataItem.places_of_birth)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.description', dataItem.description ? `'${esc(dataItem.description)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.CREATE_BY', esc(dataItem.CREATE_BY))
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY ? `'${esc(dataItem.UPDATE_BY)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.INUSE', String(dataItem.INUSE ?? 1))
+    // ⚠️  Order matters: replace longer keys BEFORE shorter ones that share a prefix
+    //    e.g. 'dataItem.source_list_url' must come before 'dataItem.source'
+    sql = sql.replaceAll('dataItem.source_list_url', dataItem.source_list_url ? `'${esc(dataItem.source_list_url)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.source_information_url', dataItem.source_information_url ? `'${esc(dataItem.source_information_url)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.source', dataItem.source ? `'${esc(dataItem.source)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.entity_number', dataItem.entity_number ? `'${esc(dataItem.entity_number)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.entity_type', dataItem.entity_type ? `'${esc(dataItem.entity_type)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.programs', dataItem.programs ? `'${esc(dataItem.programs)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.name', esc(dataItem.name))
+    sql = sql.replaceAll('dataItem.title', dataItem.title ? `'${esc(dataItem.title)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.addresses', dataItem.addresses ? `'${esc(dataItem.addresses)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.federal_register_notice', dataItem.federal_register_notice ? `'${esc(dataItem.federal_register_notice)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.start_date', dataItem.start_date ? `'${esc(dataItem.start_date)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.end_date', dataItem.end_date ? `'${esc(dataItem.end_date)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.standard_order', dataItem.standard_order ? `'${esc(dataItem.standard_order)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.license_requirement', dataItem.license_requirement ? `'${esc(dataItem.license_requirement)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.license_policy', dataItem.license_policy ? `'${esc(dataItem.license_policy)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.vessel_information', dataItem.vessel_information ? `'${esc(dataItem.vessel_information)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.remarks', dataItem.remarks ? `'${esc(dataItem.remarks)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.alt_names', dataItem.alt_names ? `'${esc(dataItem.alt_names)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.citizenships', dataItem.citizenships ? `'${esc(dataItem.citizenships)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.dates_of_birth', dataItem.dates_of_birth ? `'${esc(dataItem.dates_of_birth)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.nationalities', dataItem.nationalities ? `'${esc(dataItem.nationalities)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.places_of_birth', dataItem.places_of_birth ? `'${esc(dataItem.places_of_birth)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.description', dataItem.description ? `'${esc(dataItem.description)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.CREATE_BY', esc(dataItem.CREATE_BY))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY ? `'${esc(dataItem.UPDATE_BY)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.INUSE', String(dataItem.INUSE ?? 1))
 
-        return sql
-    },
+    return sql
+  },
 
-    insertCn: (dataItem: BlacklistCnInsertDataItem) => {
-        let sql = `
+  insertCn: (dataItem: BlacklistCnInsertDataItem) => {
+    let sql = `
         INSERT INTO blacklist_cn (
               source_name
             , entity_number
@@ -416,25 +423,25 @@ export const BlacklistSQL = {
         )
     `
 
-        sql = sql.replaceAll('dataItem.source_name', dataItem.source_name ? `'${esc(dataItem.source_name)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.entity_number', dataItem.entity_number ? `'${esc(dataItem.entity_number)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.entity_type', dataItem.entity_type ? `'${esc(dataItem.entity_type)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.programs', dataItem.programs ? `'${esc(dataItem.programs)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.country', dataItem.country ? `'${esc(dataItem.country)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.primary_name', esc(dataItem.primary_name))
-        sql = sql.replaceAll('dataItem.normalized_name', esc(dataItem.normalized_name))
-        sql = sql.replaceAll('dataItem.wmd_type', dataItem.wmd_type ? `'${esc(dataItem.wmd_type)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.raw_payload', dataItem.raw_payload ? `'${esc(dataItem.raw_payload)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem.DESCRIPTION ? `'${esc(dataItem.DESCRIPTION)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.CREATE_BY', esc(dataItem.CREATE_BY))
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY ? `'${esc(dataItem.UPDATE_BY)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.INUSE', String(dataItem.INUSE ?? 1))
+    sql = sql.replaceAll('dataItem.source_name', dataItem.source_name ? `'${esc(dataItem.source_name)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.entity_number', dataItem.entity_number ? `'${esc(dataItem.entity_number)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.entity_type', dataItem.entity_type ? `'${esc(dataItem.entity_type)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.programs', dataItem.programs ? `'${esc(dataItem.programs)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.country', dataItem.country ? `'${esc(dataItem.country)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.primary_name', esc(dataItem.primary_name))
+    sql = sql.replaceAll('dataItem.normalized_name', esc(dataItem.normalized_name))
+    sql = sql.replaceAll('dataItem.wmd_type', dataItem.wmd_type ? `'${esc(dataItem.wmd_type)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.raw_payload', dataItem.raw_payload ? `'${esc(dataItem.raw_payload)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem.DESCRIPTION ? `'${esc(dataItem.DESCRIPTION)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.CREATE_BY', esc(dataItem.CREATE_BY))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY ? `'${esc(dataItem.UPDATE_BY)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.INUSE', String(dataItem.INUSE ?? 1))
 
-        return sql
-    },
+    return sql
+  },
 
-    insertAlias: (dataItem: BlacklistAliasInsertDataItem) => {
-        let sql = `
+  insertAlias: (dataItem: BlacklistAliasInsertDataItem) => {
+    let sql = `
                 INSERT INTO blacklist_cn_aliases (
               vendor_id
             , alias_name
@@ -454,23 +461,23 @@ export const BlacklistSQL = {
         )
     `
 
-        sql = sql.replaceAll('dataItem.vendor_id', String(dataItem.vendor_id))
-        sql = sql.replaceAll('dataItem.alias_name', esc(dataItem.alias_name))
-        sql = sql.replaceAll('dataItem.normalized_alias_name', esc(dataItem.normalized_alias_name))
-        sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem.DESCRIPTION ? `'${esc(dataItem.DESCRIPTION)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.CREATE_BY', esc(dataItem.CREATE_BY))
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY ? `'${esc(dataItem.UPDATE_BY)}'` : 'NULL')
-        sql = sql.replaceAll('dataItem.INUSE', String(dataItem.INUSE ?? 1))
+    sql = sql.replaceAll('dataItem.vendor_id', String(dataItem.vendor_id))
+    sql = sql.replaceAll('dataItem.alias_name', esc(dataItem.alias_name))
+    sql = sql.replaceAll('dataItem.normalized_alias_name', esc(dataItem.normalized_alias_name))
+    sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem.DESCRIPTION ? `'${esc(dataItem.DESCRIPTION)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.CREATE_BY', esc(dataItem.CREATE_BY))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY ? `'${esc(dataItem.UPDATE_BY)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.INUSE', String(dataItem.INUSE ?? 1))
 
-        return sql
-    },
+    return sql
+  },
 
-    // ─── Blacklist check for Add Vendor ────────────────────────────────────────
-    // normalizedCompanyName must already be normalized (uppercase, punctuation stripped)
-    checkBlacklist: (normalizedCompanyName: string) => {
-        const escaped = esc(normalizedCompanyName)
+  // ─── Blacklist check for Add Vendor ────────────────────────────────────────
+  // normalizedCompanyName must already be normalized (uppercase, punctuation stripped)
+  checkBlacklist: (normalizedCompanyName: string) => {
+    const escaped = esc(normalizedCompanyName)
 
-        let sql = `
+    let sql = `
             SELECT
                   group_code
                 , matched_name
@@ -531,8 +538,8 @@ export const BlacklistSQL = {
             ORDER BY group_code ASC, match_type ASC
         `
 
-        sql = sql.replaceAll('dataItem.normalizedCompanyName', escaped)
+    sql = sql.replaceAll('dataItem.normalizedCompanyName', escaped)
 
-        return sql
-    },
+    return sql
+  },
 }

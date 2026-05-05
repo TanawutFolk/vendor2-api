@@ -1,91 +1,91 @@
 export interface RegisterRequestDataItem {
-    request_id?: number | string;
-    request_number?: string;
-    vendor_id?: number | string;
-    vendor_contact_id?: number | string;
-    Request_By_EmployeeCode?: string;
-    supportProduct_Process?: string;
-    purchase_frequency?: string;
-    request_status?: string;
-    requester_remark?: string;
-    assign_to?: string;
-    PIC_Email?: string;
-    CREATE_BY?: string;
-    UPDATE_BY?: string;
-    file_name?: string;
-    file_path?: string;
-    file_size?: number | string;
-    file_type?: string;
-    sqlWhere?: string;
-    sqlWhereColumnFilter?: string;
-    Order?: string;
-    Limit?: number | string;
-    Offset?: number | string;
-    approve_by?: string;
-    approve_date?: string;
-    approver_remark?: string;
-    step_id?: number | string;
-    step_order?: number | string;
-    approver_id?: string;
-    step_status?: string;
-    DESCRIPTION?: string;
-    step_code?: string;
-    actor_type?: string;
-    group_code?: string;
-    assignment_mode?: string;
-    action_by?: string;
-    action_type?: string;
-    remark?: string;
-    vendor_code?: string;
-    selection_id?: number | string;
-    business_category?: string;
-    start_year?: string;
-    authorized_capital?: string;
-    establish?: string;
-    number_of_employees?: string;
-    manufactured_country?: string;
-    vendor_original_country?: string;
-    sanctions?: string;
-    currency?: string;
-    suggestion?: string;
-    result?: string;
-    path?: string;
-    vendor_code_selector?: string;
-    completion_date?: string;
-    gpr_c_approver_name?: string;
-    gpr_c_approver_email?: string;
-    gpr_c_pc_pic_name?: string;
-    gpr_c_pc_pic_email?: string;
-    gpr_c_circular_json?: string;
-    action_required_json?: string;
-    completion_date_null?: string;
-    year?: string;
-    total_revenue?: number | string;
-    net_profit?: number | string;
-    no?: string | number;
-    criteria?: string;
-    uploaded_file?: string;
-    uploaded_name?: string;
-    path_null?: string;
-    name_null?: string;
-    vendor_region?: string;
-    group_name?: string;
-    scope?: string;
-    from_empcode?: string;
-    to_empcode?: string;
-    changed_by?: string;
-    reason?: string;
-    fft_status?: number | string;
-    empcode?: string;
-    target_group?: string;
-    target_compact?: string;
-    group_compact?: string;
-    is_oversea?: boolean | number | string;
+  request_id?: number | string
+  request_number?: string
+  vendor_id?: number | string
+  vendor_contact_id?: number | string
+  Request_By_EmployeeCode?: string
+  supportProduct_Process?: string
+  purchase_frequency?: string
+  request_status?: string
+  requester_remark?: string
+  assign_to?: string
+  PIC_Email?: string
+  CREATE_BY?: string
+  UPDATE_BY?: string
+  file_name?: string
+  file_path?: string
+  file_size?: number | string
+  file_type?: string
+  sqlWhere?: string
+  sqlWhereColumnFilter?: string
+  Order?: string
+  Limit?: number | string
+  Offset?: number | string
+  approve_by?: string
+  approve_date?: string
+  approver_remark?: string
+  step_id?: number | string
+  step_order?: number | string
+  approver_id?: string
+  step_status?: string
+  DESCRIPTION?: string
+  step_code?: string
+  actor_type?: string
+  group_code?: string
+  assignment_mode?: string
+  action_by?: string
+  action_type?: string
+  remark?: string
+  vendor_code?: string
+  selection_id?: number | string
+  business_category?: string
+  start_year?: string
+  authorized_capital?: string
+  establish?: string
+  number_of_employees?: string
+  manufactured_country?: string
+  vendor_original_country?: string
+  sanctions?: string
+  currency?: string
+  suggestion?: string
+  result?: string
+  path?: string
+  vendor_code_selector?: string
+  completion_date?: string
+  gpr_c_approver_name?: string
+  gpr_c_approver_email?: string
+  gpr_c_pc_pic_name?: string
+  gpr_c_pc_pic_email?: string
+  gpr_c_circular_json?: string
+  action_required_json?: string
+  completion_date_null?: string
+  year?: string
+  total_revenue?: number | string
+  net_profit?: number | string
+  no?: string | number
+  criteria?: string
+  uploaded_file?: string
+  uploaded_name?: string
+  path_null?: string
+  name_null?: string
+  vendor_region?: string
+  group_name?: string
+  scope?: string
+  from_empcode?: string
+  to_empcode?: string
+  changed_by?: string
+  reason?: string
+  fft_status?: number | string
+  empcode?: string
+  target_group?: string
+  target_compact?: string
+  group_compact?: string
+  is_oversea?: boolean | number | string
 }
 
 export const RequestHistorySQL = {
-    getById: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getById: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        rr.request_id
                                                                          , rr.request_number
@@ -278,14 +278,13 @@ export const RequestHistorySQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-
-    getApprovalSteps: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getApprovalSteps: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT 
                                        ras.step_id
                                      , ras.request_id
@@ -313,14 +312,13 @@ export const RequestHistorySQL = {
                                        ras.step_order ASC
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-
-    getApprovalLogs: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getApprovalLogs: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT 
                                        ral.log_id
                                      , ral.request_id
@@ -340,13 +338,13 @@ export const RequestHistorySQL = {
                                        ral.action_date ASC
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-    getSelection: (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getSelection: (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT * FROM
                                        request_vendor_selections
                             WHERE
@@ -356,7 +354,7 @@ export const RequestHistorySQL = {
                             LIMIT
                                        1
         `
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        return sql
-    }
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    return sql
+  },
 }

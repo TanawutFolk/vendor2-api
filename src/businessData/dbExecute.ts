@@ -204,7 +204,6 @@
 import oracledb from 'oracledb'
 import { connection, connectionOracle } from './db'
 
-
 export const MySQLExecute = {
   // SELECT
   search: async (query: string, configDb: string = '') => {
@@ -305,7 +304,6 @@ export const MySQLExecute = {
       if (conn) conn.release()
     }
   },
-
 }
 
 export const OracleExecute = {
@@ -315,7 +313,7 @@ export const OracleExecute = {
       conn = await connectionOracle(configDb)
       const binds = {}
       const options = {
-        outFormat: oracledb.OUT_FORMAT_OBJECT
+        outFormat: oracledb.OUT_FORMAT_OBJECT,
       }
       const result = await conn.execute(query, binds, options)
 
@@ -334,7 +332,7 @@ export const OracleExecute = {
       conn = await connectionOracle(configDb)
       const binds = {}
       const options = {
-        outFormat: oracledb.OUT_FORMAT_OBJECT
+        outFormat: oracledb.OUT_FORMAT_OBJECT,
       }
 
       for (let i = 0; i < queryList.length; i++) {
@@ -349,5 +347,5 @@ export const OracleExecute = {
     } finally {
       if (conn) await conn.close()
     }
-  }
+  },
 }

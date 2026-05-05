@@ -1,38 +1,38 @@
 export interface FindVendorDataItem {
-    vendor_id?: number | string;
-    sqlWhere?: string;
-    sqlWhereColumnFilter?: string;
-    Order?: string;
-    Limit?: number | string;
-    Offset?: number | string;
-    company_name?: string;
-    vendor_type_id?: number | string;
-    vendor_region?: string;
-    province?: string;
-    postal_code?: string;
-    website?: string;
-    address?: string;
-    tel_center?: string;
-    emailmain?: string;
-    INUSE?: number | string;
-    UPDATE_BY?: string;
-    contact_name?: string;
-    tel_phone?: string;
-    email?: string;
-    position?: string;
-    vendor_contact_id?: number | string;
-    product_group_id?: number | string;
-    maker_name?: string;
-    product_name?: string;
-    model_list?: string;
-    vendor_product_id?: number | string;
-    CREATE_BY?: string;
+  vendor_id?: number | string
+  sqlWhere?: string
+  sqlWhereColumnFilter?: string
+  Order?: string
+  Limit?: number | string
+  Offset?: number | string
+  company_name?: string
+  vendor_type_id?: number | string
+  vendor_region?: string
+  province?: string
+  postal_code?: string
+  website?: string
+  address?: string
+  tel_center?: string
+  emailmain?: string
+  INUSE?: number | string
+  UPDATE_BY?: string
+  contact_name?: string
+  tel_phone?: string
+  email?: string
+  position?: string
+  vendor_contact_id?: number | string
+  product_group_id?: number | string
+  maker_name?: string
+  product_name?: string
+  model_list?: string
+  vendor_product_id?: number | string
+  CREATE_BY?: string
 }
 
 export const FindVendorSQL = {
-    // Search vendors with contacts
-    search: (dataItem: FindVendorDataItem, sqlWhere: string = '') => {
-        const statusCheckExpression = `
+  // Search vendors with contacts
+  search: (dataItem: FindVendorDataItem, sqlWhere: string = '') => {
+    const statusCheckExpression = `
             CASE
                 WHEN v.fft_status = 2 THEN 'Cannot Register'
                 WHEN EXISTS (
@@ -45,8 +45,8 @@ export const FindVendorSQL = {
                 ELSE IFNULL(vmr.status_check, 'Not Registered')
             END
         `
-        // Count query
-        let sqlCount = `
+    // Count query
+    let sqlCount = `
                             SELECT
                                        COUNT(DISTINCT v.vendor_id) AS TOTAL_COUNT
                             FROM
@@ -67,8 +67,8 @@ export const FindVendorSQL = {
                                        dataItem.sqlWhereColumnFilter
         `
 
-        // Data query
-        let sqlData = `
+    // Data query
+    let sqlData = `
                             SELECT
                                        v.vendor_id
                                      , v.fft_vendor_code
@@ -183,24 +183,24 @@ export const FindVendorSQL = {
                                        dataItem.Limit OFFSET dataItem.Offset
         `
 
-        // Replace placeholders
-        sqlCount = sqlCount.replaceAll('dataItem.statusCheckExpression', statusCheckExpression)
-        sqlCount = sqlCount.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
-        sqlCount = sqlCount.replaceAll('dataItem.sqlWhere', sqlWhere)
+    // Replace placeholders
+    sqlCount = sqlCount.replaceAll('dataItem.statusCheckExpression', statusCheckExpression)
+    sqlCount = sqlCount.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
+    sqlCount = sqlCount.replaceAll('dataItem.sqlWhere', sqlWhere)
 
-        sqlData = sqlData.replaceAll('dataItem.statusCheckExpression', statusCheckExpression)
-        sqlData = sqlData.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
-        sqlData = sqlData.replaceAll('dataItem.sqlWhere', sqlWhere)
-        sqlData = sqlData.replaceAll('dataItem.Order', dataItem['Order'] || 'v.vendor_id DESC')
-        sqlData = sqlData.replaceAll('dataItem.Limit', (dataItem['Limit'] || 10).toString())
-        sqlData = sqlData.replaceAll('dataItem.Offset', (dataItem['Offset'] || 0).toString())
+    sqlData = sqlData.replaceAll('dataItem.statusCheckExpression', statusCheckExpression)
+    sqlData = sqlData.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
+    sqlData = sqlData.replaceAll('dataItem.sqlWhere', sqlWhere)
+    sqlData = sqlData.replaceAll('dataItem.Order', dataItem['Order'] || 'v.vendor_id DESC')
+    sqlData = sqlData.replaceAll('dataItem.Limit', (dataItem['Limit'] || 10).toString())
+    sqlData = sqlData.replaceAll('dataItem.Offset', (dataItem['Offset'] || 0).toString())
 
-        return [sqlCount, sqlData]
-    },
+    return [sqlCount, sqlData]
+  },
 
-    // Get vendor by ID
-    getById: (dataItem: { vendor_id: number | string }) => {
-        const statusCheckExpression = `
+  // Get vendor by ID
+  getById: (dataItem: { vendor_id: number | string }) => {
+    const statusCheckExpression = `
             CASE
                 WHEN v.fft_status = 2 THEN 'Cannot Register'
                 WHEN EXISTS (
@@ -213,7 +213,7 @@ export const FindVendorSQL = {
                 ELSE IFNULL(vmr.status_check, 'Not Registered')
             END
         `
-        let sql = `
+    let sql = `
                             SELECT
                                        v.vendor_id
                                      , v.fft_vendor_code
@@ -295,21 +295,20 @@ export const FindVendorSQL = {
                             WHERE
                                        v.vendor_id = dataItem.vendor_id
         `
-        sql = sql.replaceAll('dataItem.statusCheckExpression', statusCheckExpression)
-        sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
-        return sql
-    },
+    sql = sql.replaceAll('dataItem.statusCheckExpression', statusCheckExpression)
+    sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
+    return sql
+  },
 
+  // Helper to escape single quotes for SQL
+  escapeSql: (str: string | null | undefined) => {
+    if (str === null || str === undefined) return ''
+    return String(str).replace(/'/g, "\\'")
+  },
 
-    // Helper to escape single quotes for SQL
-    escapeSql: (str: string | null | undefined) => {
-        if (str === null || str === undefined) return ''
-        return String(str).replace(/'/g, "\\'")
-    },
-
-    // Update vendor
-    updateVendor: (dataItem: FindVendorDataItem) => {
-        let sql = `
+  // Update vendor
+  updateVendor: (dataItem: FindVendorDataItem) => {
+    let sql = `
                             UPDATE vendors SET
                                        company_name = 'dataItem.company_name'
                                      , vendor_type_id = dataItem.vendor_type_id
@@ -326,25 +325,25 @@ export const FindVendorSQL = {
                             WHERE
                                        vendor_id = dataItem.vendor_id
         `
-        sql = sql.replaceAll('dataItem.company_name', dataItem['company_name'] || '')
-        sql = sql.replaceAll('dataItem.vendor_type_id', (dataItem['vendor_type_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.vendor_region', dataItem['vendor_region'] || 'Local')
-        sql = sql.replaceAll('dataItem.province', dataItem['province'] || '')
-        sql = sql.replaceAll('dataItem.postal_code', dataItem['postal_code'] || '')
-        sql = sql.replaceAll('dataItem.website', dataItem['website'] || '')
-        sql = sql.replaceAll('dataItem.address', dataItem['address'] || '')
-        sql = sql.replaceAll('dataItem.tel_center', dataItem['tel_center'] || '')
-        sql = sql.replaceAll('dataItem.emailmain', dataItem['emailmain'] || '')
-        sql = sql.replaceAll('dataItem.INUSE', (dataItem['INUSE'] || 0).toString())
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
-        sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.company_name', dataItem['company_name'] || '')
+    sql = sql.replaceAll('dataItem.vendor_type_id', (dataItem['vendor_type_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.vendor_region', dataItem['vendor_region'] || 'Local')
+    sql = sql.replaceAll('dataItem.province', dataItem['province'] || '')
+    sql = sql.replaceAll('dataItem.postal_code', dataItem['postal_code'] || '')
+    sql = sql.replaceAll('dataItem.website', dataItem['website'] || '')
+    sql = sql.replaceAll('dataItem.address', dataItem['address'] || '')
+    sql = sql.replaceAll('dataItem.tel_center', dataItem['tel_center'] || '')
+    sql = sql.replaceAll('dataItem.emailmain', dataItem['emailmain'] || '')
+    sql = sql.replaceAll('dataItem.INUSE', (dataItem['INUSE'] || 0).toString())
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-    // Update vendor contact
-    updateVendorContact: (dataItem: FindVendorDataItem) => {
-        let sql = `
+  // Update vendor contact
+  updateVendorContact: (dataItem: FindVendorDataItem) => {
+    let sql = `
                             UPDATE vendor_contacts SET
                                        contact_name = 'dataItem.contact_name'
                                      , tel_phone = 'dataItem.tel_phone'
@@ -355,19 +354,19 @@ export const FindVendorSQL = {
                             WHERE
                                        vendor_contact_id = dataItem.vendor_contact_id
         `
-        sql = sql.replaceAll('dataItem.contact_name', dataItem['contact_name'] || '')
-        sql = sql.replaceAll('dataItem.tel_phone', dataItem['tel_phone'] || '')
-        sql = sql.replaceAll('dataItem.email', dataItem['email'] || '')
-        sql = sql.replaceAll('dataItem.position', dataItem['position'] || '')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
-        sql = sql.replaceAll('dataItem.vendor_contact_id', (dataItem['vendor_contact_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.contact_name', dataItem['contact_name'] || '')
+    sql = sql.replaceAll('dataItem.tel_phone', dataItem['tel_phone'] || '')
+    sql = sql.replaceAll('dataItem.email', dataItem['email'] || '')
+    sql = sql.replaceAll('dataItem.position', dataItem['position'] || '')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.vendor_contact_id', (dataItem['vendor_contact_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-    // Create vendor contact
-    createVendorContact: (dataItem: FindVendorDataItem) => {
-        let sql = `
+  // Create vendor contact
+  createVendorContact: (dataItem: FindVendorDataItem) => {
+    let sql = `
                             INSERT INTO vendor_contacts (
                                        vendor_id
                                      , contact_name
@@ -392,19 +391,19 @@ export const FindVendorSQL = {
                                      ,  1
                             )
         `
-        sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.contact_name', dataItem['contact_name'] || '')
-        sql = sql.replaceAll('dataItem.tel_phone', dataItem['tel_phone'] || '')
-        sql = sql.replaceAll('dataItem.email', dataItem['email'] || '')
-        sql = sql.replaceAll('dataItem.position', dataItem['position'] || '')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.contact_name', dataItem['contact_name'] || '')
+    sql = sql.replaceAll('dataItem.tel_phone', dataItem['tel_phone'] || '')
+    sql = sql.replaceAll('dataItem.email', dataItem['email'] || '')
+    sql = sql.replaceAll('dataItem.position', dataItem['position'] || '')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-    // Update vendor product
-    updateVendorProduct: (dataItem: FindVendorDataItem) => {
-        let sql = `
+  // Update vendor product
+  updateVendorProduct: (dataItem: FindVendorDataItem) => {
+    let sql = `
                             UPDATE vendor_products SET
                                        product_group_id = dataItem.product_group_id
                                      , maker_name = 'dataItem.maker_name'
@@ -415,19 +414,19 @@ export const FindVendorSQL = {
                             WHERE
                                        vendor_product_id = dataItem.vendor_product_id
         `
-        sql = sql.replaceAll('dataItem.product_group_id', (dataItem['product_group_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.maker_name', dataItem['maker_name'] || '')
-        sql = sql.replaceAll('dataItem.product_name', dataItem['product_name'] || '')
-        sql = sql.replaceAll('dataItem.model_list', dataItem['model_list'] || '')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
-        sql = sql.replaceAll('dataItem.vendor_product_id', (dataItem['vendor_product_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.product_group_id', (dataItem['product_group_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.maker_name', dataItem['maker_name'] || '')
+    sql = sql.replaceAll('dataItem.product_name', dataItem['product_name'] || '')
+    sql = sql.replaceAll('dataItem.model_list', dataItem['model_list'] || '')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.vendor_product_id', (dataItem['vendor_product_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-    // Create vendor product
-    createVendorProduct: (dataItem: FindVendorDataItem) => {
-        let sql = `
+  // Create vendor product
+  createVendorProduct: (dataItem: FindVendorDataItem) => {
+    let sql = `
                             INSERT INTO vendor_products (
                                        vendor_id
                                      , product_group_id
@@ -452,19 +451,19 @@ export const FindVendorSQL = {
                                      ,  1
                             )
         `
-        sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.product_group_id', (dataItem['product_group_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.maker_name', dataItem['maker_name'] || '')
-        sql = sql.replaceAll('dataItem.product_name', dataItem['product_name'] || '')
-        sql = sql.replaceAll('dataItem.model_list', dataItem['model_list'] || '')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.product_group_id', (dataItem['product_group_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.maker_name', dataItem['maker_name'] || '')
+    sql = sql.replaceAll('dataItem.product_name', dataItem['product_name'] || '')
+    sql = sql.replaceAll('dataItem.model_list', dataItem['model_list'] || '')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-    // Delete vendor contact (Soft Delete)
-    deleteVendorContact: (dataItem: FindVendorDataItem) => {
-        let sql = `
+  // Delete vendor contact (Soft Delete)
+  deleteVendorContact: (dataItem: FindVendorDataItem) => {
+    let sql = `
                             UPDATE vendor_contacts SET
                                        INUSE = 0
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
@@ -472,14 +471,14 @@ export const FindVendorSQL = {
                             WHERE
                                        vendor_contact_id = dataItem.vendor_contact_id
         `
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
-        sql = sql.replaceAll('dataItem.vendor_contact_id', (dataItem['vendor_contact_id'] || 0).toString())
-        return sql
-    },
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.vendor_contact_id', (dataItem['vendor_contact_id'] || 0).toString())
+    return sql
+  },
 
-    // Delete vendor product (Soft Delete)
-    deleteVendorProduct: (dataItem: FindVendorDataItem) => {
-        let sql = `
+  // Delete vendor product (Soft Delete)
+  deleteVendorProduct: (dataItem: FindVendorDataItem) => {
+    let sql = `
                             UPDATE vendor_products SET
                                        INUSE = 0
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
@@ -487,14 +486,14 @@ export const FindVendorSQL = {
                             WHERE
                                        vendor_product_id = dataItem.vendor_product_id
         `
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
-        sql = sql.replaceAll('dataItem.vendor_product_id', (dataItem['vendor_product_id'] || 0).toString())
-        return sql
-    },
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.vendor_product_id', (dataItem['vendor_product_id'] || 0).toString())
+    return sql
+  },
 
-    // Get vendor types for dropdown
-    getVendorTypes: (dataItem?: any) => {
-        let sql = `
+  // Get vendor types for dropdown
+  getVendorTypes: (dataItem?: any) => {
+    let sql = `
                             SELECT
                                        vendor_type_id AS value
                                      , name AS label
@@ -505,12 +504,12 @@ export const FindVendorSQL = {
                             ORDER BY
                                        name ASC
         `
-        return sql
-    },
+    return sql
+  },
 
-    // Get provinces for dropdown
-    getProvinces: (dataItem?: any) => {
-        let sql = `
+  // Get provinces for dropdown
+  getProvinces: (dataItem?: any) => {
+    let sql = `
                             SELECT DISTINCT
                                        province AS value
                                      , province AS label
@@ -523,12 +522,12 @@ export const FindVendorSQL = {
                             ORDER BY
                                        province ASC
         `
-        return sql
-    },
+    return sql
+  },
 
-    // Get product groups for dropdown
-    getProductGroups: (dataItem?: any) => {
-        let sql = `
+  // Get product groups for dropdown
+  getProductGroups: (dataItem?: any) => {
+    let sql = `
                             SELECT
                                        product_group_id AS value
                                      , group_name AS label
@@ -539,12 +538,12 @@ export const FindVendorSQL = {
                             ORDER BY
                                        group_name ASC
         `
-        return sql
-    },
+    return sql
+  },
 
-    // Search all vendors for export (no pagination limit)
-    searchAllForExport: (dataItem: FindVendorDataItem, sqlWhere: string = '') => {
-        const statusCheckExpression = `
+  // Search all vendors for export (no pagination limit)
+  searchAllForExport: (dataItem: FindVendorDataItem, sqlWhere: string = '') => {
+    const statusCheckExpression = `
             CASE
                 WHEN v.fft_status = 2 THEN 'Cannot Register'
                 WHEN EXISTS (
@@ -557,7 +556,7 @@ export const FindVendorSQL = {
                 ELSE IFNULL(vmr.status_check, 'Not Registered')
             END
         `
-        let sqlData = `
+    let sqlData = `
                             SELECT
                                        v.vendor_id
                                      , v.fft_vendor_code
@@ -633,20 +632,20 @@ export const FindVendorSQL = {
                                        dataItem.Order
         `
 
-        sqlData = sqlData.replaceAll('dataItem.statusCheckExpression', statusCheckExpression)
-        sqlData = sqlData.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
-        sqlData = sqlData.replaceAll('dataItem.sqlWhere', sqlWhere)
-        sqlData = sqlData.replaceAll('dataItem.Order', dataItem['Order'] || 'v.vendor_id DESC')
+    sqlData = sqlData.replaceAll('dataItem.statusCheckExpression', statusCheckExpression)
+    sqlData = sqlData.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
+    sqlData = sqlData.replaceAll('dataItem.sqlWhere', sqlWhere)
+    sqlData = sqlData.replaceAll('dataItem.Order', dataItem['Order'] || 'v.vendor_id DESC')
 
-        return sqlData
-    },
+    return sqlData
+  },
 
-    // Generate Global Search SQL
-    generateGlobalSearchSql: (dataItem: { searchKeyword?: string }) => {
-        const cleanKeyword = dataItem && dataItem.searchKeyword ? dataItem.searchKeyword.trim() : '';
+  // Generate Global Search SQL
+  generateGlobalSearchSql: (dataItem: { searchKeyword?: string }) => {
+    const cleanKeyword = dataItem && dataItem.searchKeyword ? dataItem.searchKeyword.trim() : ''
 
-        if (cleanKeyword) {
-            let sql = `
+    if (cleanKeyword) {
+      let sql = `
                             AND (
                                        v.company_name LIKE 'searchVal'
                                      OR v.province LIKE 'searchVal'
@@ -664,20 +663,20 @@ export const FindVendorSQL = {
                             )
             `
 
-            // Escape single quotes and prepare search value
-            const safeKeyword = cleanKeyword.replace(/'/g, "\\'");
-            const searchVal = `%${safeKeyword}%`
+      // Escape single quotes and prepare search value
+      const safeKeyword = cleanKeyword.replace(/'/g, "\\'")
+      const searchVal = `%${safeKeyword}%`
 
-            sql = sql.replaceAll('searchVal', searchVal)
+      sql = sql.replaceAll('searchVal', searchVal)
 
-            return sql
-        }
-        return ''
-    },
+      return sql
+    }
+    return ''
+  },
 
-    // prones
-    getPronesData: (dataItem?: any) => {
-        let sql = `
+  // prones
+  getPronesData: (dataItem?: any) => {
+    let sql = `
                             SELECT 
                                        RTRIM(I_DL_CD) Customer_code
                                      , RTRIM(I_DL_ARG_DESC) Customer_name
@@ -695,12 +694,12 @@ export const FindVendorSQL = {
                                         OR I_DL_CD = '20020FTC03'
                                        )
         `
-        return sql
-    },
+    return sql
+  },
 
-    // prones raw test
-    getPronesRawTest: (dataItem?: any) => {
-        let sql = `
+  // prones raw test
+  getPronesRawTest: (dataItem?: any) => {
+    let sql = `
                             SELECT
                                        RTRIM(I_DL_CD) Customer_code
                                      , RTRIM(I_DL_ARG_DESC) Customer_name
@@ -718,11 +717,11 @@ export const FindVendorSQL = {
                                         OR I_DL_CD = '20020FTC03'
                                        )
         `
-        return sql
-    },
+    return sql
+  },
 
-    getAllVendorNames: (dataItem?: any) => {
-        let sql = `
+  getAllVendorNames: (dataItem?: any) => {
+    let sql = `
                             SELECT
                                        company_name
                                      , address
@@ -732,23 +731,25 @@ export const FindVendorSQL = {
                             WHERE
                                        INUSE = 1
         `
-        return sql
-    },
+    return sql
+  },
 
-    // Staging Prones - Truncate
-    truncateStagingPrones: (dataItem?: any) => {
-        let sql = `TRUNCATE TABLE staging_prones_data`
-        return sql
-    },
+  // Staging Prones - Truncate
+  truncateStagingPrones: (dataItem?: any) => {
+    let sql = `TRUNCATE TABLE staging_prones_data`
+    return sql
+  },
 
-    // Staging Prones - Batch Insert
-    insertStagingPronesBatch: (rows: any[]) => {
-        const escape = FindVendorSQL.escapeSql
-        const values = rows.map((row: any) => {
-            return `('${escape(row.CUSTOMER_CODE)}', '${escape(row.CUSTOMER_NAME)}', '${escape(row.CUSTOMER_ADDRESS1)}', '${escape(row.CUSTOMER_ADDRESS2)}', '${escape(row.CUSTOMER_ADDRESS3)}', '${escape(row.CUSTOMER_TEL)}')`
-        }).join(',\n')
+  // Staging Prones - Batch Insert
+  insertStagingPronesBatch: (rows: any[]) => {
+    const escape = FindVendorSQL.escapeSql
+    const values = rows
+      .map((row: any) => {
+        return `('${escape(row.CUSTOMER_CODE)}', '${escape(row.CUSTOMER_NAME)}', '${escape(row.CUSTOMER_ADDRESS1)}', '${escape(row.CUSTOMER_ADDRESS2)}', '${escape(row.CUSTOMER_ADDRESS3)}', '${escape(row.CUSTOMER_TEL)}')`
+      })
+      .join(',\n')
 
-        let sql = `
+    let sql = `
                             INSERT INTO staging_prones_data (
                                        customer_code
                                      , customer_name
@@ -758,35 +759,37 @@ export const FindVendorSQL = {
                                      , customer_tel
                             ) VALUES ${values}
         `
-        return sql
-    },
+    return sql
+  },
 
-    // Vendor Matching - Get staging prones data (from MySQL)
-    getStagingPronesData: (dataItem?: any) => {
-        let sql = `SELECT customer_code, customer_name, customer_address1, customer_address2, customer_address3, customer_tel FROM staging_prones_data`
-        return sql
-    },
+  // Vendor Matching - Get staging prones data (from MySQL)
+  getStagingPronesData: (dataItem?: any) => {
+    let sql = `SELECT customer_code, customer_name, customer_address1, customer_address2, customer_address3, customer_tel FROM staging_prones_data`
+    return sql
+  },
 
-    // Vendor Matching - Get vendors for matching
-    getVendorsForMatch: (dataItem?: any) => {
-        let sql = `SELECT vendor_id, company_name, address, tel_center FROM vendors WHERE INUSE = 1`
-        return sql
-    },
+  // Vendor Matching - Get vendors for matching
+  getVendorsForMatch: (dataItem?: any) => {
+    let sql = `SELECT vendor_id, company_name, address, tel_center FROM vendors WHERE INUSE = 1`
+    return sql
+  },
 
-    // Vendor Matching - Truncate match result
-    truncateMatchResult: (dataItem?: any) => {
-        let sql = `TRUNCATE TABLE vendor_match_result`
-        return sql
-    },
+  // Vendor Matching - Truncate match result
+  truncateMatchResult: (dataItem?: any) => {
+    let sql = `TRUNCATE TABLE vendor_match_result`
+    return sql
+  },
 
-    // Vendor Matching - Batch insert match results
-    insertMatchResultBatch: (rows: any[]) => {
-        const escape = FindVendorSQL.escapeSql
-        const values = rows.map((row: any) => {
-            return `(${row.vendor_id}, '${escape(row.status_check)}', '${escape(row.prones_code)}', '${escape(row.prones_name)}', '${escape(row.match_method)}', NOW())`
-        }).join(',\n')
+  // Vendor Matching - Batch insert match results
+  insertMatchResultBatch: (rows: any[]) => {
+    const escape = FindVendorSQL.escapeSql
+    const values = rows
+      .map((row: any) => {
+        return `(${row.vendor_id}, '${escape(row.status_check)}', '${escape(row.prones_code)}', '${escape(row.prones_name)}', '${escape(row.match_method)}', NOW())`
+      })
+      .join(',\n')
 
-        let sql = `
+    let sql = `
                             INSERT INTO vendor_match_result (
                                        vendor_id
                                      , status_check
@@ -796,19 +799,19 @@ export const FindVendorSQL = {
                                      , last_updated
                             ) VALUES ${values}
         `
-        return sql
-    },
+    return sql
+  },
 
-    // Vendor Matching - Get match result by vendor_id
-    getMatchResultByVendorIds: (dataItem: { vendorIds: number[] }) => {
-        const ids = dataItem.vendorIds.join(',')
-        let sql = `SELECT vendor_id, status_check, prones_code, prones_name, match_method FROM vendor_match_result WHERE vendor_id IN (${ids})`
-        return sql
-    },
+  // Vendor Matching - Get match result by vendor_id
+  getMatchResultByVendorIds: (dataItem: { vendorIds: number[] }) => {
+    const ids = dataItem.vendorIds.join(',')
+    let sql = `SELECT vendor_id, status_check, prones_code, prones_name, match_method FROM vendor_match_result WHERE vendor_id IN (${ids})`
+    return sql
+  },
 
-    // Vendor Matching - Get all match results
-    getAllMatchResults: (dataItem?: any) => {
-        let sql = `SELECT vendor_id, status_check, prones_code, prones_name, match_method FROM vendor_match_result`
-        return sql
-    },
+  // Vendor Matching - Get all match results
+  getAllMatchResults: (dataItem?: any) => {
+    let sql = `SELECT vendor_id, status_check, prones_code, prones_name, match_method FROM vendor_match_result`
+    return sql
+  },
 }

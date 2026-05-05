@@ -9,16 +9,16 @@ export default function getSqlWhere(body: any, tableIds: any) {
 
   let orderBy = body.Order.length
     ? body.Order.filter((item: any) => item.id !== 'inuseForSearch')
-      .map((item: any) => {
-        const tableEntry = tableIds.find((i: any) => i.id === item.id || i.alias === item.id)
+        .map((item: any) => {
+          const tableEntry = tableIds.find((i: any) => i.id === item.id || i.alias === item.id)
 
-        if (!tableEntry) return ''
+          if (!tableEntry) return ''
 
-        const actualId = tableEntry.id // ใช้ id จริง ไม่ใช่ alias
-        return `${tableEntry.table}.${actualId} ${item.desc ? 'DESC' : 'ASC'}`
-      })
-      .filter(Boolean)
-      .join(', ')
+          const actualId = tableEntry.id // ใช้ id จริง ไม่ใช่ alias
+          return `${tableEntry.table}.${actualId} ${item.desc ? 'DESC' : 'ASC'}`
+        })
+        .filter(Boolean)
+        .join(', ')
     : `${tableIds.find((i: any) => i.id === 'UPDATE_DATE')?.table}.UPDATE_DATE DESC`
 
   const inuseForSearchOrder = body.Order.find((item: any) => item.id === 'inuseForSearch')

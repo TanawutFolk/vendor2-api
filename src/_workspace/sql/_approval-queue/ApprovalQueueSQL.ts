@@ -1,91 +1,91 @@
 export interface RegisterRequestDataItem {
-    request_id?: number | string;
-    request_number?: string;
-    vendor_id?: number | string;
-    vendor_contact_id?: number | string;
-    Request_By_EmployeeCode?: string;
-    supportProduct_Process?: string;
-    purchase_frequency?: string;
-    request_status?: string;
-    requester_remark?: string;
-    assign_to?: string;
-    PIC_Email?: string;
-    CREATE_BY?: string;
-    UPDATE_BY?: string;
-    file_name?: string;
-    file_path?: string;
-    file_size?: number | string;
-    file_type?: string;
-    sqlWhere?: string;
-    sqlWhereColumnFilter?: string;
-    Order?: string;
-    Limit?: number | string;
-    Offset?: number | string;
-    approve_by?: string;
-    approve_date?: string;
-    approver_remark?: string;
-    step_id?: number | string;
-    step_order?: number | string;
-    approver_id?: string;
-    step_status?: string;
-    DESCRIPTION?: string;
-    step_code?: string;
-    actor_type?: string;
-    group_code?: string;
-    assignment_mode?: string;
-    action_by?: string;
-    action_type?: string;
-    remark?: string;
-    vendor_code?: string;
-    selection_id?: number | string;
-    business_category?: string;
-    start_year?: string;
-    authorized_capital?: string;
-    establish?: string;
-    number_of_employees?: string;
-    manufactured_country?: string;
-    vendor_original_country?: string;
-    sanctions?: string;
-    currency?: string;
-    suggestion?: string;
-    result?: string;
-    path?: string;
-    vendor_code_selector?: string;
-    completion_date?: string;
-    gpr_c_approver_name?: string;
-    gpr_c_approver_email?: string;
-    gpr_c_pc_pic_name?: string;
-    gpr_c_pc_pic_email?: string;
-    gpr_c_circular_json?: string;
-    action_required_json?: string;
-    completion_date_null?: string;
-    year?: string;
-    total_revenue?: number | string;
-    net_profit?: number | string;
-    no?: string | number;
-    criteria?: string;
-    uploaded_file?: string;
-    uploaded_name?: string;
-    path_null?: string;
-    name_null?: string;
-    vendor_region?: string;
-    group_name?: string;
-    scope?: string;
-    from_empcode?: string;
-    to_empcode?: string;
-    changed_by?: string;
-    reason?: string;
-    fft_status?: number | string;
-    empcode?: string;
-    target_group?: string;
-    target_compact?: string;
-    group_compact?: string;
-    is_oversea?: boolean | number | string;
+  request_id?: number | string
+  request_number?: string
+  vendor_id?: number | string
+  vendor_contact_id?: number | string
+  Request_By_EmployeeCode?: string
+  supportProduct_Process?: string
+  purchase_frequency?: string
+  request_status?: string
+  requester_remark?: string
+  assign_to?: string
+  PIC_Email?: string
+  CREATE_BY?: string
+  UPDATE_BY?: string
+  file_name?: string
+  file_path?: string
+  file_size?: number | string
+  file_type?: string
+  sqlWhere?: string
+  sqlWhereColumnFilter?: string
+  Order?: string
+  Limit?: number | string
+  Offset?: number | string
+  approve_by?: string
+  approve_date?: string
+  approver_remark?: string
+  step_id?: number | string
+  step_order?: number | string
+  approver_id?: string
+  step_status?: string
+  DESCRIPTION?: string
+  step_code?: string
+  actor_type?: string
+  group_code?: string
+  assignment_mode?: string
+  action_by?: string
+  action_type?: string
+  remark?: string
+  vendor_code?: string
+  selection_id?: number | string
+  business_category?: string
+  start_year?: string
+  authorized_capital?: string
+  establish?: string
+  number_of_employees?: string
+  manufactured_country?: string
+  vendor_original_country?: string
+  sanctions?: string
+  currency?: string
+  suggestion?: string
+  result?: string
+  path?: string
+  vendor_code_selector?: string
+  completion_date?: string
+  gpr_c_approver_name?: string
+  gpr_c_approver_email?: string
+  gpr_c_pc_pic_name?: string
+  gpr_c_pc_pic_email?: string
+  gpr_c_circular_json?: string
+  action_required_json?: string
+  completion_date_null?: string
+  year?: string
+  total_revenue?: number | string
+  net_profit?: number | string
+  no?: string | number
+  criteria?: string
+  uploaded_file?: string
+  uploaded_name?: string
+  path_null?: string
+  name_null?: string
+  vendor_region?: string
+  group_name?: string
+  scope?: string
+  from_empcode?: string
+  to_empcode?: string
+  changed_by?: string
+  reason?: string
+  fft_status?: number | string
+  empcode?: string
+  target_group?: string
+  target_compact?: string
+  group_compact?: string
+  is_oversea?: boolean | number | string
 }
 
 export const ApprovalQueueSQL = {
-    getAllRequests: async (dataItem: RegisterRequestDataItem): Promise<string[]> => {
-        let countSql = `
+  getAllRequests: async (dataItem: RegisterRequestDataItem): Promise<string[]> => {
+    let countSql = `
                             SELECT
                                        COUNT(DISTINCT rr.request_id) AS TOTAL_COUNT
                             FROM
@@ -102,7 +102,7 @@ export const ApprovalQueueSQL = {
                                        dataItem.sqlWhereColumnFilter
         `
 
-        let dataSql = `
+    let dataSql = `
                             SELECT
                                        rr.request_id
                                                                          , rr.request_number
@@ -300,20 +300,20 @@ export const ApprovalQueueSQL = {
                                        dataItem.Limit OFFSET dataItem.Offset
         `
 
-        countSql = countSql.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
-        countSql = countSql.replaceAll('dataItem.sqlWhere', dataItem['sqlWhere'] || '')
+    countSql = countSql.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
+    countSql = countSql.replaceAll('dataItem.sqlWhere', dataItem['sqlWhere'] || '')
 
-        dataSql = dataSql.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
-        dataSql = dataSql.replaceAll('dataItem.sqlWhere', dataItem['sqlWhere'] || '')
-        dataSql = dataSql.replaceAll('dataItem.Order', dataItem['Order'] || 'rr.request_id DESC')
-        dataSql = dataSql.replaceAll('dataItem.Limit', (dataItem['Limit'] || 10).toString())
-        dataSql = dataSql.replaceAll('dataItem.Offset', (dataItem['Offset'] || 0).toString())
+    dataSql = dataSql.replaceAll('dataItem.sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'] || '')
+    dataSql = dataSql.replaceAll('dataItem.sqlWhere', dataItem['sqlWhere'] || '')
+    dataSql = dataSql.replaceAll('dataItem.Order', dataItem['Order'] || 'rr.request_id DESC')
+    dataSql = dataSql.replaceAll('dataItem.Limit', (dataItem['Limit'] || 10).toString())
+    dataSql = dataSql.replaceAll('dataItem.Offset', (dataItem['Offset'] || 0).toString())
 
-        return [countSql, dataSql]
-    },
+    return [countSql, dataSql]
+  },
 
-    getStatusOptions: async (dataItem?: any) => {
-        let sql = `
+  getStatusOptions: async (dataItem?: any) => {
+    let sql = `
                             SELECT
                                        status_value AS value
                                      , status_label AS label
@@ -334,12 +334,11 @@ export const ApprovalQueueSQL = {
                             ORDER BY
                                        sort_order ASC
         `
-        return sql
-    },
+    return sql
+  },
 
-
-    getRequestStatusAndAssign: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getRequestStatusAndAssign: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        request_status
                                      , assign_to
@@ -352,14 +351,13 @@ export const ApprovalQueueSQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-
-    getApprovalSteps: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getApprovalSteps: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT 
                                        ras.step_id
                                      , ras.request_id
@@ -387,13 +385,13 @@ export const ApprovalQueueSQL = {
                                        ras.step_order ASC
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-    updateRequest: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  updateRequest: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE request_register_vendor SET
                                        vendor_contact_id =  dataItem.vendor_contact_id
                                      , supportProduct_Process = 'dataItem.supportProduct_Process'
@@ -405,18 +403,18 @@ export const ApprovalQueueSQL = {
                                        request_id = dataItem.request_id
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.vendor_contact_id', (dataItem['vendor_contact_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.supportProduct_Process', dataItem['supportProduct_Process'] || '')
-        sql = sql.replaceAll('dataItem.purchase_frequency', dataItem['purchase_frequency'] || '')
-        sql = sql.replaceAll('dataItem.requester_remark', dataItem['requester_remark'] || '')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.vendor_contact_id', (dataItem['vendor_contact_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.supportProduct_Process', dataItem['supportProduct_Process'] || '')
+    sql = sql.replaceAll('dataItem.purchase_frequency', dataItem['purchase_frequency'] || '')
+    sql = sql.replaceAll('dataItem.requester_remark', dataItem['requester_remark'] || '')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
-        return sql
-    },
+    return sql
+  },
 
-    createApprovalLog: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  createApprovalLog: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             INSERT INTO request_approval_log (
                                        request_id
                                      , step_id
@@ -434,18 +432,17 @@ export const ApprovalQueueSQL = {
                             )
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.step_id', dataItem['step_id'] ? dataItem['step_id'].toString() : 'NULL')
-        sql = sql.replaceAll('dataItem.action_by', dataItem['action_by'] || '')
-        sql = sql.replaceAll('dataItem.action_type', dataItem['action_type'] || '')
-        sql = sql.replaceAll('dataItem.remark', dataItem['remark'] || '')
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.step_id', dataItem['step_id'] ? dataItem['step_id'].toString() : 'NULL')
+    sql = sql.replaceAll('dataItem.action_by', dataItem['action_by'] || '')
+    sql = sql.replaceAll('dataItem.action_type', dataItem['action_type'] || '')
+    sql = sql.replaceAll('dataItem.remark', dataItem['remark'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-
-    getApprovalLogs: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getApprovalLogs: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT 
                                        ral.log_id
                                      , ral.request_id
@@ -465,14 +462,13 @@ export const ApprovalQueueSQL = {
                                        ral.action_date ASC
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-
-    getRequestStatusContext: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getRequestStatusContext: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        rr.vendor_id
                                      , rr.assign_to
@@ -498,14 +494,13 @@ export const ApprovalQueueSQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-
-    getRequesterByRequestId: (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getRequesterByRequestId: (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        Request_By_EmployeeCode
                             FROM
@@ -515,13 +510,12 @@ export const ApprovalQueueSQL = {
                             LIMIT
                                        1
         `
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        return sql
-    },
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    return sql
+  },
 
-
-    getApproverByGroupCode: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getApproverByGroupCode: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        empcode
                                      , empName
@@ -537,14 +531,13 @@ export const ApprovalQueueSQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
+    sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-
-    getActiveAssigneeByEmpCodeAndGroupCode: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getActiveAssigneeByEmpCodeAndGroupCode: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        Assignees_id
                                      , empcode
@@ -568,15 +561,15 @@ export const ApprovalQueueSQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
-        sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
-        sql = sql.replaceAll('dataItem.group_compact', dataItem['group_compact'] || '')
+    sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
+    sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
+    sql = sql.replaceAll('dataItem.group_compact', dataItem['group_compact'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-    getSelection: (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getSelection: (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT * FROM
                                        request_vendor_selections
                             WHERE
@@ -586,13 +579,12 @@ export const ApprovalQueueSQL = {
                             LIMIT
                                        1
         `
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        return sql
-    },
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    return sql
+  },
 
-
-    getCriteria: (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getCriteria: (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        criteria_no AS no
                                      , criteria_value AS criteria
@@ -606,12 +598,12 @@ export const ApprovalQueueSQL = {
                             ORDER BY
                                        criteria_id ASC
         `
-        sql = sql.replaceAll('dataItem.selection_id', (dataItem['selection_id'] || 0).toString())
-        return sql
-    },
+    sql = sql.replaceAll('dataItem.selection_id', (dataItem['selection_id'] || 0).toString())
+    return sql
+  },
 
-    updateStatus: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  updateStatus: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE request_register_vendor SET
                                        request_status = 'dataItem.request_status'
                                      , approve_by = 'dataItem.approve_by'
@@ -623,19 +615,18 @@ export const ApprovalQueueSQL = {
                                        request_id = dataItem.request_id
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.request_status', dataItem['request_status'] || '')
-        sql = sql.replaceAll('dataItem.approve_by', dataItem['approve_by'] || '')
-        sql = sql.replaceAll("'dataItem.approve_date'", dataItem['approve_date'] === 'NOW()' ? 'NOW()' : 'approve_date')
-        sql = sql.replaceAll('dataItem.approver_remark', dataItem['approver_remark'] || '')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.request_status', dataItem['request_status'] || '')
+    sql = sql.replaceAll('dataItem.approve_by', dataItem['approve_by'] || '')
+    sql = sql.replaceAll("'dataItem.approve_date'", dataItem['approve_date'] === 'NOW()' ? 'NOW()' : 'approve_date')
+    sql = sql.replaceAll('dataItem.approver_remark', dataItem['approver_remark'] || '')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-
-    updateRequestVendorCode: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  updateRequestVendorCode: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE request_register_vendor SET
                                        vendor_code = 'dataItem.vendor_code'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
@@ -644,46 +635,43 @@ export const ApprovalQueueSQL = {
                                        request_id = dataItem.request_id
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.vendor_code', dataItem['vendor_code'] || '')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.vendor_code', dataItem['vendor_code'] || '')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
-        return sql
-    },
+    return sql
+  },
 
-
-    updateVendorFftVendorCode: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  updateVendorFftVendorCode: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE vendors SET
                                        fft_vendor_code = 'dataItem.vendor_code'
                             WHERE
                                        vendor_id = dataItem.vendor_id
         `
 
-        sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.vendor_code', dataItem['vendor_code'] || '')
+    sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.vendor_code', dataItem['vendor_code'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-
-    updateVendorFftStatus: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  updateVendorFftStatus: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE vendors SET
                                        fft_status = dataItem.fft_status
                             WHERE
                                        vendor_id = dataItem.vendor_id
         `
 
-        sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.fft_status', (dataItem['fft_status'] || 0).toString())
+    sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.fft_status', (dataItem['fft_status'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-
-    updateApprovalStep: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  updateApprovalStep: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE request_approval_step SET
                                        step_status = 'dataItem.step_status'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
@@ -692,16 +680,15 @@ export const ApprovalQueueSQL = {
                                        step_id = dataItem.step_id
         `
 
-        sql = sql.replaceAll('dataItem.step_id', (dataItem['step_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.step_status', dataItem['step_status'] || '')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.step_id', (dataItem['step_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.step_status', dataItem['step_status'] || '')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-
-    updateApprovalStepApprover: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  updateApprovalStepApprover: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE request_approval_step SET
                                        approver_id = 'dataItem.approver_id'
                                      , assignment_mode = 'dataItem.assignment_mode'
@@ -711,17 +698,16 @@ export const ApprovalQueueSQL = {
                                        step_id = dataItem.step_id
         `
 
-        sql = sql.replaceAll('dataItem.step_id', (dataItem['step_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.approver_id', dataItem['approver_id'] || '')
-        sql = sql.replaceAll('dataItem.assignment_mode', dataItem['assignment_mode'] || 'MANUAL')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.step_id', (dataItem['step_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.approver_id', dataItem['approver_id'] || '')
+    sql = sql.replaceAll('dataItem.assignment_mode', dataItem['assignment_mode'] || 'MANUAL')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
-        return sql
-    },
+    return sql
+  },
 
-
-    markRequestCompleted: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  markRequestCompleted: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE request_register_vendor SET
                                        request_status = 'Completed'
                                      , approve_date = NOW()
@@ -731,14 +717,14 @@ export const ApprovalQueueSQL = {
                                        request_id = dataItem.request_id
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
-        return sql
-    },
+    return sql
+  },
 
-    getById: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getById: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        rr.request_id
                                                                          , rr.request_number
@@ -931,14 +917,13 @@ export const ApprovalQueueSQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-
-    getAssigneeByEmpCode: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getAssigneeByEmpCode: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        Assignees_id
                                      , empcode
@@ -955,14 +940,13 @@ export const ApprovalQueueSQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.to_empcode', dataItem['to_empcode'] || '')
+    sql = sql.replaceAll('dataItem.to_empcode', dataItem['to_empcode'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-
-    updateRequestPicAssignee: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  updateRequestPicAssignee: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE request_register_vendor SET
                                        assign_to = 'dataItem.assign_to'
                                      , PIC_Email = 'dataItem.PIC_Email'
@@ -972,17 +956,16 @@ export const ApprovalQueueSQL = {
                                        request_id = dataItem.request_id
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.assign_to', dataItem['assign_to'] || '')
-        sql = sql.replaceAll('dataItem.PIC_Email', dataItem['PIC_Email'] || '')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.assign_to', dataItem['assign_to'] || '')
+    sql = sql.replaceAll('dataItem.PIC_Email', dataItem['PIC_Email'] || '')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
-        return sql
-    },
+    return sql
+  },
 
-
-    insertAssignmentHistory: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  insertAssignmentHistory: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             INSERT INTO request_assignment_history (
                                        request_id
                                      , step_id
@@ -1014,25 +997,25 @@ export const ApprovalQueueSQL = {
                             )
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.step_id', dataItem['step_id'] ? dataItem['step_id'].toString() : 'NULL')
-        sql = sql.replaceAll('dataItem.scope', dataItem['scope'] || '')
-        sql = sql.replaceAll('dataItem.step_code', dataItem['step_code'] || '')
-        sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
-        sql = sql.replaceAll('dataItem.from_empcode', dataItem['from_empcode'] || '')
-        sql = sql.replaceAll('dataItem.to_empcode', dataItem['to_empcode'] || '')
-        sql = sql.replaceAll('dataItem.reason', dataItem['reason'] || '')
-        sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem['DESCRIPTION'] || dataItem['reason'] || '')
-        sql = sql.replaceAll('dataItem.changed_by', dataItem['changed_by'] || dataItem['UPDATE_BY'] || 'SYSTEM')
-        sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || dataItem['changed_by'] || dataItem['UPDATE_BY'] || 'SYSTEM')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || dataItem['changed_by'] || 'SYSTEM')
-        sql = sql.replaceAll('dataItem.INUSE', '1')
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.step_id', dataItem['step_id'] ? dataItem['step_id'].toString() : 'NULL')
+    sql = sql.replaceAll('dataItem.scope', dataItem['scope'] || '')
+    sql = sql.replaceAll('dataItem.step_code', dataItem['step_code'] || '')
+    sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
+    sql = sql.replaceAll('dataItem.from_empcode', dataItem['from_empcode'] || '')
+    sql = sql.replaceAll('dataItem.to_empcode', dataItem['to_empcode'] || '')
+    sql = sql.replaceAll('dataItem.reason', dataItem['reason'] || '')
+    sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem['DESCRIPTION'] || dataItem['reason'] || '')
+    sql = sql.replaceAll('dataItem.changed_by', dataItem['changed_by'] || dataItem['UPDATE_BY'] || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || dataItem['changed_by'] || dataItem['UPDATE_BY'] || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || dataItem['changed_by'] || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.INUSE', '1')
 
-        return sql
-    },
+    return sql
+  },
 
-    completeRegistration: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  completeRegistration: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE request_register_vendor SET
                                        vendor_code = 'dataItem.vendor_code'
                                      , request_status = 'Completed'
@@ -1044,10 +1027,10 @@ export const ApprovalQueueSQL = {
                                        request_id = dataItem.request_id
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.vendor_code', dataItem['vendor_code'] || '')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.vendor_code', dataItem['vendor_code'] || '')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
-        return sql
-    }
+    return sql
+  },
 }

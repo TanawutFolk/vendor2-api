@@ -1,11 +1,6 @@
 import { FindVendorController } from '@src/_workspace/controllers/_find-vendor/FindVendorController'
 import { validateData } from '@src/middlewares/validationMiddleware'
-import {
-    SearchVendorSchema,
-    GetVendorByIdSchema,
-    UpdateVendorSchema,
-    ExportVendorSchema
-} from './validateSchema'
+import { SearchVendorSchema, GetVendorByIdSchema, UpdateVendorSchema, ExportVendorSchema } from './validateSchema'
 import { Router } from 'express'
 
 const findVendorRoutes = Router()

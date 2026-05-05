@@ -1,37 +1,37 @@
 export type MailTemplateData = {
-    toEmail?: string;
-    ccEmail?: string;
-    ccEmailLine1?: string;
-    ccEmailLine2?: string;
-    vendorEmail?: string;
-    topicRef?: string;
-    isNewSupplier?: boolean;
-    requestNumber?: string;
-    recipientName?: string;
-    userName?: string;
-    userTel?: string;
-    picName?: string;
-    picTel?: string;
-    picNextStepName?: string;
-    vendorName?: string;
-    address?: string;
-    contactPic?: string;
-    email?: string;
-    tel?: string;
-    supportProduct?: string;
-    purchaseFrequency?: string;
-    systemLink?: string;
-    vendorCode?: string;
-    remarkEN?: string;
-    remarkTH?: string;
-    reasons?: string[];
-    stageLabel?: string;
-    note?: string;
-};
+  toEmail?: string
+  ccEmail?: string
+  ccEmailLine1?: string
+  ccEmailLine2?: string
+  vendorEmail?: string
+  topicRef?: string
+  isNewSupplier?: boolean
+  requestNumber?: string
+  recipientName?: string
+  userName?: string
+  userTel?: string
+  picName?: string
+  picTel?: string
+  picNextStepName?: string
+  vendorName?: string
+  address?: string
+  contactPic?: string
+  email?: string
+  tel?: string
+  supportProduct?: string
+  purchaseFrequency?: string
+  systemLink?: string
+  vendorCode?: string
+  remarkEN?: string
+  remarkTH?: string
+  reasons?: string[]
+  stageLabel?: string
+  note?: string
+}
 
 //User sent to Approver PIC
 export const emailRequestRegisterVendorTemplate = (data: MailTemplateData) => {
-    return `
+  return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
@@ -86,15 +86,13 @@ export const emailRequestRegisterVendorTemplate = (data: MailTemplateData) => {
             </div>
         </div>
     </div>
-    `;
-};
+    `
+}
 //PIC sent GPR (A) to supplier/Vendor
 export const emailVendorDocumentRequestTemplate = (data: MailTemplateData) => {
-    const supplierStatusText = data.isNewSupplier
-        ? "For register new supplier"
-        : "For re-register supplier";
+  const supplierStatusText = data.isNewSupplier ? 'For register new supplier' : 'For re-register supplier'
 
-    return `
+  return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
@@ -154,11 +152,11 @@ export const emailVendorDocumentRequestTemplate = (data: MailTemplateData) => {
             </div>
         </div>
     </div>
-    `;
-};
+    `
+}
 //If supplier/Vendor not accept the GPR Form A send this email to supplier/Vendor
 export const emailExternalSubmitGPRBTemplate = (data: MailTemplateData) => {
-    return `
+  return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
@@ -191,11 +189,11 @@ export const emailExternalSubmitGPRBTemplate = (data: MailTemplateData) => {
             </div>
         </div>
     </div>
-    `;
-};
+    `
+}
 // sent to requester head approver after PIC confirms vendor accepted the GPR B conditions.
 export const emailGprCRequesterSetupTemplate = (data: MailTemplateData) => {
-    return `
+  return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
@@ -226,11 +224,11 @@ export const emailGprCRequesterSetupTemplate = (data: MailTemplateData) => {
             </div>
         </div>
     </div>
-    `;
-};
+    `
+}
 
 export const emailUserCheckerApproverGPRCTemplate = (data: MailTemplateData) => {
-    return `
+  return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
@@ -292,18 +290,16 @@ export const emailUserCheckerApproverGPRCTemplate = (data: MailTemplateData) => 
             </div>
         </div>
     </div>
-    `;
-};
-
-
+    `
+}
 
 // GPR C approval email for next workflow steps such as EMR, QMS, and PO Manager.
 export const emailGprCStepApprovalTemplate = (data: MailTemplateData) => {
-    return emailUserCheckerApproverGPRCTemplate({...data, userName: data.picNextStepName});
-};
+  return emailUserCheckerApproverGPRCTemplate({ ...data, userName: data.picNextStepName })
+}
 
 export const emailReject1Template = (data: MailTemplateData) => {
-    return `
+  return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #dc2626; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
@@ -360,11 +356,11 @@ export const emailReject1Template = (data: MailTemplateData) => {
             </div>
         </div>
     </div>
-    `;
-};
+    `
+}
 
 export const emailToCheckerPICTemplate = (data: MailTemplateData) => {
-    return `
+  return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #d32f2f; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
@@ -419,11 +415,11 @@ export const emailToCheckerPICTemplate = (data: MailTemplateData) => {
             </div>
         </div>
     </div>
-    `;
-};
+    `
+}
 
 export const emailReject2Template = (data: MailTemplateData) => {
-    return `
+  return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #dc2626; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
@@ -480,8 +476,8 @@ export const emailReject2Template = (data: MailTemplateData) => {
             </div>
         </div>
     </div>
-    `;
-};
+    `
+}
 
 // ---------------------------------------------------------
 // 1. Email to PM Mgr.
@@ -540,28 +536,25 @@ export const emailToPMMgrTemplate = (data: MailTemplateData) => `
                 <p style="margin: 0 0 4px 0; color: #d32f2f; font-weight: 600;">${data.picName} <span style="color: #6b7280; font-weight: normal;">(#Tel. ${data.picTel})</span></p>
             </div>
         </div>
-    </div>`;
+    </div>`
 
 // ---------------------------------------------------------
 // 2. Email to PM GM.
 // ---------------------------------------------------------
-export const emailToPMGMTemplate = (data: MailTemplateData) =>
-    emailToPMMgrTemplate({ ...data, recipientName: data.recipientName || 'PO GM' });
+export const emailToPMGMTemplate = (data: MailTemplateData) => emailToPMMgrTemplate({ ...data, recipientName: data.recipientName || 'PO GM' })
 
 // ---------------------------------------------------------
 // 3. Email to MD.
 // ---------------------------------------------------------
-export const emailToMDTemplate = (data: MailTemplateData) =>
-    emailToPMMgrTemplate({ ...data, recipientName: data.recipientName || 'MD' });
+export const emailToMDTemplate = (data: MailTemplateData) => emailToPMMgrTemplate({ ...data, recipientName: data.recipientName || 'MD' })
 
 // ---------------------------------------------------------
 // 4. Email to Account PIC
 // ---------------------------------------------------------
-export const emailToAccountPICTemplate = (data: MailTemplateData) =>
-    emailToPMMgrTemplate({ ...data, recipientName: data.recipientName || 'ACC PIC' });
+export const emailToAccountPICTemplate = (data: MailTemplateData) => emailToPMMgrTemplate({ ...data, recipientName: data.recipientName || 'ACC PIC' })
 
 export const emailCompleteTemplate = (data: MailTemplateData) => {
-    return `
+  return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #10b981; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
@@ -621,15 +614,15 @@ export const emailCompleteTemplate = (data: MailTemplateData) => {
             </div>
         </div>
     </div>
-    `;
-};
+    `
+}
 
 export const emailIncompleteTemplate = (data: MailTemplateData) => {
-    const reasonsHtml = (data.reasons || []).map(reason =>
-        `<div style="background: #ffe4e6; padding: 8px 12px; border-radius: 4px; color: #9f1239; font-weight: 500; margin-bottom: 6px;">• ${reason}</div>`
-    ).join('');
+  const reasonsHtml = (data.reasons || [])
+    .map((reason) => `<div style="background: #ffe4e6; padding: 8px 12px; border-radius: 4px; color: #9f1239; font-weight: 500; margin-bottom: 6px;">• ${reason}</div>`)
+    .join('')
 
-    return `
+  return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 800px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); border: 1px solid #fee2e2;">
         <div style="background-color: #dc2626; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
@@ -687,11 +680,11 @@ export const emailIncompleteTemplate = (data: MailTemplateData) => {
             </div>
         </div>
     </div>
-    `;
-};
+    `
+}
 
 export const emailActionRequiredTemplate = (data: MailTemplateData) => {
-    return `
+  return `
     <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; color: #374151; line-height: 1.6; max-width: 760px; margin: 20px auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #dbeafe;">
         <div style="background-color: #0284c7; height: 6px; width: 100%;"></div>
         <div style="padding: 32px;">
@@ -718,5 +711,5 @@ export const emailActionRequiredTemplate = (data: MailTemplateData) => {
             </div>
         </div>
     </div>
-    `;
-};
+    `
+}

@@ -1,91 +1,91 @@
 export interface RegisterRequestDataItem {
-    request_id?: number | string;
-    request_number?: string;
-    vendor_id?: number | string;
-    vendor_contact_id?: number | string;
-    Request_By_EmployeeCode?: string;
-    supportProduct_Process?: string;
-    purchase_frequency?: string;
-    request_status?: string;
-    requester_remark?: string;
-    assign_to?: string;
-    PIC_Email?: string;
-    CREATE_BY?: string;
-    UPDATE_BY?: string;
-    file_name?: string;
-    file_path?: string;
-    file_size?: number | string;
-    file_type?: string;
-    sqlWhere?: string;
-    sqlWhereColumnFilter?: string;
-    Order?: string;
-    Limit?: number | string;
-    Offset?: number | string;
-    approve_by?: string;
-    approve_date?: string;
-    approver_remark?: string;
-    step_id?: number | string;
-    step_order?: number | string;
-    approver_id?: string;
-    step_status?: string;
-    DESCRIPTION?: string;
-    step_code?: string;
-    actor_type?: string;
-    group_code?: string;
-    assignment_mode?: string;
-    action_by?: string;
-    action_type?: string;
-    remark?: string;
-    vendor_code?: string;
-    selection_id?: number | string;
-    business_category?: string;
-    start_year?: string;
-    authorized_capital?: string;
-    establish?: string;
-    number_of_employees?: string;
-    manufactured_country?: string;
-    vendor_original_country?: string;
-    sanctions?: string;
-    currency?: string;
-    suggestion?: string;
-    result?: string;
-    path?: string;
-    vendor_code_selector?: string;
-    completion_date?: string;
-    gpr_c_approver_name?: string;
-    gpr_c_approver_email?: string;
-    gpr_c_pc_pic_name?: string;
-    gpr_c_pc_pic_email?: string;
-    gpr_c_circular_json?: string;
-    action_required_json?: string;
-    completion_date_null?: string;
-    year?: string;
-    total_revenue?: number | string;
-    net_profit?: number | string;
-    no?: string | number;
-    criteria?: string;
-    uploaded_file?: string;
-    uploaded_name?: string;
-    path_null?: string;
-    name_null?: string;
-    vendor_region?: string;
-    group_name?: string;
-    scope?: string;
-    from_empcode?: string;
-    to_empcode?: string;
-    changed_by?: string;
-    reason?: string;
-    fft_status?: number | string;
-    empcode?: string;
-    target_group?: string;
-    target_compact?: string;
-    group_compact?: string;
-    is_oversea?: boolean | number | string;
+  request_id?: number | string
+  request_number?: string
+  vendor_id?: number | string
+  vendor_contact_id?: number | string
+  Request_By_EmployeeCode?: string
+  supportProduct_Process?: string
+  purchase_frequency?: string
+  request_status?: string
+  requester_remark?: string
+  assign_to?: string
+  PIC_Email?: string
+  CREATE_BY?: string
+  UPDATE_BY?: string
+  file_name?: string
+  file_path?: string
+  file_size?: number | string
+  file_type?: string
+  sqlWhere?: string
+  sqlWhereColumnFilter?: string
+  Order?: string
+  Limit?: number | string
+  Offset?: number | string
+  approve_by?: string
+  approve_date?: string
+  approver_remark?: string
+  step_id?: number | string
+  step_order?: number | string
+  approver_id?: string
+  step_status?: string
+  DESCRIPTION?: string
+  step_code?: string
+  actor_type?: string
+  group_code?: string
+  assignment_mode?: string
+  action_by?: string
+  action_type?: string
+  remark?: string
+  vendor_code?: string
+  selection_id?: number | string
+  business_category?: string
+  start_year?: string
+  authorized_capital?: string
+  establish?: string
+  number_of_employees?: string
+  manufactured_country?: string
+  vendor_original_country?: string
+  sanctions?: string
+  currency?: string
+  suggestion?: string
+  result?: string
+  path?: string
+  vendor_code_selector?: string
+  completion_date?: string
+  gpr_c_approver_name?: string
+  gpr_c_approver_email?: string
+  gpr_c_pc_pic_name?: string
+  gpr_c_pc_pic_email?: string
+  gpr_c_circular_json?: string
+  action_required_json?: string
+  completion_date_null?: string
+  year?: string
+  total_revenue?: number | string
+  net_profit?: number | string
+  no?: string | number
+  criteria?: string
+  uploaded_file?: string
+  uploaded_name?: string
+  path_null?: string
+  name_null?: string
+  vendor_region?: string
+  group_name?: string
+  scope?: string
+  from_empcode?: string
+  to_empcode?: string
+  changed_by?: string
+  reason?: string
+  fft_status?: number | string
+  empcode?: string
+  target_group?: string
+  target_compact?: string
+  group_compact?: string
+  is_oversea?: boolean | number | string
 }
 
 export const RequestRegisterPageSQL = {
-    getVendorCreateContext: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getVendorCreateContext: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        v.company_name
                                      , v.address
@@ -104,13 +104,13 @@ export const RequestRegisterPageSQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-    getActiveAssigneesByGroupCode: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getActiveAssigneesByGroupCode: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        empName
                                      , empcode
@@ -124,19 +124,17 @@ export const RequestRegisterPageSQL = {
                                        Assignees_id ASC
         `
 
-        sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
+    sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-    getLastAssignedPicByVendorRegion: async (dataItem: RegisterRequestDataItem) => {
-        const isOversea = String(dataItem['is_oversea'] || '').toLowerCase() === 'true' || Number(dataItem['is_oversea']) === 1
+  getLastAssignedPicByVendorRegion: async (dataItem: RegisterRequestDataItem) => {
+    const isOversea = String(dataItem['is_oversea'] || '').toLowerCase() === 'true' || Number(dataItem['is_oversea']) === 1
 
-        const vendorRegionClause = isOversea
-            ? `= 'Oversea'`
-            : `!= 'Oversea' OR v.vendor_region IS NULL`
+    const vendorRegionClause = isOversea ? `= 'Oversea'` : `!= 'Oversea' OR v.vendor_region IS NULL`
 
-        let sql = `
+    let sql = `
                             SELECT
                                        rr.assign_to
                             FROM
@@ -153,11 +151,11 @@ export const RequestRegisterPageSQL = {
                                        1
         `
 
-        return sql
-    },
+    return sql
+  },
 
-    updateRequestNumber: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  updateRequestNumber: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE request_register_vendor SET
                                        request_number = 'dataItem.request_number'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
@@ -166,15 +164,15 @@ export const RequestRegisterPageSQL = {
                                        request_id = dataItem.request_id
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.request_number', dataItem['request_number'] || '')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.request_number', dataItem['request_number'] || '')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
-        return sql
-    },
+    return sql
+  },
 
-    getRequestStatusAndAssign: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getRequestStatusAndAssign: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        request_status
                                      , assign_to
@@ -187,13 +185,13 @@ export const RequestRegisterPageSQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-    getPeerCcRowsByNormalizedGroup: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getPeerCcRowsByNormalizedGroup: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        empcode
                                      , empEmail
@@ -213,14 +211,14 @@ export const RequestRegisterPageSQL = {
                                        Assignees_id ASC
         `
 
-        sql = sql.replaceAll('dataItem.target_group', dataItem['target_group'] || '')
-        sql = sql.replaceAll('dataItem.target_compact', dataItem['target_compact'] || '')
+    sql = sql.replaceAll('dataItem.target_group', dataItem['target_group'] || '')
+    sql = sql.replaceAll('dataItem.target_compact', dataItem['target_compact'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-    getMemberByEmpCode: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getMemberByEmpCode: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        empName
                                      , empSurname
@@ -233,13 +231,13 @@ export const RequestRegisterPageSQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
+    sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-    getAssigneeByEmpCodeContact: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getAssigneeByEmpCodeContact: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        empName
                                      , empEmail
@@ -251,13 +249,13 @@ export const RequestRegisterPageSQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
+    sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-    getAssigneeEmailByEmpCode: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getAssigneeEmailByEmpCode: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        empEmail
                             FROM
@@ -268,13 +266,13 @@ export const RequestRegisterPageSQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
+    sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-    getNotificationVendorContextByRequestId: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getNotificationVendorContextByRequestId: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        rr.request_number
                                      , rr.CREATE_DATE
@@ -316,13 +314,13 @@ export const RequestRegisterPageSQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-    createRequest: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  createRequest: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             INSERT INTO request_register_vendor (
                                        vendor_id
                                      , vendor_contact_id
@@ -350,26 +348,26 @@ export const RequestRegisterPageSQL = {
                             )
         `
 
-        sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.vendor_contact_id', (dataItem['vendor_contact_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.Request_By_EmployeeCode', dataItem['Request_By_EmployeeCode'] || '')
-        sql = sql.replaceAll('dataItem.supportProduct_Process', dataItem['supportProduct_Process'] || '')
-        sql = sql.replaceAll('dataItem.purchase_frequency', dataItem['purchase_frequency'] || '')
-        sql = sql.replaceAll('dataItem.requester_remark', dataItem['requester_remark'] || '')
-        sql = sql.replaceAll('dataItem.assign_to', dataItem['assign_to'] || '')
-        sql = sql.replaceAll('dataItem.PIC_Email', dataItem['PIC_Email'] || '')
-        sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.vendor_contact_id', (dataItem['vendor_contact_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.Request_By_EmployeeCode', dataItem['Request_By_EmployeeCode'] || '')
+    sql = sql.replaceAll('dataItem.supportProduct_Process', dataItem['supportProduct_Process'] || '')
+    sql = sql.replaceAll('dataItem.purchase_frequency', dataItem['purchase_frequency'] || '')
+    sql = sql.replaceAll('dataItem.requester_remark', dataItem['requester_remark'] || '')
+    sql = sql.replaceAll('dataItem.assign_to', dataItem['assign_to'] || '')
+    sql = sql.replaceAll('dataItem.PIC_Email', dataItem['PIC_Email'] || '')
+    sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-    createDocument: async (dataItem: RegisterRequestDataItem) => {
-        const requestId = Number(dataItem['request_id'] || 0)
-        if (!requestId || Number.isNaN(requestId)) {
-            throw new Error(`Invalid request_id for createDocument: ${String(dataItem['request_id'])}`)
-        }
+  createDocument: async (dataItem: RegisterRequestDataItem) => {
+    const requestId = Number(dataItem['request_id'] || 0)
+    if (!requestId || Number.isNaN(requestId)) {
+      throw new Error(`Invalid request_id for createDocument: ${String(dataItem['request_id'])}`)
+    }
 
-        let sql = `
+    let sql = `
                             INSERT INTO request_register_document (
                                        request_id
                                      , file_name
@@ -389,18 +387,18 @@ export const RequestRegisterPageSQL = {
                             )
         `
 
-        sql = sql.replaceAll('dataItem.request_id', requestId.toString())
-        sql = sql.replaceAll('dataItem.file_name', dataItem['file_name'] || '')
-        sql = sql.replaceAll('dataItem.file_path', dataItem['file_path'] || '')
-        sql = sql.replaceAll('dataItem.file_size', (dataItem['file_size'] || 0).toString())
-        sql = sql.replaceAll('dataItem.file_type', dataItem['file_type'] || '')
-        sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.request_id', requestId.toString())
+    sql = sql.replaceAll('dataItem.file_name', dataItem['file_name'] || '')
+    sql = sql.replaceAll('dataItem.file_path', dataItem['file_path'] || '')
+    sql = sql.replaceAll('dataItem.file_size', (dataItem['file_size'] || 0).toString())
+    sql = sql.replaceAll('dataItem.file_type', dataItem['file_type'] || '')
+    sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-    updateRequest: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  updateRequest: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE request_register_vendor SET
                                        vendor_contact_id =  dataItem.vendor_contact_id
                                      , supportProduct_Process = 'dataItem.supportProduct_Process'
@@ -412,18 +410,18 @@ export const RequestRegisterPageSQL = {
                                        request_id = dataItem.request_id
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.vendor_contact_id', (dataItem['vendor_contact_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.supportProduct_Process', dataItem['supportProduct_Process'] || '')
-        sql = sql.replaceAll('dataItem.purchase_frequency', dataItem['purchase_frequency'] || '')
-        sql = sql.replaceAll('dataItem.requester_remark', dataItem['requester_remark'] || '')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.vendor_contact_id', (dataItem['vendor_contact_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.supportProduct_Process', dataItem['supportProduct_Process'] || '')
+    sql = sql.replaceAll('dataItem.purchase_frequency', dataItem['purchase_frequency'] || '')
+    sql = sql.replaceAll('dataItem.requester_remark', dataItem['requester_remark'] || '')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
-        return sql
-    },
+    return sql
+  },
 
-    getStatusOptions: async (dataItem?: any) => {
-        let sql = `
+  getStatusOptions: async (dataItem?: any) => {
+    let sql = `
                             SELECT
                                        status_value AS value
                                      , status_label AS label
@@ -444,11 +442,11 @@ export const RequestRegisterPageSQL = {
                             ORDER BY
                                        sort_order ASC
         `
-        return sql
-    },
+    return sql
+  },
 
-    createApprovalStep: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  createApprovalStep: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             INSERT INTO request_approval_step (
                                        request_id
                                      , step_order
@@ -476,22 +474,22 @@ export const RequestRegisterPageSQL = {
                             )
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.step_order', (dataItem['step_order'] || 0).toString())
-        sql = sql.replaceAll('dataItem.approver_id', dataItem['approver_id'] || '')
-        sql = sql.replaceAll('dataItem.step_status', dataItem['step_status'] || '')
-        sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem['DESCRIPTION'] || '')
-        sql = sql.replaceAll('dataItem.step_code', dataItem['step_code'] || '')
-        sql = sql.replaceAll('dataItem.actor_type', dataItem['actor_type'] || '')
-        sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
-        sql = sql.replaceAll('dataItem.assignment_mode', dataItem['assignment_mode'] || 'AUTO')
-        sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.step_order', (dataItem['step_order'] || 0).toString())
+    sql = sql.replaceAll('dataItem.approver_id', dataItem['approver_id'] || '')
+    sql = sql.replaceAll('dataItem.step_status', dataItem['step_status'] || '')
+    sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem['DESCRIPTION'] || '')
+    sql = sql.replaceAll('dataItem.step_code', dataItem['step_code'] || '')
+    sql = sql.replaceAll('dataItem.actor_type', dataItem['actor_type'] || '')
+    sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
+    sql = sql.replaceAll('dataItem.assignment_mode', dataItem['assignment_mode'] || 'AUTO')
+    sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-    getApprovalSteps: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getApprovalSteps: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT 
                                        ras.step_id
                                      , ras.request_id
@@ -519,13 +517,13 @@ export const RequestRegisterPageSQL = {
                                        ras.step_order ASC
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-    updateApprovalStep: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  updateApprovalStep: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE request_approval_step SET
                                        step_status = 'dataItem.step_status'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
@@ -534,15 +532,15 @@ export const RequestRegisterPageSQL = {
                                        step_id = dataItem.step_id
         `
 
-        sql = sql.replaceAll('dataItem.step_id', (dataItem['step_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.step_status', dataItem['step_status'] || '')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.step_id', (dataItem['step_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.step_status', dataItem['step_status'] || '')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-    createApprovalLog: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  createApprovalLog: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             INSERT INTO request_approval_log (
                                        request_id
                                      , step_id
@@ -560,21 +558,21 @@ export const RequestRegisterPageSQL = {
                             )
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.step_id', dataItem['step_id'] ? dataItem['step_id'].toString() : 'NULL')
-        sql = sql.replaceAll('dataItem.action_by', dataItem['action_by'] || '')
-        sql = sql.replaceAll('dataItem.action_type', dataItem['action_type'] || '')
-        sql = sql.replaceAll('dataItem.remark', dataItem['remark'] || '')
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.step_id', dataItem['step_id'] ? dataItem['step_id'].toString() : 'NULL')
+    sql = sql.replaceAll('dataItem.action_by', dataItem['action_by'] || '')
+    sql = sql.replaceAll('dataItem.action_type', dataItem['action_type'] || '')
+    sql = sql.replaceAll('dataItem.remark', dataItem['remark'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-    updateCcEmails: async (_dataItem: RegisterRequestDataItem) => {
-        return `SELECT 1 AS noop`
-    },
+  updateCcEmails: async (_dataItem: RegisterRequestDataItem) => {
+    return `SELECT 1 AS noop`
+  },
 
-    getSelection: (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getSelection: (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT * FROM
                                        request_vendor_selections
                             WHERE
@@ -584,12 +582,12 @@ export const RequestRegisterPageSQL = {
                             LIMIT
                                        1
         `
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        return sql
-    },
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    return sql
+  },
 
-    getFinancials: (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getFinancials: (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        year
                                      , total_revenue
@@ -601,12 +599,12 @@ export const RequestRegisterPageSQL = {
                             ORDER BY
                                        year ASC
         `
-        sql = sql.replaceAll('dataItem.selection_id', (dataItem['selection_id'] || 0).toString())
-        return sql
-    },
+    sql = sql.replaceAll('dataItem.selection_id', (dataItem['selection_id'] || 0).toString())
+    return sql
+  },
 
-    getCriteria: (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getCriteria: (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        criteria_no AS no
                                      , criteria_value AS criteria
@@ -620,12 +618,12 @@ export const RequestRegisterPageSQL = {
                             ORDER BY
                                        criteria_id ASC
         `
-        sql = sql.replaceAll('dataItem.selection_id', (dataItem['selection_id'] || 0).toString())
-        return sql
-    },
+    sql = sql.replaceAll('dataItem.selection_id', (dataItem['selection_id'] || 0).toString())
+    return sql
+  },
 
-    checkSelectionExists: (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  checkSelectionExists: (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        selection_id
                             FROM
@@ -635,12 +633,12 @@ export const RequestRegisterPageSQL = {
                             LIMIT
                                        1
         `
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        return sql
-    },
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    return sql
+  },
 
-    getRequesterByRequestId: (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getRequesterByRequestId: (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        Request_By_EmployeeCode
                             FROM
@@ -650,12 +648,12 @@ export const RequestRegisterPageSQL = {
                             LIMIT
                                        1
         `
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        return sql
-    },
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    return sql
+  },
 
-    insertSelection: (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  insertSelection: (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             INSERT INTO request_vendor_selections (
                                        request_id
                                      , business_category
@@ -706,45 +704,45 @@ export const RequestRegisterPageSQL = {
                                      , 'dataItem.UPDATE_BY'
                             )
         `
-        const d = dataItem
-        // Escape quotes helper
-        const esc = (str: any) => String(str || '').replace(/'/g, "\\'")
+    const d = dataItem
+    // Escape quotes helper
+    const esc = (str: any) => String(str || '').replace(/'/g, "\\'")
 
-        sql = sql.replaceAll('dataItem.request_id', esc(d['request_id']))
-        sql = sql.replaceAll('dataItem.business_category', esc(d['business_category']))
-        sql = sql.replaceAll('dataItem.start_year', esc(d['start_year']))
-        sql = sql.replaceAll('dataItem.authorized_capital', esc(d['authorized_capital']))
-        sql = sql.replaceAll('dataItem.establish', esc(d['establish']))
-        sql = sql.replaceAll('dataItem.number_of_employees', esc(d['number_of_employees']))
-        sql = sql.replaceAll('dataItem.manufactured_country', esc(d['manufactured_country']))
-        sql = sql.replaceAll('dataItem.vendor_original_country', esc(d['vendor_original_country']))
-        sql = sql.replaceAll('dataItem.sanctions', esc(d['sanctions']))
-        sql = sql.replaceAll('dataItem.currency', esc(d['currency'] || 'THB'))
-        sql = sql.replaceAll('dataItem.suggestion', esc(d['suggestion']))
-        sql = sql.replaceAll('dataItem.result', esc(d['result']))
-        sql = sql.replaceAll('dataItem.path', esc(d['path']))
-        sql = sql.replaceAll('dataItem.vendor_code_selector', esc(d['vendor_code_selector']))
-        sql = sql.replaceAll('dataItem.gpr_c_approver_name', esc(d['gpr_c_approver_name']))
-        sql = sql.replaceAll('dataItem.gpr_c_approver_email', esc(d['gpr_c_approver_email']))
-        sql = sql.replaceAll('dataItem.gpr_c_pc_pic_name', esc(d['gpr_c_pc_pic_name']))
-        sql = sql.replaceAll('dataItem.gpr_c_pc_pic_email', esc(d['gpr_c_pc_pic_email']))
-        sql = sql.replaceAll('dataItem.gpr_c_circular_json', esc(d['gpr_c_circular_json']))
-        sql = sql.replaceAll('dataItem.action_required_json', esc(d['action_required_json']))
-        
-        if (d.completion_date) {
-            sql = sql.replaceAll('dataItem.completion_date_null', `'${esc(d.completion_date)}'`)
-        } else {
-            sql = sql.replaceAll('dataItem.completion_date_null', 'NULL')
-        }
-        
-        sql = sql.replaceAll('dataItem.UPDATE_BY', esc(d['UPDATE_BY'] || 'SYSTEM'))
-        return sql
-    },
+    sql = sql.replaceAll('dataItem.request_id', esc(d['request_id']))
+    sql = sql.replaceAll('dataItem.business_category', esc(d['business_category']))
+    sql = sql.replaceAll('dataItem.start_year', esc(d['start_year']))
+    sql = sql.replaceAll('dataItem.authorized_capital', esc(d['authorized_capital']))
+    sql = sql.replaceAll('dataItem.establish', esc(d['establish']))
+    sql = sql.replaceAll('dataItem.number_of_employees', esc(d['number_of_employees']))
+    sql = sql.replaceAll('dataItem.manufactured_country', esc(d['manufactured_country']))
+    sql = sql.replaceAll('dataItem.vendor_original_country', esc(d['vendor_original_country']))
+    sql = sql.replaceAll('dataItem.sanctions', esc(d['sanctions']))
+    sql = sql.replaceAll('dataItem.currency', esc(d['currency'] || 'THB'))
+    sql = sql.replaceAll('dataItem.suggestion', esc(d['suggestion']))
+    sql = sql.replaceAll('dataItem.result', esc(d['result']))
+    sql = sql.replaceAll('dataItem.path', esc(d['path']))
+    sql = sql.replaceAll('dataItem.vendor_code_selector', esc(d['vendor_code_selector']))
+    sql = sql.replaceAll('dataItem.gpr_c_approver_name', esc(d['gpr_c_approver_name']))
+    sql = sql.replaceAll('dataItem.gpr_c_approver_email', esc(d['gpr_c_approver_email']))
+    sql = sql.replaceAll('dataItem.gpr_c_pc_pic_name', esc(d['gpr_c_pc_pic_name']))
+    sql = sql.replaceAll('dataItem.gpr_c_pc_pic_email', esc(d['gpr_c_pc_pic_email']))
+    sql = sql.replaceAll('dataItem.gpr_c_circular_json', esc(d['gpr_c_circular_json']))
+    sql = sql.replaceAll('dataItem.action_required_json', esc(d['action_required_json']))
 
-    // 2B. Update selection,
+    if (d.completion_date) {
+      sql = sql.replaceAll('dataItem.completion_date_null', `'${esc(d.completion_date)}'`)
+    } else {
+      sql = sql.replaceAll('dataItem.completion_date_null', 'NULL')
+    }
 
-    updateSelection: (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(d['UPDATE_BY'] || 'SYSTEM'))
+    return sql
+  },
+
+  // 2B. Update selection,
+
+  updateSelection: (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE request_vendor_selections SET
                                        business_category = 'dataItem.business_category'
                                      , start_year = 'dataItem.start_year'
@@ -771,42 +769,42 @@ export const RequestRegisterPageSQL = {
                             WHERE
                                        selection_id = dataItem.selection_id
         `
-        const d = dataItem
-        const esc = (str: any) => String(str || '').replace(/'/g, "\\'")
+    const d = dataItem
+    const esc = (str: any) => String(str || '').replace(/'/g, "\\'")
 
-        sql = sql.replaceAll('dataItem.selection_id', (d['selection_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.business_category', esc(d['business_category']))
-        sql = sql.replaceAll('dataItem.start_year', esc(d['start_year']))
-        sql = sql.replaceAll('dataItem.authorized_capital', esc(d['authorized_capital']))
-        sql = sql.replaceAll('dataItem.establish', esc(d['establish']))
-        sql = sql.replaceAll('dataItem.number_of_employees', esc(d['number_of_employees']))
-        sql = sql.replaceAll('dataItem.manufactured_country', esc(d['manufactured_country']))
-        sql = sql.replaceAll('dataItem.vendor_original_country', esc(d['vendor_original_country']))
-        sql = sql.replaceAll('dataItem.sanctions', esc(d['sanctions']))
-        sql = sql.replaceAll('dataItem.currency', esc(d['currency'] || 'THB'))
-        sql = sql.replaceAll('dataItem.suggestion', esc(d['suggestion']))
-        sql = sql.replaceAll('dataItem.result', esc(d['result']))
-        sql = sql.replaceAll('dataItem.path', esc(d['path']))
-        sql = sql.replaceAll('dataItem.vendor_code_selector', esc(d['vendor_code_selector']))
-        sql = sql.replaceAll('dataItem.gpr_c_approver_name', esc(d['gpr_c_approver_name']))
-        sql = sql.replaceAll('dataItem.gpr_c_approver_email', esc(d['gpr_c_approver_email']))
-        sql = sql.replaceAll('dataItem.gpr_c_pc_pic_name', esc(d['gpr_c_pc_pic_name']))
-        sql = sql.replaceAll('dataItem.gpr_c_pc_pic_email', esc(d['gpr_c_pc_pic_email']))
-        sql = sql.replaceAll('dataItem.gpr_c_circular_json', esc(d['gpr_c_circular_json']))
-        sql = sql.replaceAll('dataItem.action_required_json', esc(d['action_required_json']))
+    sql = sql.replaceAll('dataItem.selection_id', (d['selection_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.business_category', esc(d['business_category']))
+    sql = sql.replaceAll('dataItem.start_year', esc(d['start_year']))
+    sql = sql.replaceAll('dataItem.authorized_capital', esc(d['authorized_capital']))
+    sql = sql.replaceAll('dataItem.establish', esc(d['establish']))
+    sql = sql.replaceAll('dataItem.number_of_employees', esc(d['number_of_employees']))
+    sql = sql.replaceAll('dataItem.manufactured_country', esc(d['manufactured_country']))
+    sql = sql.replaceAll('dataItem.vendor_original_country', esc(d['vendor_original_country']))
+    sql = sql.replaceAll('dataItem.sanctions', esc(d['sanctions']))
+    sql = sql.replaceAll('dataItem.currency', esc(d['currency'] || 'THB'))
+    sql = sql.replaceAll('dataItem.suggestion', esc(d['suggestion']))
+    sql = sql.replaceAll('dataItem.result', esc(d['result']))
+    sql = sql.replaceAll('dataItem.path', esc(d['path']))
+    sql = sql.replaceAll('dataItem.vendor_code_selector', esc(d['vendor_code_selector']))
+    sql = sql.replaceAll('dataItem.gpr_c_approver_name', esc(d['gpr_c_approver_name']))
+    sql = sql.replaceAll('dataItem.gpr_c_approver_email', esc(d['gpr_c_approver_email']))
+    sql = sql.replaceAll('dataItem.gpr_c_pc_pic_name', esc(d['gpr_c_pc_pic_name']))
+    sql = sql.replaceAll('dataItem.gpr_c_pc_pic_email', esc(d['gpr_c_pc_pic_email']))
+    sql = sql.replaceAll('dataItem.gpr_c_circular_json', esc(d['gpr_c_circular_json']))
+    sql = sql.replaceAll('dataItem.action_required_json', esc(d['action_required_json']))
 
-        if (d.completion_date) {
-            sql = sql.replaceAll('dataItem.completion_date_null', `'${esc(d.completion_date)}'`)
-        } else {
-            sql = sql.replaceAll('dataItem.completion_date_null', 'NULL')
-        }
+    if (d.completion_date) {
+      sql = sql.replaceAll('dataItem.completion_date_null', `'${esc(d.completion_date)}'`)
+    } else {
+      sql = sql.replaceAll('dataItem.completion_date_null', 'NULL')
+    }
 
-        sql = sql.replaceAll('dataItem.UPDATE_BY', esc(d['UPDATE_BY'] || 'SYSTEM'))
-        return sql
-    },
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(d['UPDATE_BY'] || 'SYSTEM'))
+    return sql
+  },
 
-    updateSelectionGprCOnly: (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  updateSelectionGprCOnly: (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE request_vendor_selections SET
                                        gpr_c_approver_name = 'dataItem.gpr_c_approver_name'
                                      , gpr_c_approver_email = 'dataItem.gpr_c_approver_email'
@@ -820,76 +818,99 @@ export const RequestRegisterPageSQL = {
                                        selection_id = dataItem.selection_id
         `
 
-        const d = dataItem
-        const esc = (str: any) => String(str || '').replace(/'/g, "\\'")
+    const d = dataItem
+    const esc = (str: any) => String(str || '').replace(/'/g, "\\'")
 
-        sql = sql.replaceAll('dataItem.selection_id', (d['selection_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.gpr_c_approver_name', esc(d['gpr_c_approver_name']))
-        sql = sql.replaceAll('dataItem.gpr_c_approver_email', esc(d['gpr_c_approver_email']))
-        sql = sql.replaceAll('dataItem.gpr_c_pc_pic_name', esc(d['gpr_c_pc_pic_name']))
-        sql = sql.replaceAll('dataItem.gpr_c_pc_pic_email', esc(d['gpr_c_pc_pic_email']))
-        sql = sql.replaceAll('dataItem.gpr_c_circular_json', esc(d['gpr_c_circular_json']))
-        sql = sql.replaceAll('dataItem.action_required_json', esc(d['action_required_json']))
-        sql = sql.replaceAll('dataItem.UPDATE_BY', esc(d['UPDATE_BY'] || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.selection_id', (d['selection_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.gpr_c_approver_name', esc(d['gpr_c_approver_name']))
+    sql = sql.replaceAll('dataItem.gpr_c_approver_email', esc(d['gpr_c_approver_email']))
+    sql = sql.replaceAll('dataItem.gpr_c_pc_pic_name', esc(d['gpr_c_pc_pic_name']))
+    sql = sql.replaceAll('dataItem.gpr_c_pc_pic_email', esc(d['gpr_c_pc_pic_email']))
+    sql = sql.replaceAll('dataItem.gpr_c_circular_json', esc(d['gpr_c_circular_json']))
+    sql = sql.replaceAll('dataItem.action_required_json', esc(d['action_required_json']))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(d['UPDATE_BY'] || 'SYSTEM'))
 
-        return sql
-    },
+    return sql
+  },
 
-    deleteFinancials: (dataItem: RegisterRequestDataItem) => {
-        let sql = `DELETE FROM vendor_selection_financials WHERE selection_id = dataItem.selection_id`
-        sql = sql.replaceAll('dataItem.selection_id', (dataItem.selection_id || 0).toString())
-        return sql
-    },
+  deleteFinancials: (dataItem: RegisterRequestDataItem) => {
+    let sql = `DELETE FROM vendor_selection_financials WHERE selection_id = dataItem.selection_id`
+    sql = sql.replaceAll('dataItem.selection_id', (dataItem.selection_id || 0).toString())
+    return sql
+  },
 
-    deleteCriteria: (dataItem: RegisterRequestDataItem) => {
-        let sql = `DELETE FROM vendor_selection_criteria WHERE selection_id = dataItem.selection_id`
-        sql = sql.replaceAll('dataItem.selection_id', (dataItem.selection_id || 0).toString())
-        return sql
-    },
+  deleteCriteria: (dataItem: RegisterRequestDataItem) => {
+    let sql = `DELETE FROM vendor_selection_criteria WHERE selection_id = dataItem.selection_id`
+    sql = sql.replaceAll('dataItem.selection_id', (dataItem.selection_id || 0).toString())
+    return sql
+  },
 
-    // 4. Insert Financial Data,
+  // 4. Insert Financial Data,
 
-    insertFinancial: (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  insertFinancial: (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             INSERT INTO vendor_selection_financials (selection_id, year, total_revenue, net_profit)
                             VALUES (dataItem.selection_id, 'dataItem.year', dataItem.total_revenue, dataItem.net_profit)
         `
-        const esc = (str: any) => String(str || '').replace(/'/g, "\\'")
-        sql = sql.replaceAll('dataItem.selection_id', (dataItem.selection_id || 0).toString())
-        sql = sql.replaceAll('dataItem.year', esc(dataItem.year))
-        
-        // Ensure numeric or NULL
-        const rev = parseFloat(dataItem.total_revenue as string)
-        const pro = parseFloat(dataItem.net_profit as string)
-        sql = sql.replaceAll('dataItem.total_revenue', isNaN(rev) ? 'NULL' : String(rev))
-        sql = sql.replaceAll('dataItem.net_profit', isNaN(pro) ? 'NULL' : String(pro))
-        
-        return sql
-    },
+    const esc = (str: any) => String(str || '').replace(/'/g, "\\'")
+    sql = sql.replaceAll('dataItem.selection_id', (dataItem.selection_id || 0).toString())
+    sql = sql.replaceAll('dataItem.year', esc(dataItem.year))
 
-    insertCriteria: (dataItem: RegisterRequestDataItem) => {
-        let sql = `
-                            INSERT INTO vendor_selection_criteria (selection_id, criteria_no, criteria_value, remark, uploaded_file_path, uploaded_file_name)
-                            VALUES (dataItem.selection_id, 'dataItem.no', 'dataItem.criteria', 'dataItem.remark', dataItem.path_null, dataItem.name_null)
+    // Ensure numeric or NULL
+    const rev = parseFloat(dataItem.total_revenue as string)
+    const pro = parseFloat(dataItem.net_profit as string)
+    sql = sql.replaceAll('dataItem.total_revenue', isNaN(rev) ? 'NULL' : String(rev))
+    sql = sql.replaceAll('dataItem.net_profit', isNaN(pro) ? 'NULL' : String(pro))
+
+    return sql
+  },
+
+  insertCriteria: (dataItem: RegisterRequestDataItem) => {
+    let sql = `
+                            INSERT INTO vendor_selection_criteria (
+                                       selection_id
+                                     , criteria_no
+                                     , criteria_value
+                                     , remark
+                                     , uploaded_file_path
+                                     , uploaded_file_name
+                                     , CREATE_BY
+                                     , UPDATE_BY
+                                     , INUSE
+                            )
+                            VALUES (
+                                       dataItem.selection_id
+                                     , 'dataItem.no'
+                                     , 'dataItem.criteria'
+                                     , 'dataItem.remark'
+                                     , dataItem.path_null
+                                     , dataItem.name_null
+                                     , 'dataItem.CREATE_BY'
+                                     , 'dataItem.UPDATE_BY'
+                                     , 1
+                            )
         `
-        const esc = (str: any) => String(str || '').replace(/'/g, "\\'")
-        sql = sql.replaceAll('dataItem.selection_id', (dataItem.selection_id || 0).toString())
-        sql = sql.replaceAll('dataItem.no', esc(dataItem.no))
-        sql = sql.replaceAll('dataItem.criteria', esc(dataItem.criteria))
-        sql = sql.replaceAll('dataItem.remark', esc(dataItem.remark))
+    const esc = (str: any) => String(str || '').replace(/'/g, "\\'")
+    sql = sql.replaceAll('dataItem.selection_id', (dataItem.selection_id || 0).toString())
+    sql = sql.replaceAll('dataItem.no', esc(dataItem.no))
+    sql = sql.replaceAll('dataItem.criteria', esc(dataItem.criteria))
+    sql = sql.replaceAll('dataItem.remark', esc(dataItem.remark))
 
-        if (dataItem.uploaded_file) {
-            sql = sql.replaceAll('dataItem.path_null', `'${esc(dataItem.uploaded_file)}'`)
-        } else {
-            sql = sql.replaceAll('dataItem.path_null', 'NULL')
-        }
-
-        if (dataItem.uploaded_name) {
-            sql = sql.replaceAll('dataItem.name_null', `'${esc(dataItem.uploaded_name)}'`)
-        } else {
-            sql = sql.replaceAll('dataItem.name_null', 'NULL')
-        }
-
-        return sql
+    if (dataItem.uploaded_file) {
+      sql = sql.replaceAll('dataItem.path_null', `'${esc(dataItem.uploaded_file)}'`)
+    } else {
+      sql = sql.replaceAll('dataItem.path_null', 'NULL')
     }
+
+    if (dataItem.uploaded_name) {
+      sql = sql.replaceAll('dataItem.name_null', `'${esc(dataItem.uploaded_name)}'`)
+    } else {
+      sql = sql.replaceAll('dataItem.name_null', 'NULL')
+    }
+
+    sql = sql.replaceAll('dataItem.CREATE_BY', esc(dataItem.CREATE_BY || dataItem.UPDATE_BY || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM'))
+
+    return sql
+  },
 }

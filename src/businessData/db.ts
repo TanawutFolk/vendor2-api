@@ -27,7 +27,6 @@
 import mysql, { Pool, PoolConnection, PoolOptions } from 'mysql2/promise'
 import oracledb from 'oracledb'
 
-
 try {
   oracledb.initOracleClient()
 } catch (err) {
@@ -48,7 +47,7 @@ const connectionOracle = async (configDb: string = ''): Promise<oracledb.Connect
       connectString: process.env[`${configDb ? `${configDb}_` : ''}HOST`],
       poolMin: 1,
       poolMax: 10,
-      poolIncrement: 1
+      poolIncrement: 1,
     }
 
     const pool = await oracledb.createPool(dbConfig)

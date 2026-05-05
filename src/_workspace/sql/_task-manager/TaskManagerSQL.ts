@@ -1,48 +1,46 @@
 export interface TaskManagerDataItem {
-    sqlWhere?: string
-    sqlWhereColumnFilter?: string
-    Order?: string
-    Limit?: number | string
-    Offset?: number | string
-    SearchFilters?: Array<{ id: string; value: any }>
-    ColumnFilters?: Array<{ id: string; value: any }>
+  sqlWhere?: string
+  sqlWhereColumnFilter?: string
+  Order?: string
+  Limit?: number | string
+  Offset?: number | string
+  SearchFilters?: Array<{ id: string; value: any }>
+  ColumnFilters?: Array<{ id: string; value: any }>
 }
 
 export const TaskManagerSQL = {
-    /**
-     * SearchAllTask — Unified task-manager query
-     * Merges Main Workflow (request_register_vendor + request_approval_step)
-     * with GPR C Sub-Workflow (REQUEST_VENDOR_GPR_C_FLOWS + STEPS)
-     * and LEFT JOINs assignees_to to resolve owner-active status.
-     *
-     * Returns [countSql, dataSql] — same pattern as ApprovalQueueSQL.getAllRequests
-     */
-    searchAllTask: async (dataItem: TaskManagerDataItem): Promise<string[]> => {
-        // ── Build WHERE conditions from SearchFilters ──
-        const filterConditions: string[] = []
+  /**
+   * SearchAllTask — Unified task-manager query
+   * Merges Main Workflow (request_register_vendor + request_approval_step)
+   * with GPR C Sub-Workflow (REQUEST_VENDOR_GPR_C_FLOWS + STEPS)
+   * and LEFT JOINs assignees_to to resolve owner-active status.
+   *
+   * Returns [countSql, dataSql] — same pattern as ApprovalQueueSQL.getAllRequests
+   */
+  searchAllTask: async (dataItem: TaskManagerDataItem): Promise<string[]> => {
+    // ── Build WHERE conditions from SearchFilters ──
+    const filterConditions: string[] = []
 
-        if (dataItem.SearchFilters && Array.isArray(dataItem.SearchFilters)) {
-            for (const f of dataItem.SearchFilters) {
-                if (f.value === null || f.value === undefined || f.value === '') continue
-                const safeVal = String(f.value).replace(/'/g, "\\'")
-                if (f.id === 'request_status') {
-                    filterConditions.push(`t.request_status = '${safeVal}'`)
-                }
-                if (f.id === 'current_owner_empcode') {
-                    filterConditions.push(`t.current_owner_empcode LIKE '%${safeVal}%'`)
-                }
-                if (f.id === 'company_name') {
-                    filterConditions.push(`t.company_name LIKE '%${safeVal}%'`)
-                }
-            }
+    if (dataItem.SearchFilters && Array.isArray(dataItem.SearchFilters)) {
+      for (const f of dataItem.SearchFilters) {
+        if (f.value === null || f.value === undefined || f.value === '') continue
+        const safeVal = String(f.value).replace(/'/g, "\\'")
+        if (f.id === 'request_status') {
+          filterConditions.push(`t.request_status = '${safeVal}'`)
         }
+        if (f.id === 'current_owner_empcode') {
+          filterConditions.push(`t.current_owner_empcode LIKE '%${safeVal}%'`)
+        }
+        if (f.id === 'company_name') {
+          filterConditions.push(`t.company_name LIKE '%${safeVal}%'`)
+        }
+      }
+    }
 
-        const whereClause = filterConditions.length > 0
-            ? 'WHERE ' + filterConditions.join(' AND ')
-            : ''
+    const whereClause = filterConditions.length > 0 ? 'WHERE ' + filterConditions.join(' AND ') : ''
 
-        // ── Shared inner query (UNION of Main + GPR C) ──
-        const innerQuery = `
+    // ── Shared inner query (UNION of Main + GPR C) ──
+    const innerQuery = `
             (
                 /* ── Main Workflow: requests with an in-progress approval step ── */
                 SELECT
@@ -207,13 +205,13 @@ export const TaskManagerSQL = {
             ) t
         `
 
-        let countSql = `
+    let countSql = `
             SELECT COUNT(*) AS TOTAL_COUNT
             FROM ${innerQuery}
             ${whereClause}
         `
 
-        let dataSql = `
+    let dataSql = `
             SELECT t.*
             FROM ${innerQuery}
             ${whereClause}
@@ -221,10 +219,10 @@ export const TaskManagerSQL = {
             LIMIT dataItem.Limit OFFSET dataItem.Offset
         `
 
-        dataSql = dataSql.replaceAll('dataItem.Order', dataItem['Order'] || 't.request_id DESC')
-        dataSql = dataSql.replaceAll('dataItem.Limit', (dataItem['Limit'] || 50).toString())
-        dataSql = dataSql.replaceAll('dataItem.Offset', (dataItem['Offset'] || 0).toString())
+    dataSql = dataSql.replaceAll('dataItem.Order', dataItem['Order'] || 't.request_id DESC')
+    dataSql = dataSql.replaceAll('dataItem.Limit', (dataItem['Limit'] || 50).toString())
+    dataSql = dataSql.replaceAll('dataItem.Offset', (dataItem['Offset'] || 0).toString())
 
-        return [countSql, dataSql]
-    }
+    return [countSql, dataSql]
+  },
 }

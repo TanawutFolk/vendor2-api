@@ -3,176 +3,176 @@ import { ResponseI } from '@src/types/ResponseI'
 import { Request, Response } from 'express'
 
 export const AddVendorController = {
-    checkBlacklist: async (req: Request, res: Response) => {
-        const dataItem = (!req.body || Object.entries(req.body).length === 0) ? req.query : req.body
+  checkBlacklist: async (req: Request, res: Response) => {
+    const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
-        try {
-            const result = await AddVendorModel.checkBlacklist(dataItem) as any
+    try {
+      const result = (await AddVendorModel.checkBlacklist(dataItem)) as any
 
-            return res.status(200).json({
-                Status: result?.Status ?? true,
-                isBlacklisted: result?.isBlacklisted ?? false,
-                blacklistMatches: result?.blacklistMatches ?? [],
-                ResultOnDb: result?.ResultOnDb ?? [],
-                TotalCountOnDb: result?.TotalCountOnDb ?? 0,
-                MethodOnDb: 'Check Blacklist',
-                Message: result?.Message || 'Success'
-            } as ResponseI)
-        } catch (error: any) {
-            console.error('Check Blacklist Error:', error)
+      return res.status(200).json({
+        Status: result?.Status ?? true,
+        isBlacklisted: result?.isBlacklisted ?? false,
+        blacklistMatches: result?.blacklistMatches ?? [],
+        ResultOnDb: result?.ResultOnDb ?? [],
+        TotalCountOnDb: result?.TotalCountOnDb ?? 0,
+        MethodOnDb: 'Check Blacklist',
+        Message: result?.Message || 'Success',
+      } as ResponseI)
+    } catch (error: any) {
+      console.error('Check Blacklist Error:', error)
 
-            return res.status(200).json({
-                Status: false,
-                isBlacklisted: false,
-                blacklistMatches: [],
-                ResultOnDb: [],
-                TotalCountOnDb: 0,
-                MethodOnDb: 'Check Blacklist',
-                Message: error?.message || 'Failed to check blacklist'
-            } as ResponseI)
-        }
-    },
+      return res.status(200).json({
+        Status: false,
+        isBlacklisted: false,
+        blacklistMatches: [],
+        ResultOnDb: [],
+        TotalCountOnDb: 0,
+        MethodOnDb: 'Check Blacklist',
+        Message: error?.message || 'Failed to check blacklist',
+      } as ResponseI)
+    }
+  },
 
-    // Check duplicate vendor
-    checkDuplicate: async (req: Request, res: Response) => {
-        let dataItem
+  // Check duplicate vendor
+  checkDuplicate: async (req: Request, res: Response) => {
+    let dataItem
 
-        if (!req.body || Object.entries(req.body).length === 0) {
-            dataItem = req.query
-        } else {
-            dataItem = req.body
-        }
+    if (!req.body || Object.entries(req.body).length === 0) {
+      dataItem = req.query
+    } else {
+      dataItem = req.body
+    }
 
-        try {
-            const result = await AddVendorModel.checkDuplicateVendor(dataItem) as any
-            return res.status(200).json({
-                Status: result?.Status ?? true,
-                isDuplicate: result?.isDuplicate ?? false,
-                existingVendorId: result?.existingVendorId ?? null,
-                isBlacklisted: result?.isBlacklisted ?? false,
-                blacklistMatches: result?.blacklistMatches ?? [],
-                ResultOnDb: result?.ResultOnDb ?? [],
-                TotalCountOnDb: result?.TotalCountOnDb ?? 0,
-                MethodOnDb: 'Check Duplicate Vendor',
-                Message: result?.Message || 'Success'
-            } as ResponseI)
-        } catch (error: any) {
-            console.error('Check Duplicate Vendor Error:', error)
-            return res.status(200).json({
-                Status: false,
-                isDuplicate: false,
-                existingVendorId: null,
-                isBlacklisted: false,
-                blacklistMatches: [],
-                ResultOnDb: [],
-                TotalCountOnDb: 0,
-                MethodOnDb: 'Check Duplicate Vendor',
-                Message: error?.message || 'Failed to check duplicate'
-            } as ResponseI)
-        }
-    },
+    try {
+      const result = (await AddVendorModel.checkDuplicateVendor(dataItem)) as any
+      return res.status(200).json({
+        Status: result?.Status ?? true,
+        isDuplicate: result?.isDuplicate ?? false,
+        existingVendorId: result?.existingVendorId ?? null,
+        isBlacklisted: result?.isBlacklisted ?? false,
+        blacklistMatches: result?.blacklistMatches ?? [],
+        ResultOnDb: result?.ResultOnDb ?? [],
+        TotalCountOnDb: result?.TotalCountOnDb ?? 0,
+        MethodOnDb: 'Check Duplicate Vendor',
+        Message: result?.Message || 'Success',
+      } as ResponseI)
+    } catch (error: any) {
+      console.error('Check Duplicate Vendor Error:', error)
+      return res.status(200).json({
+        Status: false,
+        isDuplicate: false,
+        existingVendorId: null,
+        isBlacklisted: false,
+        blacklistMatches: [],
+        ResultOnDb: [],
+        TotalCountOnDb: 0,
+        MethodOnDb: 'Check Duplicate Vendor',
+        Message: error?.message || 'Failed to check duplicate',
+      } as ResponseI)
+    }
+  },
 
-    // Create new vendor with contacts and products
-    create: async (req: Request, res: Response) => {
-        let dataItem
+  // Create new vendor with contacts and products
+  create: async (req: Request, res: Response) => {
+    let dataItem
 
-        if (!req.body || Object.entries(req.body).length === 0) {
-            dataItem = req.query.data
-        } else {
-            dataItem = req.body
-        }
+    if (!req.body || Object.entries(req.body).length === 0) {
+      dataItem = req.query.data
+    } else {
+      dataItem = req.body
+    }
 
-        try {
-            // Ensure contacts and products are arrays if they exist
-            if (dataItem.contacts && !Array.isArray(dataItem.contacts)) {
-                dataItem.contacts = [dataItem.contacts]
-            }
-            if (dataItem.products && !Array.isArray(dataItem.products)) {
-                dataItem.products = [dataItem.products]
-            }
+    try {
+      // Ensure contacts and products are arrays if they exist
+      if (dataItem.contacts && !Array.isArray(dataItem.contacts)) {
+        dataItem.contacts = [dataItem.contacts]
+      }
+      if (dataItem.products && !Array.isArray(dataItem.products)) {
+        dataItem.products = [dataItem.products]
+      }
 
-            const result = await AddVendorModel.createVendor(dataItem)
-            return res.status(200).json(result as ResponseI)
-        } catch (error: any) {
-            console.error('Create Vendor Error:', error)
-            return res.status(200).json({
-                Status: false,
-                Message: error?.message || 'Failed to create vendor',
-                ResultOnDb: [],
-                MethodOnDb: 'Create Vendor',
-                TotalCountOnDb: 0
-            } as ResponseI)
-        }
-    },
+      const result = await AddVendorModel.createVendor(dataItem)
+      return res.status(200).json(result as ResponseI)
+    } catch (error: any) {
+      console.error('Create Vendor Error:', error)
+      return res.status(200).json({
+        Status: false,
+        Message: error?.message || 'Failed to create vendor',
+        ResultOnDb: [],
+        MethodOnDb: 'Create Vendor',
+        TotalCountOnDb: 0,
+      } as ResponseI)
+    }
+  },
 
-    // Get vendor types for dropdown
-    getVendorTypes: async (req: Request, res: Response) => {
-        try {
-            const result = await AddVendorModel.getVendorTypes()
+  // Get vendor types for dropdown
+  getVendorTypes: async (req: Request, res: Response) => {
+    try {
+      const result = await AddVendorModel.getVendorTypes()
 
-            return res.status(200).json({
-                Status: true,
-                ResultOnDb: result,
-                TotalCountOnDb: result.length,
-                MethodOnDb: 'Get Vendor Types',
-                Message: 'Search Data Success',
-            } as ResponseI)
-        } catch (error: any) {
-            console.error('Get Vendor Types Error:', error)
-            return res.status(200).json({
-                Status: false,
-                ResultOnDb: [],
-                TotalCountOnDb: 0,
-                MethodOnDb: 'Get Vendor Types',
-                Message: error?.message || 'Failed to get vendor types',
-            } as ResponseI)
-        }
-    },
+      return res.status(200).json({
+        Status: true,
+        ResultOnDb: result,
+        TotalCountOnDb: result.length,
+        MethodOnDb: 'Get Vendor Types',
+        Message: 'Search Data Success',
+      } as ResponseI)
+    } catch (error: any) {
+      console.error('Get Vendor Types Error:', error)
+      return res.status(200).json({
+        Status: false,
+        ResultOnDb: [],
+        TotalCountOnDb: 0,
+        MethodOnDb: 'Get Vendor Types',
+        Message: error?.message || 'Failed to get vendor types',
+      } as ResponseI)
+    }
+  },
 
-    // Get product groups for dropdown
-    getProductGroups: async (_req: Request, res: Response) => {
-        try {
-            const result = await AddVendorModel.getProductGroups()
+  // Get product groups for dropdown
+  getProductGroups: async (_req: Request, res: Response) => {
+    try {
+      const result = await AddVendorModel.getProductGroups()
 
-            res.status(200).json({
-                Status: true,
-                ResultOnDb: result,
-                TotalCountOnDb: result.length,
-                MethodOnDb: 'Get Product Groups',
-                Message: 'Search Data Success',
-            } as ResponseI)
-        } catch (error: any) {
-            res.status(200).json({
-                Status: false,
-                ResultOnDb: [],
-                TotalCountOnDb: 0,
-                MethodOnDb: 'Get Product Groups',
-                Message: error?.message || 'Failed to get product groups',
-            } as ResponseI)
-        }
-    },
+      res.status(200).json({
+        Status: true,
+        ResultOnDb: result,
+        TotalCountOnDb: result.length,
+        MethodOnDb: 'Get Product Groups',
+        Message: 'Search Data Success',
+      } as ResponseI)
+    } catch (error: any) {
+      res.status(200).json({
+        Status: false,
+        ResultOnDb: [],
+        TotalCountOnDb: 0,
+        MethodOnDb: 'Get Product Groups',
+        Message: error?.message || 'Failed to get product groups',
+      } as ResponseI)
+    }
+  },
 
-    // Create new product group
-    createProductGroup: async (req: Request, res: Response) => {
-        let dataItem
+  // Create new product group
+  createProductGroup: async (req: Request, res: Response) => {
+    let dataItem
 
-        if (!req.body || Object.entries(req.body).length === 0) {
-            dataItem = req.query
-        } else {
-            dataItem = req.body
-        }
+    if (!req.body || Object.entries(req.body).length === 0) {
+      dataItem = req.query
+    } else {
+      dataItem = req.body
+    }
 
-        try {
-            const result = await AddVendorModel.createProductGroup(dataItem)
-            res.status(200).json(result as ResponseI)
-        } catch (error: any) {
-            res.status(200).json({
-                Status: false,
-                Message: error?.message || 'Failed to create product group',
-                ResultOnDb: [],
-                MethodOnDb: 'Create Product Group',
-                TotalCountOnDb: 0
-            } as ResponseI)
-        }
-    },
+    try {
+      const result = await AddVendorModel.createProductGroup(dataItem)
+      res.status(200).json(result as ResponseI)
+    } catch (error: any) {
+      res.status(200).json({
+        Status: false,
+        Message: error?.message || 'Failed to create product group',
+        ResultOnDb: [],
+        MethodOnDb: 'Create Product Group',
+        TotalCountOnDb: 0,
+      } as ResponseI)
+    }
+  },
 }

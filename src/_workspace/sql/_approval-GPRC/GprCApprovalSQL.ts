@@ -1,138 +1,138 @@
 interface RegisterRequestDataItem {
-    request_id?: number | string;
-    request_number?: string;
-    vendor_id?: number | string;
-    vendor_contact_id?: number | string;
-    Request_By_EmployeeCode?: string;
-    supportProduct_Process?: string;
-    purchase_frequency?: string;
-    request_status?: string;
-    requester_remark?: string;
-    assign_to?: string;
-    PIC_Email?: string;
-    CREATE_BY?: string;
-    UPDATE_BY?: string;
-    file_name?: string;
-    file_path?: string;
-    file_size?: number | string;
-    file_type?: string;
-    sqlWhere?: string;
-    sqlWhereColumnFilter?: string;
-    Order?: string;
-    Limit?: number | string;
-    Offset?: number | string;
-    approve_by?: string;
-    approve_date?: string;
-    approver_remark?: string;
-    step_id?: number | string;
-    step_order?: number | string;
-    approver_id?: string;
-    step_status?: string;
-    DESCRIPTION?: string;
-    step_code?: string;
-    actor_type?: string;
-    group_code?: string;
-    assignment_mode?: string;
-    action_by?: string;
-    action_type?: string;
-    remark?: string;
-    vendor_code?: string;
-    selection_id?: number | string;
-    business_category?: string;
-    start_year?: string;
-    authorized_capital?: string;
-    establish?: string;
-    number_of_employees?: string;
-    manufactured_country?: string;
-    vendor_original_country?: string;
-    sanctions?: string;
-    currency?: string;
-    suggestion?: string;
-    result?: string;
-    path?: string;
-    vendor_code_selector?: string;
-    completion_date?: string;
-    gpr_c_approver_name?: string;
-    gpr_c_approver_email?: string;
-    gpr_c_pc_pic_name?: string;
-    gpr_c_pc_pic_email?: string;
-    gpr_c_circular_json?: string;
-    action_required_json?: string;
-    completion_date_null?: string;
-    year?: string;
-    total_revenue?: number | string;
-    net_profit?: number | string;
-    no?: string | number;
-    criteria?: string;
-    uploaded_file?: string;
-    uploaded_name?: string;
-    path_null?: string;
-    name_null?: string;
-    vendor_region?: string;
-    group_name?: string;
-    scope?: string;
-    from_empcode?: string;
-    to_empcode?: string;
-    changed_by?: string;
-    reason?: string;
-    fft_status?: number | string;
-    empcode?: string;
-    target_group?: string;
-    target_compact?: string;
-    group_compact?: string;
-    is_oversea?: boolean | number | string;
+  request_id?: number | string
+  request_number?: string
+  vendor_id?: number | string
+  vendor_contact_id?: number | string
+  Request_By_EmployeeCode?: string
+  supportProduct_Process?: string
+  purchase_frequency?: string
+  request_status?: string
+  requester_remark?: string
+  assign_to?: string
+  PIC_Email?: string
+  CREATE_BY?: string
+  UPDATE_BY?: string
+  file_name?: string
+  file_path?: string
+  file_size?: number | string
+  file_type?: string
+  sqlWhere?: string
+  sqlWhereColumnFilter?: string
+  Order?: string
+  Limit?: number | string
+  Offset?: number | string
+  approve_by?: string
+  approve_date?: string
+  approver_remark?: string
+  step_id?: number | string
+  step_order?: number | string
+  approver_id?: string
+  step_status?: string
+  DESCRIPTION?: string
+  step_code?: string
+  actor_type?: string
+  group_code?: string
+  assignment_mode?: string
+  action_by?: string
+  action_type?: string
+  remark?: string
+  vendor_code?: string
+  selection_id?: number | string
+  business_category?: string
+  start_year?: string
+  authorized_capital?: string
+  establish?: string
+  number_of_employees?: string
+  manufactured_country?: string
+  vendor_original_country?: string
+  sanctions?: string
+  currency?: string
+  suggestion?: string
+  result?: string
+  path?: string
+  vendor_code_selector?: string
+  completion_date?: string
+  gpr_c_approver_name?: string
+  gpr_c_approver_email?: string
+  gpr_c_pc_pic_name?: string
+  gpr_c_pc_pic_email?: string
+  gpr_c_circular_json?: string
+  action_required_json?: string
+  completion_date_null?: string
+  year?: string
+  total_revenue?: number | string
+  net_profit?: number | string
+  no?: string | number
+  criteria?: string
+  uploaded_file?: string
+  uploaded_name?: string
+  path_null?: string
+  name_null?: string
+  vendor_region?: string
+  group_name?: string
+  scope?: string
+  from_empcode?: string
+  to_empcode?: string
+  changed_by?: string
+  reason?: string
+  fft_status?: number | string
+  empcode?: string
+  target_group?: string
+  target_compact?: string
+  group_compact?: string
+  is_oversea?: boolean | number | string
 }
 
 export interface GprCFlowDataItem {
-    request_id?: number | string
-    selection_id?: number | string
-    gpr_c_flow_id?: number | string
-    gpr_c_step_id?: number | string
-    action_required_id?: number | string
-    flow_status?: string
-    current_step_code?: string
-    requester_empcode?: string
-    requester_submitted_at?: string
-    gpr_c_approver_empcode?: string
-    gpr_c_approver_name?: string
-    gpr_c_approver_email?: string
-    pc_pic_name?: string
-    pc_pic_email?: string
-    circular_json?: string
-    completed_at?: string
-    rejected_at?: string
-    rejected_by?: string
-    rejected_remark?: string
-    step_order?: number | string
-    step_code?: string
-    step_name?: string
-    approver_empcode?: string
-    approver_name?: string
-    approver_email?: string
-    step_status?: string
-    action_by?: string
-    action_type?: string
-    action_remark?: string
-    stage_code?: string
-    stage_name?: string
-    pic_name?: string
-    pic_email?: string
-    required_detail?: string
-    result_status?: string
-    result_remark?: string
-    result_by?: string
-    sent_at?: string
-    CREATE_BY?: string
-    UPDATE_BY?: string
+  request_id?: number | string
+  selection_id?: number | string
+  gpr_c_flow_id?: number | string
+  gpr_c_step_id?: number | string
+  action_required_id?: number | string
+  flow_status?: string
+  current_step_code?: string
+  requester_empcode?: string
+  requester_submitted_at?: string
+  gpr_c_approver_empcode?: string
+  gpr_c_approver_name?: string
+  gpr_c_approver_email?: string
+  pc_pic_name?: string
+  pc_pic_email?: string
+  circular_json?: string
+  completed_at?: string
+  rejected_at?: string
+  rejected_by?: string
+  rejected_remark?: string
+  step_order?: number | string
+  step_code?: string
+  step_name?: string
+  approver_empcode?: string
+  approver_name?: string
+  approver_email?: string
+  step_status?: string
+  action_by?: string
+  action_type?: string
+  action_remark?: string
+  stage_code?: string
+  stage_name?: string
+  pic_name?: string
+  pic_email?: string
+  required_detail?: string
+  result_status?: string
+  result_remark?: string
+  result_by?: string
+  sent_at?: string
+  CREATE_BY?: string
+  UPDATE_BY?: string
 }
 
 const esc = (value: any) => String(value ?? '').replace(/'/g, "\\'")
 const num = (value: any) => Number(value) || 0
-const nullableDate = (value: any) => value === 'NOW()' ? 'NOW()' : 'NULL'
+const nullableDate = (value: any) => (value === 'NOW()' ? 'NOW()' : 'NULL')
 
 export const GprCApprovalSQL = {
-    getSelectionIdByRequest: (dataItem: GprCFlowDataItem) => {
-        return `
+  getSelectionIdByRequest: (dataItem: GprCFlowDataItem) => {
+    return `
             SELECT SELECTION_ID
             FROM request_vendor_selections
             WHERE request_id = ${num(dataItem.request_id)}
@@ -140,10 +140,10 @@ export const GprCApprovalSQL = {
             ORDER BY selection_id DESC
             LIMIT 1
         `
-    },
+  },
 
-    getFlowByRequestId: (dataItem: GprCFlowDataItem) => {
-        return `
+  getFlowByRequestId: (dataItem: GprCFlowDataItem) => {
+    return `
             SELECT *
             FROM REQUEST_VENDOR_GPR_C_FLOWS
             WHERE REQUEST_ID = ${num(dataItem.request_id)}
@@ -151,10 +151,10 @@ export const GprCApprovalSQL = {
             ORDER BY GPR_C_FLOW_ID DESC
             LIMIT 1
         `
-    },
+  },
 
-    insertFlow: (dataItem: GprCFlowDataItem) => {
-        return `
+  insertFlow: (dataItem: GprCFlowDataItem) => {
+    return `
             INSERT INTO REQUEST_VENDOR_GPR_C_FLOWS (
                 REQUEST_ID,
                 SELECTION_ID,
@@ -175,10 +175,10 @@ export const GprCApprovalSQL = {
                 1
             )
         `
-    },
+  },
 
-    updateFlowSetup: (dataItem: GprCFlowDataItem) => {
-        return `
+  updateFlowSetup: (dataItem: GprCFlowDataItem) => {
+    return `
             UPDATE REQUEST_VENDOR_GPR_C_FLOWS SET
                 SELECTION_ID = ${dataItem.selection_id ? num(dataItem.selection_id) : 'SELECTION_ID'},
                 FLOW_STATUS = '${esc(dataItem.flow_status || 'IN_PROGRESS')}',
@@ -195,10 +195,10 @@ export const GprCApprovalSQL = {
                 UPDATE_DATE = NOW()
             WHERE GPR_C_FLOW_ID = ${num(dataItem.gpr_c_flow_id)}
         `
-    },
+  },
 
-    updateFlowStatus: (dataItem: GprCFlowDataItem) => {
-        return `
+  updateFlowStatus: (dataItem: GprCFlowDataItem) => {
+    return `
             UPDATE REQUEST_VENDOR_GPR_C_FLOWS SET
                 FLOW_STATUS = '${esc(dataItem.flow_status)}',
                 CURRENT_STEP_CODE = ${dataItem.current_step_code === null ? 'NULL' : `'${esc(dataItem.current_step_code)}'`},
@@ -210,10 +210,10 @@ export const GprCApprovalSQL = {
                 UPDATE_DATE = NOW()
             WHERE GPR_C_FLOW_ID = ${num(dataItem.gpr_c_flow_id)}
         `
-    },
+  },
 
-    deactivateStepsByFlow: (dataItem: GprCFlowDataItem) => {
-        return `
+  deactivateStepsByFlow: (dataItem: GprCFlowDataItem) => {
+    return `
             UPDATE REQUEST_VENDOR_GPR_C_STEPS SET
                 INUSE = 0,
                 UPDATE_BY = '${esc(dataItem.UPDATE_BY || 'SYSTEM')}',
@@ -221,10 +221,10 @@ export const GprCApprovalSQL = {
             WHERE GPR_C_FLOW_ID = ${num(dataItem.gpr_c_flow_id)}
               AND INUSE = 1
         `
-    },
+  },
 
-    insertStep: (dataItem: GprCFlowDataItem) => {
-        return `
+  insertStep: (dataItem: GprCFlowDataItem) => {
+    return `
             INSERT INTO REQUEST_VENDOR_GPR_C_STEPS (
                 GPR_C_FLOW_ID,
                 REQUEST_ID,
@@ -253,20 +253,20 @@ export const GprCApprovalSQL = {
                 1
             )
         `
-    },
+  },
 
-    getStepsByFlow: (dataItem: GprCFlowDataItem) => {
-        return `
+  getStepsByFlow: (dataItem: GprCFlowDataItem) => {
+    return `
             SELECT *
             FROM REQUEST_VENDOR_GPR_C_STEPS
             WHERE GPR_C_FLOW_ID = ${num(dataItem.gpr_c_flow_id)}
               AND INUSE = 1
             ORDER BY STEP_ORDER ASC
         `
-    },
+  },
 
-    getCurrentStepByFlow: (dataItem: GprCFlowDataItem) => {
-        return `
+  getCurrentStepByFlow: (dataItem: GprCFlowDataItem) => {
+    return `
             SELECT *
             FROM REQUEST_VENDOR_GPR_C_STEPS
             WHERE GPR_C_FLOW_ID = ${num(dataItem.gpr_c_flow_id)}
@@ -275,10 +275,10 @@ export const GprCApprovalSQL = {
             ORDER BY STEP_ORDER ASC
             LIMIT 1
         `
-    },
+  },
 
-    updateStepAction: (dataItem: GprCFlowDataItem) => {
-        return `
+  updateStepAction: (dataItem: GprCFlowDataItem) => {
+    return `
             UPDATE REQUEST_VENDOR_GPR_C_STEPS SET
                 STEP_STATUS = '${esc(dataItem.step_status)}',
                 ACTION_BY = '${esc(dataItem.action_by)}',
@@ -289,20 +289,20 @@ export const GprCApprovalSQL = {
                 UPDATE_DATE = NOW()
             WHERE GPR_C_STEP_ID = ${num(dataItem.gpr_c_step_id)}
         `
-    },
+  },
 
-    activateStep: (dataItem: GprCFlowDataItem) => {
-        return `
+  activateStep: (dataItem: GprCFlowDataItem) => {
+    return `
             UPDATE REQUEST_VENDOR_GPR_C_STEPS SET
                 STEP_STATUS = 'IN_PROGRESS',
                 UPDATE_BY = '${esc(dataItem.UPDATE_BY || 'SYSTEM')}',
                 UPDATE_DATE = NOW()
             WHERE GPR_C_STEP_ID = ${num(dataItem.gpr_c_step_id)}
         `
-    },
+  },
 
-    skipPendingSteps: (dataItem: GprCFlowDataItem) => {
-        return `
+  skipPendingSteps: (dataItem: GprCFlowDataItem) => {
+    return `
             UPDATE REQUEST_VENDOR_GPR_C_STEPS SET
                 STEP_STATUS = 'SKIPPED',
                 UPDATE_BY = '${esc(dataItem.UPDATE_BY || 'SYSTEM')}',
@@ -311,10 +311,10 @@ export const GprCApprovalSQL = {
               AND STEP_STATUS = 'PENDING'
               AND INUSE = 1
         `
-    },
+  },
 
-    insertActionRequired: (dataItem: GprCFlowDataItem) => {
-        return `
+  insertActionRequired: (dataItem: GprCFlowDataItem) => {
+    return `
             INSERT INTO REQUEST_VENDOR_GPR_C_ACTION_REQUIRED (
                 GPR_C_FLOW_ID,
                 GPR_C_STEP_ID,
@@ -345,10 +345,10 @@ export const GprCApprovalSQL = {
                 1
             )
         `
-    },
+  },
 
-    updateActionRequiredResult: (dataItem: GprCFlowDataItem) => {
-        return `
+  updateActionRequiredResult: (dataItem: GprCFlowDataItem) => {
+    return `
             UPDATE REQUEST_VENDOR_GPR_C_ACTION_REQUIRED SET
                 RESULT_STATUS = '${esc(dataItem.result_status || 'COMPLETED')}',
                 RESULT_REMARK = '${esc(dataItem.result_remark)}',
@@ -359,20 +359,20 @@ export const GprCApprovalSQL = {
             WHERE ACTION_REQUIRED_ID = ${num(dataItem.action_required_id)}
               AND INUSE = 1
         `
-    },
+  },
 
-    getActionRequiredById: (dataItem: GprCFlowDataItem) => {
-        return `
+  getActionRequiredById: (dataItem: GprCFlowDataItem) => {
+    return `
             SELECT *
             FROM REQUEST_VENDOR_GPR_C_ACTION_REQUIRED
             WHERE ACTION_REQUIRED_ID = ${num(dataItem.action_required_id)}
               AND INUSE = 1
             LIMIT 1
         `
-    },
+  },
 
-    getActionRequiredQueueByPicEmail: (dataItem: GprCFlowDataItem) => {
-        return `
+  getActionRequiredQueueByPicEmail: (dataItem: GprCFlowDataItem) => {
+    return `
             SELECT
                 ar.*,
                 f.FLOW_STATUS,
@@ -396,10 +396,10 @@ export const GprCApprovalSQL = {
               AND ar.RESULT_STATUS IN ('PENDING', 'INCOMPLETE')
             ORDER BY ar.SENT_AT DESC, ar.ACTION_REQUIRED_ID DESC
         `
-    },
+  },
 
-    getQueueByApprover: (dataItem: GprCFlowDataItem) => {
-        return `
+  getQueueByApprover: (dataItem: GprCFlowDataItem) => {
+    return `
             SELECT
                 f.*,
                 s.GPR_C_STEP_ID,
@@ -441,10 +441,10 @@ export const GprCApprovalSQL = {
               AND s.APPROVER_EMPCODE = '${esc(dataItem.approver_empcode)}'
             ORDER BY f.GPR_C_FLOW_ID DESC
         `
-    },
+  },
 
-    getTaskManagerQueue: () => {
-        return `
+  getTaskManagerQueue: () => {
+    return `
             SELECT
                 f.GPR_C_FLOW_ID,
                 f.REQUEST_ID,
@@ -480,20 +480,20 @@ export const GprCApprovalSQL = {
               AND f.FLOW_STATUS = 'IN_PROGRESS'
             ORDER BY f.GPR_C_FLOW_ID DESC
         `
-    },
+  },
 
-    getStepById: (dataItem: GprCFlowDataItem) => {
-        return `
+  getStepById: (dataItem: GprCFlowDataItem) => {
+    return `
             SELECT *
             FROM REQUEST_VENDOR_GPR_C_STEPS
             WHERE GPR_C_STEP_ID = ${num(dataItem.gpr_c_step_id)}
               AND INUSE = 1
             LIMIT 1
         `
-    },
+  },
 
-    updateStepApprover: (dataItem: GprCFlowDataItem) => {
-        return `
+  updateStepApprover: (dataItem: GprCFlowDataItem) => {
+    return `
             UPDATE REQUEST_VENDOR_GPR_C_STEPS SET
                 APPROVER_EMPCODE = '${esc(dataItem.approver_empcode)}',
                 APPROVER_NAME = '${esc(dataItem.approver_name)}',
@@ -503,10 +503,10 @@ export const GprCApprovalSQL = {
             WHERE GPR_C_STEP_ID = ${num(dataItem.gpr_c_step_id)}
               AND INUSE = 1
         `
-    },
+  },
 
-    getRequestSummary: (dataItem: GprCFlowDataItem) => {
-        return `
+  getRequestSummary: (dataItem: GprCFlowDataItem) => {
+    return `
             SELECT
                 rr.request_id,
                 rr.request_number,
@@ -530,11 +530,10 @@ export const GprCApprovalSQL = {
             WHERE rr.request_id = ${num(dataItem.request_id)}
             LIMIT 1
         `
-    },
+  },
 
-
-    getMemberByEmpCode: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getMemberByEmpCode: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        empName
                                      , empSurname
@@ -547,14 +546,13 @@ export const GprCApprovalSQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
+    sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-
-    getAssigneeByEmpCodeContact: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getAssigneeByEmpCodeContact: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        empName
                                      , empEmail
@@ -566,14 +564,13 @@ export const GprCApprovalSQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
+    sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-
-    getPeerCcRowsByNormalizedGroup: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getPeerCcRowsByNormalizedGroup: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        empcode
                                      , empEmail
@@ -593,15 +590,14 @@ export const GprCApprovalSQL = {
                                        Assignees_id ASC
         `
 
-        sql = sql.replaceAll('dataItem.target_group', dataItem['target_group'] || '')
-        sql = sql.replaceAll('dataItem.target_compact', dataItem['target_compact'] || '')
+    sql = sql.replaceAll('dataItem.target_group', dataItem['target_group'] || '')
+    sql = sql.replaceAll('dataItem.target_compact', dataItem['target_compact'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-
-    getApprovalSteps: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getApprovalSteps: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT 
                                        ras.step_id
                                      , ras.request_id
@@ -629,14 +625,13 @@ export const GprCApprovalSQL = {
                                        ras.step_order ASC
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-
-    updateApprovalStep: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  updateApprovalStep: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE request_approval_step SET
                                        step_status = 'dataItem.step_status'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
@@ -645,15 +640,15 @@ export const GprCApprovalSQL = {
                                        step_id = dataItem.step_id
         `
 
-        sql = sql.replaceAll('dataItem.step_id', (dataItem['step_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.step_status', dataItem['step_status'] || '')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.step_id', (dataItem['step_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.step_status', dataItem['step_status'] || '')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-    createApprovalLog: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  createApprovalLog: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             INSERT INTO request_approval_log (
                                        request_id
                                      , step_id
@@ -671,17 +666,17 @@ export const GprCApprovalSQL = {
                             )
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.step_id', dataItem['step_id'] ? dataItem['step_id'].toString() : 'NULL')
-        sql = sql.replaceAll('dataItem.action_by', dataItem['action_by'] || '')
-        sql = sql.replaceAll('dataItem.action_type', dataItem['action_type'] || '')
-        sql = sql.replaceAll('dataItem.remark', dataItem['remark'] || '')
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.step_id', dataItem['step_id'] ? dataItem['step_id'].toString() : 'NULL')
+    sql = sql.replaceAll('dataItem.action_by', dataItem['action_by'] || '')
+    sql = sql.replaceAll('dataItem.action_type', dataItem['action_type'] || '')
+    sql = sql.replaceAll('dataItem.remark', dataItem['remark'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-    updateStatus: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  updateStatus: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE request_register_vendor SET
                                        request_status = 'dataItem.request_status'
                                      , approve_by = 'dataItem.approve_by'
@@ -693,19 +688,18 @@ export const GprCApprovalSQL = {
                                        request_id = dataItem.request_id
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.request_status', dataItem['request_status'] || '')
-        sql = sql.replaceAll('dataItem.approve_by', dataItem['approve_by'] || '')
-        sql = sql.replaceAll("'dataItem.approve_date'", dataItem['approve_date'] === 'NOW()' ? 'NOW()' : 'approve_date')
-        sql = sql.replaceAll('dataItem.approver_remark', dataItem['approver_remark'] || '')
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.request_status', dataItem['request_status'] || '')
+    sql = sql.replaceAll('dataItem.approve_by', dataItem['approve_by'] || '')
+    sql = sql.replaceAll("'dataItem.approve_date'", dataItem['approve_date'] === 'NOW()' ? 'NOW()' : 'approve_date')
+    sql = sql.replaceAll('dataItem.approver_remark', dataItem['approver_remark'] || '')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
 
-        return sql
-    },
+    return sql
+  },
 
-
-    markRequestCompleted: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  markRequestCompleted: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE request_register_vendor SET
                                        request_status = 'Completed'
                                      , approve_date = NOW()
@@ -715,15 +709,14 @@ export const GprCApprovalSQL = {
                                        request_id = dataItem.request_id
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
-        return sql
-    },
+    return sql
+  },
 
-
-    getRequestStatusContext: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getRequestStatusContext: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        rr.vendor_id
                                      , rr.assign_to
@@ -749,29 +742,27 @@ export const GprCApprovalSQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-
-    updateVendorFftStatus: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  updateVendorFftStatus: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             UPDATE vendors SET
                                        fft_status = dataItem.fft_status
                             WHERE
                                        vendor_id = dataItem.vendor_id
         `
 
-        sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
-        sql = sql.replaceAll('dataItem.fft_status', (dataItem['fft_status'] || 0).toString())
+    sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.fft_status', (dataItem['fft_status'] || 0).toString())
 
-        return sql
-    },
+    return sql
+  },
 
-
-    getActiveAssigneeByEmpCodeAndGroupCode: async (dataItem: RegisterRequestDataItem) => {
-        let sql = `
+  getActiveAssigneeByEmpCodeAndGroupCode: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
                             SELECT
                                        Assignees_id
                                      , empcode
@@ -795,10 +786,10 @@ export const GprCApprovalSQL = {
                                        1
         `
 
-        sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
-        sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
-        sql = sql.replaceAll('dataItem.group_compact', dataItem['group_compact'] || '')
+    sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
+    sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
+    sql = sql.replaceAll('dataItem.group_compact', dataItem['group_compact'] || '')
 
-        return sql
-    }
+    return sql
+  },
 }

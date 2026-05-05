@@ -113,7 +113,6 @@ Routers.use('/manufacturing-item/manufacturing-item-group', manufacturingItemGro
 Routers.use('/theme-color', themeColorRoutes)
 Routers.use('/common', commonRoutes)
 
-
 Routers.use('/yield-rate-material', YieldRateMaterialRoutes)
 
 Routers.use('/loc', LocRoutes)
@@ -121,7 +120,6 @@ Routers.use('/loc', LocRoutes)
 Routers.use('/yield-rate-go-straight-rate-process-for-sct', YieldRateGoStraightRateProcessForSctRoutes)
 Routers.use('/yield-rate-go-straight-rate-total-for-sct', YieldRateGoStraightRateTotalForSctRoutes)
 // Routers.use('/yield-accumulation-of-item-for-sct', YieldAccumulationOfItemForSctRoutes)
-
 
 // ? Add Vendor Routes
 Routers.use('/add-vendor', addVendorRoutes)
