@@ -8,26 +8,114 @@ export interface AssigneesDataItem {
   INUSE?: number | string
   keyword?: string
   in_use?: string | number
+  SearchFilters?: Array<{ id: string; value: unknown }>
+  Order?: Array<{ id: string; desc?: boolean }>
+  Start?: number | string
+  Limit?: number | string
 }
 
-const esc = (value: any) => String(value || '').replace(/'/g, "\\'")
+const esc = (value: unknown) => String(value || '').replace(/'/g, "\\'")
+const num = (value: unknown, fallback = 0) => {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+const parseSearchFilters = (dataItem: AssigneesDataItem) => {
+  const searchFilterMap = new Map<string, unknown>()
+
+  for (const item of Array.isArray(dataItem.SearchFilters) ? dataItem.SearchFilters : []) {
+    if (item?.id) {
+      searchFilterMap.set(item.id, item.value)
+    }
+  }
+
+  return {
+    keyword: String(searchFilterMap.get('keyword') ?? dataItem.keyword ?? '').trim(),
+    group_code: String(searchFilterMap.get('group_code') ?? dataItem.group_code ?? '')
+      .trim()
+      .toUpperCase(),
+    in_use: String(searchFilterMap.get('in_use') ?? dataItem.in_use ?? '').trim(),
+  }
+}
+
+const buildWhereClause = (dataItem: AssigneesDataItem) => {
+  const filters = parseSearchFilters(dataItem)
+  const whereParts = ['1 = 1']
+
+  if (filters.keyword) {
+    const keywordVal = `%${esc(filters.keyword)}%`
+    whereParts.push(`(empName LIKE '${keywordVal}' OR empcode LIKE '${keywordVal}' OR empEmail LIKE '${keywordVal}')`)
+  }
+
+  if (filters.group_code) {
+    const groupCompact = filters.group_code.replace(/[^A-Z0-9]/g, '')
+    whereParts.push(`(
+      UPPER(TRIM(COALESCE(group_code, ''))) = '${esc(filters.group_code)}'
+      OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_') = '${esc(filters.group_code)}'
+      OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_code, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = '${esc(groupCompact)}'
+      OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = '${esc(groupCompact)}'
+    )`)
+  }
+
+  if (filters.in_use !== '') {
+    whereParts.push(`INUSE = ${num(filters.in_use)}`)
+  }
+
+  return whereParts.join('\n              AND ')
+}
+
+const buildOrderClause = (dataItem: AssigneesDataItem) => {
+  const sortableColumns: Record<string, string> = {
+    Assignees_id: 'Assignees_id',
+    empcode: 'empcode',
+    empName: 'empName',
+    empEmail: 'empEmail',
+    group_code: 'group_code',
+    group_name: 'group_name',
+    INUSE: 'INUSE',
+  }
+
+  const orderItems = (Array.isArray(dataItem.Order) ? dataItem.Order : [])
+    .map(item => {
+      const column = sortableColumns[item?.id || '']
+      if (!column) return null
+      return `${column} ${item?.desc ? 'DESC' : 'ASC'}`
+    })
+    .filter(Boolean)
+
+  return orderItems.length > 0 ? orderItems.join(', ') : 'group_code ASC, empcode ASC'
+}
 
 export const AssigneesSQL = {
-  getGroups: (dataItem: { keyword?: string }) => {
-    let sql = `
-                            SELECT
+  getGroups: (_dataItem: { keyword?: string }) => {
+    return `
+                            SELECT DISTINCT
                                     group_code
                             FROM 
                                     assignees_to
                             WHERE
-                                       1 = 1
+                                    1 = 1
+                            ORDER BY
+                                    group_code ASC
                             `
-
-    return sql
   },
 
   search: (dataItem: AssigneesDataItem) => {
-    let sql = `
+    const sqlWhere = buildWhereClause(dataItem)
+    const orderBy = buildOrderClause(dataItem)
+    const offset = num(dataItem.Start, 0)
+    const limit = num(dataItem.Limit, 20)
+
+    const sqlCount = `
+                            SELECT
+                                       COUNT(*) AS TOTAL_COUNT
+                            FROM
+                                       assignees_to
+                            WHERE
+                                       ${sqlWhere}
+        `
+
+    const sqlData = `
                             SELECT 
                                        Assignees_id
                                      , empcode
@@ -39,55 +127,13 @@ export const AssigneesSQL = {
                             FROM
                                        assignees_to 
                             WHERE
-                                       1 = 1
-                                       dataItem.keywordSql
-                                       dataItem.groupSql
-                                       dataItem.inUseSql
+                                       ${sqlWhere}
                             ORDER BY
-                                       group_code, empcode ASC
+                                       ${orderBy}
+                            LIMIT ${limit} OFFSET ${offset}
         `
 
-    let keywordSql = ''
-    if (dataItem.keyword) {
-      keywordSql = ` AND (empName LIKE 'keywordVal' OR empcode LIKE 'keywordVal' OR empEmail LIKE 'keywordVal')`
-      const keywordVal = `%${dataItem.keyword}%`
-      keywordSql = keywordSql.replaceAll('keywordVal', keywordVal)
-    }
-
-    let groupSql = ''
-    if (dataItem.group_code) {
-      groupSql = ` AND (
-                UPPER(TRIM(COALESCE(group_code, ''))) = 'dataItem.group_code'
-                OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_') = 'dataItem.group_code'
-                OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_code, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.group_compact'
-                OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.group_compact'
-            )`
-    }
-
-    let inUseSql = ''
-    if (dataItem.in_use && dataItem.in_use !== '') {
-      inUseSql = ` AND INUSE = dataItem.in_use`
-    }
-
-    sql = sql.replaceAll('dataItem.keywordSql', keywordSql)
-    sql = sql.replaceAll('dataItem.groupSql', groupSql)
-    sql = sql.replaceAll('dataItem.inUseSql', inUseSql)
-    sql = sql.replaceAll(
-      'dataItem.group_code',
-      String(dataItem.group_code || '')
-        .trim()
-        .toUpperCase()
-    )
-    sql = sql.replaceAll(
-      'dataItem.group_compact',
-      String(dataItem.group_code || '')
-        .trim()
-        .toUpperCase()
-        .replace(/[^A-Z0-9]/g, '')
-    )
-    sql = sql.replaceAll('dataItem.in_use', (dataItem.in_use || 0).toString())
-
-    return sql
+    return [sqlCount, sqlData]
   },
 
   insert: (dataItem: AssigneesDataItem) => {

@@ -86,15 +86,12 @@ export const FindVendorController = {
         let sqlWhere = ''
         if (dataItem.sqlWhere) {
             sqlWhere = dataItem.sqlWhere.trim()
-            // getSqlWhere_aggrid might have prefixed with WHERE. 
-            // The FindVendorSQL base query already has `WHERE 1 = 1`.
-            // So we must strip WHERE and replace it with AND.
             sqlWhere = sqlWhere.replace(/^WHERE\s+/i, '')
             if (sqlWhere) {
                 sqlWhere = ` AND ${sqlWhere}`
             }
         }
-
+        // for prones Status
         if (dataItem.pronesStatusFilter) {
             const statusValue = String(dataItem.pronesStatusFilter).replace(/'/g, "\\'")
             sqlWhere += `
@@ -316,6 +313,74 @@ export const FindVendorController = {
                 TotalCountOnDb: 0,
                 MethodOnDb: 'Update Vendor',
                 Message: error?.message || 'Failed to update vendor'
+            } as ResponseI)
+        }
+    },
+
+    updateComprehensive: async (req: Request, res: Response) => {
+        const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
+
+        try {
+            const vendor_id = parseInt(dataItem.vendor_id as string)
+
+            if (!vendor_id || isNaN(vendor_id)) {
+                return res.status(400).json({
+                    Status: false,
+                    ResultOnDb: {},
+                    TotalCountOnDb: 0,
+                    MethodOnDb: 'Update Vendor Comprehensive',
+                    Message: 'Invalid vendor ID'
+                } as ResponseI)
+            }
+
+            const result = await FindVendorModel.updateVendorComprehensive({
+                ...dataItem,
+                vendor_id,
+            })
+
+            return res.status(200).json(result as ResponseI)
+        } catch (error: any) {
+            console.error('Update Vendor Comprehensive Error:', error)
+            return res.status(200).json({
+                Status: false,
+                ResultOnDb: {},
+                TotalCountOnDb: 0,
+                MethodOnDb: 'Update Vendor Comprehensive',
+                Message: error?.message || 'Failed to update vendor'
+            } as ResponseI)
+        }
+    },
+
+    deleteVendor: async (req: Request, res: Response) => {
+        const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
+
+        try {
+            const vendor_id = parseInt(dataItem.vendor_id as string)
+
+            if (!vendor_id || isNaN(vendor_id)) {
+                return res.status(400).json({
+                    Status: false,
+                    ResultOnDb: {},
+                    TotalCountOnDb: 0,
+                    MethodOnDb: 'Delete Vendor',
+                    Message: 'Invalid vendor ID'
+                } as ResponseI)
+            }
+
+            const result = await FindVendorModel.deleteVendor({
+                vendor_id,
+                UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
+            })
+
+            return res.status(200).json(result as ResponseI)
+        } catch (error: any) {
+            console.error('Delete Vendor Error:', error)
+            return res.status(200).json({
+                Status: false,
+                ResultOnDb: {},
+                TotalCountOnDb: 0,
+                MethodOnDb: 'Delete Vendor',
+                Message: error?.message || 'Failed to delete vendor'
             } as ResponseI)
         }
     },

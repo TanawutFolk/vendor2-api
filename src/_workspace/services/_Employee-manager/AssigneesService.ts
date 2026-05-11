@@ -11,9 +11,14 @@ export const AssigneesService = {
 
   // Search assignees
   search: async (dataItem: any) => {
-    const sql = await AssigneesSQL.search(dataItem)
-    const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
-    return resultData
+    const [countSql, dataSql] = await AssigneesSQL.search(dataItem)
+    const totalCountRows = (await MySQLExecute.search(countSql)) as RowDataPacket[]
+    const resultData = (await MySQLExecute.search(dataSql)) as RowDataPacket[]
+
+    return {
+      resultData,
+      totalCount: Number(totalCountRows[0]?.TOTAL_COUNT || 0),
+    }
   },
 
   // Save assignee (Create or Update)
@@ -71,7 +76,7 @@ export const AssigneesService = {
         TotalCountOnDb: 1,
       }
     } catch (error: any) {
-      console.error(`Error in AssigneesService.save:`, error)
+      console.error('Error in AssigneesService.save:', error)
       return {
         Status: false,
         Message: error?.message || 'Failed to save data',

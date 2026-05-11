@@ -157,7 +157,10 @@ export const GprCApprovalController = {
         } as ResponseI)
       }
 
-      const result = await GprCApprovalModel.gprCQueue({ approver_empcode })
+      const result = await GprCApprovalModel.gprCQueue({
+        ...dataItem,
+        approver_empcode,
+      })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
       console.error('Get GPR C Queue Error:', error)
@@ -186,7 +189,10 @@ export const GprCApprovalController = {
         } as ResponseI)
       }
 
-      const result = await GprCApprovalModel.gprCActionRequiredQueue({ pic_email })
+      const result = await GprCApprovalModel.gprCActionRequiredQueue({
+        ...dataItem,
+        pic_email,
+      })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
       console.error('Get GPR C Action Required Queue Error:', error)

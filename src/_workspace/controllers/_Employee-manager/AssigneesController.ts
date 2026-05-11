@@ -40,8 +40,8 @@ export const AssigneesController = {
       const result = await AssigneesModel.search(dataItem)
       return res.status(200).json({
         Status: true,
-        ResultOnDb: result,
-        TotalCountOnDb: result.length,
+        ResultOnDb: result.resultData,
+        TotalCountOnDb: result.totalCount,
         MethodOnDb: 'Search Assignees',
         Message: 'Success',
       } as ResponseI)

@@ -81,6 +81,10 @@ export interface RegisterRequestDataItem {
   target_compact?: string
   group_compact?: string
   is_oversea?: boolean | number | string
+  request_number_year?: string
+  request_number_prefix?: string
+  vendor_contact_ids?: Array<number | string>
+  is_primary?: number | string
 }
 
 export const RequestRegisterPageSQL = {
@@ -98,6 +102,8 @@ export const RequestRegisterPageSQL = {
                                        vendors v
                                             LEFT JOIN
                                        vendor_contacts vc ON vc.vendor_id = v.vendor_id
+                                            AND vc.INUSE = 1
+                                            AND COALESCE(vc.email, '') != ''
                             WHERE
                                        v.vendor_id = dataItem.vendor_id
                             LIMIT
@@ -167,6 +173,38 @@ export const RequestRegisterPageSQL = {
     sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
     sql = sql.replaceAll('dataItem.request_number', dataItem['request_number'] || '')
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+
+    return sql
+  },
+
+  getNextRequestRunningNumber: async (dataItem: RegisterRequestDataItem) => {
+    const year = String(dataItem['request_number_year'] || '').replace(/[^0-9]/g, '').slice(-2)
+    const prefix = String(dataItem['request_number_prefix'] || 'N')
+      .trim()
+      .toUpperCase() === 'R'
+      ? 'R'
+      : 'N'
+
+    let sql = `
+                            SELECT
+                                       COALESCE(
+                                         MAX(
+                                           CAST(
+                                             SUBSTRING_INDEX(request_number, '-dataItem.prefix', -1)
+                                             AS UNSIGNED
+                                           )
+                                         ),
+                                         0
+                                       ) + 1 AS next_no
+                            FROM
+                                       request_register_vendor
+                            WHERE
+                                       request_number LIKE '%-dataItem.year-dataItem.prefix%'
+                                       AND request_number REGEXP '-dataItem.prefix[0-9]+$'
+        `
+
+    sql = sql.replaceAll('dataItem.year', year)
+    sql = sql.replaceAll('dataItem.prefix', prefix)
 
     return sql
   },
@@ -310,6 +348,14 @@ export const RequestRegisterPageSQL = {
                                        vendor_contacts vc_sel ON vc_sel.vendor_contact_id = rr.vendor_contact_id AND vc_sel.INUSE = 1
                             WHERE
                                        rr.request_id = dataItem.request_id
+                            ORDER BY
+                                       CASE
+                                           WHEN COALESCE(vc_sel.email, '') != '' THEN 0
+                                           WHEN COALESCE(v.emailmain, '') != '' THEN 1
+                                           WHEN COALESCE(vc.email, '') != '' THEN 2
+                                           ELSE 3
+                                       END ASC
+                                     , vc.vendor_contact_id ASC
                             LIMIT
                                        1
         `
@@ -339,7 +385,7 @@ export const RequestRegisterPageSQL = {
                                      , 'dataItem.Request_By_EmployeeCode'
                                      , 'dataItem.supportProduct_Process'
                                      , 'dataItem.purchase_frequency'
-                                     , 'Sent To PO & SCM(PIC)'
+                                     , 'dataItem.request_status'
                                      , 'dataItem.requester_remark'
                                      , 'dataItem.assign_to'
                                      , 'dataItem.PIC_Email'
@@ -353,10 +399,60 @@ export const RequestRegisterPageSQL = {
     sql = sql.replaceAll('dataItem.Request_By_EmployeeCode', dataItem['Request_By_EmployeeCode'] || '')
     sql = sql.replaceAll('dataItem.supportProduct_Process', dataItem['supportProduct_Process'] || '')
     sql = sql.replaceAll('dataItem.purchase_frequency', dataItem['purchase_frequency'] || '')
+    sql = sql.replaceAll('dataItem.request_status', dataItem['request_status'] || 'Sent To PO & SCM(PIC)')
     sql = sql.replaceAll('dataItem.requester_remark', dataItem['requester_remark'] || '')
     sql = sql.replaceAll('dataItem.assign_to', dataItem['assign_to'] || '')
     sql = sql.replaceAll('dataItem.PIC_Email', dataItem['PIC_Email'] || '')
     sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || '')
+
+    return sql
+  },
+
+  createRequestVendorContact: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
+                            INSERT INTO request_register_vendor_contacts (
+                                       request_id
+                                     , vendor_contact_id
+                                     , is_primary
+                                     , INUSE
+                            ) VALUES (
+                                        dataItem.request_id
+                                     ,  dataItem.vendor_contact_id
+                                     ,  dataItem.is_primary
+                                     ,  1
+                            )
+        `
+
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.vendor_contact_id', (dataItem['vendor_contact_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.is_primary', (dataItem['is_primary'] || 0).toString())
+
+    return sql
+  },
+
+  getRequestVendorContactsByRequestId: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
+                            SELECT
+                                       rrvc.vendor_contact_id
+                                     , rrvc.is_primary
+                                     , vc.contact_name
+                                     , vc.email
+                                     , vc.tel_phone
+                                     , vc.position
+                            FROM
+                                       request_register_vendor_contacts rrvc
+                                            JOIN
+                                       vendor_contacts vc ON vc.vendor_contact_id = rrvc.vendor_contact_id
+                            WHERE
+                                       rrvc.request_id = dataItem.request_id
+                                       AND rrvc.INUSE = 1
+                                       AND vc.INUSE = 1
+                            ORDER BY
+                                       rrvc.is_primary DESC
+                                     , rrvc.vendor_contact_id ASC
+        `
+
+    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
 
     return sql
   },

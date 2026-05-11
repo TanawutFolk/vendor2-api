@@ -522,9 +522,14 @@ export const GprCApprovalService = {
     try {
       const approverEmpcode = normalizeValue(dataItem.approver_empcode || dataItem.approver_id)
       if (!approverEmpcode) throw new Error('Missing approver_empcode')
-      const sql = GprCApprovalSQL.getQueueByApprover({ approver_empcode: approverEmpcode })
-      const rows = (await MySQLExecute.search(sql)) as RowDataPacket[]
-      return response(true, 'GPR C queue loaded', rows, 'Get GPR C Queue', rows.length)
+      const [countSql, dataSql] = GprCApprovalSQL.getQueueByApproverPaginated({
+        ...dataItem,
+        approver_empcode: approverEmpcode,
+      })
+      const totalCountRows = (await MySQLExecute.search(countSql)) as RowDataPacket[]
+      const rows = (await MySQLExecute.search(dataSql)) as RowDataPacket[]
+      const totalCount = Number(totalCountRows[0]?.TOTAL_COUNT || 0)
+      return response(true, 'GPR C queue loaded', rows, 'Get GPR C Queue', totalCount)
     } catch (error: any) {
       return response(false, error?.message || 'Failed to get GPR C queue', [], 'Get GPR C Queue Failed', 0)
     }
@@ -592,9 +597,14 @@ export const GprCApprovalService = {
     try {
       const picEmail = normalizeEmail(dataItem.pic_email)
       if (!picEmail) throw new Error('Missing pic_email')
-      const sql = GprCApprovalSQL.getActionRequiredQueueByPicEmail({ pic_email: picEmail })
-      const rows = (await MySQLExecute.search(sql)) as RowDataPacket[]
-      return response(true, 'GPR C Action Required queue loaded', rows, 'Get GPR C Action Required Queue', rows.length)
+      const [countSql, dataSql] = GprCApprovalSQL.getActionRequiredQueueByPicEmailPaginated({
+        ...dataItem,
+        pic_email: picEmail,
+      })
+      const totalCountRows = (await MySQLExecute.search(countSql)) as RowDataPacket[]
+      const rows = (await MySQLExecute.search(dataSql)) as RowDataPacket[]
+      const totalCount = Number(totalCountRows[0]?.TOTAL_COUNT || 0)
+      return response(true, 'GPR C Action Required queue loaded', rows, 'Get GPR C Action Required Queue', totalCount)
     } catch (error: any) {
       return response(false, error?.message || 'Failed to get GPR C Action Required queue', [], 'Get GPR C Action Required Queue Failed', 0)
     }

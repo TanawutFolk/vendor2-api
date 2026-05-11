@@ -124,11 +124,98 @@ export interface GprCFlowDataItem {
   sent_at?: string
   CREATE_BY?: string
   UPDATE_BY?: string
+  SearchFilters?: Array<{ id: string; value: any }>
+  ColumnFilters?: Array<{ id: string; columnFns?: string; value: any }>
+  Order?: Array<{ id: string; desc?: boolean }>
+  Start?: number | string
+  Limit?: number | string
 }
 
 const esc = (value: any) => String(value ?? '').replace(/'/g, "\\'")
 const num = (value: any) => Number(value) || 0
 const nullableDate = (value: any) => (value === 'NOW()' ? 'NOW()' : 'NULL')
+const escLike = (value: any) => `%${esc(String(value ?? '').trim())}%`
+
+const buildLikeCondition = (column: string, rawValue: any) => {
+  const value = String(rawValue ?? '').trim()
+  if (!value) return ''
+  return `${column} LIKE '${escLike(value)}'`
+}
+
+const buildKeywordConditions = (dataItem: GprCFlowDataItem, mapping: Record<string, string[]>) => {
+  const conditions: string[] = []
+
+  for (const filter of Array.isArray(dataItem.SearchFilters) ? dataItem.SearchFilters : []) {
+    const columns = mapping[filter?.id || '']
+    const value = String(filter?.value ?? '').trim()
+    if (!columns?.length || !value) continue
+
+    const clause = columns
+      .map(column => buildLikeCondition(column, value))
+      .filter(Boolean)
+      .join(' OR ')
+
+    if (clause) {
+      conditions.push(`(${clause})`)
+    }
+  }
+
+  return conditions
+}
+
+const buildColumnFilterConditions = (dataItem: GprCFlowDataItem, mapping: Record<string, string>) => {
+  const conditions: string[] = []
+
+  for (const filter of Array.isArray(dataItem.ColumnFilters) ? dataItem.ColumnFilters : []) {
+    const column = mapping[filter?.id || '']
+    const value = filter?.value
+    const fn = String(filter?.columnFns || 'contains').trim()
+
+    if (!column || value === null || value === undefined || value === '') continue
+
+    if (Array.isArray(value)) {
+      const values = value.map(item => `'${esc(item)}'`).filter(Boolean)
+      if (values.length > 0) {
+        conditions.push(`${column} IN (${values.join(', ')})`)
+      }
+      continue
+    }
+
+    const safeValue = esc(value)
+
+    switch (fn) {
+      case 'equals':
+        conditions.push(`${column} = '${safeValue}'`)
+        break
+      case 'notEqual':
+        conditions.push(`${column} <> '${safeValue}'`)
+        break
+      case 'startsWith':
+        conditions.push(`${column} LIKE '${esc(safeValue)}%'`)
+        break
+      case 'endsWith':
+        conditions.push(`${column} LIKE '%${esc(safeValue)}'`)
+        break
+      default:
+        conditions.push(`${column} LIKE '%${safeValue}%'`)
+        break
+    }
+  }
+
+  return conditions
+}
+
+const buildOrderClause = (dataItem: GprCFlowDataItem, mapping: Record<string, string>, fallback: string) => {
+  const orderItems = (Array.isArray(dataItem.Order) ? dataItem.Order : [])
+    .map(item => {
+      const column = mapping[item?.id || '']
+      if (!column) return null
+      return `${column} ${item?.desc ? 'DESC' : 'ASC'}`
+    })
+    .filter(Boolean)
+
+  return orderItems.length > 0 ? orderItems.join(', ') : fallback
+}
 
 export const GprCApprovalSQL = {
   getSelectionIdByRequest: (dataItem: GprCFlowDataItem) => {
@@ -398,6 +485,85 @@ export const GprCApprovalSQL = {
         `
   },
 
+  getActionRequiredQueueByPicEmailPaginated: (dataItem: GprCFlowDataItem) => {
+    const conditions = [
+      `t.pic_email_normalized = LOWER('${esc(dataItem.pic_email)}')`,
+      't.RESULT_STATUS IN (\'PENDING\', \'INCOMPLETE\')',
+      ...buildKeywordConditions(dataItem, {
+        request_number: ['t.request_number', 'CAST(t.REQUEST_ID AS CHAR)'],
+        vendor_name: ['t.company_name'],
+        step_keyword: ['t.STAGE_NAME', 't.STAGE_CODE'],
+        status_keyword: ['t.RESULT_STATUS', 't.request_status'],
+      }),
+      ...buildColumnFilterConditions(dataItem, {
+        request_number: 't.request_number',
+        company_name: 't.company_name',
+        STAGE_NAME: 't.STAGE_NAME',
+        STAGE_CODE: 't.STAGE_CODE',
+        REQUIRED_DETAIL: 't.REQUIRED_DETAIL',
+        RESULT_STATUS: 't.RESULT_STATUS',
+      }),
+    ]
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join('\n              AND ')}` : ''
+    const orderClause = buildOrderClause(
+      dataItem,
+      {
+        ACTION_REQUIRED_ID: 't.ACTION_REQUIRED_ID',
+        request_number: 't.request_number',
+        company_name: 't.company_name',
+        STAGE_NAME: 't.STAGE_NAME',
+        STAGE_CODE: 't.STAGE_CODE',
+        REQUIRED_DETAIL: 't.REQUIRED_DETAIL',
+        RESULT_STATUS: 't.RESULT_STATUS',
+        SENT_AT: 't.SENT_AT',
+      },
+      't.SENT_AT DESC, t.ACTION_REQUIRED_ID DESC'
+    )
+    const offset = num(dataItem.Start)
+    const limit = num(dataItem.Limit) || 20
+    const innerQuery = `
+            (
+                SELECT
+                    ar.*,
+                    LOWER(ar.PIC_EMAIL) AS pic_email_normalized,
+                    f.FLOW_STATUS,
+                    f.CURRENT_STEP_CODE,
+                    s.STEP_NAME,
+                    rr.request_number,
+                    rr.request_status,
+                    v.company_name
+                FROM REQUEST_VENDOR_GPR_C_ACTION_REQUIRED ar
+                    JOIN REQUEST_VENDOR_GPR_C_FLOWS f
+                        ON f.GPR_C_FLOW_ID = ar.GPR_C_FLOW_ID
+                        AND f.INUSE = 1
+                    LEFT JOIN REQUEST_VENDOR_GPR_C_STEPS s
+                        ON s.GPR_C_STEP_ID = ar.GPR_C_STEP_ID
+                    JOIN request_register_vendor rr
+                        ON rr.request_id = ar.REQUEST_ID
+                    LEFT JOIN vendors v
+                        ON v.vendor_id = rr.vendor_id
+                WHERE ar.INUSE = 1
+            ) t
+        `
+
+    const countSql = `
+            SELECT COUNT(*) AS TOTAL_COUNT
+            FROM ${innerQuery}
+            ${whereClause}
+        `
+
+    const dataSql = `
+            SELECT t.*
+            FROM ${innerQuery}
+            ${whereClause}
+            ORDER BY ${orderClause}
+            LIMIT ${limit} OFFSET ${offset}
+        `
+
+    return [countSql, dataSql]
+  },
+
   getQueueByApprover: (dataItem: GprCFlowDataItem) => {
     return `
             SELECT
@@ -441,6 +607,100 @@ export const GprCApprovalSQL = {
               AND s.APPROVER_EMPCODE = '${esc(dataItem.approver_empcode)}'
             ORDER BY f.GPR_C_FLOW_ID DESC
         `
+  },
+
+  getQueueByApproverPaginated: (dataItem: GprCFlowDataItem) => {
+    const conditions = [
+      `t.APPROVER_EMPCODE = '${esc(dataItem.approver_empcode)}'`,
+      ...buildKeywordConditions(dataItem, {
+        request_number: ['t.request_number', 'CAST(t.REQUEST_ID AS CHAR)'],
+        vendor_name: ['t.company_name'],
+        step_keyword: ['t.STEP_NAME', 't.STEP_CODE'],
+        status_keyword: ['t.request_status'],
+      }),
+      ...buildColumnFilterConditions(dataItem, {
+        request_number: 't.request_number',
+        company_name: 't.company_name',
+        STEP_NAME: 't.STEP_NAME',
+        STEP_CODE: 't.STEP_CODE',
+        request_status: 't.request_status',
+      }),
+    ]
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join('\n              AND ')}` : ''
+    const orderClause = buildOrderClause(
+      dataItem,
+      {
+        GPR_C_FLOW_ID: 't.GPR_C_FLOW_ID',
+        request_number: 't.request_number',
+        company_name: 't.company_name',
+        STEP_NAME: 't.STEP_NAME',
+        STEP_CODE: 't.STEP_CODE',
+        request_status: 't.request_status',
+        REQUEST_CREATE_DATE: 't.REQUEST_CREATE_DATE',
+      },
+      't.GPR_C_FLOW_ID DESC'
+    )
+    const offset = num(dataItem.Start)
+    const limit = num(dataItem.Limit) || 20
+    const innerQuery = `
+            (
+                SELECT
+                    f.*,
+                    s.GPR_C_STEP_ID,
+                    s.STEP_ORDER,
+                    s.STEP_CODE,
+                    s.STEP_NAME,
+                    s.APPROVER_EMPCODE,
+                    s.APPROVER_NAME,
+                    s.APPROVER_EMAIL,
+                    s.STEP_STATUS,
+                    rr.request_number,
+                    rr.request_status,
+                    rr.supportProduct_Process,
+                    rr.purchase_frequency,
+                    rr.Request_By_EmployeeCode,
+                    rr.CREATE_DATE AS REQUEST_CREATE_DATE,
+                    v.company_name,
+                    v.address,
+                    v.vendor_region,
+                    vc.contact_name,
+                    COALESCE(vc_sel.email, vc.email, v.emailmain) AS vendor_email,
+                    vc.tel_phone
+                FROM REQUEST_VENDOR_GPR_C_FLOWS f
+                    JOIN REQUEST_VENDOR_GPR_C_STEPS s
+                        ON s.GPR_C_FLOW_ID = f.GPR_C_FLOW_ID
+                        AND s.STEP_STATUS = 'IN_PROGRESS'
+                        AND s.INUSE = 1
+                    JOIN request_register_vendor rr
+                        ON rr.request_id = f.REQUEST_ID
+                    LEFT JOIN vendors v
+                        ON v.vendor_id = rr.vendor_id
+                    LEFT JOIN vendor_contacts vc
+                        ON vc.vendor_id = v.vendor_id
+                    LEFT JOIN vendor_contacts vc_sel
+                        ON vc_sel.vendor_contact_id = rr.vendor_contact_id
+                        AND vc_sel.INUSE = 1
+                WHERE f.INUSE = 1
+                  AND f.FLOW_STATUS = 'IN_PROGRESS'
+            ) t
+        `
+
+    const countSql = `
+            SELECT COUNT(*) AS TOTAL_COUNT
+            FROM ${innerQuery}
+            ${whereClause}
+        `
+
+    const dataSql = `
+            SELECT t.*
+            FROM ${innerQuery}
+            ${whereClause}
+            ORDER BY ${orderClause}
+            LIMIT ${limit} OFFSET ${offset}
+        `
+
+    return [countSql, dataSql]
   },
 
   getTaskManagerQueue: () => {
@@ -581,9 +841,14 @@ export const GprCApprovalSQL = {
                             WHERE
                                        (
                                            UPPER(TRIM(COALESCE(group_code, ''))) = 'dataItem.target_group'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_') = 'dataItem.target_group'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_code, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.target_compact'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.target_compact'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_')
+                                               = 'dataItem.target_group'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                                               UPPER(TRIM(COALESCE(group_code, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '')
+                                               = 'dataItem.target_compact'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                                               UPPER(TRIM(COALESCE(group_name, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '')
+                                               = 'dataItem.target_compact'
                                        )
                                        AND INUSE = 1
                             ORDER BY
@@ -777,9 +1042,14 @@ export const GprCApprovalSQL = {
                                        empcode = 'dataItem.empcode'
                                        AND (
                                            UPPER(TRIM(COALESCE(group_code, ''))) = 'dataItem.group_code'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_') = 'dataItem.group_code'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_code, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.group_compact'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.group_compact'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_')
+                                               = 'dataItem.group_code'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                                               UPPER(TRIM(COALESCE(group_code, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '')
+                                               = 'dataItem.group_compact'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
+                                               UPPER(TRIM(COALESCE(group_name, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '')
+                                               = 'dataItem.group_compact'
                                        )
                                        AND INUSE = 1
                             LIMIT

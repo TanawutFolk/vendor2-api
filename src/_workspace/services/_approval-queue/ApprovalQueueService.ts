@@ -10,6 +10,7 @@ import {
   normalizeText,
   requiresVendorCode,
   requiresVendorReply,
+  resolveRequestNumber,
   resolveWorkflowAction,
   resolveGroupCodeForStep,
   WORKFLOW_ACTION,
@@ -23,6 +24,7 @@ import {
   triggerVendorDisagreeEmail,
   triggerVendorDocumentEmail,
 } from '../_request-register/RegisterRequestNotificationHelper'
+import { SelectionFileService } from '../_request-register/SelectionFileService'
 import { GprCApprovalService } from '../_approval-GPRC/GprCApprovalService'
 
 type ApprovalStepStatus = 'pending' | 'in_progress' | 'approved' | 'rejected' | 'skipped' | 'completed'
@@ -55,6 +57,8 @@ interface UpdateStatusPayload {
 interface RequestRecord extends RowDataPacket {
   vendor_id?: number
   assign_to?: string
+  request_number?: string
+  CREATE_DATE?: string | Date
   vendor_code_selector?: string
   vendor_region?: string
 }
@@ -238,6 +242,11 @@ const getPendingNonBranchAnywhere = (steps: ApprovalStep[], currentStep: Approva
     .sort((a, b) => Number(a.step_order || 0) - Number(b.step_order || 0))
 
 const findFirstByTypes = (steps: ApprovalStep[], types: StepType[]) => steps.find((step) => types.includes(getStepType(step)))
+
+const createSelectionFolderForVendorRequest = (context: WorkflowContext) => {
+  const requestNumber = resolveRequestNumber(context.request.request_number, context.dataItem.request_id, context.request.CREATE_DATE)
+  return SelectionFileService.createFolderStructure(requestNumber)
+}
 
 const createWorkflowResolver = (context: WorkflowContext) => {
   const approverByGroupCache = new Map<string, string>()
@@ -582,6 +591,8 @@ const handleVendorReplyRequest = async (context: WorkflowContext, resolver: Work
       })
     )
   }
+
+  createSelectionFolderForVendorRequest(context)
 
   const resultData = await MySQLExecute.executeList(sqlList)
   const mailResult = await triggerVendorDocumentEmail(dataItem.request_id)
@@ -1070,7 +1081,7 @@ export const ApprovalQueueService = {
   reassignAssignment: async (dataItem: ReassignPayload) => {
     try {
       const requestId = Number(dataItem.request_id) || 0
-      const scope = String(dataItem.scope || '')
+      const scope = String(dataItem.scope || 'REQUEST_PIC')
         .trim()
         .toUpperCase()
       const toEmpCode = String(dataItem.to_empcode || '').trim()
@@ -1078,12 +1089,8 @@ export const ApprovalQueueService = {
       const reason = dataItem.reason || ''
 
       if (!requestId) throw new Error('Missing request_id')
-      if (!['REQUEST_PIC', 'CURRENT_STEP', 'GPR_C_STEP'].includes(scope)) throw new Error('Invalid reassign scope')
+      if (scope !== 'REQUEST_PIC') throw new Error('Task Manager can only reassign PO PIC')
       if (!toEmpCode) throw new Error('Missing to_empcode')
-
-      if (scope === 'GPR_C_STEP') {
-        return GprCApprovalService.reassignStep(dataItem)
-      }
 
       const requestSql = await ApprovalQueueSQL.getById({ request_id: requestId })
       const requestRes = (await MySQLExecute.search(requestSql)) as RowDataPacket[]
@@ -1093,90 +1100,40 @@ export const ApprovalQueueService = {
       const stepsSql = await ApprovalQueueSQL.getApprovalSteps({ request_id: requestId })
       const steps = (await MySQLExecute.search(stepsSql)) as ApprovalStep[]
       const currentStep = steps.find((step) => step.step_status === 'in_progress')
-      if (!currentStep) throw new Error('No in-progress step found for this request')
 
       const isOversea = normalizeText(request.vendor_region) === 'oversea'
       const picGroupCode = isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
-      const currentStepGroupCode = resolveGroupCodeForStep(currentStep, isOversea)
-      const expectedGroupCode = scope === 'REQUEST_PIC' ? picGroupCode : currentStepGroupCode
 
-      const assigneeSql = expectedGroupCode
-        ? await ApprovalQueueSQL.getActiveAssigneeByEmpCodeAndGroupCode({
-            empcode: toEmpCode,
-            group_code: expectedGroupCode,
-            group_compact: expectedGroupCode.replace(/[^A-Z0-9]/g, ''),
-          })
-        : await ApprovalQueueSQL.getAssigneeByEmpCode({ to_empcode: toEmpCode })
+      const assigneeSql = await ApprovalQueueSQL.getActiveAssigneeByEmpCodeAndGroupCode({
+        empcode: toEmpCode,
+        group_code: picGroupCode,
+        group_compact: picGroupCode.replace(/[^A-Z0-9]/g, ''),
+      })
       const assigneeRes = (await MySQLExecute.search(assigneeSql)) as RowDataPacket[]
       const targetAssignee = assigneeRes[0] || null
-      if (!targetAssignee || Number(targetAssignee.INUSE) !== 1) throw new Error(`Target assignee must belong to group ${expectedGroupCode || 'active assignees'}`)
+      if (!targetAssignee || Number(targetAssignee.INUSE) !== 1) throw new Error(`Target assignee must belong to group ${picGroupCode}`)
 
       const sqlList = []
-      let fromEmpcode = currentStep.approver_id || ''
-      let targetStepId: number | undefined = currentStep.step_id
-      let stepCode = inferStepCode(currentStep)
-      let groupCode = currentStepGroupCode
-      let actionType = 'reassigned_step'
-
-      if (scope === 'REQUEST_PIC') {
-        fromEmpcode = request.assign_to || currentStep.approver_id || ''
-        targetStepId = isPicStep(currentStep) ? currentStep.step_id : undefined
-        stepCode = 'PIC_REVIEW'
-        groupCode = picGroupCode
-        actionType = 'reassigned_pic'
-
-        sqlList.push(
-          await ApprovalQueueSQL.updateRequestPicAssignee({
-            request_id: requestId,
-            assign_to: targetAssignee.empcode,
-            PIC_Email: targetAssignee.empEmail || '',
-            UPDATE_BY: updateBy,
-          })
-        )
-
-        if (isPicStep(currentStep)) {
-          sqlList.push(
-            await ApprovalQueueSQL.updateApprovalStepApprover({
-              step_id: currentStep.step_id,
-              approver_id: targetAssignee.empcode,
-              assignment_mode: 'MANUAL',
-              UPDATE_BY: updateBy,
-            })
-          )
-        }
-      } else {
-        sqlList.push(
-          await ApprovalQueueSQL.updateApprovalStepApprover({
-            step_id: currentStep.step_id,
-            approver_id: targetAssignee.empcode,
-            assignment_mode: 'MANUAL',
-            UPDATE_BY: updateBy,
-          })
-        )
-
-        if (isPicStep(currentStep)) {
-          sqlList.push(
-            await ApprovalQueueSQL.updateRequestPicAssignee({
-              request_id: requestId,
-              assign_to: targetAssignee.empcode,
-              PIC_Email: targetAssignee.empEmail || '',
-              UPDATE_BY: updateBy,
-            })
-          )
-        }
-      }
+      sqlList.push(
+        await ApprovalQueueSQL.updateRequestPicAssignee({
+          request_id: requestId,
+          assign_to: targetAssignee.empcode,
+          PIC_Email: targetAssignee.empEmail || '',
+          UPDATE_BY: updateBy,
+        })
+      )
 
       sqlList.push(
         await ApprovalQueueSQL.insertAssignmentHistory({
           request_id: requestId,
-          step_id: targetStepId,
+          step_id: currentStep?.step_id,
           scope,
-          step_code: stepCode,
-          group_code: groupCode,
-          from_empcode: fromEmpcode,
+          step_code: 'PIC_REVIEW',
+          group_code: picGroupCode,
+          from_empcode: request.assign_to || '',
           to_empcode: targetAssignee.empcode,
           reason,
-          DESCRIPTION: scope === 'REQUEST_PIC' ? 'PIC reassigned' : 'Current approval step reassigned',
+          DESCRIPTION: 'PO PIC reassigned',
           changed_by: updateBy,
           CREATE_BY: updateBy,
           UPDATE_BY: updateBy,
@@ -1186,9 +1143,9 @@ export const ApprovalQueueService = {
       sqlList.push(
         await ApprovalQueueSQL.createApprovalLog({
           request_id: requestId,
-          step_id: currentStep.step_id,
+          step_id: currentStep?.step_id,
           action_by: updateBy,
-          action_type: actionType,
+          action_type: 'reassigned_pic',
           remark: reason || `Reassigned to ${targetAssignee.empcode}`,
         })
       )

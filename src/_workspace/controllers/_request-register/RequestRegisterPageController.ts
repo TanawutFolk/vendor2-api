@@ -1,7 +1,18 @@
 import { RequestRegisterPageModel } from '@src/_workspace/models/_request-register/RequestRegisterPageModel'
+import { SelectionFileService } from '@src/_workspace/services/_request-register/SelectionFileService'
 import { ResponseI } from '@src/types/ResponseI'
 import { Request, Response } from 'express'
 import path from 'path'
+
+const parseVendorContactIds = (dataItem: any): string[] => {
+  const rawValue = dataItem.vendor_contact_ids || dataItem['vendor_contact_ids[]'] || dataItem.vendor_contact_id || []
+  const rawList = Array.isArray(rawValue) ? rawValue : [rawValue]
+
+  return rawList
+    .flatMap((value) => String(value || '').split(','))
+    .map((value) => value.trim())
+    .filter((value) => value && Number(value) > 0)
+}
 
 export const RequestRegisterPageController = {
   create: async (req: Request, res: Response) => {
@@ -29,14 +40,19 @@ export const RequestRegisterPageController = {
 
       // req.files is populated by multer upload.array() middleware in the route
       const files = (req.files as any[]) || []
+      const vendorContactIds = parseVendorContactIds(dataItem)
 
       const createResult = await RequestRegisterPageModel.createRequest({
         vendor_id,
-        vendor_contact_id: dataItem.vendor_contact_id || null,
+        vendor_contact_id: vendorContactIds[0] || dataItem.vendor_contact_id || null,
+        vendor_contact_ids: vendorContactIds,
         Request_By_EmployeeCode: dataItem.Request_By_EmployeeCode || '',
         supportProduct_Process: dataItem.support_type || '',
         purchase_frequency: dataItem.purchase_frequency || '',
         requester_remark: dataItem.requester_remark || '',
+        request_type: dataItem.request_type || '',
+        request_number_prefix: dataItem.request_number_prefix || '',
+        PIC_Email: dataItem.PIC_Email || '',
         CREATE_BY: normalizedCreator,
         // assign_to is resolved by the service via round-robin logic (do NOT set here)
       })
@@ -51,7 +67,8 @@ export const RequestRegisterPageController = {
         } as ResponseI)
       }
 
-      const insertedId = Number((createResult?.ResultOnDb as any)?.insertedId || 0)
+      const createResultData = (createResult?.ResultOnDb as any) || {}
+      const insertedId = Number(createResultData?.insertedId || 0)
 
       if (!insertedId || Number.isNaN(insertedId)) {
         return res.status(200).json({
@@ -81,10 +98,10 @@ export const RequestRegisterPageController = {
       }
       return res.status(200).json({
         Status: true,
-        ResultOnDb: { request_id: insertedId },
+        ResultOnDb: { request_id: insertedId, request_number: createResultData?.request_number || '' },
         TotalCountOnDb: 1,
         MethodOnDb: 'Create Registration Request',
-        Message: 'Create Request Register Success',
+        Message: createResult?.Message || 'Create Request Register Success',
       } as ResponseI)
     } catch (error: any) {
       console.error('Create Registration Request Error:', error)
@@ -540,6 +557,23 @@ export const RequestRegisterPageController = {
           MethodOnDb: 'Add Document',
           Message: 'Document was created but document_id was not returned correctly',
         } as ResponseI)
+      }
+
+      // ── Selection File: Save criteria uploads directly to 01.Receiving ──
+      const { criteria_no, criteria_detail, request_number } = dataItem
+      if (criteria_no && request_number) {
+        try {
+          SelectionFileService.saveToReceiving(
+            String(request_number),
+            file.path,
+            String(criteria_no),
+            String(criteria_detail || ''),
+            file_name || path.basename(file.path),
+          )
+        } catch (selectionFileError: any) {
+          // Never block the document upload — log warning only
+          console.warn('[SelectionFile] Failed to save to Receiving:', selectionFileError?.message)
+        }
       }
 
       res.status(200).json({

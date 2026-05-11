@@ -4,6 +4,8 @@ export const FindVendorModel = {
   searchVendors: async (dataItem: any) => FindVendorService.searchVendors(dataItem),
   getById: async (vendor_id: number) => FindVendorService.getById({ vendor_id }),
   updateVendor: async (dataItem: any) => FindVendorService.updateVendor(dataItem),
+  updateVendorComprehensive: async (dataItem: any) => FindVendorService.updateVendorComprehensive(dataItem),
+  deleteVendor: async (dataItem: any) => FindVendorService.deleteVendor(dataItem),
   getVendorTypes: async (dataItem: any = {}) => FindVendorService.getVendorTypes(dataItem),
   getProvinces: async (dataItem: any = {}) => FindVendorService.getProvinces(dataItem),
   getProductGroups: async (dataItem: any = {}) => FindVendorService.getProductGroups(dataItem),

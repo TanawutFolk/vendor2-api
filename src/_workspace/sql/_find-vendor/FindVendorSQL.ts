@@ -6,7 +6,7 @@ export interface FindVendorDataItem {
   Limit?: number | string
   Offset?: number | string
   company_name?: string
-  vendor_type_id?: number | string
+  vendor_type_id?: number | string | null
   vendor_region?: string
   province?: string
   postal_code?: string
@@ -306,6 +306,11 @@ export const FindVendorSQL = {
     return String(str).replace(/'/g, "\\'")
   },
 
+  toNullableNumberSql: (value: number | string | null | undefined) => {
+    if (value === null || value === undefined || value === '') return 'NULL'
+    return String(value)
+  },
+
   // Update vendor
   updateVendor: (dataItem: FindVendorDataItem) => {
     let sql = `
@@ -326,7 +331,7 @@ export const FindVendorSQL = {
                                        vendor_id = dataItem.vendor_id
         `
     sql = sql.replaceAll('dataItem.company_name', dataItem['company_name'] || '')
-    sql = sql.replaceAll('dataItem.vendor_type_id', (dataItem['vendor_type_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.vendor_type_id', FindVendorSQL.toNullableNumberSql(dataItem['vendor_type_id']))
     sql = sql.replaceAll('dataItem.vendor_region', dataItem['vendor_region'] || 'Local')
     sql = sql.replaceAll('dataItem.province', dataItem['province'] || '')
     sql = sql.replaceAll('dataItem.postal_code', dataItem['postal_code'] || '')
@@ -488,6 +493,21 @@ export const FindVendorSQL = {
         `
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
     sql = sql.replaceAll('dataItem.vendor_product_id', (dataItem['vendor_product_id'] || 0).toString())
+    return sql
+  },
+
+  // Delete vendor (Soft Delete)
+  deleteVendor: (dataItem: FindVendorDataItem) => {
+    let sql = `
+                            UPDATE vendors SET
+                                       INUSE = 0
+                                     , UPDATE_BY = 'dataItem.UPDATE_BY'
+                                     , UPDATE_DATE = NOW()
+                            WHERE
+                                       vendor_id = dataItem.vendor_id
+        `
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
     return sql
   },
 

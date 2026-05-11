@@ -68,6 +68,49 @@ export const UpdateVendorSchema = z.object({
   UPDATE_BY: z.string().min(1, 'UPDATE_BY is required'),
 })
 
+const ContactBatchSchema = z.object({
+  vendor_contact_id: z.number().int().positive().optional(),
+  contact_name: z.string().optional().default(''),
+  tel_phone: z.string().max(30).optional().nullable().default(''),
+  email: z.string().email('Invalid email format').optional().nullable().or(z.literal('')),
+  position: z.string().max(50).optional().nullable().default(''),
+})
+
+const ProductBatchSchema = z.object({
+  vendor_product_id: z.number().int().positive().optional(),
+  product_group_id: z.number().int().positive().optional().nullable(),
+  maker_name: z.string().optional().nullable().default(''),
+  product_name: z.string().optional().default(''),
+  model_list: z.string().optional().nullable().default(''),
+})
+
+export const UpdateVendorComprehensiveSchema = z.object({
+  vendor_id: z.union([z.number().int().positive('Vendor ID is required'), z.string().regex(/^\d+$/, 'Vendor ID must be numeric')]),
+  vendor: z.object({
+    company_name: z.string().min(3, 'Company Name must be at least 3 characters'),
+    vendor_type_id: z.number().int().positive().optional().nullable(),
+    vendor_region: z.enum(['Local', 'Oversea']).optional().nullable(),
+    province: z.string().optional().nullable(),
+    postal_code: z.string().optional().nullable(),
+    website: z.string().max(200).optional().nullable(),
+    address: z.string().max(500).optional().nullable(),
+    tel_center: z.string().max(30).optional().nullable(),
+    emailmain: z.string().email('Invalid email format').optional().nullable().or(z.literal('')),
+    INUSE: z.number().int().optional().nullable(),
+  }),
+  contacts: z.array(ContactBatchSchema).optional().default([]),
+  products: z.array(ProductBatchSchema).optional().default([]),
+  deleted_contact_ids: z.array(z.number().int().positive()).optional().default([]),
+  deleted_product_ids: z.array(z.number().int().positive()).optional().default([]),
+  vendor_changed: z.boolean().optional().default(true),
+  UPDATE_BY: z.string().min(1, 'UPDATE_BY is required'),
+})
+
+export const DeleteVendorSchema = z.object({
+  vendor_id: z.union([z.number().int().positive('Vendor ID is required'), z.string().regex(/^\d+$/, 'Vendor ID must be numeric')]),
+  UPDATE_BY: z.string().min(1, 'UPDATE_BY is required'),
+})
+
 // --- Export Schema ---
 export const ExportVendorSchema = z.object({
   TYPE: z

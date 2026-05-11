@@ -472,6 +472,8 @@ export const ApprovalQueueSQL = {
                             SELECT
                                        rr.vendor_id
                                      , rr.assign_to
+                                     , rr.request_number
+                                     , rr.CREATE_DATE
                                      , rvs.vendor_code_selector
                                      , rvs.gpr_c_approver_name
                                      , rvs.gpr_c_approver_email

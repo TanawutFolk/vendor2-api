@@ -21,6 +21,7 @@ import {
   emailVendorDocumentRequestTemplate,
   type MailTemplateData,
 } from '@src/config/mailTemplate'
+import { SelectionFileService } from './SelectionFileService'
 import {
   excludeEmails,
   GROUP_CODE,
@@ -28,7 +29,6 @@ import {
   mergeUniqueEmails,
   normalizeEmail,
   normalizeText,
-  parseCcEmails,
   resolveGroupCodeForStep,
   resolveRequestNumber,
 } from './RegisterRequestWorkflowHelper'
@@ -524,7 +524,7 @@ export const selectApprovalNotificationByStep = (
 }
 
 export const triggerCreationEmail = async (dataItem: any, vendorData: any, nextAssignee: any, insertedId: number, persistedRequestNumber?: string, assigneeGroupCode?: string) => {
-  //ทำไม ไม่เอาจาก getUserdata ไม่รู้นึกยุ โฟค 18/04/2026
+  //à¸—à¸³à¹„à¸¡ à¹„à¸¡à¹ˆà¹€à¸­à¸²à¸ˆà¸²à¸ getUserdata à¹„à¸¡à¹ˆà¸£à¸¹à¹‰à¸™à¸¶à¸à¸¢à¸¸ à¹‚à¸Ÿà¸„ 18/04/2026
   const requester = await resolveRequesterMailProfile(dataItem)
   const nextAssigneeProfile = await resolveAssigneeProfile(nextAssignee.empCode)
   const nextAssigneeEmail = await resolveAssignedEmail(nextAssignee.empCode)
@@ -578,15 +578,24 @@ export const triggerCreationEmail = async (dataItem: any, vendorData: any, nextA
 
 export const sendAgreementEmail = async (dataItem: any) => {
   let contextVendor: any = {}
+  let selectedContactEmails: string[] = []
   if (dataItem.request_id) {
     const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ request_id: Number(dataItem.request_id) || 0 })
     const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
     contextVendor = vendorRes[0] || {}
+
+    const contactSql = await RequestRegisterPageSQL.getRequestVendorContactsByRequestId({ request_id: Number(dataItem.request_id) || 0 })
+    const contactRes = (await MySQLExecute.search(contactSql)) as any[]
+    selectedContactEmails = contactRes.map((contact) => contact.email)
   }
 
-  const recipientEmail = String(dataItem.emailmain || contextVendor.selected_vendor_email || contextVendor.emailmain || '').trim()
+  const recipientEmails = mergeUniqueEmails(
+    selectedContactEmails,
+    [dataItem.emailmain, contextVendor.selected_vendor_email, contextVendor.vendor_email, contextVendor.vendor_main_email, contextVendor.emailmain]
+  )
+  const recipientEmail = recipientEmails.join(';')
   if (!recipientEmail) {
-    throw new Error('Vendor emailmain is required')
+    throw new Error('Vendor email is required')
   }
 
   let ccEmails: string[] = []
@@ -594,15 +603,31 @@ export const sendAgreementEmail = async (dataItem: any) => {
     const picProfile = await resolveAssigneeProfile(contextVendor.assign_to)
     const picEmail = await resolveAssignedEmail(contextVendor.assign_to)
     const poPicContext = await getPoPicAndSubPicCc(contextVendor.vendor_region, contextVendor.assign_to, picEmail)
-    ccEmails = excludeEmails(mergeUniqueEmails(poPicContext.allPoPicEmails), [recipientEmail, contextVendor.emailmain, contextVendor.vendor_email, contextVendor.vendor_main_email])
+    ccEmails = excludeEmails(
+      mergeUniqueEmails(poPicContext.allPoPicEmails),
+      [...recipientEmails, contextVendor.emailmain, contextVendor.vendor_email, contextVendor.vendor_main_email]
+    )
 
     dataItem.pic_name = dataItem.pic_name || resolveDisplayName([picProfile?.fullName], 'PO PIC')
+  }
+
+  const resolvedRequestNumber = String(dataItem.request_number || contextVendor.request_number || '').trim()
+  if (!resolvedRequestNumber) {
+    throw new Error('Request number is required before sending Agreement to Vendor')
+  }
+
+  const vendorDocumentAttachments = buildVendorDocumentAttachments(contextVendor.vendor_region || dataItem.vendor_region, false)
+
+  // Make folder creation part of the Agreement sending flow so PO PIC sees the error immediately.
+  SelectionFileService.createFolderStructure(resolvedRequestNumber)
+  if (vendorDocumentAttachments.length > 0) {
+    SelectionFileService.copyAttachmentsToSending(resolvedRequestNumber, vendorDocumentAttachments)
   }
 
   const emailHtml = emailVendorDocumentRequestTemplate({
     vendorEmail: recipientEmail,
     ccEmail: ccEmails.join('; '),
-    topicRef: dataItem.request_number || '-',
+    topicRef: resolvedRequestNumber,
     isNewSupplier: !dataItem.fft_vendor_code,
     picName: dataItem.pic_name || 'PO PIC',
     picTel: dataItem.pic_tel || '',
@@ -612,11 +637,11 @@ export const sendAgreementEmail = async (dataItem: any) => {
     templateName: 'emailVendorDocumentRequestTemplate',
     emailHtml,
     toEmail: recipientEmail,
-    subject: dataItem.email_subject || `[Request Submit] Document for ${dataItem.request_number || 'vendor registration'}`,
+    subject: dataItem.email_subject || `[Request Submit] Document for ${resolvedRequestNumber}`,
     ccEmails,
     requestId: dataItem.request_id,
-    requestNumber: dataItem.request_number,
-    attachments: buildVendorDocumentAttachments(contextVendor.vendor_region || dataItem.vendor_region, false),
+    requestNumber: resolvedRequestNumber,
+    attachments: vendorDocumentAttachments,
     extra: { flow: 'sendAgreementEmail' },
   })
 
@@ -628,8 +653,15 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
     const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ request_id: Number(requestId) || 0 })
     const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
     const vd = vendorRes[0] || {}
+    const contactSql = await RequestRegisterPageSQL.getRequestVendorContactsByRequestId({ request_id: Number(requestId) || 0 })
+    const contactRes = (await MySQLExecute.search(contactSql)) as any[]
+    const selectedContactEmails = contactRes.map((contact) => contact.email)
 
-    const vendorEmail = (vd.selected_vendor_email || vd.emailmain || '').trim()
+    const vendorEmails = mergeUniqueEmails(
+      selectedContactEmails,
+      [vd.selected_vendor_email, vd.vendor_email, vd.vendor_main_email, vd.emailmain]
+    )
+    const vendorEmail = vendorEmails.join(';')
 
     const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
 
@@ -641,8 +673,8 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
     const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
 
     const ccEmails = excludeEmails(
-      mergeUniqueEmails(poPicContext.allPoPicEmails).filter((email) => email !== normalizeEmail(vendorEmail)),
-      [vendorEmail, vd.emailmain]
+      mergeUniqueEmails(poPicContext.allPoPicEmails),
+      [...vendorEmails, vd.emailmain]
     )
 
     const stageHintRaw = String(stageHint || '')
@@ -659,7 +691,7 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
 
       const gprCCcEmails = excludeEmails(
         mergeUniqueEmails(poPicContext.allPoPicEmails).filter((email) => email !== requester.email),
-        [vendorEmail, vd.emailmain]
+        [...vendorEmails, vd.emailmain]
       )
 
       const gprCApprovalHtml = emailGprCRequesterSetupTemplate({
@@ -706,6 +738,14 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
       return { sent: false, reason: 'missing vendor email' }
     }
 
+    const vendorDocumentAttachments = buildVendorDocumentAttachments(vd.vendor_region, isGprBStage)
+
+    // This flow runs right after PO & SCM (PIC) approval moves to vendor-facing steps.
+    SelectionFileService.createFolderStructure(requestNumber)
+    if (vendorDocumentAttachments.length > 0) {
+      SelectionFileService.copyAttachmentsToSending(requestNumber, vendorDocumentAttachments)
+    }
+
     let emailHtml = emailVendorDocumentRequestTemplate({
       vendorEmail,
       ccEmail: ccEmails.join('; '),
@@ -735,7 +775,7 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
       ccEmails,
       requestId,
       requestNumber,
-      attachments: buildVendorDocumentAttachments(vd.vendor_region, isGprBStage),
+      attachments: vendorDocumentAttachments,
       extra: { flow: 'triggerVendorDocumentEmail', stageHint: stageHint || '' },
     })
 

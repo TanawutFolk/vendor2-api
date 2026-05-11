@@ -128,11 +128,11 @@ export const requiresVendorCode = (step: any) => {
 
 export const isRejectedStatus = (value: any) => normalizeText(value) === 'rejected'
 
-export const formatRequestNumber = (requestId: number | string, baseDate?: string | Date) => {
+export const formatRequestNumber = (requestId: number | string, baseDate?: string | Date, prefix: 'N' | 'R' = 'N') => {
   const date = baseDate ? new Date(baseDate) : new Date()
   const currentYear = date.getFullYear().toString().slice(-2)
   const paddedId = String(requestId || 0).padStart(3, '0')
-  return `Register_Selection-${currentYear}-N${paddedId}`
+  return `Selection-${currentYear}-${prefix}${paddedId}`
 }
 
 export const normalizeRequestNumber = (requestNumberFromDb: any, requestId: number | string, baseDate?: string | Date) => {
@@ -143,16 +143,21 @@ export const normalizeRequestNumber = (requestNumberFromDb: any, requestId: numb
   }
 
   const trimmed = requestNumberFromDb.trim()
-  const modernMatch = trimmed.match(/^Register_Selection-(\d{2})-N(\d{3})$/i)
+  const currentMatch = trimmed.match(/^(?:Register|Selection)-(\d{2})-([NR])(\d{3,})$/i)
+  if (currentMatch) {
+    return `Selection-${currentMatch[1]}-${currentMatch[2].toUpperCase()}${currentMatch[3].padStart(3, '0')}`
+  }
+
+  const modernMatch = trimmed.match(/^Register_Selection-(\d{2})-([NR])(\d{3})$/i)
   if (modernMatch) {
-    return `Register_Selection-${modernMatch[1]}-N${modernMatch[2]}`
+    return `Selection-${modernMatch[1]}-${modernMatch[2].toUpperCase()}${modernMatch[3]}`
   }
 
   const legacyMatch = trimmed.match(/^Register_Selection-(\d{2})-(\d+)$/i)
   if (legacyMatch) {
     const year = legacyMatch[1]
     const numericPart = legacyMatch[2].slice(-3).padStart(3, '0')
-    return `Register_Selection-${year}-N${numericPart}`
+    return `Selection-${year}-N${numericPart}`
   }
 
   return fallback

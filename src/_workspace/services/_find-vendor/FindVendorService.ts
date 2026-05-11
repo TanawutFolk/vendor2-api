@@ -81,6 +81,123 @@ export const FindVendorService = {
     }
   },
 
+  updateVendorComprehensive: async (dataItem: any) => {
+    try {
+      const vendorId = Number(dataItem.vendor_id) || 0
+      if (!vendorId) throw new Error('Invalid vendor_id')
+
+      const updateBy = dataItem.UPDATE_BY || 'SYSTEM'
+      const sqlList = []
+      const vendor = dataItem.vendor || {}
+
+      if (dataItem.vendor_changed !== false) {
+        sqlList.push(await FindVendorSQL.updateVendor({
+          vendor_id: vendorId,
+          company_name: vendor.company_name || '',
+          vendor_type_id: vendor.vendor_type_id ?? null,
+          vendor_region: vendor.vendor_region || 'Local',
+          province: vendor.province || '',
+          postal_code: vendor.postal_code || '',
+          website: vendor.website || '',
+          address: vendor.address || '',
+          tel_center: vendor.tel_center || '',
+          emailmain: vendor.emailmain || '',
+          INUSE: vendor.INUSE !== undefined && vendor.INUSE !== null ? vendor.INUSE : 1,
+          UPDATE_BY: updateBy,
+        }))
+      }
+
+      for (const contact of dataItem.contacts || []) {
+        const payload = {
+          vendor_id: vendorId,
+          vendor_contact_id: contact.vendor_contact_id,
+          contact_name: contact.contact_name || '',
+          tel_phone: contact.tel_phone || '',
+          email: contact.email || '',
+          position: contact.position || '',
+          UPDATE_BY: updateBy,
+        }
+        if (contact.vendor_contact_id) {
+          sqlList.push(await FindVendorSQL.updateVendorContact(payload))
+        } else if (payload.contact_name || payload.email || payload.tel_phone || payload.position) {
+          sqlList.push(await FindVendorSQL.createVendorContact(payload))
+        }
+      }
+
+      for (const product of dataItem.products || []) {
+        const payload = {
+          vendor_id: vendorId,
+          vendor_product_id: product.vendor_product_id,
+          product_group_id: product.product_group_id || 0,
+          maker_name: product.maker_name || '',
+          product_name: product.product_name || '',
+          model_list: product.model_list || '',
+          UPDATE_BY: updateBy,
+        }
+        if (product.vendor_product_id) {
+          sqlList.push(await FindVendorSQL.updateVendorProduct(payload))
+        } else if (payload.product_name || payload.maker_name || payload.model_list || payload.product_group_id) {
+          sqlList.push(await FindVendorSQL.createVendorProduct(payload))
+        }
+      }
+
+      for (const contactId of dataItem.deleted_contact_ids || []) {
+        sqlList.push(await FindVendorSQL.deleteVendorContact({
+          vendor_contact_id: contactId,
+          UPDATE_BY: updateBy,
+        }))
+      }
+
+      for (const productId of dataItem.deleted_product_ids || []) {
+        sqlList.push(await FindVendorSQL.deleteVendorProduct({
+          vendor_product_id: productId,
+          UPDATE_BY: updateBy,
+        }))
+      }
+
+      const resultData = sqlList.length > 0 ? await MySQLExecute.executeList(sqlList) : []
+
+      return {
+        Status: true,
+        Message: 'Update Vendor Success',
+        ResultOnDb: resultData,
+        MethodOnDb: 'Update Vendor Comprehensive',
+        TotalCountOnDb: sqlList.length,
+      }
+    } catch (error: any) {
+      console.error('Error in FindVendorService.updateVendorComprehensive:', error)
+      return {
+        Status: false,
+        Message: error?.message || 'Update Failed',
+        ResultOnDb: [],
+        MethodOnDb: 'Update Vendor Comprehensive Failed',
+        TotalCountOnDb: 0,
+      }
+    }
+  },
+
+  deleteVendor: async (dataItem: any) => {
+    try {
+      const sql = await FindVendorSQL.deleteVendor(dataItem)
+      const resultData = await MySQLExecute.execute(sql)
+      return {
+        Status: true,
+        Message: 'Delete Vendor Success',
+        ResultOnDb: resultData,
+        MethodOnDb: 'Delete Vendor',
+        TotalCountOnDb: 1,
+      }
+    } catch (error: any) {
+      return {
+        Status: false,
+        Message: error?.message || 'Delete Vendor Failed',
+        ResultOnDb: [],
+        MethodOnDb: 'Delete Vendor Failed',
+        TotalCountOnDb: 0,
+      }
+    }
+  },
+
   // Delete vendor contact
   deleteVendorContact: async (dataItem: any) => {
     try {
