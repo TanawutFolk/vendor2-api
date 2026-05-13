@@ -7,9 +7,9 @@ export const AddVendorModel = {
 
   createVendor: async (dataItem: any) => AddVendorService.createVendor(dataItem),
 
-  getVendorTypes: async () => AddVendorService.getVendorTypes(),
+  getVendorTypes: async () => AddVendorService.getVendorTypes({}),
 
-  getProductGroups: async () => AddVendorService.getProductGroups(),
+  getProductGroups: async () => AddVendorService.getProductGroups({}),
 
   createProductGroup: async (dataItem: any) => AddVendorService.createProductGroup(dataItem),
 }

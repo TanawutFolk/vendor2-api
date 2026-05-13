@@ -30,6 +30,7 @@ import { GprCApprovalService } from '../_approval-GPRC/GprCApprovalService'
 type ApprovalStepStatus = 'pending' | 'in_progress' | 'approved' | 'rejected' | 'skipped' | 'completed'
 
 interface ApprovalStep extends RowDataPacket {
+  [key: string]: any
   step_id: number
   step_order: number
   step_status: ApprovalStepStatus
@@ -39,6 +40,7 @@ interface ApprovalStep extends RowDataPacket {
 }
 
 interface UpdateStatusPayload {
+  [key: string]: any
   request_id: number
   request_status?: string
   approve_by?: string
@@ -51,10 +53,10 @@ interface UpdateStatusPayload {
   action_required_stage?: string
   action_required_owner?: string
   action_required_owner_email?: string
-  [key: string]: unknown
 }
 
 interface RequestRecord extends RowDataPacket {
+  [key: string]: any
   vendor_id?: number
   assign_to?: string
   request_number?: string
@@ -75,11 +77,13 @@ interface WorkflowContext {
 }
 
 interface SelectionRecord extends RowDataPacket {
+  [key: string]: any
   selection_id?: number
   action_required_json?: string
 }
 
 interface CriteriaRow extends RowDataPacket {
+  [key: string]: any
   no?: string
   criteria_no?: string
   uploaded_file?: string
@@ -89,7 +93,7 @@ interface CriteriaRow extends RowDataPacket {
 type SqlStatement = Awaited<ReturnType<typeof ApprovalQueueSQL.updateStatus>>
 type SqlList = SqlStatement[]
 type PostCommitTask = () => Promise<void>
-type ServicePayload = Record<string, unknown>
+type ServicePayload = Record<string, any>
 type ReassignPayload = ServicePayload & {
   request_id?: number | string
   scope?: string
@@ -244,7 +248,7 @@ const getPendingNonBranchAnywhere = (steps: ApprovalStep[], currentStep: Approva
 const findFirstByTypes = (steps: ApprovalStep[], types: StepType[]) => steps.find((step) => types.includes(getStepType(step)))
 
 const createSelectionFolderForVendorRequest = (context: WorkflowContext) => {
-  const requestNumber = resolveRequestNumber(context.request.request_number, context.dataItem.request_id, context.request.CREATE_DATE)
+  const requestNumber = resolveRequestNumber(context.request.request_number, context.dataItem.REQUEST_ID, context.request.CREATE_DATE)
   return SelectionFileService.createFolderStructure(requestNumber)
 }
 
@@ -262,7 +266,7 @@ const createWorkflowResolver = (context: WorkflowContext) => {
       return approverByGroupCache.get(safeGroupCode) || ''
     }
 
-    const approverSql = await ApprovalQueueSQL.getApproverByGroupCode({ group_code: safeGroupCode })
+    const approverSql = await ApprovalQueueSQL.getApproverByGroupCode({ GROUP_CODE: safeGroupCode })
     const approverRes = (await MySQLExecute.search(approverSql)) as RowDataPacket[]
     const approver = String(approverRes[0]?.empcode || '')
     approverByGroupCache.set(safeGroupCode, approver)
@@ -277,8 +281,8 @@ const createWorkflowResolver = (context: WorkflowContext) => {
     if (!safeEmpCode || !safeGroupCode) return false
 
     const assigneeSql = await ApprovalQueueSQL.getActiveAssigneeByEmpCodeAndGroupCode({
-      empcode: safeEmpCode,
-      group_code: safeGroupCode,
+      EMPCODE: safeEmpCode,
+      GROUP_CODE: safeGroupCode,
     })
     const assigneeRes = (await MySQLExecute.search(assigneeSql)) as RowDataPacket[]
     return assigneeRes.length > 0
@@ -286,7 +290,7 @@ const createWorkflowResolver = (context: WorkflowContext) => {
 
   const getSelectionRecord = async () => {
     if (selectionCache !== undefined) return selectionCache
-    const selectionSql = await ApprovalQueueSQL.getSelection({ request_id: context.dataItem.request_id })
+    const selectionSql = await ApprovalQueueSQL.getSelection({ REQUEST_ID: context.dataItem.REQUEST_ID })
     const selectionRes = (await MySQLExecute.search(selectionSql)) as SelectionRecord[]
     selectionCache = selectionRes[0] || null
     return selectionCache
@@ -344,15 +348,15 @@ type WorkflowResolver = ReturnType<typeof createWorkflowResolver>
 const loadWorkflowContext = async (dataItem: UpdateStatusPayload): Promise<WorkflowContext> => {
   const [stepsRes, checkRes, requesterRes] = await Promise.all([
     (async () => {
-      const sql = await ApprovalQueueSQL.getApprovalSteps({ request_id: dataItem.request_id })
+      const sql = await ApprovalQueueSQL.getApprovalSteps({ REQUEST_ID: dataItem.REQUEST_ID })
       return MySQLExecute.search(sql) as Promise<ApprovalStep[]>
     })(),
     (async () => {
-      const sql = await ApprovalQueueSQL.getRequestStatusContext({ request_id: dataItem.request_id })
+      const sql = await ApprovalQueueSQL.getRequestStatusContext({ REQUEST_ID: dataItem.REQUEST_ID })
       return MySQLExecute.search(sql) as Promise<RequestRecord[]>
     })(),
     (async () => {
-      const sql = await ApprovalQueueSQL.getRequesterByRequestId({ request_id: dataItem.request_id })
+      const sql = await ApprovalQueueSQL.getRequesterByRequestId({ REQUEST_ID: dataItem.REQUEST_ID })
       return MySQLExecute.search(sql) as Promise<RowDataPacket[]>
     })(),
   ])
@@ -375,7 +379,7 @@ const loadWorkflowContext = async (dataItem: UpdateStatusPayload): Promise<Workf
 const hasVendorRequestLog = async (context: WorkflowContext) => {
   if (!context.currentStep || !requiresVendorReply(context.currentStep)) return false
 
-  const logsSql = await ApprovalQueueSQL.getApprovalLogs({ request_id: context.dataItem.request_id })
+  const logsSql = await ApprovalQueueSQL.getApprovalLogs({ REQUEST_ID: context.dataItem.REQUEST_ID })
   const logs = (await MySQLExecute.search(logsSql)) as RowDataPacket[]
   return logs.some((log) => String(log.step_id || '') === String(context.currentStep?.step_id || '') && log.action_type === 'vendor_requested')
 }
@@ -384,7 +388,7 @@ const validateCurrentStep = async (context: WorkflowContext, resolver: WorkflowR
   const { currentStep, dataItem, request, selectedVendorCode } = context
   if (!currentStep) return
 
-  const actionBy = String(dataItem.approve_by || dataItem.UPDATE_BY || '')
+  const actionBy = String(dataItem.APPROVE_BY || dataItem.UPDATE_BY || '')
   const isCurrentPicStep = isPicStep(currentStep)
   const requiresRoleApprover = ['APPROVER', 'ACCOUNT'].includes(inferActorType(currentStep))
 
@@ -406,7 +410,7 @@ const validateCurrentStep = async (context: WorkflowContext, resolver: WorkflowR
     if (!extractedVendorCode.trim()) {
       throw new Error('Approval blocked: You must open the GPR Form and specify the "Vendor Code" before approving this step.')
     }
-    dataItem.vendor_code_extracted = extractedVendorCode
+    dataItem.VENDOR_CODE_EXTRACTED = extractedVendorCode
   }
 
   const requiresGprDecision = isStepType(currentStep, StepType.PENDING_AGREEMENT, StepType.AGREEMENT_REACHED)
@@ -420,7 +424,7 @@ const validateCurrentStep = async (context: WorkflowContext, resolver: WorkflowR
     }
 
     if (attemptingApprove) {
-      const criteriaSql = await ApprovalQueueSQL.getCriteria({ selection_id: selection.selection_id })
+      const criteriaSql = await ApprovalQueueSQL.getCriteria({ SELECTION_ID: selection.selection_id })
       const criteriaRes = (await MySQLExecute.search(criteriaSql)) as CriteriaRow[]
       const gprEval = evaluateGprCriteria(criteriaRes)
 
@@ -450,28 +454,28 @@ const validateCurrentStep = async (context: WorkflowContext, resolver: WorkflowR
       throw new Error(`Action Required blocked: please configure PIC email for ${stageLabel} in the GPR form.`)
     }
 
-    dataItem.action_required_stage = stageKey
-    dataItem.action_required_owner = ownerName || ownerEmail
-    dataItem.action_required_owner_email = ownerEmail
+    dataItem.ACTION_REQUIRED_STAGE = stageKey
+    dataItem.ACTION_REQUIRED_OWNER = ownerName || ownerEmail
+    dataItem.ACTION_REQUIRED_OWNER_EMAIL = ownerEmail
   }
 }
 
 const addVendorCodeUpdates = async (context: WorkflowContext, sqlList: SqlList) => {
   const { dataItem, vendor_id } = context
-  if (!dataItem.vendor_code_extracted) return
+  if (!dataItem.VENDOR_CODE_EXTRACTED) return
 
   sqlList.push(
     await ApprovalQueueSQL.updateRequestVendorCode({
-      request_id: dataItem.request_id,
-      vendor_code: dataItem.vendor_code_extracted,
-      UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+      REQUEST_ID: dataItem.REQUEST_ID,
+      VENDOR_CODE: dataItem.VENDOR_CODE_EXTRACTED,
+      UPDATE_BY: dataItem.UPDATE_BY || dataItem.APPROVE_BY || 'SYSTEM',
     })
   )
   if (vendor_id) {
     sqlList.push(
       await ApprovalQueueSQL.updateVendorFftVendorCode({
-        vendor_id,
-        vendor_code: dataItem.vendor_code_extracted,
+        VENDOR_ID: vendor_id,
+        VENDOR_CODE: dataItem.VENDOR_CODE_EXTRACTED,
       })
     )
   }
@@ -480,23 +484,23 @@ const addVendorCodeUpdates = async (context: WorkflowContext, sqlList: SqlList) 
 const handleRejection = async (context: WorkflowContext, sqlList: SqlList, postCommitTasks: PostCommitTask[]) => {
   const { dataItem, currentStep, steps, vendor_id } = context
   if (vendor_id) {
-    sqlList.push(await ApprovalQueueSQL.updateVendorFftStatus({ vendor_id, fft_status: 2 }))
+    sqlList.push(await ApprovalQueueSQL.updateVendorFftStatus({ VENDOR_ID: vendor_id, FFT_STATUS: 2 }))
   }
   if (currentStep) {
     sqlList.push(
       await ApprovalQueueSQL.updateApprovalStep({
-        step_id: currentStep.step_id,
-        step_status: 'rejected',
-        UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+        STEP_ID: currentStep.step_id,
+        STEP_STATUS: 'rejected',
+        UPDATE_BY: dataItem.UPDATE_BY || dataItem.APPROVE_BY || 'SYSTEM',
       })
     )
     sqlList.push(
       await ApprovalQueueSQL.createApprovalLog({
-        request_id: dataItem.request_id,
-        step_id: currentStep.step_id,
-        action_by: dataItem.approve_by || dataItem.UPDATE_BY || 'SYSTEM',
-        action_type: 'rejected',
-        remark: dataItem.approver_remark || '',
+        REQUEST_ID: dataItem.REQUEST_ID,
+        STEP_ID: currentStep.step_id,
+        ACTION_BY: dataItem.APPROVE_BY || dataItem.UPDATE_BY || 'SYSTEM',
+        ACTION_TYPE: 'rejected',
+        REMARK: dataItem.APPROVER_REMARK || '',
       })
     )
   }
@@ -504,8 +508,8 @@ const handleRejection = async (context: WorkflowContext, sqlList: SqlList, postC
   for (const pendingStep of pendingSteps) {
     sqlList.push(
       await ApprovalQueueSQL.updateApprovalStep({
-        step_id: pendingStep.step_id,
-        step_status: 'skipped',
+        STEP_ID: pendingStep.step_id,
+        STEP_STATUS: 'skipped',
         UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
       })
     )
@@ -522,18 +526,18 @@ const handleVendorReplyRequest = async (context: WorkflowContext, resolver: Work
 
   sqlList.push(
     await ApprovalQueueSQL.updateApprovalStep({
-      step_id: currentStep.step_id,
-      step_status: 'approved',
-      UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+      STEP_ID: currentStep.step_id,
+      STEP_STATUS: 'approved',
+      UPDATE_BY: dataItem.UPDATE_BY || dataItem.APPROVE_BY || 'SYSTEM',
     })
   )
   sqlList.push(
     await ApprovalQueueSQL.createApprovalLog({
-      request_id: dataItem.request_id,
-      step_id: currentStep.step_id,
-      action_by: dataItem.approve_by || dataItem.UPDATE_BY || 'SYSTEM',
-      action_type: 'vendor_requested',
-      remark: 'Vendor document request email has been sent',
+      REQUEST_ID: dataItem.REQUEST_ID,
+      STEP_ID: currentStep.step_id,
+      ACTION_BY: dataItem.APPROVE_BY || dataItem.UPDATE_BY || 'SYSTEM',
+      ACTION_TYPE: 'vendor_requested',
+      REMARK: 'Vendor document request email has been sent',
     })
   )
 
@@ -546,27 +550,27 @@ const handleVendorReplyRequest = async (context: WorkflowContext, resolver: Work
     if (pendingAgreementApprover && pendingAgreementApprover !== pendingAgreementStep.approver_id) {
       sqlList.push(
         await ApprovalQueueSQL.updateApprovalStepApprover({
-          step_id: pendingAgreementStep.step_id,
-          approver_id: pendingAgreementApprover,
-          assignment_mode: 'AUTO',
+          STEP_ID: pendingAgreementStep.step_id,
+          APPROVER_ID: pendingAgreementApprover,
+          ASSIGNMENT_MODE: 'AUTO',
           UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
         })
       )
     }
     sqlList.push(
       await ApprovalQueueSQL.updateApprovalStep({
-        step_id: pendingAgreementStep.step_id,
-        step_status: 'completed',
-        UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+        STEP_ID: pendingAgreementStep.step_id,
+        STEP_STATUS: 'completed',
+        UPDATE_BY: dataItem.UPDATE_BY || dataItem.APPROVE_BY || 'SYSTEM',
       })
     )
     sqlList.push(
       await ApprovalQueueSQL.createApprovalLog({
-        request_id: dataItem.request_id,
-        step_id: pendingAgreementStep.step_id,
-        action_by: dataItem.approve_by || dataItem.UPDATE_BY || 'SYSTEM',
-        action_type: 'approved',
-        remark: 'Pending Agreement auto-completed after sending vendor email',
+        REQUEST_ID: dataItem.REQUEST_ID,
+        STEP_ID: pendingAgreementStep.step_id,
+        ACTION_BY: dataItem.APPROVE_BY || dataItem.UPDATE_BY || 'SYSTEM',
+        ACTION_TYPE: 'approved',
+        REMARK: 'Pending Agreement auto-completed after sending vendor email',
       })
     )
   }
@@ -576,18 +580,18 @@ const handleVendorReplyRequest = async (context: WorkflowContext, resolver: Work
     if (agreementReachedApprover && agreementReachedApprover !== agreementReachedStep.approver_id) {
       sqlList.push(
         await ApprovalQueueSQL.updateApprovalStepApprover({
-          step_id: agreementReachedStep.step_id,
-          approver_id: agreementReachedApprover,
-          assignment_mode: 'AUTO',
+          STEP_ID: agreementReachedStep.step_id,
+          APPROVER_ID: agreementReachedApprover,
+          ASSIGNMENT_MODE: 'AUTO',
           UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
         })
       )
     }
     sqlList.push(
       await ApprovalQueueSQL.updateApprovalStep({
-        step_id: agreementReachedStep.step_id,
-        step_status: 'in_progress',
-        UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+        STEP_ID: agreementReachedStep.step_id,
+        STEP_STATUS: 'in_progress',
+        UPDATE_BY: dataItem.UPDATE_BY || dataItem.APPROVE_BY || 'SYSTEM',
       })
     )
   }
@@ -595,7 +599,7 @@ const handleVendorReplyRequest = async (context: WorkflowContext, resolver: Work
   createSelectionFolderForVendorRequest(context)
 
   const resultData = await MySQLExecute.executeList(sqlList)
-  const mailResult = await triggerVendorDocumentEmail(dataItem.request_id)
+  const mailResult = await triggerVendorDocumentEmail(dataItem.REQUEST_ID)
   const mailMessage = mailResult?.sent
     ? 'Vendor notification sent. Waiting vendor response before next approval step.'
     : `Request updated but vendor email failed: ${mailResult?.reason || 'unknown error'}`
@@ -620,7 +624,7 @@ const handleGprCRequesterPhase = async (
   const { dataItem, currentStep, requesterCode } = context
   if (!currentStep) return null
 
-  const actionBy = String(dataItem.approve_by || dataItem.UPDATE_BY || '').trim()
+  const actionBy = String(dataItem.APPROVE_BY || dataItem.UPDATE_BY || '').trim()
   const isRequesterGprCPhase =
     getStepType(currentStep) === StepType.ISSUE_GPR_C && !!requesterCode && String(currentStep.approver_id || '').trim() === requesterCode && actionBy === requesterCode
 
@@ -636,37 +640,37 @@ const handleGprCRequesterPhase = async (
     throw new Error('GPR C approver must be different from requester.')
   }
 
-  dataItem.request_status = currentStep.DESCRIPTION || 'Issue GPR C'
+  dataItem.REQUEST_STATUS = currentStep.DESCRIPTION || 'Issue GPR C'
   sqlList.push(
     await ApprovalQueueSQL.updateApprovalStepApprover({
-      step_id: currentStep.step_id,
-      approver_id: requesterHeadEmpCode,
-      assignment_mode: 'AUTO',
-      UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+      STEP_ID: currentStep.step_id,
+      APPROVER_ID: requesterHeadEmpCode,
+      ASSIGNMENT_MODE: 'AUTO',
+      UPDATE_BY: dataItem.UPDATE_BY || dataItem.APPROVE_BY || 'SYSTEM',
     })
   )
   sqlList.push(
     await ApprovalQueueSQL.updateApprovalStep({
-      step_id: currentStep.step_id,
-      step_status: 'in_progress',
-      UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+      STEP_ID: currentStep.step_id,
+      STEP_STATUS: 'in_progress',
+      UPDATE_BY: dataItem.UPDATE_BY || dataItem.APPROVE_BY || 'SYSTEM',
     })
   )
   sqlList.push(
     await ApprovalQueueSQL.createApprovalLog({
-      request_id: dataItem.request_id,
-      step_id: currentStep.step_id,
-      action_by: actionBy || 'SYSTEM',
-      action_type: 'submitted_to_requester_head',
-      remark: dataItem.approver_remark || 'Requester submitted GPR C to requester head approval',
+      REQUEST_ID: dataItem.REQUEST_ID,
+      STEP_ID: currentStep.step_id,
+      ACTION_BY: actionBy || 'SYSTEM',
+      ACTION_TYPE: 'submitted_to_requester_head',
+      REMARK: dataItem.APPROVER_REMARK || 'Requester submitted GPR C to requester head approval',
     })
   )
 
   const resultData = await MySQLExecute.executeList(sqlList)
   postCommitTasks.push(async () => {
-    await triggerVendorDocumentEmail(dataItem.request_id, currentStep?.DESCRIPTION || 'Issue GPR C')
+    await triggerVendorDocumentEmail(dataItem.REQUEST_ID, currentStep?.DESCRIPTION || 'Issue GPR C')
   })
-  queuePostCommitTasks(postCommitTasks, dataItem.request_id)
+  queuePostCommitTasks(postCommitTasks, dataItem.REQUEST_ID)
 
   return {
     Status: true,
@@ -710,8 +714,8 @@ const handleNegotiationBranch = async ({
     for (const branchStep of branchSteps) {
       sqlList.push(
         await ApprovalQueueSQL.updateApprovalStep({
-          step_id: branchStep.step_id,
-          step_status: 'skipped',
+          STEP_ID: branchStep.step_id,
+          STEP_STATUS: 'skipped',
           UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
         })
       )
@@ -732,8 +736,8 @@ const handleNegotiationBranch = async ({
       for (const branchStep of branchSteps) {
         sqlList.push(
           await ApprovalQueueSQL.updateApprovalStep({
-            step_id: branchStep.step_id,
-            step_status: 'skipped',
+            STEP_ID: branchStep.step_id,
+            STEP_STATUS: 'skipped',
             UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
           })
         )
@@ -754,22 +758,22 @@ const handleNegotiationBranch = async ({
       closeAsVendorDisagreed = true
 
       if (vendor_id) {
-        sqlList.push(await ApprovalQueueSQL.updateVendorFftStatus({ vendor_id, fft_status: 2 }))
+        sqlList.push(await ApprovalQueueSQL.updateVendorFftStatus({ VENDOR_ID: vendor_id, FFT_STATUS: 2 }))
       }
       sqlList.push(
         await ApprovalQueueSQL.updateApprovalStep({
-          step_id: resolvedNextStep.step_id,
-          step_status: 'rejected',
-          UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+          STEP_ID: resolvedNextStep.step_id,
+          STEP_STATUS: 'rejected',
+          UPDATE_BY: dataItem.UPDATE_BY || dataItem.APPROVE_BY || 'SYSTEM',
         })
       )
       sqlList.push(
         await ApprovalQueueSQL.createApprovalLog({
-          request_id: dataItem.request_id,
-          step_id: resolvedNextStep.step_id,
-          action_by: dataItem.approve_by || dataItem.UPDATE_BY || 'SYSTEM',
-          action_type: 'rejected',
-          remark: dataItem.approver_remark || 'Vendor disagreed after GPR negotiation',
+          REQUEST_ID: dataItem.REQUEST_ID,
+          STEP_ID: resolvedNextStep.step_id,
+          ACTION_BY: dataItem.APPROVE_BY || dataItem.UPDATE_BY || 'SYSTEM',
+          ACTION_TYPE: 'rejected',
+          REMARK: dataItem.APPROVER_REMARK || 'Vendor disagreed after GPR negotiation',
         })
       )
 
@@ -777,8 +781,8 @@ const handleNegotiationBranch = async ({
       for (const trailingStep of trailingSteps) {
         sqlList.push(
           await ApprovalQueueSQL.updateApprovalStep({
-            step_id: trailingStep.step_id,
-            step_status: 'skipped',
+            STEP_ID: trailingStep.step_id,
+            STEP_STATUS: 'skipped',
             UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
           })
         )
@@ -805,7 +809,7 @@ const handleNormalApproval = async (
   if (!currentStep) return
 
   const approvalActionType = explicitAction === WORKFLOW_ACTION.ACTION_REQUIRED ? 'action_required' : explicitAction === WORKFLOW_ACTION.DISAGREE ? 'vendor_disagreed' : 'approved'
-  const approvalRemark = explicitAction === WORKFLOW_ACTION.ACTION_REQUIRED ? buildActionRequiredRemark(dataItem) : dataItem.approver_remark || ''
+  const approvalRemark = explicitAction === WORKFLOW_ACTION.ACTION_REQUIRED ? buildActionRequiredRemark(dataItem) : dataItem.APPROVER_REMARK || ''
   const currentStepStatus =
     getStepType(currentStep) === StepType.PENDING_AGREEMENT && !disagreementRequested
       ? 'completed'
@@ -815,18 +819,18 @@ const handleNormalApproval = async (
 
   sqlList.push(
     await ApprovalQueueSQL.updateApprovalStep({
-      step_id: currentStep.step_id,
-      step_status: currentStepStatus,
-      UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+      STEP_ID: currentStep.step_id,
+      STEP_STATUS: currentStepStatus,
+      UPDATE_BY: dataItem.UPDATE_BY || dataItem.APPROVE_BY || 'SYSTEM',
     })
   )
   sqlList.push(
     await ApprovalQueueSQL.createApprovalLog({
-      request_id: dataItem.request_id,
-      step_id: currentStep.step_id,
-      action_by: dataItem.approve_by || dataItem.UPDATE_BY || 'SYSTEM',
-      action_type: approvalActionType,
-      remark: approvalRemark,
+      REQUEST_ID: dataItem.REQUEST_ID,
+      STEP_ID: currentStep.step_id,
+      ACTION_BY: dataItem.APPROVE_BY || dataItem.UPDATE_BY || 'SYSTEM',
+      ACTION_TYPE: approvalActionType,
+      REMARK: approvalRemark,
     })
   )
 
@@ -856,8 +860,8 @@ const handleNormalApproval = async (
     for (const remainingStep of remainingSteps) {
       sqlList.push(
         await ApprovalQueueSQL.updateApprovalStep({
-          step_id: remainingStep.step_id,
-          step_status: 'skipped',
+          STEP_ID: remainingStep.step_id,
+          STEP_STATUS: 'skipped',
           UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
         })
       )
@@ -868,9 +872,9 @@ const handleNormalApproval = async (
     if (getStepType(currentStep) === StepType.ISSUE_GPR_C && !disagreementRequested && !actionRequiredRequested && getStepType(nextStep) === StepType.AGREEMENT_REACHED) {
       sqlList.push(
         await ApprovalQueueSQL.updateApprovalStep({
-          step_id: nextStep.step_id,
-          step_status: 'pending',
-          UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+          STEP_ID: nextStep.step_id,
+          STEP_STATUS: 'pending',
+          UPDATE_BY: dataItem.UPDATE_BY || dataItem.APPROVE_BY || 'SYSTEM',
         })
       )
     }
@@ -881,29 +885,29 @@ const handleNormalApproval = async (
     if (nextStepApprover && nextStepApprover !== nextStep.approver_id) {
       sqlList.push(
         await ApprovalQueueSQL.updateApprovalStepApprover({
-          step_id: nextStep.step_id,
-          approver_id: nextStepApprover,
-          assignment_mode: 'AUTO',
+          STEP_ID: nextStep.step_id,
+          APPROVER_ID: nextStepApprover,
+          ASSIGNMENT_MODE: 'AUTO',
           UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
         })
       )
     }
     sqlList.push(
       await ApprovalQueueSQL.updateApprovalStep({
-        step_id: nextStep.step_id,
-        step_status: 'in_progress',
+        STEP_ID: nextStep.step_id,
+        STEP_STATUS: 'in_progress',
         UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
       })
     )
     if (getStepType(nextStep) === StepType.ISSUE_GPR_B) {
       postCommitTasks.push(async () => {
-        await triggerVendorDocumentEmail(dataItem.request_id, nextStep?.DESCRIPTION)
+        await triggerVendorDocumentEmail(dataItem.REQUEST_ID, nextStep?.DESCRIPTION)
       })
     } else if (getStepType(nextStep) === StepType.ISSUE_GPR_C) {
       postCommitTasks.push(async () => {
         await GprCApprovalService.createOrGetFlow({
-          request_id: dataItem.request_id,
-          UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+          REQUEST_ID: dataItem.REQUEST_ID,
+          UPDATE_BY: dataItem.UPDATE_BY || dataItem.APPROVE_BY || 'SYSTEM',
         })
       })
     } else {
@@ -918,8 +922,8 @@ const handleNormalApproval = async (
   } else if (!closeAsVendorDisagreed) {
     sqlList.push(
       await ApprovalQueueSQL.markRequestCompleted({
-        request_id: dataItem.request_id,
-        UPDATE_BY: dataItem.UPDATE_BY || dataItem.approve_by || 'SYSTEM',
+        REQUEST_ID: dataItem.REQUEST_ID,
+        UPDATE_BY: dataItem.UPDATE_BY || dataItem.APPROVE_BY || 'SYSTEM',
       })
     )
     if (actionRequiredRequested) {
@@ -958,10 +962,10 @@ export const ApprovalQueueService = {
   },
 
   getById: async (dataItem: ServicePayload) => {
-    const requestId = Number(dataItem.request_id) || 0
+    const requestId = Number(dataItem.REQUEST_ID) || 0
     if (!requestId) throw new Error('Invalid request_id')
 
-    const sql = await ApprovalQueueSQL.getById({ request_id: requestId })
+    const sql = await ApprovalQueueSQL.getById({ REQUEST_ID: requestId })
     const result = (await MySQLExecute.search(sql)) as RowDataPacket[]
 
     return result[0] || null
@@ -975,15 +979,15 @@ export const ApprovalQueueService = {
 
   updateRequest: async (dataItem: UpdateStatusPayload) => {
     try {
-      const requestId = Number(dataItem.request_id)
+      const requestId = Number(dataItem.REQUEST_ID)
       if (!requestId) throw new Error('Invalid request_id')
 
-      const checkSql = await ApprovalQueueSQL.getRequestStatusAndAssign({ request_id: requestId })
+      const checkSql = await ApprovalQueueSQL.getRequestStatusAndAssign({ REQUEST_ID: requestId })
       const checkRes = (await MySQLExecute.search(checkSql)) as RowDataPacket[]
       const request = checkRes[0]
       if (!request) throw new Error('Request not found')
 
-      const stepsSql = await ApprovalQueueSQL.getApprovalSteps({ request_id: requestId })
+      const stepsSql = await ApprovalQueueSQL.getApprovalSteps({ REQUEST_ID: requestId })
       const steps = (await MySQLExecute.search(stepsSql)) as ApprovalStep[]
       const currentStep = steps.find((step) => step.step_status === 'in_progress')
 
@@ -999,11 +1003,11 @@ export const ApprovalQueueService = {
       sqlList.push(await ApprovalQueueSQL.updateRequest(dataItem))
       sqlList.push(
         await ApprovalQueueSQL.createApprovalLog({
-          request_id: requestId,
-          step_id: currentStep.step_id,
-          action_by: dataItem.UPDATE_BY || 'SYSTEM',
-          action_type: 'edited',
-          remark: 'PIC edited request details',
+          REQUEST_ID: requestId,
+          STEP_ID: currentStep.step_id,
+          ACTION_BY: dataItem.UPDATE_BY || 'SYSTEM',
+          ACTION_TYPE: 'edited',
+          REMARK: 'PIC edited request details',
         })
       )
 
@@ -1028,7 +1032,7 @@ export const ApprovalQueueService = {
 
   updateStatus: async (dataItem: UpdateStatusPayload) => {
     try {
-      const newStatus = String(dataItem.request_status || '')
+      const newStatus = String(dataItem.REQUEST_STATUS || '')
       const explicitAction = resolveWorkflowAction(dataItem)
       const isExplicitReject = explicitAction === WORKFLOW_ACTION.REJECT
       const actionRequiredRequested = explicitAction === WORKFLOW_ACTION.ACTION_REQUIRED
@@ -1057,7 +1061,7 @@ export const ApprovalQueueService = {
       }
 
       const resultData = await MySQLExecute.executeList(sqlList)
-      queuePostCommitTasks(postCommitTasks, dataItem.request_id)
+      queuePostCommitTasks(postCommitTasks, dataItem.REQUEST_ID)
 
       return {
         Status: true,
@@ -1080,24 +1084,24 @@ export const ApprovalQueueService = {
 
   reassignAssignment: async (dataItem: ReassignPayload) => {
     try {
-      const requestId = Number(dataItem.request_id) || 0
-      const scope = String(dataItem.scope || 'REQUEST_PIC')
+      const requestId = Number(dataItem.REQUEST_ID) || 0
+      const scope = String(dataItem.SCOPE || 'REQUEST_PIC')
         .trim()
         .toUpperCase()
-      const toEmpCode = String(dataItem.to_empcode || '').trim()
-      const updateBy = dataItem.UPDATE_BY || dataItem.changed_by || 'SYSTEM'
-      const reason = dataItem.reason || ''
+      const toEmpCode = String(dataItem.TO_EMPCODE || '').trim()
+      const updateBy = dataItem.UPDATE_BY || dataItem.CHANGED_BY || 'SYSTEM'
+      const reason = dataItem.REASON || ''
 
       if (!requestId) throw new Error('Missing request_id')
       if (scope !== 'REQUEST_PIC') throw new Error('Task Manager can only reassign PO PIC')
       if (!toEmpCode) throw new Error('Missing to_empcode')
 
-      const requestSql = await ApprovalQueueSQL.getById({ request_id: requestId })
+      const requestSql = await ApprovalQueueSQL.getById({ REQUEST_ID: requestId })
       const requestRes = (await MySQLExecute.search(requestSql)) as RowDataPacket[]
       const request = requestRes[0] || null
       if (!request) throw new Error('Request not found')
 
-      const stepsSql = await ApprovalQueueSQL.getApprovalSteps({ request_id: requestId })
+      const stepsSql = await ApprovalQueueSQL.getApprovalSteps({ REQUEST_ID: requestId })
       const steps = (await MySQLExecute.search(stepsSql)) as ApprovalStep[]
       const currentStep = steps.find((step) => step.step_status === 'in_progress')
 
@@ -1105,9 +1109,9 @@ export const ApprovalQueueService = {
       const picGroupCode = isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
 
       const assigneeSql = await ApprovalQueueSQL.getActiveAssigneeByEmpCodeAndGroupCode({
-        empcode: toEmpCode,
-        group_code: picGroupCode,
-        group_compact: picGroupCode.replace(/[^A-Z0-9]/g, ''),
+        EMPCODE: toEmpCode,
+        GROUP_CODE: picGroupCode,
+        GROUP_COMPACT: picGroupCode.replace(/[^A-Z0-9]/g, ''),
       })
       const assigneeRes = (await MySQLExecute.search(assigneeSql)) as RowDataPacket[]
       const targetAssignee = assigneeRes[0] || null
@@ -1116,25 +1120,25 @@ export const ApprovalQueueService = {
       const sqlList = []
       sqlList.push(
         await ApprovalQueueSQL.updateRequestPicAssignee({
-          request_id: requestId,
-          assign_to: targetAssignee.empcode,
-          PIC_Email: targetAssignee.empEmail || '',
+          REQUEST_ID: requestId,
+          ASSIGN_TO: targetAssignee.empcode,
+          PIC_EMAIL: targetAssignee.empEmail || '',
           UPDATE_BY: updateBy,
         })
       )
 
       sqlList.push(
         await ApprovalQueueSQL.insertAssignmentHistory({
-          request_id: requestId,
-          step_id: currentStep?.step_id,
-          scope,
-          step_code: 'PIC_REVIEW',
-          group_code: picGroupCode,
-          from_empcode: request.assign_to || '',
-          to_empcode: targetAssignee.empcode,
-          reason,
+          REQUEST_ID: requestId,
+          STEP_ID: currentStep?.step_id,
+          SCOPE: scope,
+          STEP_CODE: 'PIC_REVIEW',
+          GROUP_CODE: picGroupCode,
+          FROM_EMPCODE: request.assign_to || '',
+          TO_EMPCODE: targetAssignee.empcode,
+          REASON: reason,
           DESCRIPTION: 'PO PIC reassigned',
-          changed_by: updateBy,
+          CHANGED_BY: updateBy,
           CREATE_BY: updateBy,
           UPDATE_BY: updateBy,
         })
@@ -1142,11 +1146,11 @@ export const ApprovalQueueService = {
 
       sqlList.push(
         await ApprovalQueueSQL.createApprovalLog({
-          request_id: requestId,
-          step_id: currentStep?.step_id,
-          action_by: updateBy,
-          action_type: 'reassigned_pic',
-          remark: reason || `Reassigned to ${targetAssignee.empcode}`,
+          REQUEST_ID: requestId,
+          STEP_ID: currentStep?.step_id,
+          ACTION_BY: updateBy,
+          ACTION_TYPE: 'reassigned_pic',
+          REMARK: reason || `Reassigned to ${targetAssignee.empcode}`,
         })
       )
 
@@ -1179,18 +1183,18 @@ export const ApprovalQueueService = {
       if (currentStep) {
         sqlList.push(
           await ApprovalQueueSQL.updateApprovalStep({
-            step_id: currentStep.step_id,
-            step_status: 'approved',
+            STEP_ID: currentStep.step_id,
+            STEP_STATUS: 'approved',
             UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
           })
         )
         sqlList.push(
           await ApprovalQueueSQL.createApprovalLog({
-            request_id: dataItem.request_id,
-            step_id: currentStep.step_id,
-            action_by: dataItem.UPDATE_BY || 'SYSTEM',
-            action_type: 'approved',
-            remark: dataItem.vendor_code ? `Vendor Code: ${dataItem.vendor_code}` : 'Registration completed',
+            REQUEST_ID: dataItem.REQUEST_ID,
+            STEP_ID: currentStep.step_id,
+            ACTION_BY: dataItem.UPDATE_BY || 'SYSTEM',
+            ACTION_TYPE: 'approved',
+            REMARK: dataItem.VENDOR_CODE ? `Vendor Code: ${dataItem.VENDOR_CODE}` : 'Registration completed',
           })
         )
       }

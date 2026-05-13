@@ -12,10 +12,10 @@ export const BlacklistCNService = {
     return resultData
   },
 
-  importFile: async (dataItem: { file?: Express.Multer.File; CREATE_BY?: string; UPDATE_BY?: string }) => {
+  importFile: async (dataItem: { FILE?: Express.Multer.File; CREATE_BY?: string; UPDATE_BY?: string }) => {
     let conn: any = null
     try {
-      const file = dataItem.file
+      const file = dataItem.FILE
       const createBy = String(dataItem.CREATE_BY || dataItem.UPDATE_BY || 'SYSTEM').trim() || 'SYSTEM'
       const updateBy = String(dataItem.UPDATE_BY || createBy).trim() || createBy
 
@@ -63,9 +63,9 @@ export const BlacklistCNService = {
 
         for (const aliasName of row.aliases) {
           const sqlInsertAlias = BlacklistSQL.insertAlias({
-            vendor_id: insertedVendorId,
-            alias_name: aliasName,
-            normalized_alias_name: normalizeName(aliasName),
+            VENDOR_ID: insertedVendorId,
+            ALIAS_NAME: aliasName,
+            NORMALIZED_ALIAS_NAME: normalizeName(aliasName),
             DESCRIPTION: null,
             CREATE_BY: createBy,
             UPDATE_BY: updateBy || null,

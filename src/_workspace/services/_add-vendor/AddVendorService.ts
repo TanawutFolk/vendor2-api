@@ -6,7 +6,7 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2'
 
 export const AddVendorService = {
   checkBlacklist: async (dataItem: any) => {
-    const companyName = String(dataItem.company_name || '').trim()
+    const companyName = String(dataItem.COMPANY_NAME || '').trim()
     const normalizedName = normalizeName(companyName)
     const blacklistResult = normalizedName ? ((await MySQLExecute.search(BlacklistSQL.checkBlacklist(normalizedName))) as RowDataPacket[]) : []
 
@@ -22,7 +22,7 @@ export const AddVendorService = {
 
   // Check if vendor already exists + check against blacklist
   checkDuplicateVendor: async (dataItem: any) => {
-    const companyName = String(dataItem.company_name || '').trim()
+    const companyName = String(dataItem.COMPANY_NAME || '').trim()
     const normalizedName = normalizeName(companyName)
 
     // Run both checks in parallel
@@ -110,11 +110,11 @@ export const AddVendorService = {
       const sqlList = []
 
       // Step 3: Prepare contacts
-      if (dataItem.contacts && Array.isArray(dataItem.contacts)) {
-        for (const contact of dataItem.contacts) {
+      if (dataItem.CONTACTS && Array.isArray(dataItem.CONTACTS)) {
+        for (const contact of dataItem.CONTACTS) {
           const contactData = {
             ...contact,
-            vendor_id: vendorId,
+            VENDOR_ID: vendorId,
             CREATE_BY: dataItem.CREATE_BY,
           }
           sqlList.push(await AddVendorSQL.createVendorContact(contactData))
@@ -122,11 +122,11 @@ export const AddVendorService = {
       }
 
       // Step 4: Prepare products
-      if (dataItem.products && Array.isArray(dataItem.products)) {
-        for (const product of dataItem.products) {
+      if (dataItem.PRODUCTS && Array.isArray(dataItem.PRODUCTS)) {
+        for (const product of dataItem.PRODUCTS) {
           const productData = {
             ...product,
-            vendor_id: vendorId,
+            VENDOR_ID: vendorId,
             CREATE_BY: dataItem.CREATE_BY,
           }
           sqlList.push(await AddVendorSQL.createVendorProduct(productData))

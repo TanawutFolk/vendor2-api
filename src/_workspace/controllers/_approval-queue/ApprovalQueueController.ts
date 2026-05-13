@@ -8,7 +8,7 @@ export const ApprovalQueueController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const request_id = parseInt(dataItem.request_id as string)
+      const request_id = parseInt(dataItem.REQUEST_ID as string)
 
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
@@ -20,7 +20,7 @@ export const ApprovalQueueController = {
         } as ResponseI)
       }
 
-      const result = await ApprovalQueueModel.getById({ request_id })
+      const result = await ApprovalQueueModel.getById({ REQUEST_ID: request_id })
 
       return res.status(200).json({
         Status: true,
@@ -70,28 +70,28 @@ export const ApprovalQueueController = {
       ]
 
       // Filter out null/empty values from SearchFilters before passing to helper
-      if (dataItem.SearchFilters && Array.isArray(dataItem.SearchFilters)) {
-        dataItem.SearchFilters = dataItem.SearchFilters.filter((item: any) => item.value !== null && item.value !== undefined && item.value !== '')
+      if (dataItem.SEARCHFILTERS && Array.isArray(dataItem.SEARCHFILTERS)) {
+        dataItem.SEARCHFILTERS = dataItem.SEARCHFILTERS.filter((item: any) => item.value !== null && item.value !== undefined && item.value !== '')
       }
 
       // Create SQL WHERE, ORDER BY, and Offset using AG Grid-compatible helper
       getSqlWhere_aggrid(dataItem, tableIds, 'rr.request_id')
 
       // Default Limit if not provided by frontend
-      dataItem.Limit = dataItem.Limit || 50
+      dataItem.LIMIT = dataItem.LIMIT || 50
 
       // Extract sqlWhere from dataItem
       let sqlWhere = ''
-      if (dataItem.sqlWhere) {
-        sqlWhere = dataItem.sqlWhere.trim()
+      if (dataItem.SQLWHERE) {
+        sqlWhere = dataItem.SQLWHERE.trim()
         sqlWhere = sqlWhere.replace(/^WHERE\s+/i, '')
       }
 
       // Manually add root-level filters (frontend passes these directly instead of via SearchFilters)
       const manualFilters: string[] = []
       const actorFilters: string[] = []
-      if (dataItem.approver_id) {
-        const queueStepCode = String(dataItem.queue_step_code || '')
+      if (dataItem.APPROVER_ID) {
+        const queueStepCode = String(dataItem.QUEUE_STEP_CODE || '')
           .trim()
           .toUpperCase()
           .replace(/[^A-Z0-9_]/g, '')
@@ -130,7 +130,7 @@ export const ApprovalQueueController = {
             [
               'EXISTS (SELECT 1 FROM request_approval_step ras',
               'WHERE ras.request_id = rr.request_id',
-              `AND ras.approver_id = '${dataItem.approver_id}'`,
+              `AND ras.approver_id = '${dataItem.APPROVER_ID}'`,
               'AND ras.step_status IN (\'in_progress\', \'approved\', \'rejected\')',
               `AND ${queueStepCondition}`,
               'AND ras.INUSE = 1)',
@@ -142,26 +142,26 @@ export const ApprovalQueueController = {
             [
               'EXISTS (SELECT 1 FROM request_approval_step ras',
               'WHERE ras.request_id = rr.request_id',
-              `AND ras.approver_id = '${dataItem.approver_id}'`,
+              `AND ras.approver_id = '${dataItem.APPROVER_ID}'`,
               'AND ras.step_status IN (\'in_progress\', \'approved\', \'rejected\')',
               'AND ras.INUSE = 1)',
             ].join(' ')
           )
         }
       }
-      if (dataItem.assign_to) {
+      if (dataItem.ASSIGN_TO) {
         // PIC dashboard: show requests assigned to PIC only.
         // Excludes approver step records so PIC doesn't see MD/GM/Mgr queues.
-        actorFilters.push(`rr.assign_to = '${dataItem.assign_to}'`)
+        actorFilters.push(`rr.assign_to = '${dataItem.ASSIGN_TO}'`)
       }
       if (actorFilters.length > 0) {
         manualFilters.push(`(${actorFilters.join(' OR ')})`)
       }
-      if (dataItem.Request_By_EmployeeCode) {
-        manualFilters.push(`rr.Request_By_EmployeeCode = '${dataItem.Request_By_EmployeeCode}'`)
+      if (dataItem.REQUEST_BY_EMPLOYEECODE) {
+        manualFilters.push(`rr.Request_By_EmployeeCode = '${dataItem.REQUEST_BY_EMPLOYEECODE}'`)
       }
-      if (dataItem.request_status) {
-        manualFilters.push(`rr.request_status = '${dataItem.request_status}'`)
+      if (dataItem.REQUEST_STATUS) {
+        manualFilters.push(`rr.request_status = '${dataItem.REQUEST_STATUS}'`)
       }
 
       // Combine AG Grid filters and manual root filters
@@ -178,8 +178,8 @@ export const ApprovalQueueController = {
         sqlWhere = ` AND ${sqlWhere}`
       }
 
-      dataItem.sqlWhere = sqlWhere
-      dataItem['sqlWhereColumnFilter'] = ''
+      dataItem.SQLWHERE = sqlWhere
+      dataItem['SQLWHERECOLUMNFILTER'] = ''
 
       const { data, totalCount } = await ApprovalQueueModel.getAllRequests(dataItem, sqlWhere)
       return res.status(200).json({
@@ -211,7 +211,7 @@ export const ApprovalQueueController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.request_id as string)
+      const request_id = parseInt(dataItem.REQUEST_ID as string)
 
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
@@ -224,19 +224,19 @@ export const ApprovalQueueController = {
       }
 
       // approve_date: set to 'NOW()' (DB CURRENT_TIMESTAMP) when Rejected, or when it's the final step
-      const isFinalStep = dataItem.isFinalStep === true || dataItem.isFinalStep === 'true'
-      const isFinalStepOrRejected = dataItem.request_status === 'Rejected' || isFinalStep
+      const isFinalStep = dataItem.ISFINALSTEP === true || dataItem.ISFINALSTEP === 'true'
+      const isFinalStepOrRejected = dataItem.REQUEST_STATUS === 'Rejected' || isFinalStep
       const result = await ApprovalQueueModel.updateStatus({
-        request_id,
-        request_status: dataItem.request_status || '',
-        workflow_action: dataItem.workflow_action || '',
-        action_type: dataItem.action_type || '',
-        negotiation_action: dataItem.negotiation_action || '',
-        approve_by: dataItem.approve_by || '',
-        approve_date: isFinalStepOrRejected ? 'NOW()' : null,
-        approver_remark: dataItem.approver_remark || '',
+        REQUEST_ID: request_id,
+        REQUEST_STATUS: dataItem.REQUEST_STATUS || '',
+        WORKFLOW_ACTION: dataItem.WORKFLOW_ACTION || '',
+        ACTION_TYPE: dataItem.ACTION_TYPE || '',
+        NEGOTIATION_ACTION: dataItem.NEGOTIATION_ACTION || '',
+        APPROVE_BY: dataItem.APPROVE_BY || '',
+        APPROVE_DATE: isFinalStepOrRejected ? 'NOW()' : null,
+        APPROVER_REMARK: dataItem.APPROVER_REMARK || '',
         UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
-        isFinalStep,
+        ISFINALSTEP: isFinalStep,
       })
 
       res.status(200).json(result as ResponseI)
@@ -284,7 +284,7 @@ export const ApprovalQueueController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.request_id as string)
+      const request_id = parseInt(dataItem.REQUEST_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -296,10 +296,10 @@ export const ApprovalQueueController = {
       }
 
       const result = await ApprovalQueueModel.reassignAssignment({
-        request_id,
-        scope: dataItem.scope || '',
-        to_empcode: dataItem.to_empcode || '',
-        reason: dataItem.reason || '',
+        REQUEST_ID: request_id,
+        SCOPE: dataItem.SCOPE || '',
+        TO_EMPCODE: dataItem.TO_EMPCODE || '',
+        REASON: dataItem.REASON || '',
         UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
       })
 

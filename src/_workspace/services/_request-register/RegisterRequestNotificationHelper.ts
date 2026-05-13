@@ -58,7 +58,7 @@ const resolveEmployeeProfile = async (empCodeRaw: unknown): Promise<EmployeeProf
     return employeeProfileCache.get(empCode) || null
   }
 
-  const sql = await RequestRegisterPageSQL.getMemberByEmpCode({ empcode: empCode })
+  const sql = await RequestRegisterPageSQL.getMemberByEmpCode({ EMPCODE: empCode })
   const rows = (await MySQLExecute.search(sql)) as any[]
   const row = rows[0]
 
@@ -85,7 +85,7 @@ const resolveAssignedEmail = async (empCodeRaw: unknown) => {
     return assigneeEmailCache.get(empCode) || ''
   }
 
-  const sql = await RequestRegisterPageSQL.getAssigneeEmailByEmpCode({ empcode: empCode })
+  const sql = await RequestRegisterPageSQL.getAssigneeEmailByEmpCode({ EMPCODE: empCode })
   const rows = (await MySQLExecute.search(sql)) as any[]
   const email = normalizeEmail(rows[0]?.empEmail)
   assigneeEmailCache.set(empCode, email)
@@ -100,7 +100,7 @@ const resolveAssigneeProfile = async (empCodeRaw: unknown): Promise<EmployeeProf
     return assigneeProfileCache.get(empCode) || null
   }
 
-  const sql = await RequestRegisterPageSQL.getAssigneeByEmpCodeContact({ empcode: empCode })
+  const sql = await RequestRegisterPageSQL.getAssigneeByEmpCodeContact({ EMPCODE: empCode })
   const rows = (await MySQLExecute.search(sql)) as any[]
   const row = rows[0]
 
@@ -124,7 +124,7 @@ const getPeerCcEmailsByExactGroupCode = async (groupCode: string, excludeEmpCode
   if (!safeGroupCode) return []
 
   const excludeEmp = String(excludeEmpCode || '').trim()
-  const rowsSql = await RequestRegisterPageSQL.getActiveAssigneesByGroupCode({ group_code: safeGroupCode })
+  const rowsSql = await RequestRegisterPageSQL.getActiveAssigneesByGroupCode({ GROUP_CODE: safeGroupCode })
   const rows = (await MySQLExecute.search(rowsSql)) as any[]
 
   return mergeUniqueEmails(
@@ -144,7 +144,7 @@ const inspectGroupRecipients = async (groupCode: string, excludeEmpCode?: string
 
   const excludeEmp = String(excludeEmpCode || '').trim()
   const normalizedExcludeEmail = normalizeEmail(excludeEmail)
-  const rowsSql = await RequestRegisterPageSQL.getActiveAssigneesByGroupCode({ group_code: safeGroupCode })
+  const rowsSql = await RequestRegisterPageSQL.getActiveAssigneesByGroupCode({ GROUP_CODE: safeGroupCode })
   const rows = (await MySQLExecute.search(rowsSql)) as any[]
 
   return rows.map((row: any) => {
@@ -181,8 +181,8 @@ export const getPeerCcEmailsByGroupCode = async (groupCode: string, excludeEmpCo
   const excludeEmp = String(excludeEmpCode || '').trim()
 
   const rowsSql = await RequestRegisterPageSQL.getPeerCcRowsByNormalizedGroup({
-    target_group: targetGroup,
-    target_compact: targetCompact,
+    TARGET_GROUP: targetGroup,
+    TARGET_COMPACT: targetCompact,
   })
   const rows = (await MySQLExecute.search(rowsSql)) as any[]
 
@@ -209,8 +209,8 @@ const resolvePrimaryAssigneeByGroupCode = async (groupCode: string) => {
 
   const targetCompact = targetGroup.replace(/[^A-Z0-9]/g, '')
   const rowsSql = await RequestRegisterPageSQL.getPeerCcRowsByNormalizedGroup({
-    target_group: targetGroup,
-    target_compact: targetCompact,
+    TARGET_GROUP: targetGroup,
+    TARGET_COMPACT: targetCompact,
   })
   const rows = (await MySQLExecute.search(rowsSql)) as any[]
   const row = rows.find((item: any) => normalizeEmail(item?.empEmail))
@@ -548,8 +548,8 @@ export const triggerCreationEmail = async (dataItem: any, vendorData: any, nextA
       contactPic: vendorData.contact_name || 'Error Connection',
       email: vendorData.email || 'Error Connection',
       tel: vendorData.tel_phone || 'Error Connection',
-      supportProduct: dataItem.supportProduct_Process || 'Error Connection',
-      purchaseFrequency: dataItem.purchase_frequency || 'Error Connection',
+      supportProduct: dataItem.SUPPORTPRODUCT_PROCESS || 'Error Connection',
+      purchaseFrequency: dataItem.PURCHASE_FREQUENCY || 'Error Connection',
       systemLink,
       userName: requester.name,
       userTel: '',
@@ -579,19 +579,19 @@ export const triggerCreationEmail = async (dataItem: any, vendorData: any, nextA
 export const sendAgreementEmail = async (dataItem: any) => {
   let contextVendor: any = {}
   let selectedContactEmails: string[] = []
-  if (dataItem.request_id) {
-    const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ request_id: Number(dataItem.request_id) || 0 })
+  if (dataItem.REQUEST_ID) {
+    const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ REQUEST_ID: Number(dataItem.REQUEST_ID) || 0 })
     const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
     contextVendor = vendorRes[0] || {}
 
-    const contactSql = await RequestRegisterPageSQL.getRequestVendorContactsByRequestId({ request_id: Number(dataItem.request_id) || 0 })
+    const contactSql = await RequestRegisterPageSQL.getRequestVendorContactsByRequestId({ REQUEST_ID: Number(dataItem.REQUEST_ID) || 0 })
     const contactRes = (await MySQLExecute.search(contactSql)) as any[]
     selectedContactEmails = contactRes.map((contact) => contact.email)
   }
 
   const recipientEmails = mergeUniqueEmails(
     selectedContactEmails,
-    [dataItem.emailmain, contextVendor.selected_vendor_email, contextVendor.vendor_email, contextVendor.vendor_main_email, contextVendor.emailmain]
+    [dataItem.EMAILMAIN, contextVendor.selected_vendor_email, contextVendor.vendor_email, contextVendor.vendor_main_email, contextVendor.emailmain]
   )
   const recipientEmail = recipientEmails.join(';')
   if (!recipientEmail) {
@@ -599,7 +599,7 @@ export const sendAgreementEmail = async (dataItem: any) => {
   }
 
   let ccEmails: string[] = []
-  if (dataItem.request_id) {
+  if (dataItem.REQUEST_ID) {
     const picProfile = await resolveAssigneeProfile(contextVendor.assign_to)
     const picEmail = await resolveAssignedEmail(contextVendor.assign_to)
     const poPicContext = await getPoPicAndSubPicCc(contextVendor.vendor_region, contextVendor.assign_to, picEmail)
@@ -608,15 +608,15 @@ export const sendAgreementEmail = async (dataItem: any) => {
       [...recipientEmails, contextVendor.emailmain, contextVendor.vendor_email, contextVendor.vendor_main_email]
     )
 
-    dataItem.pic_name = dataItem.pic_name || resolveDisplayName([picProfile?.fullName], 'PO PIC')
+    dataItem.PIC_NAME = dataItem.PIC_NAME || resolveDisplayName([picProfile?.fullName], 'PO PIC')
   }
 
-  const resolvedRequestNumber = String(dataItem.request_number || contextVendor.request_number || '').trim()
+  const resolvedRequestNumber = String(dataItem.REQUEST_NUMBER || contextVendor.request_number || '').trim()
   if (!resolvedRequestNumber) {
     throw new Error('Request number is required before sending Agreement to Vendor')
   }
 
-  const vendorDocumentAttachments = buildVendorDocumentAttachments(contextVendor.vendor_region || dataItem.vendor_region, false)
+  const vendorDocumentAttachments = buildVendorDocumentAttachments(contextVendor.vendor_region || dataItem.VENDOR_REGION, false)
 
   // Make folder creation part of the Agreement sending flow so PO PIC sees the error immediately.
   SelectionFileService.createFolderStructure(resolvedRequestNumber)
@@ -628,18 +628,18 @@ export const sendAgreementEmail = async (dataItem: any) => {
     vendorEmail: recipientEmail,
     ccEmail: ccEmails.join('; '),
     topicRef: resolvedRequestNumber,
-    isNewSupplier: !dataItem.fft_vendor_code,
-    picName: dataItem.pic_name || 'PO PIC',
-    picTel: dataItem.pic_tel || '',
+    isNewSupplier: !dataItem.FFT_VENDOR_CODE,
+    picName: dataItem.PIC_NAME || 'PO PIC',
+    picTel: dataItem.PIC_TEL || '',
   })
 
   await sendTemplatedEmail({
     templateName: 'emailVendorDocumentRequestTemplate',
     emailHtml,
     toEmail: recipientEmail,
-    subject: dataItem.email_subject || `[Request Submit] Document for ${resolvedRequestNumber}`,
+    subject: dataItem.EMAIL_SUBJECT || `[Request Submit] Document for ${resolvedRequestNumber}`,
     ccEmails,
-    requestId: dataItem.request_id,
+    requestId: dataItem.REQUEST_ID,
     requestNumber: resolvedRequestNumber,
     attachments: vendorDocumentAttachments,
     extra: { flow: 'sendAgreementEmail' },
@@ -650,10 +650,10 @@ export const sendAgreementEmail = async (dataItem: any) => {
 
 export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: string) => {
   try {
-    const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ request_id: Number(requestId) || 0 })
+    const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ REQUEST_ID: Number(requestId) || 0 })
     const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
     const vd = vendorRes[0] || {}
-    const contactSql = await RequestRegisterPageSQL.getRequestVendorContactsByRequestId({ request_id: Number(requestId) || 0 })
+    const contactSql = await RequestRegisterPageSQL.getRequestVendorContactsByRequestId({ REQUEST_ID: Number(requestId) || 0 })
     const contactRes = (await MySQLExecute.search(contactSql)) as any[]
     const selectedContactEmails = contactRes.map((contact) => contact.email)
 
@@ -788,8 +788,8 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
 
 export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynamicApprover: string) => {
   try {
-    const requestId = dataItem.request_id
-    const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ request_id: requestId })
+    const requestId = dataItem.REQUEST_ID
+    const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ REQUEST_ID: requestId })
     const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
     const vd = vendorRes[0] || {}
 
@@ -886,8 +886,8 @@ export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynami
 
 export const triggerActionRequiredEmail = async (dataItem: any, currentStep: any) => {
   try {
-    const requestId = dataItem.request_id
-    const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ request_id: requestId })
+    const requestId = dataItem.REQUEST_ID
+    const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ REQUEST_ID: requestId })
     const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
     const vd = vendorRes[0] || {}
 
@@ -947,10 +947,10 @@ export const triggerActionRequiredEmail = async (dataItem: any, currentStep: any
 
 export const triggerAfterGprCApprovedEmail = async (dataItem: any) => {
   try {
-    const requestId = Number(dataItem.request_id) || 0
+    const requestId = Number(dataItem.REQUEST_ID) || 0
     if (!requestId) return
 
-    const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ request_id: requestId })
+    const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ REQUEST_ID: requestId })
     const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
     const vd = vendorRes[0] || {}
 
@@ -1015,8 +1015,8 @@ export const triggerAfterGprCApprovedEmail = async (dataItem: any) => {
 
 export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => {
   try {
-    const requestId = dataItem.request_id
-    const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ request_id: requestId })
+    const requestId = dataItem.REQUEST_ID
+    const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ REQUEST_ID: requestId })
     const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
     const vd = vendorRes[0] || {}
 
@@ -1036,7 +1036,7 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
 
     if (!picEmail) return
 
-    const rejectRemark = dataItem.approver_remark || ''
+    const rejectRemark = dataItem.APPROVER_REMARK || ''
     const currentStepCode = inferStepCode(currentStep)
     const currentStepDesc = normalizeText(currentStep?.DESCRIPTION)
     const isCheckerReject =
@@ -1091,8 +1091,8 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
 
 export const triggerCompletionEmail = async (dataItem: any) => {
   try {
-    const requestId = dataItem.request_id
-    const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ request_id: requestId })
+    const requestId = dataItem.REQUEST_ID
+    const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ REQUEST_ID: requestId })
     const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
     const vd = vendorRes[0] || {}
 
@@ -1130,7 +1130,7 @@ export const triggerCompletionEmail = async (dataItem: any) => {
       systemLink,
       picName,
       picTel,
-      vendorCode: dataItem.vendor_code || vd.vendor_code || 'Pending',
+      vendorCode: dataItem.VENDOR_CODE || vd.vendor_code || 'Pending',
       userName: requester.name || 'Requester',
     }
 
@@ -1143,7 +1143,7 @@ export const triggerCompletionEmail = async (dataItem: any) => {
       ccEmails: finalCcEmails,
       requestId,
       requestNumber,
-      extra: { flow: 'triggerCompletionEmail', vendorCode: dataItem.vendor_code || vd.vendor_code || '' },
+      extra: { flow: 'triggerCompletionEmail', vendorCode: dataItem.VENDOR_CODE || vd.vendor_code || '' },
     })
   } catch (err: any) {
     console.error('[triggerCompletionEmail] Failed:', err?.message)
@@ -1152,10 +1152,10 @@ export const triggerCompletionEmail = async (dataItem: any) => {
 
 export const triggerVendorDisagreeEmail = async (dataItem: any) => {
   try {
-    const requestId = Number(dataItem.request_id) || 0
+    const requestId = Number(dataItem.REQUEST_ID) || 0
     if (!requestId) return
 
-    const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ request_id: requestId })
+    const vendorSql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({ REQUEST_ID: requestId })
     const vendorRes = (await MySQLExecute.search(vendorSql)) as any[]
     const vd = vendorRes[0] || {}
 
@@ -1176,7 +1176,7 @@ export const triggerVendorDisagreeEmail = async (dataItem: any) => {
       [vd.vendor_email, vd.vendor_main_email]
     )
 
-    const safeRemark = String(dataItem.approver_remark || '').trim()
+    const safeRemark = String(dataItem.APPROVER_REMARK || '').trim()
     const reasons = ['Vendor disagreed after GPR negotiation rounds', ...(safeRemark ? [safeRemark] : [])]
 
     const picProfile = await resolveAssigneeProfile(vd.assign_to)

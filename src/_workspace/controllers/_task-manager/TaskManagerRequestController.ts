@@ -22,12 +22,12 @@ export const TaskManagerRequestController = {
       ]
 
       // Filter out null/empty values from SearchFilters before passing to helper
-      if (dataItem.SearchFilters && Array.isArray(dataItem.SearchFilters)) {
-        dataItem.SearchFilters = dataItem.SearchFilters.filter((item: any) => item.value !== null && item.value !== undefined && item.value !== '')
+      if (dataItem.SEARCHFILTERS && Array.isArray(dataItem.SEARCHFILTERS)) {
+        dataItem.SEARCHFILTERS = dataItem.SEARCHFILTERS.filter((item: any) => item.value !== null && item.value !== undefined && item.value !== '')
       }
 
       // Default Limit if not provided by frontend
-      dataItem.Limit = dataItem.Limit || 50
+      dataItem.LIMIT = dataItem.LIMIT || 50
 
       const { data, totalCount } = await TaskManagerRequestModel.searchAllTask(dataItem)
       return res.status(200).json({

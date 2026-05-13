@@ -84,11 +84,11 @@ export const AddVendorController = {
 
     try {
       // Ensure contacts and products are arrays if they exist
-      if (dataItem.contacts && !Array.isArray(dataItem.contacts)) {
-        dataItem.contacts = [dataItem.contacts]
+      if (dataItem.CONTACTS && !Array.isArray(dataItem.CONTACTS)) {
+        dataItem.CONTACTS = [dataItem.CONTACTS]
       }
-      if (dataItem.products && !Array.isArray(dataItem.products)) {
-        dataItem.products = [dataItem.products]
+      if (dataItem.PRODUCTS && !Array.isArray(dataItem.PRODUCTS)) {
+        dataItem.PRODUCTS = [dataItem.PRODUCTS]
       }
 
       const result = await AddVendorModel.createVendor(dataItem)

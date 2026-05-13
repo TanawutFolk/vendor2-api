@@ -24,8 +24,8 @@ export const AssigneesService = {
   // Save assignee (Create or Update)
   save: async (dataItem: any) => {
     try {
-      const empcode = String(dataItem.empcode || '').trim()
-      const groupCode = String(dataItem.group_code || '')
+      const empcode = String(dataItem.EMPCODE || '').trim()
+      const groupCode = String(dataItem.GROUP_CODE || '')
         .trim()
         .toUpperCase()
       const inUse = dataItem.INUSE === 0 || dataItem.INUSE === '0' || dataItem.INUSE === false ? 0 : 1
@@ -34,9 +34,9 @@ export const AssigneesService = {
       if (!groupCode) throw new Error('Group code is required')
 
       const duplicateSql = await AssigneesSQL.findDuplicate({
-        Assignees_id: dataItem.Assignees_id,
-        empcode,
-        group_code: groupCode,
+        ASSIGNEES_ID: dataItem.ASSIGNEES_ID,
+        EMPCODE: empcode,
+        GROUP_CODE: groupCode,
       })
       const duplicateRows = (await MySQLExecute.search(duplicateSql)) as RowDataPacket[]
       const duplicate = duplicateRows[0]
@@ -48,19 +48,19 @@ export const AssigneesService = {
       let sql = ''
       let method = ''
 
-      if (dataItem.Assignees_id) {
+      if (dataItem.ASSIGNEES_ID) {
         sql = await AssigneesSQL.update({
           ...dataItem,
-          empcode,
-          group_code: groupCode,
+          EMPCODE: empcode,
+          GROUP_CODE: groupCode,
           INUSE: inUse,
         })
         method = 'Update Assignee'
       } else {
         sql = await AssigneesSQL.insert({
           ...dataItem,
-          empcode,
-          group_code: groupCode,
+          EMPCODE: empcode,
+          GROUP_CODE: groupCode,
           INUSE: inUse,
         })
         method = 'Create Assignee'

@@ -13,16 +13,16 @@ const getRequestDataItem = (req: Request) => {
     dataItem = req.body
   }
 
-  if (typeof dataItem.dataItem === 'string') {
+  if (typeof dataItem.DATAITEM === 'string') {
     try {
-      return JSON.parse(dataItem.dataItem)
+      return JSON.parse(dataItem.DATAITEM)
     } catch {
       return dataItem
     }
   }
 
-  if (dataItem.dataItem && typeof dataItem.dataItem === 'object') {
-    return dataItem.dataItem
+  if (dataItem.DATAITEM && typeof dataItem.DATAITEM === 'object') {
+    return dataItem.DATAITEM
   }
 
   return dataItem
@@ -87,7 +87,7 @@ export const BlacklistUSController = {
     try {
       const result = await BlacklistUSModel.importFile({
         ...dataItem,
-        file: req.file,
+        FILE: req.file,
       })
 
       return res.status(200).json({
@@ -143,7 +143,7 @@ export const BlacklistCNController = {
     try {
       const result = await BlacklistCNModel.importFile({
         ...dataItem,
-        file: req.file,
+        FILE: req.file,
       })
 
       return res.status(200).json({

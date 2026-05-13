@@ -7,7 +7,7 @@ export const GprCApprovalController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const request_id = parseInt(dataItem.request_id as string)
+      const request_id = parseInt(dataItem.REQUEST_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -19,10 +19,10 @@ export const GprCApprovalController = {
       }
 
       const result = await GprCApprovalModel.gprCApproveStep({
-        request_id,
-        action_by: dataItem.action_by || dataItem.UPDATE_BY || '',
-        remark: dataItem.remark || dataItem.action_remark || '',
-        UPDATE_BY: dataItem.UPDATE_BY || dataItem.action_by || 'SYSTEM',
+        REQUEST_ID: request_id,
+        ACTION_BY: dataItem.ACTION_BY || dataItem.UPDATE_BY || '',
+        REMARK: dataItem.REMARK || dataItem.ACTION_REMARK || '',
+        UPDATE_BY: dataItem.UPDATE_BY || dataItem.ACTION_BY || 'SYSTEM',
       })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
@@ -41,7 +41,7 @@ export const GprCApprovalController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const request_id = parseInt(dataItem.request_id as string)
+      const request_id = parseInt(dataItem.REQUEST_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -53,10 +53,10 @@ export const GprCApprovalController = {
       }
 
       const result = await GprCApprovalModel.gprCRejectStep({
-        request_id,
-        action_by: dataItem.action_by || dataItem.UPDATE_BY || '',
-        remark: dataItem.remark || dataItem.action_remark || '',
-        UPDATE_BY: dataItem.UPDATE_BY || dataItem.action_by || 'SYSTEM',
+        REQUEST_ID: request_id,
+        ACTION_BY: dataItem.ACTION_BY || dataItem.UPDATE_BY || '',
+        REMARK: dataItem.REMARK || dataItem.ACTION_REMARK || '',
+        UPDATE_BY: dataItem.UPDATE_BY || dataItem.ACTION_BY || 'SYSTEM',
       })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
@@ -75,7 +75,7 @@ export const GprCApprovalController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const request_id = parseInt(dataItem.request_id as string)
+      const request_id = parseInt(dataItem.REQUEST_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -87,12 +87,12 @@ export const GprCApprovalController = {
       }
 
       const result = await GprCApprovalModel.gprCActionRequired({
-        request_id,
-        action_by: dataItem.action_by || dataItem.UPDATE_BY || '',
-        pic_name: dataItem.pic_name || '',
-        pic_email: dataItem.pic_email || '',
-        required_detail: dataItem.required_detail || dataItem.remark || '',
-        UPDATE_BY: dataItem.UPDATE_BY || dataItem.action_by || 'SYSTEM',
+        REQUEST_ID: request_id,
+        ACTION_BY: dataItem.ACTION_BY || dataItem.UPDATE_BY || '',
+        PIC_NAME: dataItem.PIC_NAME || '',
+        PIC_EMAIL: dataItem.PIC_EMAIL || '',
+        REQUIRED_DETAIL: dataItem.REQUIRED_DETAIL || dataItem.REMARK || '',
+        UPDATE_BY: dataItem.UPDATE_BY || dataItem.ACTION_BY || 'SYSTEM',
       })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
@@ -111,7 +111,7 @@ export const GprCApprovalController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const action_required_id = parseInt(dataItem.action_required_id as string)
+      const action_required_id = parseInt(dataItem.ACTION_REQUIRED_ID as string)
       if (!action_required_id || isNaN(action_required_id)) {
         return res.status(400).json({
           Status: false,
@@ -123,11 +123,11 @@ export const GprCApprovalController = {
       }
 
       const result = await GprCApprovalModel.gprCRecordActionResult({
-        action_required_id,
-        result_status: dataItem.result_status || 'COMPLETED',
-        result_remark: dataItem.result_remark || '',
-        result_by: dataItem.result_by || dataItem.UPDATE_BY || '',
-        UPDATE_BY: dataItem.UPDATE_BY || dataItem.result_by || 'SYSTEM',
+        ACTION_REQUIRED_ID: action_required_id,
+        RESULT_STATUS: dataItem.RESULT_STATUS || 'COMPLETED',
+        RESULT_REMARK: dataItem.RESULT_REMARK || '',
+        RESULT_BY: dataItem.RESULT_BY || dataItem.UPDATE_BY || '',
+        UPDATE_BY: dataItem.UPDATE_BY || dataItem.RESULT_BY || 'SYSTEM',
       })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
@@ -146,7 +146,7 @@ export const GprCApprovalController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const approver_empcode = String(dataItem.approver_empcode || dataItem.approver_id || '').trim()
+      const approver_empcode = String(dataItem.APPROVER_EMPCODE || dataItem.APPROVER_ID || '').trim()
       if (!approver_empcode) {
         return res.status(400).json({
           Status: false,
@@ -159,7 +159,7 @@ export const GprCApprovalController = {
 
       const result = await GprCApprovalModel.gprCQueue({
         ...dataItem,
-        approver_empcode,
+        APPROVER_EMPCODE: approver_empcode,
       })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
@@ -178,7 +178,7 @@ export const GprCApprovalController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const pic_email = String(dataItem.pic_email || '').trim()
+      const pic_email = String(dataItem.PIC_EMAIL || '').trim()
       if (!pic_email) {
         return res.status(400).json({
           Status: false,
@@ -191,7 +191,7 @@ export const GprCApprovalController = {
 
       const result = await GprCApprovalModel.gprCActionRequiredQueue({
         ...dataItem,
-        pic_email,
+        PIC_EMAIL: pic_email,
       })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {

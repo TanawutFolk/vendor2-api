@@ -5,7 +5,7 @@ import { Request, Response } from 'express'
 import path from 'path'
 
 const parseVendorContactIds = (dataItem: any): string[] => {
-  const rawValue = dataItem.vendor_contact_ids || dataItem['vendor_contact_ids[]'] || dataItem.vendor_contact_id || []
+  const rawValue = dataItem.VENDOR_CONTACT_IDS || dataItem['VENDOR_CONTACT_IDS[]'] || dataItem.VENDOR_CONTACT_ID || []
   const rawList = Array.isArray(rawValue) ? rawValue : [rawValue]
 
   return rawList
@@ -25,8 +25,8 @@ export const RequestRegisterPageController = {
     }
 
     try {
-      const vendor_id = parseInt(dataItem.vendor_id as string)
-      const normalizedCreator = dataItem.CREATE_BY || dataItem.Request_By_EmployeeCode || 'SYSTEM'
+      const vendor_id = parseInt(dataItem.VENDOR_ID as string)
+      const normalizedCreator = dataItem.CREATE_BY || dataItem.REQUEST_BY_EMPLOYEECODE || 'SYSTEM'
 
       if (!vendor_id || isNaN(vendor_id)) {
         return res.status(400).json({
@@ -43,16 +43,16 @@ export const RequestRegisterPageController = {
       const vendorContactIds = parseVendorContactIds(dataItem)
 
       const createResult = await RequestRegisterPageModel.createRequest({
-        vendor_id,
-        vendor_contact_id: vendorContactIds[0] || dataItem.vendor_contact_id || null,
-        vendor_contact_ids: vendorContactIds,
-        Request_By_EmployeeCode: dataItem.Request_By_EmployeeCode || '',
-        supportProduct_Process: dataItem.support_type || '',
-        purchase_frequency: dataItem.purchase_frequency || '',
-        requester_remark: dataItem.requester_remark || '',
-        request_type: dataItem.request_type || '',
-        request_number_prefix: dataItem.request_number_prefix || '',
-        PIC_Email: dataItem.PIC_Email || '',
+        VENDOR_ID: vendor_id,
+        VENDOR_CONTACT_ID: vendorContactIds[0] || dataItem.VENDOR_CONTACT_ID || null,
+        VENDOR_CONTACT_IDS: vendorContactIds,
+        REQUEST_BY_EMPLOYEECODE: dataItem.REQUEST_BY_EMPLOYEECODE || '',
+        SUPPORTPRODUCT_PROCESS: dataItem.SUPPORTPRODUCT_PROCESS || dataItem.SUPPORT_TYPE || '',
+        PURCHASE_FREQUENCY: dataItem.PURCHASE_FREQUENCY || '',
+        REQUESTER_REMARK: dataItem.REQUESTER_REMARK || '',
+        REQUEST_TYPE: dataItem.REQUEST_TYPE || '',
+        REQUEST_NUMBER_PREFIX: dataItem.REQUEST_NUMBER_PREFIX || '',
+        PIC_EMAIL: dataItem.PIC_EMAIL || '',
         CREATE_BY: normalizedCreator,
         // assign_to is resolved by the service via round-robin logic (do NOT set here)
       })
@@ -87,11 +87,11 @@ export const RequestRegisterPageController = {
           // so Thai/Japanese/etc. filenames are stored correctly in the DB.
           const file_name = Buffer.from(file.originalname, 'latin1').toString('utf8')
           await RequestRegisterPageModel.createDocument({
-            request_id: insertedId,
-            file_name: file_name || path.basename(file.path),
-            file_path: file.filename || path.basename(file.path),
-            file_size: file.size || 0,
-            file_type: file.mimetype || '',
+            REQUEST_ID: insertedId,
+            FILE_NAME: file_name || path.basename(file.path),
+            FILE_PATH: file.filename || path.basename(file.path),
+            FILE_SIZE: file.size || 0,
+            FILE_TYPE: file.mimetype || '',
             CREATE_BY: normalizedCreator,
           })
         }
@@ -125,7 +125,7 @@ export const RequestRegisterPageController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.request_id as string)
+      const request_id = parseInt(dataItem.REQUEST_ID as string)
 
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
@@ -138,11 +138,11 @@ export const RequestRegisterPageController = {
       }
 
       const result = await RequestRegisterPageModel.updateRequest({
-        request_id,
-        vendor_contact_id: dataItem.vendor_contact_id || null,
-        supportProduct_Process: dataItem.supportProduct_Process || '',
-        purchase_frequency: dataItem.purchase_frequency || '',
-        requester_remark: dataItem.requester_remark || '',
+        REQUEST_ID: request_id,
+        VENDOR_CONTACT_ID: dataItem.VENDOR_CONTACT_ID || null,
+        SUPPORTPRODUCT_PROCESS: dataItem.SUPPORTPRODUCT_PROCESS || '',
+        PURCHASE_FREQUENCY: dataItem.PURCHASE_FREQUENCY || '',
+        REQUESTER_REMARK: dataItem.REQUESTER_REMARK || '',
         UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
       })
 
@@ -169,7 +169,7 @@ export const RequestRegisterPageController = {
     }
 
     try {
-      if (!dataItem.emailmain && !dataItem.request_id) {
+      if (!dataItem.EMAILMAIN && !dataItem.REQUEST_ID) {
         return res.status(400).json({
           Status: false,
           ResultOnDb: {},
@@ -210,7 +210,7 @@ export const RequestRegisterPageController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.request_id as string)
+      const request_id = parseInt(dataItem.REQUEST_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -222,15 +222,15 @@ export const RequestRegisterPageController = {
       }
 
       const insertedId = await RequestRegisterPageModel.createApprovalStep({
-        request_id,
-        step_order: dataItem.step_order || 1,
-        approver_id: dataItem.approver_id || '',
-        step_status: dataItem.step_status || 'pending',
+        REQUEST_ID: request_id,
+        STEP_ORDER: dataItem.STEP_ORDER || 1,
+        APPROVER_ID: dataItem.APPROVER_ID || '',
+        STEP_STATUS: dataItem.STEP_STATUS || 'pending',
         DESCRIPTION: dataItem.DESCRIPTION || '',
-        step_code: dataItem.step_code || '',
-        actor_type: dataItem.actor_type || '',
-        group_code: dataItem.group_code || '',
-        assignment_mode: dataItem.assignment_mode || 'AUTO',
+        STEP_CODE: dataItem.STEP_CODE || '',
+        ACTOR_TYPE: dataItem.ACTOR_TYPE || '',
+        GROUP_CODE: dataItem.GROUP_CODE || '',
+        ASSIGNMENT_MODE: dataItem.ASSIGNMENT_MODE || 'AUTO',
         CREATE_BY: dataItem.CREATE_BY || '',
       })
 
@@ -263,7 +263,7 @@ export const RequestRegisterPageController = {
     }
 
     try {
-      const step_id = parseInt(dataItem.step_id as string)
+      const step_id = parseInt(dataItem.STEP_ID as string)
       if (!step_id || isNaN(step_id)) {
         return res.status(400).json({
           Status: false,
@@ -275,19 +275,19 @@ export const RequestRegisterPageController = {
       }
 
       await RequestRegisterPageModel.updateApprovalStep({
-        step_id,
-        step_status: dataItem.step_status || '',
+        STEP_ID: step_id,
+        STEP_STATUS: dataItem.STEP_STATUS || '',
         UPDATE_BY: dataItem.UPDATE_BY || '',
       })
 
       // Create approval log
-      if (dataItem.request_id) {
+      if (dataItem.REQUEST_ID) {
         await RequestRegisterPageModel.createApprovalLog({
-          request_id: parseInt(dataItem.request_id as string),
-          step_id,
-          action_by: dataItem.action_by || dataItem.UPDATE_BY || '',
-          action_type: dataItem.action_type || dataItem.step_status || '',
-          remark: dataItem.remark || '',
+          REQUEST_ID: parseInt(dataItem.REQUEST_ID as string),
+          STEP_ID: step_id,
+          ACTION_BY: dataItem.ACTION_BY || dataItem.UPDATE_BY || '',
+          ACTION_TYPE: dataItem.ACTION_TYPE || dataItem.STEP_STATUS || '',
+          REMARK: dataItem.REMARK || '',
         })
       }
 
@@ -320,7 +320,7 @@ export const RequestRegisterPageController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.request_id as string)
+      const request_id = parseInt(dataItem.REQUEST_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -331,7 +331,7 @@ export const RequestRegisterPageController = {
         } as ResponseI)
       }
       await RequestRegisterPageModel.updateCcEmails({
-        request_id,
+        REQUEST_ID: request_id,
         UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
       })
       res.status(200).json({
@@ -363,7 +363,7 @@ export const RequestRegisterPageController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.request_id as string)
+      const request_id = parseInt(dataItem.REQUEST_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -374,8 +374,8 @@ export const RequestRegisterPageController = {
         } as ResponseI)
       }
       const result = await RequestRegisterPageModel.saveGprForm({
-        request_id,
-        gpr_data: dataItem.gpr_data || {},
+        REQUEST_ID: request_id,
+        GPR_DATA: dataItem.GPR_DATA || {},
         CREATE_BY: dataItem.CREATE_BY || dataItem.UPDATE_BY || 'SYSTEM',
         UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
       })
@@ -402,7 +402,7 @@ export const RequestRegisterPageController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.request_id as string)
+      const request_id = parseInt(dataItem.REQUEST_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -414,8 +414,8 @@ export const RequestRegisterPageController = {
       }
 
       const result = await RequestRegisterPageModel.saveGprCNotification({
-        request_id,
-        gpr_c_data: dataItem.gpr_c_data || {},
+        REQUEST_ID: request_id,
+        GPR_C_DATA: dataItem.GPR_C_DATA || {},
         CREATE_BY: dataItem.CREATE_BY || dataItem.UPDATE_BY || 'SYSTEM',
         UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
       })
@@ -437,7 +437,7 @@ export const RequestRegisterPageController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const request_id = parseInt(dataItem.request_id as string)
+      const request_id = parseInt(dataItem.REQUEST_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -448,7 +448,7 @@ export const RequestRegisterPageController = {
         } as ResponseI)
       }
 
-      const result = await RequestRegisterPageModel.gprCGetFlow({ request_id })
+      const result = await RequestRegisterPageModel.gprCGetFlow({ REQUEST_ID: request_id })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
       console.error('Get GPR C Flow Error:', error)
@@ -466,7 +466,7 @@ export const RequestRegisterPageController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const request_id = parseInt(dataItem.request_id as string)
+      const request_id = parseInt(dataItem.REQUEST_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -478,8 +478,8 @@ export const RequestRegisterPageController = {
       }
 
       const result = await RequestRegisterPageModel.gprCSubmitSetup({
-        request_id,
-        gpr_c_data: dataItem.gpr_c_data || {},
+        REQUEST_ID: request_id,
+        GPR_C_DATA: dataItem.GPR_C_DATA || {},
         UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
       })
       res.status(200).json(result as ResponseI)
@@ -505,10 +505,10 @@ export const RequestRegisterPageController = {
       dataItem = req.body
     }
 
-    const { request_id, CREATE_BY } = dataItem
+    const { REQUEST_ID, CREATE_BY } = dataItem
 
     try {
-      const reqId = parseInt(request_id as string)
+      const reqId = parseInt(REQUEST_ID as string)
       if (!reqId || isNaN(reqId)) {
         return res.status(400).json({
           Status: false,
@@ -529,11 +529,11 @@ export const RequestRegisterPageController = {
       }
       const file_name = Buffer.from(file.originalname, 'latin1').toString('utf8')
       const createDocumentResult = await RequestRegisterPageModel.createDocument({
-        request_id: reqId,
-        file_name: file_name || path.basename(file.path),
-        file_path: file.filename || path.basename(file.path),
-        file_size: file.size || 0,
-        file_type: file.mimetype || '',
+        REQUEST_ID: reqId,
+        FILE_NAME: file_name || path.basename(file.path),
+        FILE_PATH: file.filename || path.basename(file.path),
+        FILE_SIZE: file.size || 0,
+        FILE_TYPE: file.mimetype || '',
         CREATE_BY: CREATE_BY || 'SYSTEM',
       })
 
@@ -560,14 +560,14 @@ export const RequestRegisterPageController = {
       }
 
       // ── Selection File: Save criteria uploads directly to 01.Receiving ──
-      const { criteria_no, criteria_detail, request_number } = dataItem
-      if (criteria_no && request_number) {
+      const { CRITERIA_NO, CRITERIA_DETAIL, REQUEST_NUMBER } = dataItem
+      if (CRITERIA_NO && REQUEST_NUMBER) {
         try {
           SelectionFileService.saveToReceiving(
-            String(request_number),
+            String(REQUEST_NUMBER),
             file.path,
-            String(criteria_no),
-            String(criteria_detail || ''),
+            String(CRITERIA_NO),
+            String(CRITERIA_DETAIL || ''),
             file_name || path.basename(file.path),
           )
         } catch (selectionFileError: any) {

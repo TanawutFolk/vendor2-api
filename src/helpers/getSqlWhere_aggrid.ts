@@ -1,55 +1,50 @@
 import { getSqlWhereByColumnFilters } from './getSqlWhereByFilterColumn'
 
-/**
- * getSqlWhere_aggrid
- *
- * SQL helper designed for AG Grid Server-Side Row Model.
- *
- * Key difference from getSqlWhere_elysia / getSqlWhere:
- *   - AG Grid sends `Start` as actual row offset (0, 100, 200) — NOT page index (0, 1, 2)
- *   - So we use `Start` directly as `Offset`, WITHOUT multiplying by `Limit`
- *
- * Input body shape (from AG Grid getRows):
- *   - SearchFilters: [{ id: string, value: any }]
- *   - ColumnFilters: [{ column: string, value: string, columnFns?: string }]
- *   - Order: [{ id: string, desc: boolean }]
- *   - Start: number  ← row offset (e.g. 0, 100, 200)
- *   - Limit: number  ← rows per block (e.g. 100)
- *
- * Output (mutates body):
- *   - body.Offset  = Start (row offset, used directly in SQL OFFSET)
- *   - body.Order   = SQL ORDER BY string
- *   - body.sqlWhere = SQL WHERE string
- *   - body.sqlHaving = SQL HAVING string (for computed columns like inuseForSearch)
- */
 export default function getSqlWhere_aggrid(body: any, tableIds: any, orderByDefault: string = 'UPDATE_DATE') {
-  // ── Pagination ──────────────────────────────────────────────────────
-  // AG Grid sends Start as actual row offset → use directly, do NOT multiply
-  body.Offset = Number(body.Start || 0)
+  const searchFiltersInput = body.SEARCHFILTERS || body.SearchFilters || []
+  const columnFiltersInput = body.COLUMNFILTERS || body.ColumnFilters || []
+  const orderInput = body.ORDER || body.Order || []
+  const startInput = body.START ?? body.Start ?? 0
+  const columnSql = (id: string) => {
+    const tableId = tableIds.find((item: any) => item.id === id || item.alias === id)
+    if (tableId) {
+      const columnName = String(tableId.column || tableId.alias || tableId.id).toUpperCase()
+      return `${tableId.table ? `${tableId.table}.` : ''}${columnName}`
+    }
 
-  // ── ORDER BY ────────────────────────────────────────────────────────
+    if (id.includes('.')) {
+      const [tableName, columnName] = id.split('.')
+      return `${tableName}.${columnName.toUpperCase()}`
+    }
+
+    return id
+  }
+
+  body.OFFSET = Number(startInput || 0)
+  body.Offset = body.OFFSET
+
   let orderBy =
-    body.Order && body.Order.length
-      ? body.Order.filter((item: any) => item.id !== 'inuseForSearch')
+    orderInput && orderInput.length
+      ? orderInput
+          .filter((item: any) => item.id !== 'inuseForSearch')
           .map(
             (item: any) =>
-              `${tableIds.find((i: any) => i.id === item.id)?.table ? tableIds.find((i: any) => i.id === item.id)?.table + '.' : ''}${item.id} ${item.desc ? 'DESC' : 'ASC'}`
+              `${columnSql(item.id)} ${item.desc ? 'DESC' : 'ASC'}`
           )
           .join(', ')
-      : `${tableIds.find((i: any) => i.id === orderByDefault)?.table ? tableIds.find((i: any) => i.id === orderByDefault)?.table + '.' : ''}${orderByDefault} DESC`
+      : `${columnSql(orderByDefault)} DESC`
 
-  // Handle inuseForSearch special sort
-  if (body.Order && Array.isArray(body.Order)) {
-    const inuseForSearchOrder = body.Order.find((item: any) => item.id === 'inuseForSearch')
+  if (orderInput && Array.isArray(orderInput)) {
+    const inuseForSearchOrder = orderInput.find((item: any) => item.id === 'inuseForSearch')
     if (typeof inuseForSearchOrder?.desc !== 'undefined') {
       orderBy = orderBy.length ? (orderBy += ` , inuseForSearch ${inuseForSearchOrder.desc ? 'DESC' : 'ASC'}`) : `inuseForSearch ${inuseForSearchOrder.desc ? 'DESC' : 'ASC'}`
     }
   }
 
+  body.ORDER = orderBy
   body.Order = orderBy
 
-  // ── WHERE (SearchFilters) ───────────────────────────────────────────
-  const searchFilters = (body.SearchFilters || [])
+  const searchFilters = searchFiltersInput
     .filter((item: any) => item.value !== '' && item.value !== null && item.value !== undefined)
     .map((item: any) => {
       const dataItem = tableIds.find((i: any) => i.id === item.id)
@@ -72,25 +67,27 @@ export default function getSqlWhere_aggrid(body: any, tableIds: any, orderByDefa
           break
       }
 
-      return `${dataItem.table ? dataItem.table + '.' : ''}${item.id} ${dataItem.Fns} ${value}`
+      return `${columnSql(item.id)} ${dataItem.Fns} ${value}`
     })
     .filter(Boolean)
     .join(' AND ')
 
+  body.SQLWHERE = searchFilters
   body.sqlWhere = searchFilters
 
-  // ── WHERE (ColumnFilters) ───────────────────────────────────────────
-  const sqlWhereColumnFilter = body.ColumnFilters && body.ColumnFilters.length ? getSqlWhereByColumnFilters(body.ColumnFilters, tableIds) : ''
+  const sqlWhereColumnFilter = columnFiltersInput && columnFiltersInput.length ? getSqlWhereByColumnFilters(columnFiltersInput, tableIds) : ''
 
-  if (body.sqlWhere || sqlWhereColumnFilter) {
-    body.sqlWhere = `WHERE ${body.sqlWhere} ${body.sqlWhere && sqlWhereColumnFilter ? 'AND' : ''} ${sqlWhereColumnFilter}`
+  if (body.SQLWHERE || sqlWhereColumnFilter) {
+    body.SQLWHERE = `WHERE ${body.SQLWHERE} ${body.SQLWHERE && sqlWhereColumnFilter ? 'AND' : ''} ${sqlWhereColumnFilter}`
+    body.sqlWhere = body.SQLWHERE
   }
 
-  // ── HAVING (inuseForSearch) ─────────────────────────────────────────
-  const inuseForSearch = (body.SearchFilters || []).find((item: any) => item.id === 'inuseForSearch')
+  const inuseForSearch = searchFiltersInput.find((item: any) => item.id === 'inuseForSearch')
+  body.SQLHAVING = ''
   body.sqlHaving = ''
 
   if (typeof inuseForSearch?.value !== 'undefined' && inuseForSearch.value !== '') {
-    body.sqlHaving = ` HAVING inuseForSearch = ${inuseForSearch?.value}`
+    body.SQLHAVING = ` HAVING inuseForSearch = ${inuseForSearch?.value}`
+    body.sqlHaving = body.SQLHAVING
   }
 }

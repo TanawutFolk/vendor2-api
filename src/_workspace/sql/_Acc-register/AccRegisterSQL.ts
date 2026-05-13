@@ -1,4 +1,5 @@
 export interface RegisterRequestDataItem {
+  [key: string]: any
   request_id?: number | string
   request_number?: string
   vendor_id?: number | string
@@ -87,33 +88,33 @@ export const AccRegisterSQL = {
   getApprovalSteps: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             SELECT 
-                                       ras.step_id
-                                     , ras.request_id
-                                     , ras.step_order
-                                     , ras.approver_id
-                                     , ras.step_status
+                                       ras.STEP_ID
+                                     , ras.REQUEST_ID
+                                     , ras.STEP_ORDER
+                                     , ras.APPROVER_ID
+                                     , ras.STEP_STATUS
                                      , ras.DESCRIPTION
-                                     , ras.step_code
-                                     , ras.actor_type
-                                     , ras.group_code
-                                     , ras.assignment_mode
+                                     , ras.STEP_CODE
+                                     , ras.ACTOR_TYPE
+                                     , ras.GROUP_CODE
+                                     , ras.ASSIGNMENT_MODE
                                      , ras.CREATE_BY
                                      , ras.CREATE_DATE
                                      , ras.UPDATE_BY
                                      , ras.UPDATE_DATE
-                                     , CONCAT(m.empName, ' ', m.empSurname) AS approver_name
+                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS approver_name
                             FROM
                                        request_approval_step ras
                                             LEFT JOIN
-                                       Person.MEMBER_FED m ON m.empCode = ras.approver_id
+                                       Person.MEMBER_FED m ON m.EMPCODE = ras.APPROVER_ID
                             WHERE
-                                       ras.request_id = dataItem.request_id
+                                       ras.REQUEST_ID = dataItem.REQUEST_ID
                                        AND ras.INUSE = 1
                             ORDER BY
-                                       ras.step_order ASC
+                                       ras.STEP_ORDER ASC
         `
 
-    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
 
     return sql
   },
@@ -121,15 +122,15 @@ export const AccRegisterSQL = {
   updateApprovalStep: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE request_approval_step SET
-                                       step_status = 'dataItem.step_status'
+                                       STEP_STATUS = 'dataItem.STEP_STATUS'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
-                                       step_id = dataItem.step_id
+                                       STEP_ID = dataItem.STEP_ID
         `
 
-    sql = sql.replaceAll('dataItem.step_id', (dataItem['step_id'] || 0).toString())
-    sql = sql.replaceAll('dataItem.step_status', dataItem['step_status'] || '')
+    sql = sql.replaceAll('dataItem.STEP_ID', (dataItem['STEP_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.STEP_STATUS', dataItem['STEP_STATUS'] || '')
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
 
     return sql
@@ -138,27 +139,27 @@ export const AccRegisterSQL = {
   createApprovalLog: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             INSERT INTO request_approval_log (
-                                       request_id
-                                     , step_id
-                                     , action_by
-                                     , action_type
-                                     , remark
-                                     , action_date
+                                       REQUEST_ID
+                                     , STEP_ID
+                                     , ACTION_BY
+                                     , ACTION_TYPE
+                                     , REMARK
+                                     , ACTION_DATE
                             ) VALUES (
-                                        dataItem.request_id
-                                     ,  dataItem.step_id
-                                     , 'dataItem.action_by'
-                                     , 'dataItem.action_type'
-                                     , 'dataItem.remark'
+                                        dataItem.REQUEST_ID
+                                     ,  dataItem.STEP_ID
+                                     , 'dataItem.ACTION_BY'
+                                     , 'dataItem.ACTION_TYPE'
+                                     , 'dataItem.REMARK'
                                      ,  NOW()
                             )
         `
 
-    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-    sql = sql.replaceAll('dataItem.step_id', dataItem['step_id'] ? dataItem['step_id'].toString() : 'NULL')
-    sql = sql.replaceAll('dataItem.action_by', dataItem['action_by'] || '')
-    sql = sql.replaceAll('dataItem.action_type', dataItem['action_type'] || '')
-    sql = sql.replaceAll('dataItem.remark', dataItem['remark'] || '')
+    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.STEP_ID', dataItem['STEP_ID'] ? dataItem['STEP_ID'].toString() : 'NULL')
+    sql = sql.replaceAll('dataItem.ACTION_BY', dataItem['ACTION_BY'] || '')
+    sql = sql.replaceAll('dataItem.ACTION_TYPE', dataItem['ACTION_TYPE'] || '')
+    sql = sql.replaceAll('dataItem.REMARK', dataItem['REMARK'] || '')
 
     return sql
   },
@@ -166,18 +167,18 @@ export const AccRegisterSQL = {
   completeRegistration: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE request_register_vendor SET
-                                       vendor_code = 'dataItem.vendor_code'
-                                     , request_status = 'Completed'
-                                     , approve_by = 'dataItem.UPDATE_BY'
-                                     , approve_date = NOW()
+                                       VENDOR_CODE = 'dataItem.VENDOR_CODE'
+                                     , REQUEST_STATUS = 'Completed'
+                                     , APPROVE_BY = 'dataItem.UPDATE_BY'
+                                     , APPROVE_DATE = NOW()
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
-                                       request_id = dataItem.request_id
+                                       REQUEST_ID = dataItem.REQUEST_ID
         `
 
-    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-    sql = sql.replaceAll('dataItem.vendor_code', dataItem['vendor_code'] || '')
+    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.VENDOR_CODE', dataItem['VENDOR_CODE'] || '')
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
     return sql
@@ -186,15 +187,15 @@ export const AccRegisterSQL = {
   updateRequestVendorCode: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE request_register_vendor SET
-                                       vendor_code = 'dataItem.vendor_code'
+                                       VENDOR_CODE = 'dataItem.VENDOR_CODE'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
-                                       request_id = dataItem.request_id
+                                       REQUEST_ID = dataItem.REQUEST_ID
         `
 
-    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-    sql = sql.replaceAll('dataItem.vendor_code', dataItem['vendor_code'] || '')
+    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.VENDOR_CODE', dataItem['VENDOR_CODE'] || '')
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
     return sql
@@ -203,13 +204,13 @@ export const AccRegisterSQL = {
   updateVendorFftVendorCode: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE vendors SET
-                                       fft_vendor_code = 'dataItem.vendor_code'
+                                       FFT_VENDOR_CODE = 'dataItem.VENDOR_CODE'
                             WHERE
-                                       vendor_id = dataItem.vendor_id
+                                       VENDOR_ID = dataItem.VENDOR_ID
         `
 
-    sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
-    sql = sql.replaceAll('dataItem.vendor_code', dataItem['vendor_code'] || '')
+    sql = sql.replaceAll('dataItem.VENDOR_ID', (dataItem['VENDOR_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.VENDOR_CODE', dataItem['VENDOR_CODE'] || '')
 
     return sql
   },
@@ -217,13 +218,13 @@ export const AccRegisterSQL = {
   updateVendorFftStatus: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE vendors SET
-                                       fft_status = dataItem.fft_status
+                                       FFT_STATUS = dataItem.FFT_STATUS
                             WHERE
-                                       vendor_id = dataItem.vendor_id
+                                       VENDOR_ID = dataItem.VENDOR_ID
         `
 
-    sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
-    sql = sql.replaceAll('dataItem.fft_status', (dataItem['fft_status'] || 0).toString())
+    sql = sql.replaceAll('dataItem.VENDOR_ID', (dataItem['VENDOR_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.FFT_STATUS', (dataItem['FFT_STATUS'] || 0).toString())
 
     return sql
   },
@@ -231,15 +232,15 @@ export const AccRegisterSQL = {
   markRequestCompleted: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE request_register_vendor SET
-                                       request_status = 'Completed'
-                                     , approve_date = NOW()
+                                       REQUEST_STATUS = 'Completed'
+                                     , APPROVE_DATE = NOW()
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
-                                       request_id = dataItem.request_id
+                                       REQUEST_ID = dataItem.REQUEST_ID
         `
 
-    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
     return sql

@@ -6,12 +6,12 @@ import { RowDataPacket } from 'mysql2'
 export const FindVendorService = {
   // Search vendors with contacts
   searchVendors: async (dataItem: any) => {
-    let sqlWhere = dataItem.sqlWhere || ''
+    let sqlWhere = dataItem.SQLWHERE || ''
 
     // Handle Global Search inside Service to match Bom pattern style
-    const globalSearchFilter = dataItem.SearchFilters?.find((item: any) => item.id === 'global_search')
+    const globalSearchFilter = dataItem.SEARCHFILTERS?.find((item: any) => item.id === 'global_search')
     if (globalSearchFilter?.value) {
-      sqlWhere += FindVendorSQL.generateGlobalSearchSql({ searchKeyword: globalSearchFilter.value })
+      sqlWhere += FindVendorSQL.generateGlobalSearchSql({ SEARCHKEYWORD: globalSearchFilter.value })
     }
 
     // Get SQL queries [countSql, dataSql]
@@ -39,21 +39,21 @@ export const FindVendorService = {
       const sqlList = []
 
       // Update vendor main table
-      if (dataItem.company_name !== undefined) {
+      if (dataItem.COMPANY_NAME !== undefined) {
         sqlList.push(await FindVendorSQL.updateVendor(dataItem))
       }
 
       // Contact Logic
-      if (dataItem.vendor_contact_id) {
+      if (dataItem.VENDOR_CONTACT_ID) {
         sqlList.push(await FindVendorSQL.updateVendorContact(dataItem))
-      } else if (dataItem.vendor_id && (dataItem.contact_name !== undefined || dataItem.email !== undefined)) {
+      } else if (dataItem.VENDOR_ID && (dataItem.CONTACT_NAME !== undefined || dataItem.EMAIL !== undefined)) {
         sqlList.push(await FindVendorSQL.createVendorContact(dataItem))
       }
 
       // Product Logic
-      if (dataItem.vendor_product_id) {
+      if (dataItem.VENDOR_PRODUCT_ID) {
         sqlList.push(await FindVendorSQL.updateVendorProduct(dataItem))
-      } else if (dataItem.vendor_id && (dataItem.product_name !== undefined || dataItem.maker_name !== undefined)) {
+      } else if (dataItem.VENDOR_ID && (dataItem.PRODUCT_NAME !== undefined || dataItem.MAKER_NAME !== undefined)) {
         sqlList.push(await FindVendorSQL.createVendorProduct(dataItem))
       }
 
@@ -83,74 +83,74 @@ export const FindVendorService = {
 
   updateVendorComprehensive: async (dataItem: any) => {
     try {
-      const vendorId = Number(dataItem.vendor_id) || 0
+      const vendorId = Number(dataItem.VENDOR_ID) || 0
       if (!vendorId) throw new Error('Invalid vendor_id')
 
       const updateBy = dataItem.UPDATE_BY || 'SYSTEM'
       const sqlList = []
-      const vendor = dataItem.vendor || {}
+      const vendor = dataItem.VENDOR || {}
 
-      if (dataItem.vendor_changed !== false) {
+      if (dataItem.VENDOR_CHANGED !== false) {
         sqlList.push(await FindVendorSQL.updateVendor({
-          vendor_id: vendorId,
-          company_name: vendor.company_name || '',
-          vendor_type_id: vendor.vendor_type_id ?? null,
-          vendor_region: vendor.vendor_region || 'Local',
-          province: vendor.province || '',
-          postal_code: vendor.postal_code || '',
-          website: vendor.website || '',
-          address: vendor.address || '',
-          tel_center: vendor.tel_center || '',
-          emailmain: vendor.emailmain || '',
+          VENDOR_ID: vendorId,
+          COMPANY_NAME: vendor.COMPANY_NAME || '',
+          VENDOR_TYPE_ID: vendor.VENDOR_TYPE_ID ?? null,
+          VENDOR_REGION: vendor.VENDOR_REGION || 'Local',
+          PROVINCE: vendor.PROVINCE || '',
+          POSTAL_CODE: vendor.POSTAL_CODE || '',
+          WEBSITE: vendor.WEBSITE || '',
+          ADDRESS: vendor.ADDRESS || '',
+          TEL_CENTER: vendor.TEL_CENTER || '',
+          EMAILMAIN: vendor.EMAILMAIN || '',
           INUSE: vendor.INUSE !== undefined && vendor.INUSE !== null ? vendor.INUSE : 1,
           UPDATE_BY: updateBy,
         }))
       }
 
-      for (const contact of dataItem.contacts || []) {
+      for (const contact of dataItem.CONTACTS || []) {
         const payload = {
-          vendor_id: vendorId,
-          vendor_contact_id: contact.vendor_contact_id,
-          contact_name: contact.contact_name || '',
-          tel_phone: contact.tel_phone || '',
-          email: contact.email || '',
-          position: contact.position || '',
+          VENDOR_ID: vendorId,
+          VENDOR_CONTACT_ID: contact.VENDOR_CONTACT_ID,
+          CONTACT_NAME: contact.CONTACT_NAME || '',
+          TEL_PHONE: contact.TEL_PHONE || '',
+          EMAIL: contact.EMAIL || '',
+          POSITION: contact.POSITION || '',
           UPDATE_BY: updateBy,
         }
-        if (contact.vendor_contact_id) {
+        if (contact.VENDOR_CONTACT_ID) {
           sqlList.push(await FindVendorSQL.updateVendorContact(payload))
-        } else if (payload.contact_name || payload.email || payload.tel_phone || payload.position) {
+        } else if (payload.CONTACT_NAME || payload.EMAIL || payload.TEL_PHONE || payload.POSITION) {
           sqlList.push(await FindVendorSQL.createVendorContact(payload))
         }
       }
 
-      for (const product of dataItem.products || []) {
+      for (const product of dataItem.PRODUCTS || []) {
         const payload = {
-          vendor_id: vendorId,
-          vendor_product_id: product.vendor_product_id,
-          product_group_id: product.product_group_id || 0,
-          maker_name: product.maker_name || '',
-          product_name: product.product_name || '',
-          model_list: product.model_list || '',
+          VENDOR_ID: vendorId,
+          VENDOR_PRODUCT_ID: product.VENDOR_PRODUCT_ID,
+          PRODUCT_GROUP_ID: product.PRODUCT_GROUP_ID || 0,
+          MAKER_NAME: product.MAKER_NAME || '',
+          PRODUCT_NAME: product.PRODUCT_NAME || '',
+          MODEL_LIST: product.MODEL_LIST || '',
           UPDATE_BY: updateBy,
         }
-        if (product.vendor_product_id) {
+        if (product.VENDOR_PRODUCT_ID) {
           sqlList.push(await FindVendorSQL.updateVendorProduct(payload))
-        } else if (payload.product_name || payload.maker_name || payload.model_list || payload.product_group_id) {
+        } else if (payload.PRODUCT_NAME || payload.MAKER_NAME || payload.MODEL_LIST || payload.PRODUCT_GROUP_ID) {
           sqlList.push(await FindVendorSQL.createVendorProduct(payload))
         }
       }
 
-      for (const contactId of dataItem.deleted_contact_ids || []) {
+      for (const contactId of dataItem.DELETED_CONTACT_IDS || []) {
         sqlList.push(await FindVendorSQL.deleteVendorContact({
-          vendor_contact_id: contactId,
+          VENDOR_CONTACT_ID: contactId,
           UPDATE_BY: updateBy,
         }))
       }
 
-      for (const productId of dataItem.deleted_product_ids || []) {
+      for (const productId of dataItem.DELETED_PRODUCT_IDS || []) {
         sqlList.push(await FindVendorSQL.deleteVendorProduct({
-          vendor_product_id: productId,
+          VENDOR_PRODUCT_ID: productId,
           UPDATE_BY: updateBy,
         }))
       }
@@ -267,10 +267,10 @@ export const FindVendorService = {
 
   // Search all vendors for export
   searchAllForExport: async (dataItem: any) => {
-    let sqlWhere = dataItem.sqlWhere || ''
-    const globalSearchFilter = dataItem.SearchFilters?.find((item: any) => item.id === 'global_search')
+    let sqlWhere = dataItem.SQLWHERE || ''
+    const globalSearchFilter = dataItem.SEARCHFILTERS?.find((item: any) => item.id === 'global_search')
     if (globalSearchFilter?.value) {
-      sqlWhere += FindVendorSQL.generateGlobalSearchSql({ searchKeyword: globalSearchFilter.value })
+      sqlWhere += FindVendorSQL.generateGlobalSearchSql({ SEARCHKEYWORD: globalSearchFilter.value })
     }
 
     const sql = await FindVendorSQL.searchAllForExport(dataItem, sqlWhere)
@@ -403,25 +403,25 @@ export const FindVendorService = {
       }
 
       for (const vendor of vendors) {
-        const mTel = cleanTel(vendor.tel_center),
-          mName = cleanName(vendor.company_name),
-          mAddress = vendor.address || ''
+        const mTel = cleanTel(vendor.TEL_CENTER),
+          mName = cleanName(vendor.COMPANY_NAME),
+          mAddress = vendor.ADDRESS || ''
         let bestScore = 0,
           bestMethods: string[] = [],
           bestPronesRef: any = null
         for (const prones of pronesRows) {
           let score = 0,
             methods: string[] = []
-          if (mName && cleanName(prones.customer_name) === mName) {
+          if (mName && cleanName(prones.CUSTOMER_NAME) === mName) {
             score++
             methods.push('name')
           }
-          if (mTel && cleanTel(prones.customer_tel) === mTel) {
+          if (mTel && cleanTel(prones.CUSTOMER_TEL) === mTel) {
             score++
             methods.push('tel')
           }
           if (mAddress) {
-            const pFullAddr = `${prones.customer_address1 || ''} ${prones.customer_address2 || ''} ${prones.customer_address3 || ''}`
+            const pFullAddr = `${prones.CUSTOMER_ADDRESS1 || ''} ${prones.CUSTOMER_ADDRESS2 || ''} ${prones.CUSTOMER_ADDRESS3 || ''}`
             if (calculateSimilarity(mAddress, pFullAddr) > 0.7) {
               score++
               methods.push('address')
@@ -435,11 +435,11 @@ export const FindVendorService = {
           if (bestScore === 3) break
         }
         matchResults.push({
-          vendor_id: vendor.vendor_id,
-          status_check: bestScore >= 2 ? 'Registered' : 'Not Registered',
-          prones_code: bestPronesRef ? bestPronesRef.customer_code : '',
-          prones_name: bestPronesRef ? bestPronesRef.customer_name : '',
-          match_method: bestMethods.join('+') || 'none',
+          VENDOR_ID: vendor.VENDOR_ID,
+          STATUS_CHECK: bestScore >= 2 ? 'Registered' : 'Not Registered',
+          PRONES_CODE: bestPronesRef ? bestPronesRef.CUSTOMER_CODE : '',
+          PRONES_NAME: bestPronesRef ? bestPronesRef.CUSTOMER_NAME : '',
+          MATCH_METHOD: bestMethods.join('+') || 'none',
         })
       }
 
@@ -481,7 +481,7 @@ export const FindVendorService = {
 
   // Get match results by vendor IDs
   getMatchResultsByVendorIds: async (dataItem: any) => {
-    if (!dataItem.vendorIds || dataItem.vendorIds.length === 0) return []
+    if (!dataItem.VENDORIDS || dataItem.VENDORIDS.length === 0) return []
     const sql = await FindVendorSQL.getMatchResultByVendorIds(dataItem)
     const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
     return resultData

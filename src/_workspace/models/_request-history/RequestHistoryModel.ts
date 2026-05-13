@@ -5,5 +5,5 @@ export const RequestHistoryModel = {
   getApprovalSteps: async (dataItem: any) => RequestHistoryService.getApprovalSteps(dataItem),
   getApprovalLogs: async (dataItem: any) => RequestHistoryService.getApprovalLogs(dataItem),
   resolveEmployeeProfile: async (dataItem: any) => RequestHistoryService.resolveEmployeeProfile(dataItem),
-  getGprForm: async (request_id: number) => RequestHistoryService.getGprForm({ request_id }),
+  getGprForm: async (request_id: number) => RequestHistoryService.getGprForm({ REQUEST_ID: request_id }),
 }

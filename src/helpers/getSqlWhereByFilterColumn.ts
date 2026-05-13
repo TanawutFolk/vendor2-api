@@ -35,7 +35,7 @@ export const getSqlWhereByColumnFilters = (columnFilters: ColumnFilter[], tableI
     const tableId = tableIds.find((tableId) => tableId.id === columnFilter.column || tableId.alias === columnFilter.column)
     if (!tableId) continue
 
-    const actualColumn = tableId.id // Always use the real column name for SQL
+    const actualColumn = String((tableId as any).column || tableId.alias || tableId.id).toUpperCase()
     const tableStmt = ['CREATE_DATE', 'UPDATE_DATE', 'ESTIMATE_PERIOD_START_DATE', 'ESTIMATE_PERIOD_END_DATE', 'RE_CAL_UPDATE_DATE'].includes(actualColumn)
       ? `DATE(${tableId.table}.${actualColumn})`
       : `${tableId.table}.${actualColumn}`
@@ -96,7 +96,7 @@ export const getSqlWhereByColumnFilters_elysia = (columnFilters: any, tableIds: 
       columnFilter.column === 'ESTIMATE_PERIOD_END_DATE' ||
       columnFilter.column === 'RE_CAL_UPDATE_DATE'
     ) {
-      tableStmt = `DATE(${tableId.table ? `${tableId.table}.` : ''}${columnFilter.column})`
+      tableStmt = `DATE(${tableId.table ? `${tableId.table}.` : ''}${String((tableId as any).column || tableId.alias || columnFilter.column).toUpperCase()})`
 
       const date = new Date(columnFilter.value)
       const formattedDate = date.toLocaleDateString('en-US', {
@@ -107,7 +107,7 @@ export const getSqlWhereByColumnFilters_elysia = (columnFilters: any, tableIds: 
 
       columnFilter.value = dayjs(formattedDate).format('YYYY-MM-DD')
     } else {
-      tableStmt = `${tableId.table ? `${tableId.table}.` : ''}${!tableId?.alias ? columnFilter.column : tableId.alias}`
+      tableStmt = `${tableId.table ? `${tableId.table}.` : ''}${String((tableId as any).column || tableId.alias || columnFilter.column).toUpperCase()}`
     }
 
     if (columnFilter.column === 'INUSE') {

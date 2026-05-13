@@ -14,18 +14,18 @@ export const AccRegisterService = {
       if (currentStep) {
         sqlList.push(
           await AccRegisterSQL.updateApprovalStep({
-            step_id: currentStep.step_id,
-            step_status: 'approved',
+            STEP_ID: currentStep.step_id,
+            STEP_STATUS: 'approved',
             UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
           })
         )
         sqlList.push(
           await AccRegisterSQL.createApprovalLog({
-            request_id: dataItem.request_id,
-            step_id: currentStep.step_id,
-            action_by: dataItem.UPDATE_BY || 'SYSTEM',
-            action_type: 'approved',
-            remark: dataItem.vendor_code ? `Vendor Code: ${dataItem.vendor_code}` : 'Registration completed',
+            REQUEST_ID: dataItem.REQUEST_ID,
+            STEP_ID: currentStep.step_id,
+            ACTION_BY: dataItem.UPDATE_BY || 'SYSTEM',
+            ACTION_TYPE: 'approved',
+            REMARK: dataItem.VENDOR_CODE ? `Vendor Code: ${dataItem.VENDOR_CODE}` : 'Registration completed',
           })
         )
       }

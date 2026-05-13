@@ -1,4 +1,5 @@
 export interface RegisterRequestDataItem {
+  [key: string]: any
   request_id?: number | string
   request_number?: string
   vendor_id?: number | string
@@ -87,43 +88,43 @@ export const RequestHistorySQL = {
   getById: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             SELECT
-                                       rr.request_id
-                                                                         , rr.request_number
-                                     , rr.vendor_id
-                                     , rr.request_status
-                                     , rr.supportProduct_Process
-                                     , rr.purchase_frequency
-                                     , rr.requester_remark
-                                     , rr.approver_remark
-                                     , rr.approve_by
-                                     , rr.approve_date
-                                     , rr.vendor_code
-                                     , rr.assign_to
-                                     , rr.PIC_Email
-                                     , rr.vendor_contact_id
-                                     , rr.Request_By_EmployeeCode AS EMPLOYEE_CODE
-                                     , CONCAT(m.empName, ' ', m.empSurname) AS FULL_NAME
-                                     , m.empDept AS EMPLOYEE_DEPT
+                                       rr.REQUEST_ID
+                                                                         , rr.REQUEST_NUMBER
+                                     , rr.VENDOR_ID
+                                     , rr.REQUEST_STATUS
+                                     , rr.SUPPORTPRODUCT_PROCESS
+                                     , rr.PURCHASE_FREQUENCY
+                                     , rr.REQUESTER_REMARK
+                                     , rr.APPROVER_REMARK
+                                     , rr.APPROVE_BY
+                                     , rr.APPROVE_DATE
+                                     , rr.VENDOR_CODE
+                                     , rr.ASSIGN_TO
+                                     , rr.PIC_EMAIL
+                                     , rr.VENDOR_CONTACT_ID
+                                     , rr.REQUEST_BY_EMPLOYEECODE AS EMPLOYEE_CODE
+                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS FULL_NAME
+                                     , m.EMPDEPT AS EMPLOYEE_DEPT
                                      , rr.CREATE_DATE
-                                     , rvs.gpr_c_approver_name
-                                     , rvs.gpr_c_approver_email
-                                     , rvs.gpr_c_pc_pic_name
-                                     , rvs.gpr_c_pc_pic_email
-                                     , rvs.gpr_c_circular_json
-                                     , rvs.action_required_json
+                                     , rvs.GPR_C_APPROVER_NAME
+                                     , rvs.GPR_C_APPROVER_EMAIL
+                                     , rvs.GPR_C_PC_PIC_NAME
+                                     , rvs.GPR_C_PC_PIC_EMAIL
+                                     , rvs.GPR_C_CIRCULAR_JSON
+                                     , rvs.ACTION_REQUIRED_JSON
 
                                      -- Vendor Info
-                                     , v.company_name
-                                     , v.fft_vendor_code
-                                     , v.fft_status
-                                     , v.vendor_region
-                                     , v.province
-                                     , v.postal_code
-                                     , v.address
-                                     , v.tel_center
-                                     , v.website
-                                     , v.emailmain
-                                     , vt.name AS vendor_type_name
+                                     , v.COMPANY_NAME
+                                     , v.FFT_VENDOR_CODE
+                                     , v.FFT_STATUS
+                                     , v.VENDOR_REGION
+                                     , v.PROVINCE
+                                     , v.POSTAL_CODE
+                                     , v.ADDRESS
+                                     , v.TEL_CENTER
+                                     , v.WEBSITE
+                                     , v.EMAILMAIN
+                                     , vt.NAME AS vendor_type_name
 
                                      -- Contacts (as JSON array)
                                      , IFNULL(
@@ -131,16 +132,16 @@ export const RequestHistorySQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
-                                                                               'contact_name', vc.contact_name,
-                                                                               'tel_phone', vc.tel_phone,
-                                                                               'email', vc.email,
-                                                                               'position', vc.position
+                                                                               'contact_name', vc.CONTACT_NAME,
+                                                                               'tel_phone', vc.TEL_PHONE,
+                                                                               'email', vc.EMAIL,
+                                                                               'position', vc.POSITION
                                                                            )
                                                                       )
                                                            FROM
                                                                       vendor_contacts vc
                                                            WHERE
-                                                                      vc.vendor_id = v.vendor_id AND vc.INUSE = 1
+                                                                      vc.VENDOR_ID = v.VENDOR_ID AND vc.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS contacts
@@ -151,18 +152,18 @@ export const RequestHistorySQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
-                                                                               'product_group', mpg.group_name,
-                                                                               'maker_name', vp.maker_name,
-                                                                               'product_name', vp.product_name,
-                                                                               'model_list', vp.model_list
+                                                                               'product_group', mpg.GROUP_NAME,
+                                                                               'maker_name', vp.MAKER_NAME,
+                                                                               'product_name', vp.PRODUCT_NAME,
+                                                                               'model_list', vp.MODEL_LIST
                                                                            )
                                                                       )
                                                            FROM
                                                                       vendor_products vp
                                                                            LEFT JOIN
-                                                                      master_product_groups mpg ON mpg.product_group_id = vp.product_group_id
+                                                                      master_product_groups mpg ON mpg.PRODUCT_GROUP_ID = vp.PRODUCT_GROUP_ID
                                                            WHERE
-                                                                      vp.vendor_id = v.vendor_id AND vp.INUSE = 1
+                                                                      vp.VENDOR_ID = v.VENDOR_ID AND vp.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS products
@@ -173,17 +174,17 @@ export const RequestHistorySQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
-                                                                               'document_id', rrd.document_id,
-                                                                               'file_name', rrd.file_name,
-                                                                               'file_path', rrd.file_path,
-                                                                               'file_size', rrd.file_size,
-                                                                               'file_type', rrd.file_type
+                                                                               'document_id', rrd.DOCUMENT_ID,
+                                                                               'file_name', rrd.FILE_NAME,
+                                                                               'file_path', rrd.FILE_PATH,
+                                                                               'file_size', rrd.FILE_SIZE,
+                                                                               'file_type', rrd.FILE_TYPE
                                                                            )
                                                                       )
                                                            FROM
                                                                       request_register_document rrd
                                                            WHERE
-                                                                      rrd.request_id = rr.request_id AND rrd.INUSE = 1
+                                                                      rrd.REQUEST_ID = rr.REQUEST_ID AND rrd.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS documents
@@ -194,16 +195,16 @@ export const RequestHistorySQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
-                                                                               'step_id', ras.step_id,
-                                                                               'step_order', ras.step_order,
-                                                                               'approver_id', ras.approver_id,
-                                                                               'approver_name', (SELECT CONCAT(pm.empName, ' ', pm.empSurname) FROM Person.MEMBER_FED pm WHERE pm.empCode = ras.approver_id LIMIT 1),
-                                                                               'step_status', ras.step_status,
+                                                                               'step_id', ras.STEP_ID,
+                                                                               'step_order', ras.STEP_ORDER,
+                                                                               'approver_id', ras.APPROVER_ID,
+                                                                               'approver_name', (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM Person.MEMBER_FED pm WHERE pm.EMPCODE = ras.APPROVER_ID LIMIT 1),
+                                                                               'step_status', ras.STEP_STATUS,
                                                                                'DESCRIPTION', ras.DESCRIPTION,
-                                                                               'step_code', ras.step_code,
-                                                                               'actor_type', ras.actor_type,
-                                                                               'group_code', ras.group_code,
-                                                                               'assignment_mode', ras.assignment_mode,
+                                                                               'step_code', ras.STEP_CODE,
+                                                                               'actor_type', ras.ACTOR_TYPE,
+                                                                               'group_code', ras.GROUP_CODE,
+                                                                               'assignment_mode', ras.ASSIGNMENT_MODE,
                                                                                'CREATE_DATE', ras.CREATE_DATE,
                                                                                'UPDATE_BY', ras.UPDATE_BY,
                                                                                'UPDATE_DATE', ras.UPDATE_DATE
@@ -212,7 +213,7 @@ export const RequestHistorySQL = {
                                                            FROM
                                                                       request_approval_step ras
                                                            WHERE
-                                                                      ras.request_id = rr.request_id AND ras.INUSE = 1
+                                                                      ras.REQUEST_ID = rr.REQUEST_ID AND ras.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS approval_steps
@@ -223,18 +224,18 @@ export const RequestHistorySQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
-                                                                               'log_id', ral.log_id,
-                                                                               'step_id', ral.step_id,
-                                                                               'action_by', ral.action_by,
-                                                                               'action_type', ral.action_type,
-                                                                               'remark', ral.remark,
-                                                                               'action_date', ral.action_date
+                                                                               'log_id', ral.LOG_ID,
+                                                                               'step_id', ral.STEP_ID,
+                                                                               'action_by', ral.ACTION_BY,
+                                                                               'action_type', ral.ACTION_TYPE,
+                                                                               'remark', ral.REMARK,
+                                                                               'action_date', ral.ACTION_DATE
                                                                            )
                                                                       )
                                                            FROM
                                                                       request_approval_log ral
                                                            WHERE
-                                                                      ral.request_id = rr.request_id
+                                                                      ral.REQUEST_ID = rr.REQUEST_ID
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS approval_logs
@@ -245,18 +246,18 @@ export const RequestHistorySQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
-                                                                               'no', vsc.criteria_no,
-                                                                               'criteria', vsc.criteria_value,
-                                                                               'uploaded_file', vsc.uploaded_file_path,
-                                                                               'uploaded_name', vsc.uploaded_file_name
+                                                                               'no', vsc.CRITERIA_NO,
+                                                                               'criteria', vsc.CRITERIA_VALUE,
+                                                                               'uploaded_file', vsc.UPLOADED_FILE_PATH,
+                                                                               'uploaded_name', vsc.UPLOADED_FILE_NAME
                                                                            )
                                                                       )
                                                            FROM
                                                                       request_vendor_selections rvs2
                                                                            JOIN
-                                                                      vendor_selection_criteria vsc ON vsc.selection_id = rvs2.selection_id
+                                                                      vendor_selection_criteria vsc ON vsc.SELECTION_ID = rvs2.SELECTION_ID
                                                            WHERE
-                                                                      rvs2.request_id = rr.request_id AND rvs2.INUSE = 1
+                                                                      rvs2.REQUEST_ID = rr.REQUEST_ID AND rvs2.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS gpr_criteria
@@ -264,21 +265,21 @@ export const RequestHistorySQL = {
                             FROM
                                        request_register_vendor rr
                                             LEFT JOIN
-                                       request_vendor_selections rvs ON rvs.request_id = rr.request_id AND rvs.INUSE = 1
+                                       request_vendor_selections rvs ON rvs.REQUEST_ID = rr.REQUEST_ID AND rvs.INUSE = 1
                                             LEFT JOIN
-                                       vendors v ON v.vendor_id = rr.vendor_id
+                                       vendors v ON v.VENDOR_ID = rr.VENDOR_ID
                                             LEFT JOIN
-                                       master_vendor_types vt ON vt.vendor_type_id = v.vendor_type_id
+                                       master_vendor_types vt ON vt.VENDOR_TYPE_ID = v.VENDOR_TYPE_ID
                                             LEFT JOIN
-                                       Person.MEMBER_FED m ON m.empCode = rr.Request_By_EmployeeCode
+                                       Person.MEMBER_FED m ON m.EMPCODE = rr.REQUEST_BY_EMPLOYEECODE
                             WHERE
-                                       rr.request_id = dataItem.request_id
+                                       rr.REQUEST_ID = dataItem.REQUEST_ID
                                        AND rr.INUSE = 1
                             LIMIT
                                        1
         `
 
-    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
 
     return sql
   },
@@ -286,33 +287,33 @@ export const RequestHistorySQL = {
   getApprovalSteps: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             SELECT 
-                                       ras.step_id
-                                     , ras.request_id
-                                     , ras.step_order
-                                     , ras.approver_id
-                                     , ras.step_status
+                                       ras.STEP_ID
+                                     , ras.REQUEST_ID
+                                     , ras.STEP_ORDER
+                                     , ras.APPROVER_ID
+                                     , ras.STEP_STATUS
                                      , ras.DESCRIPTION
-                                     , ras.step_code
-                                     , ras.actor_type
-                                     , ras.group_code
-                                     , ras.assignment_mode
+                                     , ras.STEP_CODE
+                                     , ras.ACTOR_TYPE
+                                     , ras.GROUP_CODE
+                                     , ras.ASSIGNMENT_MODE
                                      , ras.CREATE_BY
                                      , ras.CREATE_DATE
                                      , ras.UPDATE_BY
                                      , ras.UPDATE_DATE
-                                     , CONCAT(m.empName, ' ', m.empSurname) AS approver_name
+                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS approver_name
                             FROM
                                        request_approval_step ras
                                             LEFT JOIN
-                                       Person.MEMBER_FED m ON m.empCode = ras.approver_id
+                                       Person.MEMBER_FED m ON m.EMPCODE = ras.APPROVER_ID
                             WHERE
-                                       ras.request_id = dataItem.request_id
+                                       ras.REQUEST_ID = dataItem.REQUEST_ID
                                        AND ras.INUSE = 1
                             ORDER BY
-                                       ras.step_order ASC
+                                       ras.STEP_ORDER ASC
         `
 
-    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
 
     return sql
   },
@@ -320,25 +321,25 @@ export const RequestHistorySQL = {
   getApprovalLogs: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             SELECT 
-                                       ral.log_id
-                                     , ral.request_id
-                                     , ral.step_id
-                                     , ral.action_by
-                                     , ral.action_type
-                                     , ral.remark
-                                     , ral.action_date
-                                     , CONCAT(m.empName, ' ', m.empSurname) AS action_by_name
+                                       ral.LOG_ID
+                                     , ral.REQUEST_ID
+                                     , ral.STEP_ID
+                                     , ral.ACTION_BY
+                                     , ral.ACTION_TYPE
+                                     , ral.REMARK
+                                     , ral.ACTION_DATE
+                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS action_by_name
                             FROM
                                        request_approval_log ral
                                             LEFT JOIN
-                                       Person.MEMBER_FED m ON m.empCode = ral.action_by
+                                       Person.MEMBER_FED m ON m.EMPCODE = ral.ACTION_BY
                             WHERE
-                                       ral.request_id = dataItem.request_id
+                                       ral.REQUEST_ID = dataItem.REQUEST_ID
                             ORDER BY
-                                       ral.action_date ASC
+                                       ral.ACTION_DATE ASC
         `
 
-    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
 
     return sql
   },
@@ -348,13 +349,13 @@ export const RequestHistorySQL = {
                             SELECT * FROM
                                        request_vendor_selections
                             WHERE
-                                       request_id = 'dataItem.request_id' AND INUSE = 1
+                                       REQUEST_ID = 'dataItem.REQUEST_ID' AND INUSE = 1
                             ORDER BY
-                                       selection_id DESC
+                                       SELECTION_ID DESC
                             LIMIT
                                        1
         `
-    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
     return sql
   },
 }

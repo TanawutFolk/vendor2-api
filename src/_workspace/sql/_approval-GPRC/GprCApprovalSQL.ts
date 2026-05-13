@@ -1,4 +1,5 @@
 interface RegisterRequestDataItem {
+  [key: string]: any
   request_id?: number | string
   request_number?: string
   vendor_id?: number | string
@@ -84,6 +85,7 @@ interface RegisterRequestDataItem {
 }
 
 export interface GprCFlowDataItem {
+  [key: string]: any
   request_id?: number | string
   selection_id?: number | string
   gpr_c_flow_id?: number | string
@@ -139,13 +141,15 @@ const escLike = (value: any) => `%${esc(String(value ?? '').trim())}%`
 const buildLikeCondition = (column: string, rawValue: any) => {
   const value = String(rawValue ?? '').trim()
   if (!value) return ''
-  return `${column} LIKE '${escLike(value)}'`
+  let condition = column + ` LIKE 'dataItem.LIKE_VALUE'`
+  condition = condition.replaceAll('dataItem.LIKE_VALUE', escLike(value))
+  return condition
 }
 
 const buildKeywordConditions = (dataItem: GprCFlowDataItem, mapping: Record<string, string[]>) => {
   const conditions: string[] = []
 
-  for (const filter of Array.isArray(dataItem.SearchFilters) ? dataItem.SearchFilters : []) {
+  for (const filter of Array.isArray(dataItem.SEARCHFILTERS) ? dataItem.SEARCHFILTERS : []) {
     const columns = mapping[filter?.id || '']
     const value = String(filter?.value ?? '').trim()
     if (!columns?.length || !value) continue
@@ -166,7 +170,7 @@ const buildKeywordConditions = (dataItem: GprCFlowDataItem, mapping: Record<stri
 const buildColumnFilterConditions = (dataItem: GprCFlowDataItem, mapping: Record<string, string>) => {
   const conditions: string[] = []
 
-  for (const filter of Array.isArray(dataItem.ColumnFilters) ? dataItem.ColumnFilters : []) {
+  for (const filter of Array.isArray(dataItem.COLUMNFILTERS) ? dataItem.COLUMNFILTERS : []) {
     const column = mapping[filter?.id || '']
     const value = filter?.value
     const fn = String(filter?.columnFns || 'contains').trim()
@@ -174,9 +178,17 @@ const buildColumnFilterConditions = (dataItem: GprCFlowDataItem, mapping: Record
     if (!column || value === null || value === undefined || value === '') continue
 
     if (Array.isArray(value)) {
-      const values = value.map(item => `'${esc(item)}'`).filter(Boolean)
+      const values = value
+        .map((item, index) => {
+          let valueSql = `'dataItem.FILTER_VALUE_${index}'`
+          valueSql = valueSql.replaceAll(`dataItem.FILTER_VALUE_${index}`, esc(item))
+          return valueSql
+        })
+        .filter(Boolean)
       if (values.length > 0) {
-        conditions.push(`${column} IN (${values.join(', ')})`)
+        let condition = column + ` IN (dataItem.FILTER_VALUES)`
+        condition = condition.replaceAll('dataItem.FILTER_VALUES', values.join(', '))
+        conditions.push(condition)
       }
       continue
     }
@@ -185,19 +197,39 @@ const buildColumnFilterConditions = (dataItem: GprCFlowDataItem, mapping: Record
 
     switch (fn) {
       case 'equals':
-        conditions.push(`${column} = '${safeValue}'`)
+        {
+          let condition = column + ` = 'dataItem.FILTER_VALUE'`
+          condition = condition.replaceAll('dataItem.FILTER_VALUE', safeValue)
+          conditions.push(condition)
+        }
         break
       case 'notEqual':
-        conditions.push(`${column} <> '${safeValue}'`)
+        {
+          let condition = column + ` <> 'dataItem.FILTER_VALUE'`
+          condition = condition.replaceAll('dataItem.FILTER_VALUE', safeValue)
+          conditions.push(condition)
+        }
         break
       case 'startsWith':
-        conditions.push(`${column} LIKE '${esc(safeValue)}%'`)
+        {
+          let condition = column + ` LIKE 'dataItem.FILTER_VALUE%'`
+          condition = condition.replaceAll('dataItem.FILTER_VALUE', safeValue)
+          conditions.push(condition)
+        }
         break
       case 'endsWith':
-        conditions.push(`${column} LIKE '%${esc(safeValue)}'`)
+        {
+          let condition = column + ` LIKE '%dataItem.FILTER_VALUE'`
+          condition = condition.replaceAll('dataItem.FILTER_VALUE', safeValue)
+          conditions.push(condition)
+        }
         break
       default:
-        conditions.push(`${column} LIKE '%${safeValue}%'`)
+        {
+          let condition = column + ` LIKE '%dataItem.FILTER_VALUE%'`
+          condition = condition.replaceAll('dataItem.FILTER_VALUE', safeValue)
+          conditions.push(condition)
+        }
         break
     }
   }
@@ -206,7 +238,7 @@ const buildColumnFilterConditions = (dataItem: GprCFlowDataItem, mapping: Record
 }
 
 const buildOrderClause = (dataItem: GprCFlowDataItem, mapping: Record<string, string>, fallback: string) => {
-  const orderItems = (Array.isArray(dataItem.Order) ? dataItem.Order : [])
+  const orderItems = (Array.isArray(dataItem.ORDER) ? dataItem.ORDER : [])
     .map(item => {
       const column = mapping[item?.id || '']
       if (!column) return null
@@ -219,29 +251,33 @@ const buildOrderClause = (dataItem: GprCFlowDataItem, mapping: Record<string, st
 
 export const GprCApprovalSQL = {
   getSelectionIdByRequest: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             SELECT SELECTION_ID
             FROM request_vendor_selections
-            WHERE request_id = ${num(dataItem.request_id)}
+            WHERE REQUEST_ID = dataItem.REQUEST_ID
               AND INUSE = 1
-            ORDER BY selection_id DESC
+            ORDER BY SELECTION_ID DESC
             LIMIT 1
         `
+    sql = sql.replaceAll('dataItem.REQUEST_ID', num(dataItem.REQUEST_ID).toString())
+    return sql
   },
 
   getFlowByRequestId: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             SELECT *
             FROM REQUEST_VENDOR_GPR_C_FLOWS
-            WHERE REQUEST_ID = ${num(dataItem.request_id)}
+            WHERE REQUEST_ID = dataItem.REQUEST_ID
               AND INUSE = 1
             ORDER BY GPR_C_FLOW_ID DESC
             LIMIT 1
         `
+    sql = sql.replaceAll('dataItem.REQUEST_ID', num(dataItem.REQUEST_ID).toString())
+    return sql
   },
 
   insertFlow: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             INSERT INTO REQUEST_VENDOR_GPR_C_FLOWS (
                 REQUEST_ID,
                 SELECTION_ID,
@@ -252,66 +288,99 @@ export const GprCApprovalSQL = {
                 UPDATE_BY,
                 INUSE
             ) VALUES (
-                ${num(dataItem.request_id)},
-                ${dataItem.selection_id ? num(dataItem.selection_id) : 'NULL'},
-                '${esc(dataItem.flow_status || 'REQUESTER_SETUP')}',
-                '${esc(dataItem.current_step_code || 'REQUESTER_SETUP')}',
-                '${esc(dataItem.requester_empcode)}',
-                '${esc(dataItem.CREATE_BY || 'SYSTEM')}',
-                '${esc(dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM')}',
+                dataItem.REQUEST_ID,
+                dataItem.SELECTION_ID,
+                'dataItem.FLOW_STATUS',
+                'dataItem.CURRENT_STEP_CODE',
+                'dataItem.REQUESTER_EMPCODE',
+                'dataItem.CREATE_BY',
+                'dataItem.UPDATE_BY',
                 1
             )
         `
+    sql = sql.replaceAll('dataItem.REQUEST_ID', num(dataItem.REQUEST_ID).toString())
+    sql = sql.replaceAll('dataItem.SELECTION_ID', dataItem.SELECTION_ID ? num(dataItem.SELECTION_ID).toString() : 'NULL')
+    sql = sql.replaceAll('dataItem.FLOW_STATUS', esc(dataItem.FLOW_STATUS || 'REQUESTER_SETUP'))
+    sql = sql.replaceAll('dataItem.CURRENT_STEP_CODE', esc(dataItem.CURRENT_STEP_CODE || 'REQUESTER_SETUP'))
+    sql = sql.replaceAll('dataItem.REQUESTER_EMPCODE', esc(dataItem.REQUESTER_EMPCODE))
+    sql = sql.replaceAll('dataItem.CREATE_BY', esc(dataItem.CREATE_BY || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM'))
+    return sql
   },
 
   updateFlowSetup: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             UPDATE REQUEST_VENDOR_GPR_C_FLOWS SET
-                SELECTION_ID = ${dataItem.selection_id ? num(dataItem.selection_id) : 'SELECTION_ID'},
-                FLOW_STATUS = '${esc(dataItem.flow_status || 'IN_PROGRESS')}',
-                CURRENT_STEP_CODE = '${esc(dataItem.current_step_code || 'REQUESTER_APPROVER')}',
-                REQUESTER_EMPCODE = '${esc(dataItem.requester_empcode)}',
+                SELECTION_ID = dataItem.SELECTION_ID,
+                FLOW_STATUS = 'dataItem.FLOW_STATUS',
+                CURRENT_STEP_CODE = 'dataItem.CURRENT_STEP_CODE',
+                REQUESTER_EMPCODE = 'dataItem.REQUESTER_EMPCODE',
                 REQUESTER_SUBMITTED_AT = NOW(),
-                GPR_C_APPROVER_EMPCODE = '${esc(dataItem.gpr_c_approver_empcode)}',
-                GPR_C_APPROVER_NAME = '${esc(dataItem.gpr_c_approver_name)}',
-                GPR_C_APPROVER_EMAIL = '${esc(dataItem.gpr_c_approver_email)}',
-                PC_PIC_NAME = '${esc(dataItem.pc_pic_name)}',
-                PC_PIC_EMAIL = '${esc(dataItem.pc_pic_email)}',
-                CIRCULAR_JSON = '${esc(dataItem.circular_json || '[]')}',
-                UPDATE_BY = '${esc(dataItem.UPDATE_BY || 'SYSTEM')}',
+                GPR_C_APPROVER_EMPCODE = 'dataItem.GPR_C_APPROVER_EMPCODE',
+                GPR_C_APPROVER_NAME = 'dataItem.GPR_C_APPROVER_NAME',
+                GPR_C_APPROVER_EMAIL = 'dataItem.GPR_C_APPROVER_EMAIL',
+                PC_PIC_NAME = 'dataItem.PC_PIC_NAME',
+                PC_PIC_EMAIL = 'dataItem.PC_PIC_EMAIL',
+                CIRCULAR_JSON = 'dataItem.CIRCULAR_JSON',
+                UPDATE_BY = 'dataItem.UPDATE_BY',
                 UPDATE_DATE = NOW()
-            WHERE GPR_C_FLOW_ID = ${num(dataItem.gpr_c_flow_id)}
+            WHERE GPR_C_FLOW_ID = dataItem.GPR_C_FLOW_ID
         `
+    sql = sql.replaceAll('dataItem.SELECTION_ID', dataItem.SELECTION_ID ? num(dataItem.SELECTION_ID).toString() : 'SELECTION_ID')
+    sql = sql.replaceAll('dataItem.FLOW_STATUS', esc(dataItem.FLOW_STATUS || 'IN_PROGRESS'))
+    sql = sql.replaceAll('dataItem.CURRENT_STEP_CODE', esc(dataItem.CURRENT_STEP_CODE || 'REQUESTER_APPROVER'))
+    sql = sql.replaceAll('dataItem.REQUESTER_EMPCODE', esc(dataItem.REQUESTER_EMPCODE))
+    sql = sql.replaceAll('dataItem.GPR_C_APPROVER_EMPCODE', esc(dataItem.GPR_C_APPROVER_EMPCODE))
+    sql = sql.replaceAll('dataItem.GPR_C_APPROVER_NAME', esc(dataItem.GPR_C_APPROVER_NAME))
+    sql = sql.replaceAll('dataItem.GPR_C_APPROVER_EMAIL', esc(dataItem.GPR_C_APPROVER_EMAIL))
+    sql = sql.replaceAll('dataItem.PC_PIC_NAME', esc(dataItem.PC_PIC_NAME))
+    sql = sql.replaceAll('dataItem.PC_PIC_EMAIL', esc(dataItem.PC_PIC_EMAIL))
+    sql = sql.replaceAll('dataItem.CIRCULAR_JSON', esc(dataItem.CIRCULAR_JSON || '[]'))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(dataItem.UPDATE_BY || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.GPR_C_FLOW_ID', num(dataItem.GPR_C_FLOW_ID).toString())
+    return sql
   },
 
   updateFlowStatus: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             UPDATE REQUEST_VENDOR_GPR_C_FLOWS SET
-                FLOW_STATUS = '${esc(dataItem.flow_status)}',
-                CURRENT_STEP_CODE = ${dataItem.current_step_code === null ? 'NULL' : `'${esc(dataItem.current_step_code)}'`},
-                COMPLETED_AT = ${nullableDate(dataItem.completed_at)},
-                REJECTED_AT = ${nullableDate(dataItem.rejected_at)},
-                REJECTED_BY = '${esc(dataItem.rejected_by)}',
-                REJECTED_REMARK = '${esc(dataItem.rejected_remark)}',
-                UPDATE_BY = '${esc(dataItem.UPDATE_BY || 'SYSTEM')}',
+                FLOW_STATUS = 'dataItem.FLOW_STATUS',
+                CURRENT_STEP_CODE = dataItem.CURRENT_STEP_CODE,
+                COMPLETED_AT = dataItem.COMPLETED_AT,
+                REJECTED_AT = dataItem.REJECTED_AT,
+                REJECTED_BY = 'dataItem.REJECTED_BY',
+                REJECTED_REMARK = 'dataItem.REJECTED_REMARK',
+                UPDATE_BY = 'dataItem.UPDATE_BY',
                 UPDATE_DATE = NOW()
-            WHERE GPR_C_FLOW_ID = ${num(dataItem.gpr_c_flow_id)}
+            WHERE GPR_C_FLOW_ID = dataItem.GPR_C_FLOW_ID
         `
+    sql = sql.replaceAll('dataItem.FLOW_STATUS', esc(dataItem.FLOW_STATUS))
+    sql = sql.replaceAll('dataItem.CURRENT_STEP_CODE', dataItem.CURRENT_STEP_CODE === null ? 'NULL' : `'${esc(dataItem.CURRENT_STEP_CODE)}'`)
+    sql = sql.replaceAll('dataItem.COMPLETED_AT', nullableDate(dataItem.COMPLETED_AT))
+    sql = sql.replaceAll('dataItem.REJECTED_AT', nullableDate(dataItem.REJECTED_AT))
+    sql = sql.replaceAll('dataItem.REJECTED_BY', esc(dataItem.REJECTED_BY))
+    sql = sql.replaceAll('dataItem.REJECTED_REMARK', esc(dataItem.REJECTED_REMARK))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(dataItem.UPDATE_BY || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.GPR_C_FLOW_ID', num(dataItem.GPR_C_FLOW_ID).toString())
+    return sql
   },
 
   deactivateStepsByFlow: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             UPDATE REQUEST_VENDOR_GPR_C_STEPS SET
                 INUSE = 0,
-                UPDATE_BY = '${esc(dataItem.UPDATE_BY || 'SYSTEM')}',
+                UPDATE_BY = 'dataItem.UPDATE_BY',
                 UPDATE_DATE = NOW()
-            WHERE GPR_C_FLOW_ID = ${num(dataItem.gpr_c_flow_id)}
+            WHERE GPR_C_FLOW_ID = dataItem.GPR_C_FLOW_ID
               AND INUSE = 1
         `
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(dataItem.UPDATE_BY || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.GPR_C_FLOW_ID', num(dataItem.GPR_C_FLOW_ID).toString())
+    return sql
   },
 
   insertStep: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             INSERT INTO REQUEST_VENDOR_GPR_C_STEPS (
                 GPR_C_FLOW_ID,
                 REQUEST_ID,
@@ -326,82 +395,111 @@ export const GprCApprovalSQL = {
                 UPDATE_BY,
                 INUSE
             ) VALUES (
-                ${num(dataItem.gpr_c_flow_id)},
-                ${num(dataItem.request_id)},
-                ${num(dataItem.step_order)},
-                '${esc(dataItem.step_code)}',
-                '${esc(dataItem.step_name)}',
-                '${esc(dataItem.approver_empcode)}',
-                '${esc(dataItem.approver_name)}',
-                '${esc(dataItem.approver_email)}',
-                '${esc(dataItem.step_status || 'PENDING')}',
-                '${esc(dataItem.CREATE_BY || 'SYSTEM')}',
-                '${esc(dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM')}',
+                dataItem.GPR_C_FLOW_ID,
+                dataItem.REQUEST_ID,
+                dataItem.STEP_ORDER,
+                'dataItem.STEP_CODE',
+                'dataItem.STEP_NAME',
+                'dataItem.APPROVER_EMPCODE',
+                'dataItem.APPROVER_NAME',
+                'dataItem.APPROVER_EMAIL',
+                'dataItem.STEP_STATUS',
+                'dataItem.CREATE_BY',
+                'dataItem.UPDATE_BY',
                 1
             )
         `
+    sql = sql.replaceAll('dataItem.GPR_C_FLOW_ID', num(dataItem.GPR_C_FLOW_ID).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_ID', num(dataItem.REQUEST_ID).toString())
+    sql = sql.replaceAll('dataItem.STEP_ORDER', num(dataItem.STEP_ORDER).toString())
+    sql = sql.replaceAll('dataItem.STEP_CODE', esc(dataItem.STEP_CODE))
+    sql = sql.replaceAll('dataItem.STEP_NAME', esc(dataItem.STEP_NAME))
+    sql = sql.replaceAll('dataItem.APPROVER_EMPCODE', esc(dataItem.APPROVER_EMPCODE))
+    sql = sql.replaceAll('dataItem.APPROVER_NAME', esc(dataItem.APPROVER_NAME))
+    sql = sql.replaceAll('dataItem.APPROVER_EMAIL', esc(dataItem.APPROVER_EMAIL))
+    sql = sql.replaceAll('dataItem.STEP_STATUS', esc(dataItem.STEP_STATUS || 'PENDING'))
+    sql = sql.replaceAll('dataItem.CREATE_BY', esc(dataItem.CREATE_BY || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM'))
+    return sql
   },
 
   getStepsByFlow: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             SELECT *
             FROM REQUEST_VENDOR_GPR_C_STEPS
-            WHERE GPR_C_FLOW_ID = ${num(dataItem.gpr_c_flow_id)}
+            WHERE GPR_C_FLOW_ID = dataItem.GPR_C_FLOW_ID
               AND INUSE = 1
             ORDER BY STEP_ORDER ASC
         `
+    sql = sql.replaceAll('dataItem.GPR_C_FLOW_ID', num(dataItem.GPR_C_FLOW_ID).toString())
+    return sql
   },
 
   getCurrentStepByFlow: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             SELECT *
             FROM REQUEST_VENDOR_GPR_C_STEPS
-            WHERE GPR_C_FLOW_ID = ${num(dataItem.gpr_c_flow_id)}
+            WHERE GPR_C_FLOW_ID = dataItem.GPR_C_FLOW_ID
               AND STEP_STATUS = 'IN_PROGRESS'
               AND INUSE = 1
             ORDER BY STEP_ORDER ASC
             LIMIT 1
         `
+    sql = sql.replaceAll('dataItem.GPR_C_FLOW_ID', num(dataItem.GPR_C_FLOW_ID).toString())
+    return sql
   },
 
   updateStepAction: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             UPDATE REQUEST_VENDOR_GPR_C_STEPS SET
-                STEP_STATUS = '${esc(dataItem.step_status)}',
-                ACTION_BY = '${esc(dataItem.action_by)}',
-                ACTION_TYPE = '${esc(dataItem.action_type)}',
-                ACTION_REMARK = '${esc(dataItem.action_remark)}',
+                STEP_STATUS = 'dataItem.STEP_STATUS',
+                ACTION_BY = 'dataItem.ACTION_BY',
+                ACTION_TYPE = 'dataItem.ACTION_TYPE',
+                ACTION_REMARK = 'dataItem.ACTION_REMARK',
                 ACTION_DATE = NOW(),
-                UPDATE_BY = '${esc(dataItem.UPDATE_BY || dataItem.action_by || 'SYSTEM')}',
+                UPDATE_BY = 'dataItem.UPDATE_BY',
                 UPDATE_DATE = NOW()
-            WHERE GPR_C_STEP_ID = ${num(dataItem.gpr_c_step_id)}
+            WHERE GPR_C_STEP_ID = dataItem.GPR_C_STEP_ID
         `
+    sql = sql.replaceAll('dataItem.STEP_STATUS', esc(dataItem.STEP_STATUS))
+    sql = sql.replaceAll('dataItem.ACTION_BY', esc(dataItem.ACTION_BY))
+    sql = sql.replaceAll('dataItem.ACTION_TYPE', esc(dataItem.ACTION_TYPE))
+    sql = sql.replaceAll('dataItem.ACTION_REMARK', esc(dataItem.ACTION_REMARK))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(dataItem.UPDATE_BY || dataItem.ACTION_BY || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.GPR_C_STEP_ID', num(dataItem.GPR_C_STEP_ID).toString())
+    return sql
   },
 
   activateStep: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             UPDATE REQUEST_VENDOR_GPR_C_STEPS SET
                 STEP_STATUS = 'IN_PROGRESS',
-                UPDATE_BY = '${esc(dataItem.UPDATE_BY || 'SYSTEM')}',
+                UPDATE_BY = 'dataItem.UPDATE_BY',
                 UPDATE_DATE = NOW()
-            WHERE GPR_C_STEP_ID = ${num(dataItem.gpr_c_step_id)}
+            WHERE GPR_C_STEP_ID = dataItem.GPR_C_STEP_ID
         `
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(dataItem.UPDATE_BY || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.GPR_C_STEP_ID', num(dataItem.GPR_C_STEP_ID).toString())
+    return sql
   },
 
   skipPendingSteps: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             UPDATE REQUEST_VENDOR_GPR_C_STEPS SET
                 STEP_STATUS = 'SKIPPED',
-                UPDATE_BY = '${esc(dataItem.UPDATE_BY || 'SYSTEM')}',
+                UPDATE_BY = 'dataItem.UPDATE_BY',
                 UPDATE_DATE = NOW()
-            WHERE GPR_C_FLOW_ID = ${num(dataItem.gpr_c_flow_id)}
+            WHERE GPR_C_FLOW_ID = dataItem.GPR_C_FLOW_ID
               AND STEP_STATUS = 'PENDING'
               AND INUSE = 1
         `
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(dataItem.UPDATE_BY || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.GPR_C_FLOW_ID', num(dataItem.GPR_C_FLOW_ID).toString())
+    return sql
   },
 
   insertActionRequired: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             INSERT INTO REQUEST_VENDOR_GPR_C_ACTION_REQUIRED (
                 GPR_C_FLOW_ID,
                 GPR_C_STEP_ID,
@@ -417,57 +515,77 @@ export const GprCApprovalSQL = {
                 UPDATE_BY,
                 INUSE
             ) VALUES (
-                ${num(dataItem.gpr_c_flow_id)},
-                ${num(dataItem.gpr_c_step_id)},
-                ${num(dataItem.request_id)},
-                '${esc(dataItem.stage_code)}',
-                '${esc(dataItem.stage_name)}',
-                '${esc(dataItem.pic_name)}',
-                '${esc(dataItem.pic_email)}',
-                '${esc(dataItem.required_detail)}',
-                '${esc(dataItem.result_status || 'PENDING')}',
+                dataItem.GPR_C_FLOW_ID,
+                dataItem.GPR_C_STEP_ID,
+                dataItem.REQUEST_ID,
+                'dataItem.STAGE_CODE',
+                'dataItem.STAGE_NAME',
+                'dataItem.PIC_NAME',
+                'dataItem.PIC_EMAIL',
+                'dataItem.REQUIRED_DETAIL',
+                'dataItem.RESULT_STATUS',
                 NOW(),
-                '${esc(dataItem.CREATE_BY || 'SYSTEM')}',
-                '${esc(dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM')}',
+                'dataItem.CREATE_BY',
+                'dataItem.UPDATE_BY',
                 1
             )
         `
+    sql = sql.replaceAll('dataItem.GPR_C_FLOW_ID', num(dataItem.GPR_C_FLOW_ID).toString())
+    sql = sql.replaceAll('dataItem.GPR_C_STEP_ID', num(dataItem.GPR_C_STEP_ID).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_ID', num(dataItem.REQUEST_ID).toString())
+    sql = sql.replaceAll('dataItem.STAGE_CODE', esc(dataItem.STAGE_CODE))
+    sql = sql.replaceAll('dataItem.STAGE_NAME', esc(dataItem.STAGE_NAME))
+    sql = sql.replaceAll('dataItem.PIC_NAME', esc(dataItem.PIC_NAME))
+    sql = sql.replaceAll('dataItem.PIC_EMAIL', esc(dataItem.PIC_EMAIL))
+    sql = sql.replaceAll('dataItem.REQUIRED_DETAIL', esc(dataItem.REQUIRED_DETAIL))
+    sql = sql.replaceAll('dataItem.RESULT_STATUS', esc(dataItem.RESULT_STATUS || 'PENDING'))
+    sql = sql.replaceAll('dataItem.CREATE_BY', esc(dataItem.CREATE_BY || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM'))
+    return sql
   },
 
   updateActionRequiredResult: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             UPDATE REQUEST_VENDOR_GPR_C_ACTION_REQUIRED SET
-                RESULT_STATUS = '${esc(dataItem.result_status || 'COMPLETED')}',
-                RESULT_REMARK = '${esc(dataItem.result_remark)}',
-                RESULT_BY = '${esc(dataItem.result_by)}',
+                RESULT_STATUS = 'dataItem.RESULT_STATUS',
+                RESULT_REMARK = 'dataItem.RESULT_REMARK',
+                RESULT_BY = 'dataItem.RESULT_BY',
                 RESULT_AT = NOW(),
-                UPDATE_BY = '${esc(dataItem.UPDATE_BY || dataItem.result_by || 'SYSTEM')}',
+                UPDATE_BY = 'dataItem.UPDATE_BY',
                 UPDATE_DATE = NOW()
-            WHERE ACTION_REQUIRED_ID = ${num(dataItem.action_required_id)}
+            WHERE ACTION_REQUIRED_ID = dataItem.ACTION_REQUIRED_ID
               AND INUSE = 1
         `
+    sql = sql.replaceAll('dataItem.RESULT_STATUS', esc(dataItem.RESULT_STATUS || 'COMPLETED'))
+    sql = sql.replaceAll('dataItem.RESULT_REMARK', esc(dataItem.RESULT_REMARK))
+    sql = sql.replaceAll('dataItem.RESULT_BY', esc(dataItem.RESULT_BY))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(dataItem.UPDATE_BY || dataItem.RESULT_BY || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.ACTION_REQUIRED_ID', num(dataItem.ACTION_REQUIRED_ID).toString())
+    return sql
   },
 
   getActionRequiredById: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             SELECT *
             FROM REQUEST_VENDOR_GPR_C_ACTION_REQUIRED
-            WHERE ACTION_REQUIRED_ID = ${num(dataItem.action_required_id)}
+            WHERE ACTION_REQUIRED_ID = dataItem.ACTION_REQUIRED_ID
               AND INUSE = 1
             LIMIT 1
         `
+    sql = sql.replaceAll('dataItem.ACTION_REQUIRED_ID', num(dataItem.ACTION_REQUIRED_ID).toString())
+    return sql
   },
 
   getActionRequiredQueueByPicEmail: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             SELECT
                 ar.*,
                 f.FLOW_STATUS,
                 f.CURRENT_STEP_CODE,
                 s.STEP_NAME,
-                rr.request_number,
-                rr.request_status,
-                v.company_name
+                rr.REQUEST_NUMBER,
+                rr.REQUEST_STATUS,
+                v.COMPANY_NAME
             FROM REQUEST_VENDOR_GPR_C_ACTION_REQUIRED ar
                 JOIN REQUEST_VENDOR_GPR_C_FLOWS f
                     ON f.GPR_C_FLOW_ID = ar.GPR_C_FLOW_ID
@@ -475,29 +593,31 @@ export const GprCApprovalSQL = {
                 LEFT JOIN REQUEST_VENDOR_GPR_C_STEPS s
                     ON s.GPR_C_STEP_ID = ar.GPR_C_STEP_ID
                 JOIN request_register_vendor rr
-                    ON rr.request_id = ar.REQUEST_ID
+                    ON rr.REQUEST_ID = ar.REQUEST_ID
                 LEFT JOIN vendors v
-                    ON v.vendor_id = rr.vendor_id
+                    ON v.VENDOR_ID = rr.VENDOR_ID
             WHERE ar.INUSE = 1
-              AND LOWER(ar.PIC_EMAIL) = LOWER('${esc(dataItem.pic_email)}')
+              AND LOWER(ar.PIC_EMAIL) = LOWER('dataItem.PIC_EMAIL')
               AND ar.RESULT_STATUS IN ('PENDING', 'INCOMPLETE')
             ORDER BY ar.SENT_AT DESC, ar.ACTION_REQUIRED_ID DESC
         `
+    sql = sql.replaceAll('dataItem.PIC_EMAIL', esc(dataItem.PIC_EMAIL))
+    return sql
   },
 
   getActionRequiredQueueByPicEmailPaginated: (dataItem: GprCFlowDataItem) => {
     const conditions = [
-      `t.pic_email_normalized = LOWER('${esc(dataItem.pic_email)}')`,
+      `t.PIC_EMAIL_NORMALIZED = LOWER('dataItem.PIC_EMAIL')`,
       't.RESULT_STATUS IN (\'PENDING\', \'INCOMPLETE\')',
       ...buildKeywordConditions(dataItem, {
-        request_number: ['t.request_number', 'CAST(t.REQUEST_ID AS CHAR)'],
-        vendor_name: ['t.company_name'],
+        request_number: ['t.REQUEST_NUMBER', 'CAST(t.REQUEST_ID AS CHAR)'],
+        vendor_name: ['t.COMPANY_NAME'],
         step_keyword: ['t.STAGE_NAME', 't.STAGE_CODE'],
-        status_keyword: ['t.RESULT_STATUS', 't.request_status'],
+        status_keyword: ['t.RESULT_STATUS', 't.REQUEST_STATUS'],
       }),
       ...buildColumnFilterConditions(dataItem, {
-        request_number: 't.request_number',
-        company_name: 't.company_name',
+        request_number: 't.REQUEST_NUMBER',
+        company_name: 't.COMPANY_NAME',
         STAGE_NAME: 't.STAGE_NAME',
         STAGE_CODE: 't.STAGE_CODE',
         REQUIRED_DETAIL: 't.REQUIRED_DETAIL',
@@ -505,13 +625,17 @@ export const GprCApprovalSQL = {
       }),
     ]
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join('\n              AND ')}` : ''
+    let whereClause = ''
+    if (conditions.length > 0) {
+      whereClause = 'WHERE dataItem.CONDITIONS'
+      whereClause = whereClause.replaceAll('dataItem.CONDITIONS', conditions.join('\n              AND '))
+    }
     const orderClause = buildOrderClause(
       dataItem,
       {
         ACTION_REQUIRED_ID: 't.ACTION_REQUIRED_ID',
-        request_number: 't.request_number',
-        company_name: 't.company_name',
+        request_number: 't.REQUEST_NUMBER',
+        company_name: 't.COMPANY_NAME',
         STAGE_NAME: 't.STAGE_NAME',
         STAGE_CODE: 't.STAGE_CODE',
         REQUIRED_DETAIL: 't.REQUIRED_DETAIL',
@@ -520,19 +644,19 @@ export const GprCApprovalSQL = {
       },
       't.SENT_AT DESC, t.ACTION_REQUIRED_ID DESC'
     )
-    const offset = num(dataItem.Start)
-    const limit = num(dataItem.Limit) || 20
+    const offset = num(dataItem.START)
+    const limit = num(dataItem.LIMIT) || 20
     const innerQuery = `
             (
                 SELECT
                     ar.*,
-                    LOWER(ar.PIC_EMAIL) AS pic_email_normalized,
+                    LOWER(ar.PIC_EMAIL) AS PIC_EMAIL_NORMALIZED,
                     f.FLOW_STATUS,
                     f.CURRENT_STEP_CODE,
                     s.STEP_NAME,
-                    rr.request_number,
-                    rr.request_status,
-                    v.company_name
+                    rr.REQUEST_NUMBER,
+                    rr.REQUEST_STATUS,
+                    v.COMPANY_NAME
                 FROM REQUEST_VENDOR_GPR_C_ACTION_REQUIRED ar
                     JOIN REQUEST_VENDOR_GPR_C_FLOWS f
                         ON f.GPR_C_FLOW_ID = ar.GPR_C_FLOW_ID
@@ -540,32 +664,41 @@ export const GprCApprovalSQL = {
                     LEFT JOIN REQUEST_VENDOR_GPR_C_STEPS s
                         ON s.GPR_C_STEP_ID = ar.GPR_C_STEP_ID
                     JOIN request_register_vendor rr
-                        ON rr.request_id = ar.REQUEST_ID
+                        ON rr.REQUEST_ID = ar.REQUEST_ID
                     LEFT JOIN vendors v
-                        ON v.vendor_id = rr.vendor_id
+                        ON v.VENDOR_ID = rr.VENDOR_ID
                 WHERE ar.INUSE = 1
             ) t
         `
 
-    const countSql = `
+    let countSql = `
             SELECT COUNT(*) AS TOTAL_COUNT
-            FROM ${innerQuery}
-            ${whereClause}
+            FROM dataItem.INNERQUERY
+            dataItem.WHERECLAUSE
         `
 
-    const dataSql = `
+    let dataSql = `
             SELECT t.*
-            FROM ${innerQuery}
-            ${whereClause}
-            ORDER BY ${orderClause}
-            LIMIT ${limit} OFFSET ${offset}
+            FROM dataItem.INNERQUERY
+            dataItem.WHERECLAUSE
+            ORDER BY dataItem.ORDERCLAUSE
+            LIMIT dataItem.LIMIT OFFSET dataItem.OFFSET
         `
+    countSql = countSql.replaceAll('dataItem.INNERQUERY', innerQuery)
+    countSql = countSql.replaceAll('dataItem.WHERECLAUSE', whereClause)
+    countSql = countSql.replaceAll('dataItem.PIC_EMAIL', esc(dataItem.PIC_EMAIL))
+    dataSql = dataSql.replaceAll('dataItem.INNERQUERY', innerQuery)
+    dataSql = dataSql.replaceAll('dataItem.WHERECLAUSE', whereClause)
+    dataSql = dataSql.replaceAll('dataItem.ORDERCLAUSE', orderClause)
+    dataSql = dataSql.replaceAll('dataItem.LIMIT', limit.toString())
+    dataSql = dataSql.replaceAll('dataItem.OFFSET', offset.toString())
+    dataSql = dataSql.replaceAll('dataItem.PIC_EMAIL', esc(dataItem.PIC_EMAIL))
 
     return [countSql, dataSql]
   },
 
   getQueueByApprover: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             SELECT
                 f.*,
                 s.GPR_C_STEP_ID,
@@ -576,73 +709,79 @@ export const GprCApprovalSQL = {
                 s.APPROVER_NAME,
                 s.APPROVER_EMAIL,
                 s.STEP_STATUS,
-                rr.request_number,
-                rr.request_status,
-                rr.supportProduct_Process,
-                rr.purchase_frequency,
-                rr.Request_By_EmployeeCode,
+                rr.REQUEST_NUMBER,
+                rr.REQUEST_STATUS,
+                rr.SUPPORTPRODUCT_PROCESS,
+                rr.PURCHASE_FREQUENCY,
+                rr.REQUEST_BY_EMPLOYEECODE,
                 rr.CREATE_DATE AS REQUEST_CREATE_DATE,
-                v.company_name,
-                v.address,
-                v.vendor_region,
-                vc.contact_name,
-                COALESCE(vc_sel.email, vc.email, v.emailmain) AS vendor_email,
-                vc.tel_phone
+                v.COMPANY_NAME,
+                v.ADDRESS,
+                v.VENDOR_REGION,
+                vc.CONTACT_NAME,
+                COALESCE(vc_sel.EMAIL, vc.EMAIL, v.EMAILMAIN) AS vendor_email,
+                vc.TEL_PHONE
             FROM REQUEST_VENDOR_GPR_C_FLOWS f
                 JOIN REQUEST_VENDOR_GPR_C_STEPS s
                     ON s.GPR_C_FLOW_ID = f.GPR_C_FLOW_ID
                     AND s.STEP_STATUS = 'IN_PROGRESS'
                     AND s.INUSE = 1
                 JOIN request_register_vendor rr
-                    ON rr.request_id = f.REQUEST_ID
+                    ON rr.REQUEST_ID = f.REQUEST_ID
                 LEFT JOIN vendors v
-                    ON v.vendor_id = rr.vendor_id
+                    ON v.VENDOR_ID = rr.VENDOR_ID
                 LEFT JOIN vendor_contacts vc
-                    ON vc.vendor_id = v.vendor_id
+                    ON vc.VENDOR_ID = v.VENDOR_ID
                 LEFT JOIN vendor_contacts vc_sel
-                    ON vc_sel.vendor_contact_id = rr.vendor_contact_id
+                    ON vc_sel.VENDOR_CONTACT_ID = rr.VENDOR_CONTACT_ID
                     AND vc_sel.INUSE = 1
             WHERE f.INUSE = 1
               AND f.FLOW_STATUS = 'IN_PROGRESS'
-              AND s.APPROVER_EMPCODE = '${esc(dataItem.approver_empcode)}'
+              AND s.APPROVER_EMPCODE = 'dataItem.APPROVER_EMPCODE'
             ORDER BY f.GPR_C_FLOW_ID DESC
         `
+    sql = sql.replaceAll('dataItem.APPROVER_EMPCODE', esc(dataItem.APPROVER_EMPCODE))
+    return sql
   },
 
   getQueueByApproverPaginated: (dataItem: GprCFlowDataItem) => {
     const conditions = [
-      `t.APPROVER_EMPCODE = '${esc(dataItem.approver_empcode)}'`,
+      `t.APPROVER_EMPCODE = 'dataItem.APPROVER_EMPCODE'`,
       ...buildKeywordConditions(dataItem, {
-        request_number: ['t.request_number', 'CAST(t.REQUEST_ID AS CHAR)'],
-        vendor_name: ['t.company_name'],
+        request_number: ['t.REQUEST_NUMBER', 'CAST(t.REQUEST_ID AS CHAR)'],
+        vendor_name: ['t.COMPANY_NAME'],
         step_keyword: ['t.STEP_NAME', 't.STEP_CODE'],
-        status_keyword: ['t.request_status'],
+        status_keyword: ['t.REQUEST_STATUS'],
       }),
       ...buildColumnFilterConditions(dataItem, {
-        request_number: 't.request_number',
-        company_name: 't.company_name',
+        request_number: 't.REQUEST_NUMBER',
+        company_name: 't.COMPANY_NAME',
         STEP_NAME: 't.STEP_NAME',
         STEP_CODE: 't.STEP_CODE',
-        request_status: 't.request_status',
+        request_status: 't.REQUEST_STATUS',
       }),
     ]
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join('\n              AND ')}` : ''
+    let whereClause = ''
+    if (conditions.length > 0) {
+      whereClause = 'WHERE dataItem.CONDITIONS'
+      whereClause = whereClause.replaceAll('dataItem.CONDITIONS', conditions.join('\n              AND '))
+    }
     const orderClause = buildOrderClause(
       dataItem,
       {
         GPR_C_FLOW_ID: 't.GPR_C_FLOW_ID',
-        request_number: 't.request_number',
-        company_name: 't.company_name',
+        request_number: 't.REQUEST_NUMBER',
+        company_name: 't.COMPANY_NAME',
         STEP_NAME: 't.STEP_NAME',
         STEP_CODE: 't.STEP_CODE',
-        request_status: 't.request_status',
+        request_status: 't.REQUEST_STATUS',
         REQUEST_CREATE_DATE: 't.REQUEST_CREATE_DATE',
       },
       't.GPR_C_FLOW_ID DESC'
     )
-    const offset = num(dataItem.Start)
-    const limit = num(dataItem.Limit) || 20
+    const offset = num(dataItem.START)
+    const limit = num(dataItem.LIMIT) || 20
     const innerQuery = `
             (
                 SELECT
@@ -655,50 +794,59 @@ export const GprCApprovalSQL = {
                     s.APPROVER_NAME,
                     s.APPROVER_EMAIL,
                     s.STEP_STATUS,
-                    rr.request_number,
-                    rr.request_status,
-                    rr.supportProduct_Process,
-                    rr.purchase_frequency,
-                    rr.Request_By_EmployeeCode,
+                    rr.REQUEST_NUMBER,
+                    rr.REQUEST_STATUS,
+                    rr.SUPPORTPRODUCT_PROCESS,
+                    rr.PURCHASE_FREQUENCY,
+                    rr.REQUEST_BY_EMPLOYEECODE,
                     rr.CREATE_DATE AS REQUEST_CREATE_DATE,
-                    v.company_name,
-                    v.address,
-                    v.vendor_region,
-                    vc.contact_name,
-                    COALESCE(vc_sel.email, vc.email, v.emailmain) AS vendor_email,
-                    vc.tel_phone
+                    v.COMPANY_NAME,
+                    v.ADDRESS,
+                    v.VENDOR_REGION,
+                    vc.CONTACT_NAME,
+                    COALESCE(vc_sel.EMAIL, vc.EMAIL, v.EMAILMAIN) AS vendor_email,
+                    vc.TEL_PHONE
                 FROM REQUEST_VENDOR_GPR_C_FLOWS f
                     JOIN REQUEST_VENDOR_GPR_C_STEPS s
                         ON s.GPR_C_FLOW_ID = f.GPR_C_FLOW_ID
                         AND s.STEP_STATUS = 'IN_PROGRESS'
                         AND s.INUSE = 1
                     JOIN request_register_vendor rr
-                        ON rr.request_id = f.REQUEST_ID
+                        ON rr.REQUEST_ID = f.REQUEST_ID
                     LEFT JOIN vendors v
-                        ON v.vendor_id = rr.vendor_id
+                        ON v.VENDOR_ID = rr.VENDOR_ID
                     LEFT JOIN vendor_contacts vc
-                        ON vc.vendor_id = v.vendor_id
+                        ON vc.VENDOR_ID = v.VENDOR_ID
                     LEFT JOIN vendor_contacts vc_sel
-                        ON vc_sel.vendor_contact_id = rr.vendor_contact_id
+                        ON vc_sel.VENDOR_CONTACT_ID = rr.VENDOR_CONTACT_ID
                         AND vc_sel.INUSE = 1
                 WHERE f.INUSE = 1
                   AND f.FLOW_STATUS = 'IN_PROGRESS'
             ) t
         `
 
-    const countSql = `
+    let countSql = `
             SELECT COUNT(*) AS TOTAL_COUNT
-            FROM ${innerQuery}
-            ${whereClause}
+            FROM dataItem.INNERQUERY
+            dataItem.WHERECLAUSE
         `
 
-    const dataSql = `
+    let dataSql = `
             SELECT t.*
-            FROM ${innerQuery}
-            ${whereClause}
-            ORDER BY ${orderClause}
-            LIMIT ${limit} OFFSET ${offset}
+            FROM dataItem.INNERQUERY
+            dataItem.WHERECLAUSE
+            ORDER BY dataItem.ORDERCLAUSE
+            LIMIT dataItem.LIMIT OFFSET dataItem.OFFSET
         `
+    countSql = countSql.replaceAll('dataItem.INNERQUERY', innerQuery)
+    countSql = countSql.replaceAll('dataItem.WHERECLAUSE', whereClause)
+    countSql = countSql.replaceAll('dataItem.APPROVER_EMPCODE', esc(dataItem.APPROVER_EMPCODE))
+    dataSql = dataSql.replaceAll('dataItem.INNERQUERY', innerQuery)
+    dataSql = dataSql.replaceAll('dataItem.WHERECLAUSE', whereClause)
+    dataSql = dataSql.replaceAll('dataItem.ORDERCLAUSE', orderClause)
+    dataSql = dataSql.replaceAll('dataItem.LIMIT', limit.toString())
+    dataSql = dataSql.replaceAll('dataItem.OFFSET', offset.toString())
+    dataSql = dataSql.replaceAll('dataItem.APPROVER_EMPCODE', esc(dataItem.APPROVER_EMPCODE))
 
     return [countSql, dataSql]
   },
@@ -718,24 +866,24 @@ export const GprCApprovalSQL = {
                 s.APPROVER_NAME,
                 s.APPROVER_EMAIL,
                 s.STEP_STATUS,
-                rr.request_number,
-                rr.request_status,
-                rr.supportProduct_Process,
-                rr.purchase_frequency,
-                rr.Request_By_EmployeeCode,
+                rr.REQUEST_NUMBER,
+                rr.REQUEST_STATUS,
+                rr.SUPPORTPRODUCT_PROCESS,
+                rr.PURCHASE_FREQUENCY,
+                rr.REQUEST_BY_EMPLOYEECODE,
                 rr.CREATE_DATE AS REQUEST_CREATE_DATE,
-                v.company_name,
-                v.vendor_region
+                v.COMPANY_NAME,
+                v.VENDOR_REGION
             FROM REQUEST_VENDOR_GPR_C_FLOWS f
                 JOIN REQUEST_VENDOR_GPR_C_STEPS s
                     ON s.GPR_C_FLOW_ID = f.GPR_C_FLOW_ID
                     AND s.STEP_STATUS = 'IN_PROGRESS'
                     AND s.INUSE = 1
                 JOIN request_register_vendor rr
-                    ON rr.request_id = f.REQUEST_ID
+                    ON rr.REQUEST_ID = f.REQUEST_ID
                     AND rr.INUSE = 1
                 LEFT JOIN vendors v
-                    ON v.vendor_id = rr.vendor_id
+                    ON v.VENDOR_ID = rr.VENDOR_ID
             WHERE f.INUSE = 1
               AND f.FLOW_STATUS = 'IN_PROGRESS'
             ORDER BY f.GPR_C_FLOW_ID DESC
@@ -743,70 +891,80 @@ export const GprCApprovalSQL = {
   },
 
   getStepById: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             SELECT *
             FROM REQUEST_VENDOR_GPR_C_STEPS
-            WHERE GPR_C_STEP_ID = ${num(dataItem.gpr_c_step_id)}
+            WHERE GPR_C_STEP_ID = dataItem.GPR_C_STEP_ID
               AND INUSE = 1
             LIMIT 1
         `
+    sql = sql.replaceAll('dataItem.GPR_C_STEP_ID', num(dataItem.GPR_C_STEP_ID).toString())
+    return sql
   },
 
   updateStepApprover: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             UPDATE REQUEST_VENDOR_GPR_C_STEPS SET
-                APPROVER_EMPCODE = '${esc(dataItem.approver_empcode)}',
-                APPROVER_NAME = '${esc(dataItem.approver_name)}',
-                APPROVER_EMAIL = '${esc(dataItem.approver_email)}',
-                UPDATE_BY = '${esc(dataItem.UPDATE_BY || 'SYSTEM')}',
+                APPROVER_EMPCODE = 'dataItem.APPROVER_EMPCODE',
+                APPROVER_NAME = 'dataItem.APPROVER_NAME',
+                APPROVER_EMAIL = 'dataItem.APPROVER_EMAIL',
+                UPDATE_BY = 'dataItem.UPDATE_BY',
                 UPDATE_DATE = NOW()
-            WHERE GPR_C_STEP_ID = ${num(dataItem.gpr_c_step_id)}
+            WHERE GPR_C_STEP_ID = dataItem.GPR_C_STEP_ID
               AND INUSE = 1
         `
+    sql = sql.replaceAll('dataItem.APPROVER_EMPCODE', esc(dataItem.APPROVER_EMPCODE))
+    sql = sql.replaceAll('dataItem.APPROVER_NAME', esc(dataItem.APPROVER_NAME))
+    sql = sql.replaceAll('dataItem.APPROVER_EMAIL', esc(dataItem.APPROVER_EMAIL))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(dataItem.UPDATE_BY || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.GPR_C_STEP_ID', num(dataItem.GPR_C_STEP_ID).toString())
+    return sql
   },
 
   getRequestSummary: (dataItem: GprCFlowDataItem) => {
-    return `
+    let sql = `
             SELECT
-                rr.request_id,
-                rr.request_number,
-                rr.request_status,
-                rr.assign_to,
-                rr.Request_By_EmployeeCode,
-                rr.supportProduct_Process,
-                rr.purchase_frequency,
+                rr.REQUEST_ID,
+                rr.REQUEST_NUMBER,
+                rr.REQUEST_STATUS,
+                rr.ASSIGN_TO,
+                rr.REQUEST_BY_EMPLOYEECODE,
+                rr.SUPPORTPRODUCT_PROCESS,
+                rr.PURCHASE_FREQUENCY,
                 rr.CREATE_DATE,
-                v.vendor_id,
-                v.company_name,
-                v.address,
-                v.vendor_region,
-                v.emailmain,
-                vc.contact_name,
-                vc.email AS vendor_email,
-                vc.tel_phone
+                v.VENDOR_ID,
+                v.COMPANY_NAME,
+                v.ADDRESS,
+                v.VENDOR_REGION,
+                v.EMAILMAIN,
+                vc.CONTACT_NAME,
+                vc.EMAIL AS vendor_email,
+                vc.TEL_PHONE
             FROM request_register_vendor rr
-                LEFT JOIN vendors v ON v.vendor_id = rr.vendor_id
-                LEFT JOIN vendor_contacts vc ON vc.vendor_contact_id = rr.vendor_contact_id
-            WHERE rr.request_id = ${num(dataItem.request_id)}
+                LEFT JOIN vendors v ON v.VENDOR_ID = rr.VENDOR_ID
+                LEFT JOIN vendor_contacts vc ON vc.VENDOR_CONTACT_ID = rr.VENDOR_CONTACT_ID
+            WHERE rr.REQUEST_ID = dataItem.REQUEST_ID
             LIMIT 1
         `
+    sql = sql.replaceAll('dataItem.REQUEST_ID', num(dataItem.REQUEST_ID).toString())
+    return sql
   },
 
   getMemberByEmpCode: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             SELECT
-                                       empName
-                                     , empSurname
-                                     , empEmail
+                                       EMPNAME
+                                     , EMPSURNAME
+                                     , EMPEMAIL
                             FROM
                                        Person.MEMBER_FED
                             WHERE
-                                       empCode = 'dataItem.empcode'
+                                       EMPCODE = 'dataItem.EMPCODE'
                             LIMIT
                                        1
         `
 
-    sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
+    sql = sql.replaceAll('dataItem.EMPCODE', dataItem['EMPCODE'] || '')
 
     return sql
   },
@@ -814,17 +972,17 @@ export const GprCApprovalSQL = {
   getAssigneeByEmpCodeContact: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             SELECT
-                                       empName
-                                     , empEmail
+                                       EMPNAME
+                                     , EMPEMAIL
                             FROM
                                        assignees_to
                             WHERE
-                                       empcode = 'dataItem.empcode'
+                                       EMPCODE = 'dataItem.EMPCODE'
                             LIMIT
                                        1
         `
 
-    sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
+    sql = sql.replaceAll('dataItem.EMPCODE', dataItem['EMPCODE'] || '')
 
     return sql
   },
@@ -832,31 +990,31 @@ export const GprCApprovalSQL = {
   getPeerCcRowsByNormalizedGroup: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             SELECT
-                                       empcode
-                                     , empEmail
-                                     , group_code
-                                     , group_name
+                                       EMPCODE
+                                     , EMPEMAIL
+                                     , GROUP_CODE
+                                     , GROUP_NAME
                             FROM
                                        assignees_to
                             WHERE
                                        (
-                                           UPPER(TRIM(COALESCE(group_code, ''))) = 'dataItem.target_group'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_')
-                                               = 'dataItem.target_group'
+                                           UPPER(TRIM(COALESCE(GROUP_CODE, ''))) = 'dataItem.TARGET_GROUP'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(GROUP_NAME, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_')
+                                               = 'dataItem.TARGET_GROUP'
                                            OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-                                               UPPER(TRIM(COALESCE(group_code, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '')
-                                               = 'dataItem.target_compact'
+                                               UPPER(TRIM(COALESCE(GROUP_CODE, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '')
+                                               = 'dataItem.TARGET_COMPACT'
                                            OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-                                               UPPER(TRIM(COALESCE(group_name, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '')
-                                               = 'dataItem.target_compact'
+                                               UPPER(TRIM(COALESCE(GROUP_NAME, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '')
+                                               = 'dataItem.TARGET_COMPACT'
                                        )
                                        AND INUSE = 1
                             ORDER BY
-                                       Assignees_id ASC
+                                       ASSIGNEES_ID ASC
         `
 
-    sql = sql.replaceAll('dataItem.target_group', dataItem['target_group'] || '')
-    sql = sql.replaceAll('dataItem.target_compact', dataItem['target_compact'] || '')
+    sql = sql.replaceAll('dataItem.TARGET_GROUP', dataItem['TARGET_GROUP'] || '')
+    sql = sql.replaceAll('dataItem.TARGET_COMPACT', dataItem['TARGET_COMPACT'] || '')
 
     return sql
   },
@@ -864,33 +1022,33 @@ export const GprCApprovalSQL = {
   getApprovalSteps: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             SELECT 
-                                       ras.step_id
-                                     , ras.request_id
-                                     , ras.step_order
-                                     , ras.approver_id
-                                     , ras.step_status
+                                       ras.STEP_ID
+                                     , ras.REQUEST_ID
+                                     , ras.STEP_ORDER
+                                     , ras.APPROVER_ID
+                                     , ras.STEP_STATUS
                                      , ras.DESCRIPTION
-                                     , ras.step_code
-                                     , ras.actor_type
-                                     , ras.group_code
-                                     , ras.assignment_mode
+                                     , ras.STEP_CODE
+                                     , ras.ACTOR_TYPE
+                                     , ras.GROUP_CODE
+                                     , ras.ASSIGNMENT_MODE
                                      , ras.CREATE_BY
                                      , ras.CREATE_DATE
                                      , ras.UPDATE_BY
                                      , ras.UPDATE_DATE
-                                     , CONCAT(m.empName, ' ', m.empSurname) AS approver_name
+                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS approver_name
                             FROM
                                        request_approval_step ras
                                             LEFT JOIN
-                                       Person.MEMBER_FED m ON m.empCode = ras.approver_id
+                                       Person.MEMBER_FED m ON m.EMPCODE = ras.APPROVER_ID
                             WHERE
-                                       ras.request_id = dataItem.request_id
+                                       ras.REQUEST_ID = dataItem.REQUEST_ID
                                        AND ras.INUSE = 1
                             ORDER BY
-                                       ras.step_order ASC
+                                       ras.STEP_ORDER ASC
         `
 
-    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
 
     return sql
   },
@@ -898,15 +1056,15 @@ export const GprCApprovalSQL = {
   updateApprovalStep: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE request_approval_step SET
-                                       step_status = 'dataItem.step_status'
+                                       STEP_STATUS = 'dataItem.STEP_STATUS'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
-                                       step_id = dataItem.step_id
+                                       STEP_ID = dataItem.STEP_ID
         `
 
-    sql = sql.replaceAll('dataItem.step_id', (dataItem['step_id'] || 0).toString())
-    sql = sql.replaceAll('dataItem.step_status', dataItem['step_status'] || '')
+    sql = sql.replaceAll('dataItem.STEP_ID', (dataItem['STEP_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.STEP_STATUS', dataItem['STEP_STATUS'] || '')
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
 
     return sql
@@ -915,27 +1073,27 @@ export const GprCApprovalSQL = {
   createApprovalLog: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             INSERT INTO request_approval_log (
-                                       request_id
-                                     , step_id
-                                     , action_by
-                                     , action_type
-                                     , remark
-                                     , action_date
+                                       REQUEST_ID
+                                     , STEP_ID
+                                     , ACTION_BY
+                                     , ACTION_TYPE
+                                     , REMARK
+                                     , ACTION_DATE
                             ) VALUES (
-                                        dataItem.request_id
-                                     ,  dataItem.step_id
-                                     , 'dataItem.action_by'
-                                     , 'dataItem.action_type'
-                                     , 'dataItem.remark'
+                                        dataItem.REQUEST_ID
+                                     ,  dataItem.STEP_ID
+                                     , 'dataItem.ACTION_BY'
+                                     , 'dataItem.ACTION_TYPE'
+                                     , 'dataItem.REMARK'
                                      ,  NOW()
                             )
         `
 
-    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-    sql = sql.replaceAll('dataItem.step_id', dataItem['step_id'] ? dataItem['step_id'].toString() : 'NULL')
-    sql = sql.replaceAll('dataItem.action_by', dataItem['action_by'] || '')
-    sql = sql.replaceAll('dataItem.action_type', dataItem['action_type'] || '')
-    sql = sql.replaceAll('dataItem.remark', dataItem['remark'] || '')
+    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.STEP_ID', dataItem['STEP_ID'] ? dataItem['STEP_ID'].toString() : 'NULL')
+    sql = sql.replaceAll('dataItem.ACTION_BY', dataItem['ACTION_BY'] || '')
+    sql = sql.replaceAll('dataItem.ACTION_TYPE', dataItem['ACTION_TYPE'] || '')
+    sql = sql.replaceAll('dataItem.REMARK', dataItem['REMARK'] || '')
 
     return sql
   },
@@ -943,21 +1101,21 @@ export const GprCApprovalSQL = {
   updateStatus: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE request_register_vendor SET
-                                       request_status = 'dataItem.request_status'
-                                     , approve_by = 'dataItem.approve_by'
-                                     , approve_date = 'dataItem.approve_date'
-                                     , approver_remark = 'dataItem.approver_remark'
+                                       REQUEST_STATUS = 'dataItem.REQUEST_STATUS'
+                                     , APPROVE_BY = 'dataItem.APPROVE_BY'
+                                     , APPROVE_DATE = dataItem.APPROVE_DATE
+                                     , APPROVER_REMARK = 'dataItem.APPROVER_REMARK'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
-                                       request_id = dataItem.request_id
+                                       REQUEST_ID = dataItem.REQUEST_ID
         `
 
-    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
-    sql = sql.replaceAll('dataItem.request_status', dataItem['request_status'] || '')
-    sql = sql.replaceAll('dataItem.approve_by', dataItem['approve_by'] || '')
-    sql = sql.replaceAll("'dataItem.approve_date'", dataItem['approve_date'] === 'NOW()' ? 'NOW()' : 'approve_date')
-    sql = sql.replaceAll('dataItem.approver_remark', dataItem['approver_remark'] || '')
+    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_STATUS', dataItem['REQUEST_STATUS'] || '')
+    sql = sql.replaceAll('dataItem.APPROVE_BY', dataItem['APPROVE_BY'] || '')
+    sql = sql.replaceAll('dataItem.APPROVE_DATE', dataItem['APPROVE_DATE'] === 'NOW()' ? 'NOW()' : 'APPROVE_DATE')
+    sql = sql.replaceAll('dataItem.APPROVER_REMARK', dataItem['APPROVER_REMARK'] || '')
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
 
     return sql
@@ -966,15 +1124,15 @@ export const GprCApprovalSQL = {
   markRequestCompleted: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE request_register_vendor SET
-                                       request_status = 'Completed'
-                                     , approve_date = NOW()
+                                       REQUEST_STATUS = 'Completed'
+                                     , APPROVE_DATE = NOW()
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
-                                       request_id = dataItem.request_id
+                                       REQUEST_ID = dataItem.REQUEST_ID
         `
 
-    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
     return sql
@@ -983,31 +1141,31 @@ export const GprCApprovalSQL = {
   getRequestStatusContext: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             SELECT
-                                       rr.vendor_id
-                                     , rr.assign_to
-                                     , rvs.vendor_code_selector
-                                     , rvs.gpr_c_approver_name
-                                     , rvs.gpr_c_approver_email
-                                     , rvs.gpr_c_pc_pic_name
-                                     , rvs.gpr_c_pc_pic_email
-                                     , rvs.gpr_c_circular_json
-                                     , rvs.action_required_json
-                                     , v.vendor_region
+                                       rr.VENDOR_ID
+                                     , rr.ASSIGN_TO
+                                     , rvs.VENDOR_CODE_SELECTOR
+                                     , rvs.GPR_C_APPROVER_NAME
+                                     , rvs.GPR_C_APPROVER_EMAIL
+                                     , rvs.GPR_C_PC_PIC_NAME
+                                     , rvs.GPR_C_PC_PIC_EMAIL
+                                     , rvs.GPR_C_CIRCULAR_JSON
+                                     , rvs.ACTION_REQUIRED_JSON
+                                     , v.VENDOR_REGION
                             FROM
                                        request_register_vendor rr
                                             LEFT JOIN
-                                       vendors v ON v.vendor_id = rr.vendor_id
+                                       vendors v ON v.VENDOR_ID = rr.VENDOR_ID
                                             LEFT JOIN
-                                       request_vendor_selections rvs ON rvs.request_id = rr.request_id AND rvs.INUSE = 1
+                                       request_vendor_selections rvs ON rvs.REQUEST_ID = rr.REQUEST_ID AND rvs.INUSE = 1
                             WHERE
-                                       rr.request_id = dataItem.request_id
+                                       rr.REQUEST_ID = dataItem.REQUEST_ID
                             ORDER BY
-                                       rvs.selection_id DESC
+                                       rvs.SELECTION_ID DESC
                             LIMIT
                                        1
         `
 
-    sql = sql.replaceAll('dataItem.request_id', (dataItem['request_id'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
 
     return sql
   },
@@ -1015,13 +1173,13 @@ export const GprCApprovalSQL = {
   updateVendorFftStatus: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE vendors SET
-                                       fft_status = dataItem.fft_status
+                                       FFT_STATUS = dataItem.FFT_STATUS
                             WHERE
-                                       vendor_id = dataItem.vendor_id
+                                       VENDOR_ID = dataItem.VENDOR_ID
         `
 
-    sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
-    sql = sql.replaceAll('dataItem.fft_status', (dataItem['fft_status'] || 0).toString())
+    sql = sql.replaceAll('dataItem.VENDOR_ID', (dataItem['VENDOR_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.FFT_STATUS', (dataItem['FFT_STATUS'] || 0).toString())
 
     return sql
   },
@@ -1029,36 +1187,36 @@ export const GprCApprovalSQL = {
   getActiveAssigneeByEmpCodeAndGroupCode: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             SELECT
-                                       Assignees_id
-                                     , empcode
-                                     , empName
-                                     , empEmail
-                                     , group_code
-                                     , group_name
+                                       ASSIGNEES_ID
+                                     , EMPCODE
+                                     , EMPNAME
+                                     , EMPEMAIL
+                                     , GROUP_CODE
+                                     , GROUP_NAME
                                      , INUSE
                             FROM
                                        assignees_to
                             WHERE
-                                       empcode = 'dataItem.empcode'
+                                       EMPCODE = 'dataItem.EMPCODE'
                                        AND (
-                                           UPPER(TRIM(COALESCE(group_code, ''))) = 'dataItem.group_code'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(group_name, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_')
-                                               = 'dataItem.group_code'
+                                           UPPER(TRIM(COALESCE(GROUP_CODE, ''))) = 'dataItem.GROUP_CODE'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(GROUP_NAME, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_')
+                                               = 'dataItem.GROUP_CODE'
                                            OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-                                               UPPER(TRIM(COALESCE(group_code, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '')
-                                               = 'dataItem.group_compact'
+                                               UPPER(TRIM(COALESCE(GROUP_CODE, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '')
+                                               = 'dataItem.GROUP_COMPACT'
                                            OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-                                               UPPER(TRIM(COALESCE(group_name, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '')
-                                               = 'dataItem.group_compact'
+                                               UPPER(TRIM(COALESCE(GROUP_NAME, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '')
+                                               = 'dataItem.GROUP_COMPACT'
                                        )
                                        AND INUSE = 1
                             LIMIT
                                        1
         `
 
-    sql = sql.replaceAll('dataItem.empcode', dataItem['empcode'] || '')
-    sql = sql.replaceAll('dataItem.group_code', dataItem['group_code'] || '')
-    sql = sql.replaceAll('dataItem.group_compact', dataItem['group_compact'] || '')
+    sql = sql.replaceAll('dataItem.EMPCODE', dataItem['EMPCODE'] || '')
+    sql = sql.replaceAll('dataItem.GROUP_CODE', dataItem['GROUP_CODE'] || '')
+    sql = sql.replaceAll('dataItem.GROUP_COMPACT', dataItem['GROUP_COMPACT'] || '')
 
     return sql
   },

@@ -4,11 +4,13 @@ const esc = (value: any) =>
     .replaceAll("'", "\\'")
 
 export interface BlacklistSearchDataItem {
+  [key: string]: any
   vendor_name?: string
   group_code?: 'ALL' | 'US' | 'CN' | string
 }
 
 export interface BlacklistSearchAgGridDataItem {
+  [key: string]: any
   sqlWhere?: string
   Order?: string
   Limit?: number | string
@@ -16,6 +18,7 @@ export interface BlacklistSearchAgGridDataItem {
 }
 
 export interface BlacklistUsInsertDataItem {
+  [key: string]: any
   source?: string | null
   entity_number?: string | null
   entity_type?: string | null
@@ -45,6 +48,7 @@ export interface BlacklistUsInsertDataItem {
 }
 
 export interface BlacklistCnInsertDataItem {
+  [key: string]: any
   source_name?: string | null
   entity_number?: string | null
   entity_type?: string | null
@@ -61,9 +65,10 @@ export interface BlacklistCnInsertDataItem {
 }
 
 export interface BlacklistAliasInsertDataItem {
-  vendor_id: number
-  alias_name: string
-  normalized_alias_name: string
+  [key: string]: any
+  vendor_id?: number
+  alias_name?: string
+  normalized_alias_name?: string
   CREATE_BY: string
   UPDATE_BY?: string | null
   DESCRIPTION?: string | null
@@ -72,43 +77,43 @@ export interface BlacklistAliasInsertDataItem {
 
 export const BlacklistSQL = {
   search: (dataItem: BlacklistSearchDataItem) => {
-    const groupCode = String(dataItem.group_code || '')
+    const groupCode = String(dataItem.GROUP_CODE || '')
       .trim()
       .toUpperCase()
-    const keyword = String(dataItem.vendor_name || '').trim()
+    const keyword = String(dataItem.VENDOR_NAME || '').trim()
 
     const escapedKeyword = esc(keyword)
     const escapedKeywordUpper = esc(keyword.toUpperCase())
 
     let usKeywordSql = keyword
       ? ` AND (
-                   bu.NAME LIKE '%dataItem.keywordVal%'
-                OR bu.ALT_NAMES LIKE '%dataItem.keywordVal%'
-                OR bu.SOURCE LIKE '%dataItem.keywordVal%'
+                   bu.NAME LIKE '%dataItem.KEYWORDVAL%'
+                OR bu.ALT_NAMES LIKE '%dataItem.KEYWORDVAL%'
+                OR bu.SOURCE LIKE '%dataItem.KEYWORDVAL%'
             )`
       : ''
 
-    usKeywordSql = usKeywordSql.replaceAll('dataItem.keywordVal', escapedKeyword)
+    usKeywordSql = usKeywordSql.replaceAll('dataItem.KEYWORDVAL', escapedKeyword)
 
     let cnKeywordSql = keyword
       ? ` AND (
-                   bc.primary_name LIKE '%dataItem.keywordVal%'
-                OR bc.normalized_name LIKE '%dataItem.keywordUpperVal%'
+                   bc.PRIMARY_NAME LIKE '%dataItem.KEYWORDVAL%'
+                OR bc.NORMALIZED_NAME LIKE '%dataItem.KEYWORDUPPERVAL%'
                 OR EXISTS (
                     SELECT 1
                     FROM blacklist_cn_aliases va
-                    WHERE va.vendor_id = bc.id
+                    WHERE va.VENDOR_ID = bc.ID
                       AND va.INUSE = 1
                       AND (
-                           va.alias_name LIKE '%dataItem.keywordVal%'
-                        OR va.normalized_alias_name LIKE '%dataItem.keywordUpperVal%'
+                           va.ALIAS_NAME LIKE '%dataItem.KEYWORDVAL%'
+                        OR va.NORMALIZED_ALIAS_NAME LIKE '%dataItem.KEYWORDUPPERVAL%'
                       )
                 )
             )`
       : ''
 
-    cnKeywordSql = cnKeywordSql.replaceAll('dataItem.keywordUpperVal', escapedKeywordUpper)
-    cnKeywordSql = cnKeywordSql.replaceAll('dataItem.keywordVal', escapedKeyword)
+    cnKeywordSql = cnKeywordSql.replaceAll('dataItem.KEYWORDUPPERVAL', escapedKeywordUpper)
+    cnKeywordSql = cnKeywordSql.replaceAll('dataItem.KEYWORDVAL', escapedKeyword)
 
     let usSql = `
             SELECT
@@ -132,22 +137,22 @@ export const BlacklistSQL = {
                 blacklist_us bu
             WHERE
                 bu.INUSE = 1
-                dataItem.usKeywordSql
+                dataItem.USKEYWORDSQL
         `
 
-    usSql = usSql.replaceAll('dataItem.usKeywordSql', usKeywordSql)
+    usSql = usSql.replaceAll('dataItem.USKEYWORDSQL', usKeywordSql)
 
     let cnSql = `
             SELECT
-                  bc.id AS blacklist_id
+                  bc.ID AS blacklist_id
                 , 'CN' AS group_code
-                , bc.source_name
-                , bc.entity_number
-                , bc.entity_type
-                , bc.programs
-                , bc.country
-                , bc.primary_name AS vendor_name
-                , bc.wmd_type
+                , bc.SOURCE_NAME
+                , bc.ENTITY_NUMBER
+                , bc.ENTITY_TYPE
+                , bc.PROGRAMS
+                , bc.COUNTRY
+                , bc.PRIMARY_NAME AS vendor_name
+                , bc.WMD_TYPE
                 , bc.DESCRIPTION AS description
                 , bc.CREATE_BY AS create_by
                 , bc.UPDATE_BY AS update_by
@@ -155,7 +160,7 @@ export const BlacklistSQL = {
                 , (
                     SELECT COUNT(*)
                     FROM blacklist_cn_aliases va
-                    WHERE va.vendor_id = bc.id
+                    WHERE va.VENDOR_ID = bc.ID
                       AND va.INUSE = 1
                 ) AS alias_count
                 , bc.UPDATE_DATE AS updated_date
@@ -164,48 +169,48 @@ export const BlacklistSQL = {
                 blacklist_cn bc
             WHERE
                 bc.INUSE = 1
-                dataItem.cnKeywordSql
+                dataItem.CNKEYWORDSQL
         `
 
-    cnSql = cnSql.replaceAll('dataItem.cnKeywordSql', cnKeywordSql)
+    cnSql = cnSql.replaceAll('dataItem.CNKEYWORDSQL', cnKeywordSql)
 
     if (groupCode === 'US') {
       let sql = `
-                dataItem.usSql
-                ORDER BY vendor_name ASC
+                dataItem.USSQL
+                ORDER BY VENDOR_NAME ASC
             `
 
-      sql = sql.replaceAll('dataItem.usSql', usSql)
+      sql = sql.replaceAll('dataItem.USSQL', usSql)
 
       return sql
     }
 
     if (groupCode === 'CN') {
       let sql = `
-                dataItem.cnSql
-                ORDER BY vendor_name ASC
+                dataItem.CNSQL
+                ORDER BY VENDOR_NAME ASC
             `
 
-      sql = sql.replaceAll('dataItem.cnSql', cnSql)
+      sql = sql.replaceAll('dataItem.CNSQL', cnSql)
 
       return sql
     }
 
     let sql = `
-            (dataItem.usSql)
+            (dataItem.USSQL)
             UNION ALL
-            (dataItem.cnSql)
-            ORDER BY vendor_name ASC
+            (dataItem.CNSQL)
+            ORDER BY VENDOR_NAME ASC
         `
 
-    sql = sql.replaceAll('dataItem.usSql', usSql)
-    sql = sql.replaceAll('dataItem.cnSql', cnSql)
+    sql = sql.replaceAll('dataItem.USSQL', usSql)
+    sql = sql.replaceAll('dataItem.CNSQL', cnSql)
 
     return sql
   },
 
   searchAgGrid: (dataItem: BlacklistSearchAgGridDataItem) => {
-    const sqlWhereClause = String(dataItem.sqlWhere || '')
+    const sqlWhereClause = String(dataItem.SQLWHERE || '')
       .trim()
       .replace(/^WHERE\s+/i, 'AND ')
 
@@ -233,15 +238,15 @@ export const BlacklistSQL = {
             UNION ALL
 
             SELECT
-                  bc.id AS blacklist_id
+                  bc.ID AS blacklist_id
                 , 'CN' AS group_code
-                , bc.source_name
-                , bc.entity_number
-                , bc.entity_type
-                , bc.programs
-                , bc.country
-                , bc.primary_name AS vendor_name
-                , bc.wmd_type
+                , bc.SOURCE_NAME
+                , bc.ENTITY_NUMBER
+                , bc.ENTITY_TYPE
+                , bc.PROGRAMS
+                , bc.COUNTRY
+                , bc.PRIMARY_NAME AS vendor_name
+                , bc.WMD_TYPE
                 , bc.DESCRIPTION AS description
                 , bc.CREATE_BY AS create_by
                 , bc.UPDATE_BY AS update_by
@@ -249,7 +254,7 @@ export const BlacklistSQL = {
                 , (
                     SELECT COUNT(*)
                     FROM blacklist_cn_aliases va
-                    WHERE va.vendor_id = bc.id
+                    WHERE va.VENDOR_ID = bc.ID
                       AND va.INUSE = 1
                 ) AS alias_count
                 , bc.UPDATE_DATE AS updated_date
@@ -262,36 +267,36 @@ export const BlacklistSQL = {
             SELECT
                 COUNT(*) AS TOTAL_COUNT
             FROM (
-                dataItem.baseSql
+                dataItem.BASESQL
             ) bl
             WHERE
                 1 = 1
-                dataItem.sqlWhere
+                dataItem.SQLWHERE
         `
 
     let sqlData = `
             SELECT
                 *
             FROM (
-                dataItem.baseSql
+                dataItem.BASESQL
             ) bl
             WHERE
                 1 = 1
-                dataItem.sqlWhere
+                dataItem.SQLWHERE
             ORDER BY
-                dataItem.Order
+                dataItem.ORDER
             LIMIT
-                dataItem.Limit OFFSET dataItem.Offset
+                dataItem.LIMIT OFFSET dataItem.OFFSET
         `
 
-    sqlCount = sqlCount.replaceAll('dataItem.baseSql', baseSql)
-    sqlCount = sqlCount.replaceAll('dataItem.sqlWhere', sqlWhereClause)
+    sqlCount = sqlCount.replaceAll('dataItem.BASESQL', baseSql)
+    sqlCount = sqlCount.replaceAll('dataItem.SQLWHERE', sqlWhereClause)
 
-    sqlData = sqlData.replaceAll('dataItem.baseSql', baseSql)
-    sqlData = sqlData.replaceAll('dataItem.sqlWhere', sqlWhereClause)
-    sqlData = sqlData.replaceAll('dataItem.Order', dataItem.Order || 'bl.updated_date DESC')
-    sqlData = sqlData.replaceAll('dataItem.Limit', String(dataItem.Limit || 20))
-    sqlData = sqlData.replaceAll('dataItem.Offset', String(dataItem.Offset || 0))
+    sqlData = sqlData.replaceAll('dataItem.BASESQL', baseSql)
+    sqlData = sqlData.replaceAll('dataItem.SQLWHERE', sqlWhereClause)
+    sqlData = sqlData.replaceAll('dataItem.ORDER', dataItem.ORDER || 'bl.updated_date DESC')
+    sqlData = sqlData.replaceAll('dataItem.LIMIT', String(dataItem.LIMIT || 20))
+    sqlData = sqlData.replaceAll('dataItem.OFFSET', String(dataItem.OFFSET || 0))
 
     return [sqlCount, sqlData]
   },
@@ -329,29 +334,29 @@ export const BlacklistSQL = {
             , UPDATE_BY
             , INUSE
         ) VALUES (
-              dataItem.source
-            , dataItem.entity_number
-            , dataItem.entity_type
-            , dataItem.programs
-            , 'dataItem.name'
-            , dataItem.title
-            , dataItem.addresses
-            , dataItem.federal_register_notice
-            , dataItem.start_date
-            , dataItem.end_date
-            , dataItem.standard_order
-            , dataItem.license_requirement
-            , dataItem.license_policy
-            , dataItem.vessel_information
-            , dataItem.remarks
-            , dataItem.source_list_url
-            , dataItem.alt_names
-            , dataItem.citizenships
-            , dataItem.dates_of_birth
-            , dataItem.nationalities
-            , dataItem.places_of_birth
-            , dataItem.source_information_url
-            , dataItem.description
+              dataItem.SOURCE
+            , dataItem.ENTITY_NUMBER
+            , dataItem.ENTITY_TYPE
+            , dataItem.PROGRAMS
+            , 'dataItem.NAME'
+            , dataItem.TITLE
+            , dataItem.ADDRESSES
+            , dataItem.FEDERAL_REGISTER_NOTICE
+            , dataItem.START_DATE
+            , dataItem.END_DATE
+            , dataItem.STANDARD_ORDER
+            , dataItem.LICENSE_REQUIREMENT
+            , dataItem.LICENSE_POLICY
+            , dataItem.VESSEL_INFORMATION
+            , dataItem.REMARKS
+            , dataItem.SOURCE_LIST_URL
+            , dataItem.ALT_NAMES
+            , dataItem.CITIZENSHIPS
+            , dataItem.DATES_OF_BIRTH
+            , dataItem.NATIONALITIES
+            , dataItem.PLACES_OF_BIRTH
+            , dataItem.SOURCE_INFORMATION_URL
+            , dataItem.DESCRIPTION
             , 'dataItem.CREATE_BY'
             , dataItem.UPDATE_BY
             , dataItem.INUSE
@@ -359,30 +364,30 @@ export const BlacklistSQL = {
     `
 
     // ⚠️  Order matters: replace longer keys BEFORE shorter ones that share a prefix
-    //    e.g. 'dataItem.source_list_url' must come before 'dataItem.source'
-    sql = sql.replaceAll('dataItem.source_list_url', dataItem.source_list_url ? `'${esc(dataItem.source_list_url)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.source_information_url', dataItem.source_information_url ? `'${esc(dataItem.source_information_url)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.source', dataItem.source ? `'${esc(dataItem.source)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.entity_number', dataItem.entity_number ? `'${esc(dataItem.entity_number)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.entity_type', dataItem.entity_type ? `'${esc(dataItem.entity_type)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.programs', dataItem.programs ? `'${esc(dataItem.programs)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.name', esc(dataItem.name))
-    sql = sql.replaceAll('dataItem.title', dataItem.title ? `'${esc(dataItem.title)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.addresses', dataItem.addresses ? `'${esc(dataItem.addresses)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.federal_register_notice', dataItem.federal_register_notice ? `'${esc(dataItem.federal_register_notice)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.start_date', dataItem.start_date ? `'${esc(dataItem.start_date)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.end_date', dataItem.end_date ? `'${esc(dataItem.end_date)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.standard_order', dataItem.standard_order ? `'${esc(dataItem.standard_order)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.license_requirement', dataItem.license_requirement ? `'${esc(dataItem.license_requirement)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.license_policy', dataItem.license_policy ? `'${esc(dataItem.license_policy)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.vessel_information', dataItem.vessel_information ? `'${esc(dataItem.vessel_information)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.remarks', dataItem.remarks ? `'${esc(dataItem.remarks)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.alt_names', dataItem.alt_names ? `'${esc(dataItem.alt_names)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.citizenships', dataItem.citizenships ? `'${esc(dataItem.citizenships)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.dates_of_birth', dataItem.dates_of_birth ? `'${esc(dataItem.dates_of_birth)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.nationalities', dataItem.nationalities ? `'${esc(dataItem.nationalities)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.places_of_birth', dataItem.places_of_birth ? `'${esc(dataItem.places_of_birth)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.description', dataItem.description ? `'${esc(dataItem.description)}'` : 'NULL')
+    //    e.g. 'dataItem.SOURCE_LIST_URL' must come before 'dataItem.SOURCE'
+    sql = sql.replaceAll('dataItem.SOURCE_LIST_URL', dataItem.SOURCE_LIST_URL ? `'${esc(dataItem.SOURCE_LIST_URL)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.SOURCE_INFORMATION_URL', dataItem.SOURCE_INFORMATION_URL ? `'${esc(dataItem.SOURCE_INFORMATION_URL)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.SOURCE', dataItem.SOURCE ? `'${esc(dataItem.SOURCE)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.ENTITY_NUMBER', dataItem.ENTITY_NUMBER ? `'${esc(dataItem.ENTITY_NUMBER)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.ENTITY_TYPE', dataItem.ENTITY_TYPE ? `'${esc(dataItem.ENTITY_TYPE)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.PROGRAMS', dataItem.PROGRAMS ? `'${esc(dataItem.PROGRAMS)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.NAME', esc(dataItem.NAME))
+    sql = sql.replaceAll('dataItem.TITLE', dataItem.TITLE ? `'${esc(dataItem.TITLE)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.ADDRESSES', dataItem.ADDRESSES ? `'${esc(dataItem.ADDRESSES)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.FEDERAL_REGISTER_NOTICE', dataItem.FEDERAL_REGISTER_NOTICE ? `'${esc(dataItem.FEDERAL_REGISTER_NOTICE)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.START_DATE', dataItem.START_DATE ? `'${esc(dataItem.START_DATE)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.END_DATE', dataItem.END_DATE ? `'${esc(dataItem.END_DATE)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.STANDARD_ORDER', dataItem.STANDARD_ORDER ? `'${esc(dataItem.STANDARD_ORDER)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.LICENSE_REQUIREMENT', dataItem.LICENSE_REQUIREMENT ? `'${esc(dataItem.LICENSE_REQUIREMENT)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.LICENSE_POLICY', dataItem.LICENSE_POLICY ? `'${esc(dataItem.LICENSE_POLICY)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.VESSEL_INFORMATION', dataItem.VESSEL_INFORMATION ? `'${esc(dataItem.VESSEL_INFORMATION)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.REMARKS', dataItem.REMARKS ? `'${esc(dataItem.REMARKS)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.ALT_NAMES', dataItem.ALT_NAMES ? `'${esc(dataItem.ALT_NAMES)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.CITIZENSHIPS', dataItem.CITIZENSHIPS ? `'${esc(dataItem.CITIZENSHIPS)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.DATES_OF_BIRTH', dataItem.DATES_OF_BIRTH ? `'${esc(dataItem.DATES_OF_BIRTH)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.NATIONALITIES', dataItem.NATIONALITIES ? `'${esc(dataItem.NATIONALITIES)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.PLACES_OF_BIRTH', dataItem.PLACES_OF_BIRTH ? `'${esc(dataItem.PLACES_OF_BIRTH)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem.DESCRIPTION ? `'${esc(dataItem.DESCRIPTION)}'` : 'NULL')
     sql = sql.replaceAll('dataItem.CREATE_BY', esc(dataItem.CREATE_BY))
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY ? `'${esc(dataItem.UPDATE_BY)}'` : 'NULL')
     sql = sql.replaceAll('dataItem.INUSE', String(dataItem.INUSE ?? 1))
@@ -393,29 +398,29 @@ export const BlacklistSQL = {
   insertCn: (dataItem: BlacklistCnInsertDataItem) => {
     let sql = `
         INSERT INTO blacklist_cn (
-              source_name
-            , entity_number
-            , entity_type
-            , programs
-            , country
-            , primary_name
-            , normalized_name
-            , wmd_type
-            , raw_payload
+              SOURCE_NAME
+            , ENTITY_NUMBER
+            , ENTITY_TYPE
+            , PROGRAMS
+            , COUNTRY
+            , PRIMARY_NAME
+            , NORMALIZED_NAME
+            , WMD_TYPE
+            , RAW_PAYLOAD
             , DESCRIPTION
             , CREATE_BY
             , UPDATE_BY
             , INUSE
         ) VALUES (
-              dataItem.source_name
-            , dataItem.entity_number
-            , dataItem.entity_type
-            , dataItem.programs
-            , dataItem.country
-            , 'dataItem.primary_name'
-            , 'dataItem.normalized_name'
-            , dataItem.wmd_type
-            , dataItem.raw_payload
+              dataItem.SOURCE_NAME
+            , dataItem.ENTITY_NUMBER
+            , dataItem.ENTITY_TYPE
+            , dataItem.PROGRAMS
+            , dataItem.COUNTRY
+            , 'dataItem.PRIMARY_NAME'
+            , 'dataItem.NORMALIZED_NAME'
+            , dataItem.WMD_TYPE
+            , dataItem.RAW_PAYLOAD
             , dataItem.DESCRIPTION
             , 'dataItem.CREATE_BY'
             , dataItem.UPDATE_BY
@@ -423,15 +428,15 @@ export const BlacklistSQL = {
         )
     `
 
-    sql = sql.replaceAll('dataItem.source_name', dataItem.source_name ? `'${esc(dataItem.source_name)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.entity_number', dataItem.entity_number ? `'${esc(dataItem.entity_number)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.entity_type', dataItem.entity_type ? `'${esc(dataItem.entity_type)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.programs', dataItem.programs ? `'${esc(dataItem.programs)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.country', dataItem.country ? `'${esc(dataItem.country)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.primary_name', esc(dataItem.primary_name))
-    sql = sql.replaceAll('dataItem.normalized_name', esc(dataItem.normalized_name))
-    sql = sql.replaceAll('dataItem.wmd_type', dataItem.wmd_type ? `'${esc(dataItem.wmd_type)}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.raw_payload', dataItem.raw_payload ? `'${esc(dataItem.raw_payload)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.SOURCE_NAME', dataItem.SOURCE_NAME ? `'${esc(dataItem.SOURCE_NAME)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.ENTITY_NUMBER', dataItem.ENTITY_NUMBER ? `'${esc(dataItem.ENTITY_NUMBER)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.ENTITY_TYPE', dataItem.ENTITY_TYPE ? `'${esc(dataItem.ENTITY_TYPE)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.PROGRAMS', dataItem.PROGRAMS ? `'${esc(dataItem.PROGRAMS)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.COUNTRY', dataItem.COUNTRY ? `'${esc(dataItem.COUNTRY)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.PRIMARY_NAME', esc(dataItem.PRIMARY_NAME))
+    sql = sql.replaceAll('dataItem.NORMALIZED_NAME', esc(dataItem.NORMALIZED_NAME))
+    sql = sql.replaceAll('dataItem.WMD_TYPE', dataItem.WMD_TYPE ? `'${esc(dataItem.WMD_TYPE)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.RAW_PAYLOAD', dataItem.RAW_PAYLOAD ? `'${esc(dataItem.RAW_PAYLOAD)}'` : 'NULL')
     sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem.DESCRIPTION ? `'${esc(dataItem.DESCRIPTION)}'` : 'NULL')
     sql = sql.replaceAll('dataItem.CREATE_BY', esc(dataItem.CREATE_BY))
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY ? `'${esc(dataItem.UPDATE_BY)}'` : 'NULL')
@@ -443,17 +448,17 @@ export const BlacklistSQL = {
   insertAlias: (dataItem: BlacklistAliasInsertDataItem) => {
     let sql = `
                 INSERT INTO blacklist_cn_aliases (
-              vendor_id
-            , alias_name
-            , normalized_alias_name
+              VENDOR_ID
+            , ALIAS_NAME
+            , NORMALIZED_ALIAS_NAME
             , DESCRIPTION
             , CREATE_BY
             , UPDATE_BY
             , INUSE
         ) VALUES (
-              dataItem.vendor_id
-            , 'dataItem.alias_name'
-            , 'dataItem.normalized_alias_name'
+              dataItem.VENDOR_ID
+            , 'dataItem.ALIAS_NAME'
+            , 'dataItem.NORMALIZED_ALIAS_NAME'
             , dataItem.DESCRIPTION
             , 'dataItem.CREATE_BY'
             , dataItem.UPDATE_BY
@@ -461,9 +466,9 @@ export const BlacklistSQL = {
         )
     `
 
-    sql = sql.replaceAll('dataItem.vendor_id', String(dataItem.vendor_id))
-    sql = sql.replaceAll('dataItem.alias_name', esc(dataItem.alias_name))
-    sql = sql.replaceAll('dataItem.normalized_alias_name', esc(dataItem.normalized_alias_name))
+    sql = sql.replaceAll('dataItem.VENDOR_ID', String(dataItem.VENDOR_ID))
+    sql = sql.replaceAll('dataItem.ALIAS_NAME', esc(dataItem.ALIAS_NAME))
+    sql = sql.replaceAll('dataItem.NORMALIZED_ALIAS_NAME', esc(dataItem.NORMALIZED_ALIAS_NAME))
     sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem.DESCRIPTION ? `'${esc(dataItem.DESCRIPTION)}'` : 'NULL')
     sql = sql.replaceAll('dataItem.CREATE_BY', esc(dataItem.CREATE_BY))
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY ? `'${esc(dataItem.UPDATE_BY)}'` : 'NULL')
@@ -479,14 +484,14 @@ export const BlacklistSQL = {
 
     let sql = `
             SELECT
-                  group_code
+                  GROUP_CODE
                 , matched_name
                 , match_type
-                , source_name
-                , entity_number
-                , entity_type
+                , SOURCE_NAME
+                , ENTITY_NUMBER
+                , ENTITY_TYPE
                 , addresses
-                , programs
+                , PROGRAMS
             FROM (
                 SELECT
                       'US' AS group_code
@@ -502,43 +507,43 @@ export const BlacklistSQL = {
                   AND TRIM(REGEXP_REPLACE(
                         UPPER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(bu.NAME,
                             '.', ' '), ',', ' '), '(', ' '), ')', ' '), '-', ' '), '/', ' ')),
-                        ' {2,}', ' ')) = 'dataItem.normalizedCompanyName'
+                        ' {2,}', ' ')) = 'dataItem.NORMALIZEDCOMPANYNAME'
 
                 UNION ALL
 
                 SELECT
                       'CN' AS group_code
-                    , bc.primary_name AS matched_name
+                    , bc.PRIMARY_NAME AS matched_name
                     , 'name' AS match_type
-                    , bc.source_name
-                    , bc.entity_number
-                    , bc.entity_type
-                    , bc.country AS addresses
-                    , bc.programs
+                    , bc.SOURCE_NAME
+                    , bc.ENTITY_NUMBER
+                    , bc.ENTITY_TYPE
+                    , bc.COUNTRY AS addresses
+                    , bc.PROGRAMS
                 FROM blacklist_cn bc
                 WHERE bc.INUSE = 1
-                  AND bc.normalized_name = 'dataItem.normalizedCompanyName'
+                  AND bc.NORMALIZED_NAME = 'dataItem.NORMALIZEDCOMPANYNAME'
 
                 UNION ALL
 
                 SELECT
                       'CN' AS group_code
-                    , bca.alias_name AS matched_name
+                    , bca.ALIAS_NAME AS matched_name
                     , 'alias' AS match_type
-                    , bc.source_name
-                    , bc.entity_number
-                    , bc.entity_type
-                    , bc.country AS addresses
-                    , bc.programs
+                    , bc.SOURCE_NAME
+                    , bc.ENTITY_NUMBER
+                    , bc.ENTITY_TYPE
+                    , bc.COUNTRY AS addresses
+                    , bc.PROGRAMS
                 FROM blacklist_cn_aliases bca
-                JOIN blacklist_cn bc ON bc.id = bca.vendor_id AND bc.INUSE = 1
+                JOIN blacklist_cn bc ON bc.ID = bca.VENDOR_ID AND bc.INUSE = 1
                 WHERE bca.INUSE = 1
-                  AND bca.normalized_alias_name = 'dataItem.normalizedCompanyName'
+                  AND bca.NORMALIZED_ALIAS_NAME = 'dataItem.NORMALIZEDCOMPANYNAME'
             ) AS matches
-            ORDER BY group_code ASC, match_type ASC
+            ORDER BY GROUP_CODE ASC, match_type ASC
         `
 
-    sql = sql.replaceAll('dataItem.normalizedCompanyName', escaped)
+    sql = sql.replaceAll('dataItem.NORMALIZEDCOMPANYNAME', escaped)
 
     return sql
   },

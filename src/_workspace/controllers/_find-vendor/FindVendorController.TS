@@ -20,24 +20,24 @@ export const FindVendorController = {
         // Intercept Order for SQL fallback (Removed: status_check is now natively supported in SQL)
 
         // Translate 'status' frontend filter ID to backend filter logic
-        if (dataItem.SearchFilters && Array.isArray(dataItem.SearchFilters)) {
-            const statusIdx = dataItem.SearchFilters.findIndex((item: any) => item.id === 'status');
+        if (dataItem.SEARCHFILTERS && Array.isArray(dataItem.SEARCHFILTERS)) {
+            const statusIdx = dataItem.SEARCHFILTERS.findIndex((item: any) => item.id === 'status');
             if (statusIdx > -1) {
-                const val = dataItem.SearchFilters[statusIdx].value;
+                const val = dataItem.SEARCHFILTERS[statusIdx].value;
                 if (val === '1' || val === 1) {
-                    dataItem.pronesStatusFilter = 'Registered';
-                    dataItem.SearchFilters.splice(statusIdx, 1);
+                    dataItem.PRONESSTATUSFILTER = 'Registered';
+                    dataItem.SEARCHFILTERS.splice(statusIdx, 1);
                 } else if (val === '0' || val === 0) {
-                    dataItem.pronesStatusFilter = 'Not Registered';
-                    dataItem.SearchFilters.splice(statusIdx, 1);
+                    dataItem.PRONESSTATUSFILTER = 'Not Registered';
+                    dataItem.SEARCHFILTERS.splice(statusIdx, 1);
                 } else if (val === 'In Progress') {
-                    dataItem.pronesStatusFilter = 'In Progress';
-                    dataItem.SearchFilters.splice(statusIdx, 1);
+                    dataItem.PRONESSTATUSFILTER = 'In Progress';
+                    dataItem.SEARCHFILTERS.splice(statusIdx, 1);
                 } else if (val === 'Cannot Register') {
-                    dataItem.pronesStatusFilter = 'Cannot Register';
-                    dataItem.SearchFilters.splice(statusIdx, 1);
+                    dataItem.PRONESSTATUSFILTER = 'Cannot Register';
+                    dataItem.SEARCHFILTERS.splice(statusIdx, 1);
                 } else {
-                    dataItem.SearchFilters.splice(statusIdx, 1);
+                    dataItem.SEARCHFILTERS.splice(statusIdx, 1);
                 }
             }
         }
@@ -72,8 +72,8 @@ export const FindVendorController = {
         ]
 
         // Filter out null/empty values from SearchFilters before passing to helper
-        if (dataItem.SearchFilters && Array.isArray(dataItem.SearchFilters)) {
-            dataItem.SearchFilters = dataItem.SearchFilters.filter((item: any) =>
+        if (dataItem.SEARCHFILTERS && Array.isArray(dataItem.SEARCHFILTERS)) {
+            dataItem.SEARCHFILTERS = dataItem.SEARCHFILTERS.filter((item: any) =>
                 item.value !== null && item.value !== undefined && item.value !== ''
             )
         }
@@ -84,35 +84,35 @@ export const FindVendorController = {
 
         // Extract sqlWhere from dataItem (it now contains both SearchFilters and ColumnFilters)
         let sqlWhere = ''
-        if (dataItem.sqlWhere) {
-            sqlWhere = dataItem.sqlWhere.trim()
+        if (dataItem.SQLWHERE) {
+            sqlWhere = dataItem.SQLWHERE.trim()
             sqlWhere = sqlWhere.replace(/^WHERE\s+/i, '')
             if (sqlWhere) {
                 sqlWhere = ` AND ${sqlWhere}`
             }
         }
         // for prones Status
-        if (dataItem.pronesStatusFilter) {
-            const statusValue = String(dataItem.pronesStatusFilter).replace(/'/g, "\\'")
+        if (dataItem.PRONESSTATUSFILTER) {
+            const statusValue = String(dataItem.PRONESSTATUSFILTER).replace(/'/g, "\\'")
             sqlWhere += `
                 AND (
                     CASE
-                        WHEN v.fft_status = 2 THEN 'Cannot Register'
+                        WHEN v.FFT_STATUS = 2 THEN 'Cannot Register'
                         WHEN EXISTS (
                             SELECT 1
                             FROM request_register_vendor rrv_ip
-                            WHERE rrv_ip.vendor_id = v.vendor_id
+                            WHERE rrv_ip.VENDOR_ID = v.VENDOR_ID
                               AND rrv_ip.INUSE = 1
-                              AND rrv_ip.request_status NOT IN ('Completed', 'Rejected', 'Vendor Disagreed', 'Cancelled')
+                              AND rrv_ip.REQUEST_STATUS NOT IN ('Completed', 'Rejected', 'Vendor Disagreed', 'Cancelled')
                         ) THEN 'In Progress'
-                        ELSE IFNULL(vmr.status_check, 'Not Registered')
+                        ELSE IFNULL(vmr.STATUS_CHECK, 'Not Registered')
                     END
                 ) = '${statusValue}'
             `
         }
 
-        dataItem['sqlWhereColumnFilter'] = '' // No longer needed as it's merged into sqlWhere
-        dataItem.sqlWhere = sqlWhere
+        dataItem['SQLWHERECOLUMNFILTER'] = '' // No longer needed as it's merged into sqlWhere
+        dataItem.SQLWHERE = sqlWhere
 
         // console.log('dataItem:', dataItem)
 
@@ -193,7 +193,7 @@ export const FindVendorController = {
         }
 
         try {
-            const vendor_id = parseInt(dataItem.vendor_id as string)
+            const vendor_id = parseInt(dataItem.VENDOR_ID as string)
 
             if (!vendor_id || isNaN(vendor_id)) {
                 return res.status(400).json({
@@ -280,7 +280,7 @@ export const FindVendorController = {
         }
 
         try {
-            const vendor_id = parseInt(dataItem.vendor_id as string)
+            const vendor_id = parseInt(dataItem.VENDOR_ID as string)
 
             if (!vendor_id || isNaN(vendor_id)) {
                 return res.status(400).json({
@@ -321,7 +321,7 @@ export const FindVendorController = {
         const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
         try {
-            const vendor_id = parseInt(dataItem.vendor_id as string)
+            const vendor_id = parseInt(dataItem.VENDOR_ID as string)
 
             if (!vendor_id || isNaN(vendor_id)) {
                 return res.status(400).json({
@@ -335,7 +335,7 @@ export const FindVendorController = {
 
             const result = await FindVendorModel.updateVendorComprehensive({
                 ...dataItem,
-                vendor_id,
+                VENDOR_ID: vendor_id,
             })
 
             return res.status(200).json(result as ResponseI)
@@ -355,7 +355,7 @@ export const FindVendorController = {
         const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
         try {
-            const vendor_id = parseInt(dataItem.vendor_id as string)
+            const vendor_id = parseInt(dataItem.VENDOR_ID as string)
 
             if (!vendor_id || isNaN(vendor_id)) {
                 return res.status(400).json({
@@ -368,7 +368,7 @@ export const FindVendorController = {
             }
 
             const result = await FindVendorModel.deleteVendor({
-                vendor_id,
+                VENDOR_ID: vendor_id,
                 UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
             })
 
@@ -548,7 +548,7 @@ export const FindVendorController = {
                 dataItem = req.body
             }
 
-            const query = dataItem.DataForFetch || dataItem || {}
+            const query = dataItem.DATAFORFETCH || dataItem || {}
 
             // Table mapping
             const tableIds = [
@@ -578,21 +578,21 @@ export const FindVendorController = {
                 { table: 'vc', id: 'UPDATE_DATE', Fns: '=' },
             ]
 
-            if (query.SearchFilters && Array.isArray(query.SearchFilters)) {
-                query.SearchFilters = query.SearchFilters.filter((item: any) =>
+            if (query.SEARCHFILTERS && Array.isArray(query.SEARCHFILTERS)) {
+                query.SEARCHFILTERS = query.SEARCHFILTERS.filter((item: any) =>
                     item.value !== null && item.value !== undefined && item.value !== ''
                 )
             }
 
-            const statusFilter = dataItem.DataForFetch?.SearchFilters?.find((item: any) => item.id === 'status');
+            const statusFilter = dataItem.DATAFORFETCH?.SEARCHFILTERS?.find((item: any) => item.id === 'status');
             const requiredStatus = statusFilter && statusFilter.value ? statusFilter.value.toString() : null;
 
             // Intercept Order for SQL fallback
             let statusSort: any = null;
-            if (query.Order && Array.isArray(query.Order)) {
-                statusSort = query.Order.find((o: any) => o.id === 'status_check')
+            if (query.ORDER && Array.isArray(query.ORDER)) {
+                statusSort = query.ORDER.find((o: any) => o.id === 'status_check')
                 if (statusSort) {
-                    query.Order = [{ id: 'company_name', desc: false }]
+                    query.ORDER = [{ id: 'company_name', desc: false }]
                 }
             }
 
@@ -600,32 +600,33 @@ export const FindVendorController = {
             getSqlWhere_elysia(query, tableIds, 'company_name')
 
             let sqlWhere = ''
-            if (query.sqlWhere) {
-                sqlWhere = query.sqlWhere.replace(/^WHERE\s+/i, '')
+            if (query.SQLWHERE) {
+                sqlWhere = query.SQLWHERE.replace(/^WHERE\s+/i, '')
                 if (sqlWhere) {
                     sqlWhere = ` AND ${sqlWhere}`
                 }
             }
 
             // 1. Fetch Data
-            const searchQuery = { ...query, sqlWhereColumnFilter: '', Order: query.Order || 'v.company_name ASC' };
+            const searchQuery = { ...query, SQLWHERECOLUMNFILTER: '', ORDER: query.ORDER || 'v.COMPANY_NAME ASC' };
             let vendorRows: any[] = [];
 
-            if (query.vendor_ids && Array.isArray(query.vendor_ids) && query.vendor_ids.length > 0) {
+            const vendorIds = query.VENDOR_IDS || []
+            if (Array.isArray(vendorIds) && vendorIds.length > 0) {
                 // CASE A: Export Specific IDs (Current Page from Client-Side)
                 // We fetch these specific IDs.
                 // We must modify sqlWhere to filter by these IDs.
-                const ids = query.vendor_ids.join(',');
-                const idsSqlWhere = ` AND v.vendor_id IN (${ids})`;
+                const ids = vendorIds.join(',');
+                const idsSqlWhere = ` AND v.VENDOR_ID IN (${ids})`;
                 // We use searchAllForExport but with specific IDs override
                 // We ignore Order from SQL, because we will sort by ID order in JS
-                searchQuery.sqlWhere = idsSqlWhere;
+                searchQuery.SQLWHERE = idsSqlWhere;
                 vendorRows = await FindVendorModel.searchAllForExport(searchQuery) as any[];
 
                 // Re-sort in Memory to match input ID order
                 const idMap = new Map();
-                if (Array.isArray(query.vendor_ids)) {
-                    query.vendor_ids.forEach((id: number, index: number) => idMap.set(id, index));
+                if (Array.isArray(vendorIds)) {
+                    vendorIds.forEach((id: number, index: number) => idMap.set(id, index));
                 }
 
                 vendorRows.sort((a: any, b: any) => {
@@ -636,13 +637,13 @@ export const FindVendorController = {
 
             } else if (dataItem.TYPE === 'currentPage') {
                 // CASE B: Fallback Current Page (if no vendor_ids sent)
-                searchQuery['Offset'] = Number(searchQuery['Start'] || 0) * Number(searchQuery['Limit'] || 20)
-                searchQuery.sqlWhere = sqlWhere;
+                searchQuery['OFFSET'] = Number(searchQuery['START'] || 0) * Number(searchQuery['LIMIT'] || 20)
+                searchQuery.SQLWHERE = sqlWhere;
                 const { resultData } = await FindVendorModel.searchVendors(searchQuery);
                 vendorRows = resultData;
             } else {
                 // CASE C: All Pages
-                searchQuery.sqlWhere = sqlWhere;
+                searchQuery.SQLWHERE = sqlWhere;
                 vendorRows = await FindVendorModel.searchAllForExport(searchQuery) as any[];
             }
 
@@ -765,7 +766,7 @@ export const FindVendorController = {
     //             dataItem = req.body
     //         }
     //
-    //         const query = dataItem.DataForFetch || dataItem || {}
+    //         const query = dataItem.DATAFORFETCH || dataItem || {}
     //
     //         // Table mapping
     //         const tableIds = [
@@ -800,7 +801,7 @@ export const FindVendorController = {
     //             )
     //         }
     //
-    //         const statusFilter = dataItem.DataForFetch?.SearchFilters?.find((item: any) => item.id === 'status');
+    //         const statusFilter = dataItem.DATAFORFETCH?.SearchFilters?.find((item: any) => item.id === 'status');
     //         const requiredStatus = statusFilter && statusFilter.value ? statusFilter.value.toString() : null;
     //
     //         // Intercept Order: if 'status_check', use default for SQL, but we generally can't sort effective streaming by computed field easily.

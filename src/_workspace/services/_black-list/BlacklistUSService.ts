@@ -39,10 +39,10 @@ export const BlacklistUSService = {
     return resultData
   },
 
-  importFile: async (dataItem: { file?: Express.Multer.File; CREATE_BY?: string; UPDATE_BY?: string }) => {
+  importFile: async (dataItem: { FILE?: Express.Multer.File; CREATE_BY?: string; UPDATE_BY?: string }) => {
     let conn: any = null
     try {
-      const file = dataItem.file
+      const file = dataItem.FILE
       const createBy = String(dataItem.CREATE_BY || dataItem.UPDATE_BY || 'SYSTEM').trim() || 'SYSTEM'
       const updateBy = String(dataItem.UPDATE_BY || createBy).trim() || createBy
 

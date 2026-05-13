@@ -1,4 +1,5 @@
 export interface AddVendorDataItem {
+  [key: string]: any
   company_name?: string
   province?: string
   postal_code?: string
@@ -27,22 +28,22 @@ export const AddVendorSQL = {
   checkDuplicateVendor: async (dataItem: AddVendorDataItem) => {
     let sql = `
                             SELECT
-                                       vendor_id
-                                     , company_name
-                                     , province
-                                     , postal_code
+                                       VENDOR_ID
+                                     , COMPANY_NAME
+                                     , PROVINCE
+                                     , POSTAL_CODE
                             FROM
                                        vendors
                             WHERE
-                                       LOWER(TRIM(company_name)) = LOWER(TRIM('dataItem.company_name'))
-                                       AND LOWER(TRIM(province)) = LOWER(TRIM('dataItem.province'))
-                                       AND TRIM(postal_code) = TRIM('dataItem.postal_code')
+                                       LOWER(TRIM(COMPANY_NAME)) = LOWER(TRIM('dataItem.COMPANY_NAME'))
+                                       AND LOWER(TRIM(PROVINCE)) = LOWER(TRIM('dataItem.PROVINCE'))
+                                       AND TRIM(POSTAL_CODE) = TRIM('dataItem.POSTAL_CODE')
                                        AND INUSE = 1
         `
 
-    sql = sql.replaceAll('dataItem.company_name', dataItem['company_name'] || '')
-    sql = sql.replaceAll('dataItem.province', dataItem['province'] || '')
-    sql = sql.replaceAll('dataItem.postal_code', dataItem['postal_code'] || '')
+    sql = sql.replaceAll('dataItem.COMPANY_NAME', dataItem['COMPANY_NAME'] || '')
+    sql = sql.replaceAll('dataItem.PROVINCE', dataItem['PROVINCE'] || '')
+    sql = sql.replaceAll('dataItem.POSTAL_CODE', dataItem['POSTAL_CODE'] || '')
 
     return sql
   },
@@ -51,47 +52,47 @@ export const AddVendorSQL = {
   createVendor: async (dataItem: AddVendorDataItem) => {
     let sql = `
                             INSERT INTO vendors (
-                                       company_name
-                                     , province
-                                     , postal_code
-                                     , vendor_type_id
-                                     , vendor_region
-                                     , website
-                                     , tel_center
-                                     , emailmain
-                                     , address
-                                     , note
+                                       COMPANY_NAME
+                                     , PROVINCE
+                                     , POSTAL_CODE
+                                     , VENDOR_TYPE_ID
+                                     , VENDOR_REGION
+                                     , WEBSITE
+                                     , TEL_CENTER
+                                     , EMAILMAIN
+                                     , ADDRESS
+                                     , NOTE
                                      , CREATE_BY
                                      , UPDATE_BY
                                      , INUSE
                             )
                             VALUES (
-                                       'dataItem.company_name'
-                                     , 'dataItem.province'
-                                     , 'dataItem.postal_code'
-                                     ,  dataItem.vendor_type_id
-                                     , 'dataItem.vendor_region'
-                                     , 'dataItem.website'
-                                     , 'dataItem.tel_center'
-                                     , 'dataItem.emailmain'
-                                     , 'dataItem.address'
-                                     , 'dataItem.note'
+                                       'dataItem.COMPANY_NAME'
+                                     , 'dataItem.PROVINCE'
+                                     , 'dataItem.POSTAL_CODE'
+                                     ,  dataItem.VENDOR_TYPE_ID
+                                     , 'dataItem.VENDOR_REGION'
+                                     , 'dataItem.WEBSITE'
+                                     , 'dataItem.TEL_CENTER'
+                                     , 'dataItem.EMAILMAIN'
+                                     , 'dataItem.ADDRESS'
+                                     , 'dataItem.NOTE'
                                      , 'dataItem.CREATE_BY'
                                      , 'dataItem.CREATE_BY'
                                      ,  1
                             )
         `
 
-    sql = sql.replaceAll('dataItem.company_name', dataItem['company_name'] || '')
-    sql = sql.replaceAll('dataItem.province', dataItem['province'] || '')
-    sql = sql.replaceAll('dataItem.postal_code', dataItem['postal_code'] || '')
-    sql = sql.replaceAll('dataItem.vendor_type_id', (dataItem['vendor_type_id'] || 0).toString())
-    sql = sql.replaceAll('dataItem.vendor_region', dataItem['vendor_region'] || 'Local')
-    sql = sql.replaceAll('dataItem.website', dataItem['website'] || '')
-    sql = sql.replaceAll('dataItem.tel_center', dataItem['tel_center'] || '')
-    sql = sql.replaceAll('dataItem.emailmain', dataItem['emailmain'] || '')
-    sql = sql.replaceAll('dataItem.address', dataItem['address'] || '')
-    sql = sql.replaceAll('dataItem.note', dataItem['note'] || '')
+    sql = sql.replaceAll('dataItem.COMPANY_NAME', dataItem['COMPANY_NAME'] || '')
+    sql = sql.replaceAll('dataItem.PROVINCE', dataItem['PROVINCE'] || '')
+    sql = sql.replaceAll('dataItem.POSTAL_CODE', dataItem['POSTAL_CODE'] || '')
+    sql = sql.replaceAll('dataItem.VENDOR_TYPE_ID', (dataItem['VENDOR_TYPE_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.VENDOR_REGION', dataItem['VENDOR_REGION'] || 'Local')
+    sql = sql.replaceAll('dataItem.WEBSITE', dataItem['WEBSITE'] || '')
+    sql = sql.replaceAll('dataItem.TEL_CENTER', dataItem['TEL_CENTER'] || '')
+    sql = sql.replaceAll('dataItem.EMAILMAIN', dataItem['EMAILMAIN'] || '')
+    sql = sql.replaceAll('dataItem.ADDRESS', dataItem['ADDRESS'] || '')
+    sql = sql.replaceAll('dataItem.NOTE', dataItem['NOTE'] || '')
     sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || '')
 
     return sql
@@ -101,32 +102,32 @@ export const AddVendorSQL = {
   createVendorContact: async (dataItem: AddVendorDataItem) => {
     let sql = `
                             INSERT INTO vendor_contacts (
-                                       vendor_id
-                                     , contact_name
-                                     , tel_phone
-                                     , email
-                                     , position
+                                       VENDOR_ID
+                                     , CONTACT_NAME
+                                     , TEL_PHONE
+                                     , EMAIL
+                                     , POSITION
                                      , CREATE_BY
                                      , UPDATE_BY
                                      , INUSE
                             )
                             VALUES (
-                                        dataItem.vendor_id
-                                     , 'dataItem.contact_name'
-                                     , 'dataItem.tel_phone'
-                                     , 'dataItem.email'
-                                     , 'dataItem.position'
+                                        dataItem.VENDOR_ID
+                                     , 'dataItem.CONTACT_NAME'
+                                     , 'dataItem.TEL_PHONE'
+                                     , 'dataItem.EMAIL'
+                                     , 'dataItem.POSITION'
                                      , 'dataItem.CREATE_BY'
                                      , 'dataItem.CREATE_BY'
                                      ,  1
                             )
         `
 
-    sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
-    sql = sql.replaceAll('dataItem.contact_name', dataItem['contact_name'] || '')
-    sql = sql.replaceAll('dataItem.tel_phone', dataItem['tel_phone'] || '')
-    sql = sql.replaceAll('dataItem.email', dataItem['email'] || '')
-    sql = sql.replaceAll('dataItem.position', dataItem['position'] || '')
+    sql = sql.replaceAll('dataItem.VENDOR_ID', (dataItem['VENDOR_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.CONTACT_NAME', dataItem['CONTACT_NAME'] || '')
+    sql = sql.replaceAll('dataItem.TEL_PHONE', dataItem['TEL_PHONE'] || '')
+    sql = sql.replaceAll('dataItem.EMAIL', dataItem['EMAIL'] || '')
+    sql = sql.replaceAll('dataItem.POSITION', dataItem['POSITION'] || '')
     sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || '')
 
     return sql
@@ -136,32 +137,32 @@ export const AddVendorSQL = {
   createVendorProduct: async (dataItem: AddVendorDataItem) => {
     let sql = `
                             INSERT INTO vendor_products (
-                                       vendor_id
-                                     , product_group_id
-                                     , maker_name
-                                     , product_name
-                                     , model_list
+                                       VENDOR_ID
+                                     , PRODUCT_GROUP_ID
+                                     , MAKER_NAME
+                                     , PRODUCT_NAME
+                                     , MODEL_LIST
                                      , CREATE_BY
                                      , UPDATE_BY
                                      , INUSE
                             )
                             VALUES (
-                                        dataItem.vendor_id
-                                     ,  dataItem.product_group_id
-                                     , 'dataItem.maker_name'
-                                     , 'dataItem.product_name'
-                                     , 'dataItem.model_list'
+                                        dataItem.VENDOR_ID
+                                     ,  dataItem.PRODUCT_GROUP_ID
+                                     , 'dataItem.MAKER_NAME'
+                                     , 'dataItem.PRODUCT_NAME'
+                                     , 'dataItem.MODEL_LIST'
                                      , 'dataItem.CREATE_BY'
                                      , 'dataItem.CREATE_BY'
                                      ,  1
                             )
         `
 
-    sql = sql.replaceAll('dataItem.vendor_id', (dataItem['vendor_id'] || 0).toString())
-    sql = sql.replaceAll('dataItem.product_group_id', (dataItem['product_group_id'] || 0).toString())
-    sql = sql.replaceAll('dataItem.maker_name', dataItem['maker_name'] || '')
-    sql = sql.replaceAll('dataItem.product_name', dataItem['product_name'] || '')
-    sql = sql.replaceAll('dataItem.model_list', dataItem['model_list'] || '')
+    sql = sql.replaceAll('dataItem.VENDOR_ID', (dataItem['VENDOR_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.PRODUCT_GROUP_ID', (dataItem['PRODUCT_GROUP_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.MAKER_NAME', dataItem['MAKER_NAME'] || '')
+    sql = sql.replaceAll('dataItem.PRODUCT_NAME', dataItem['PRODUCT_NAME'] || '')
+    sql = sql.replaceAll('dataItem.MODEL_LIST', dataItem['MODEL_LIST'] || '')
     sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || '')
 
     return sql
@@ -171,14 +172,14 @@ export const AddVendorSQL = {
   getVendorTypes: async (dataItem?: any) => {
     let sql = `
                             SELECT
-                                       vendor_type_id
-                                     , name
+                                       VENDOR_TYPE_ID
+                                     , NAME
                             FROM
                                        master_vendor_types
                             WHERE
                                        INUSE = 1
                             ORDER BY
-                                       name ASC
+                                       NAME ASC
         `
     return sql
   },
@@ -187,14 +188,14 @@ export const AddVendorSQL = {
   getProductGroups: async (dataItem?: any) => {
     let sql = `
                             SELECT
-                                       product_group_id
-                                     , group_name
+                                       PRODUCT_GROUP_ID
+                                     , GROUP_NAME
                             FROM
                                        master_product_groups
                             WHERE
                                        INUSE = 1
                             ORDER BY
-                                       group_name ASC
+                                       GROUP_NAME ASC
         `
     return sql
   },
@@ -209,20 +210,20 @@ export const AddVendorSQL = {
   createProductGroup: async (dataItem: AddVendorDataItem) => {
     let sql = `
                             INSERT INTO master_product_groups (
-                                       group_name
+                                       GROUP_NAME
                                      , CREATE_BY
                                      , UPDATE_BY
                                      , INUSE
                             )
                             VALUES (
-                                       'dataItem.group_name'
+                                       'dataItem.GROUP_NAME'
                                      , 'dataItem.CREATE_BY'
                                      , 'dataItem.CREATE_BY'
                                      ,  1
                             )
         `
 
-    sql = sql.replaceAll('dataItem.group_name', dataItem['group_name'] || '')
+    sql = sql.replaceAll('dataItem.GROUP_NAME', dataItem['GROUP_NAME'] || '')
     sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || '')
 
     return sql
@@ -232,16 +233,16 @@ export const AddVendorSQL = {
   checkDuplicateProductGroup: async (dataItem: AddVendorDataItem) => {
     let sql = `
                             SELECT
-                                       product_group_id
-                                     , group_name
+                                       PRODUCT_GROUP_ID
+                                     , GROUP_NAME
                             FROM
                                        master_product_groups
                             WHERE
-                                       group_name = 'dataItem.group_name'
+                                       GROUP_NAME = 'dataItem.GROUP_NAME'
                                        AND INUSE = 1
         `
 
-    sql = sql.replaceAll('dataItem.group_name', dataItem['group_name'] || '')
+    sql = sql.replaceAll('dataItem.GROUP_NAME', dataItem['GROUP_NAME'] || '')
 
     return sql
   },
