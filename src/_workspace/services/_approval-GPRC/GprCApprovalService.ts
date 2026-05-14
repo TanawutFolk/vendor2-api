@@ -40,14 +40,8 @@ const mapMember = (empcode: string, row: any) => ({
   email: normalizeEmail(row?.empEmail),
 })
 
-const MOCK_REQUESTER_EMAIL = 'tanawut.patrawan@furukawaelectric.com'
-
 const getRequesterProfile = async (empcodeRaw: any) => {
-  const profile = await getMemberProfile(empcodeRaw)
-  return {
-    ...profile,
-    email: normalizeEmail(MOCK_REQUESTER_EMAIL),
-  }
+  return getMemberProfile(empcodeRaw)
 }
 
 const isActionRequiredStep = (stepCode: string) => ['EMR_CHECKER', 'EMR_APPROVER', 'QMS_CHECKER', 'QMS_APPROVER', 'PM_MANAGER_CHECKER', 'PM_MANAGER_APPROVER'].includes(stepCode)

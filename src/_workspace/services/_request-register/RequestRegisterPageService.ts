@@ -1,4 +1,5 @@
 import { MySQLExecute } from '@businessData/dbExecute'
+import { connection } from '@businessData/db'
 import { RequestRegisterPageSQL } from '../../sql/_request-register/RequestRegisterPageSQL'
 import { RowDataPacket, ResultSetHeader } from 'mysql2'
 import {
@@ -33,12 +34,45 @@ const normalizeVendorContactIds = (dataItem: any): string[] => {
 
 export const RequestRegisterPageService = {
   createRequest: async (dataItem: any) => {
+    let conn: any = null
+    let duplicateGuardLockKey = ''
     try {
+      conn = await connection()
+      await conn.beginTransaction()
+
+      const queryRows = async (sql: string) => {
+        const [rows] = await conn.query(sql)
+        return rows as RowDataPacket[]
+      }
+
+      const executeSql = async (sql: string) => {
+        const [result] = await conn.query(sql)
+        return result as ResultSetHeader
+      }
+
+      const executeSqlList = async (sqlList: string[]) => {
+        const results: ResultSetHeader[] = []
+        for (const sql of sqlList) {
+          const [result] = await conn.query(sql)
+          results.push(result as ResultSetHeader)
+        }
+        return results
+      }
+
       const vendorCheckSql = await RequestRegisterPageSQL.getVendorCreateContext({
         VENDOR_ID: Number(dataItem.VENDOR_ID) || 0,
       })
-      const vendorRes = (await MySQLExecute.search(vendorCheckSql)) as RowDataPacket[]
-      const vendorData = vendorRes[0] || {}
+      const vendorRes = await queryRows(vendorCheckSql)
+      const vendorRow = vendorRes[0] || {}
+      const vendorData = {
+        company_name: vendorRow.company_name || vendorRow.COMPANY_NAME || '',
+        address: vendorRow.address || vendorRow.ADDRESS || '',
+        vendor_region: vendorRow.vendor_region || vendorRow.VENDOR_REGION || '',
+        emailmain: vendorRow.emailmain || vendorRow.EMAILMAIN || '',
+        contact_name: vendorRow.contact_name || vendorRow.CONTACT_NAME || '',
+        email: vendorRow.email || vendorRow.EMAIL || '',
+        tel_phone: vendorRow.tel_phone || vendorRow.TEL_PHONE || '',
+      }
       const vendorRegion = vendorData.vendor_region || 'Local'
       const isOversea = String(vendorRegion).toLowerCase() === 'oversea'
       const assignmentGroupCode = isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
@@ -50,8 +84,53 @@ export const RequestRegisterPageService = {
         dataItem.VENDOR_CONTACT_ID = selectedVendorContactIds[0]
       }
 
+      let contactNames: string[] = []
+      let contactEmails: string[] = []
+      let contactTels: string[] = []
+      if (selectedVendorContactIds.length > 0) {
+        const contactSql = `SELECT CONTACT_NAME, EMAIL, TEL_PHONE FROM vendor_contacts WHERE VENDOR_CONTACT_ID IN (${selectedVendorContactIds.map(id => Number(id)).join(',')}) AND INUSE = 1`
+        const contactRows = await queryRows(contactSql)
+        for (const row of contactRows) {
+          if (row.CONTACT_NAME) contactNames.push(row.CONTACT_NAME)
+          if (row.EMAIL) contactEmails.push(row.EMAIL)
+          if (row.TEL_PHONE) contactTels.push(row.TEL_PHONE)
+        }
+        if (contactNames.length > 0) vendorData.contact_name = contactNames.join(', ')
+        if (contactEmails.length > 0) vendorData.email = contactEmails.join('; ')
+        if (contactTels.length > 0) vendorData.tel_phone = contactTels.join(', ')
+      }
+
+      const requesterEmpCode = String(dataItem.REQUEST_BY_EMPLOYEECODE || dataItem.CREATE_BY || '').trim()
+      if (!requesterEmpCode) {
+        throw new Error('Requester employee code is required')
+      }
+      dataItem.REQUEST_BY_EMPLOYEECODE = requesterEmpCode
+      duplicateGuardLockKey = `request-create:${Number(dataItem.VENDOR_ID) || 0}:${requesterEmpCode}`
+
+      const [lockRows] = await conn.query('SELECT GET_LOCK(?, 10) AS lock_status', [duplicateGuardLockKey])
+      const lockStatus = Number((lockRows as RowDataPacket[])[0]?.lock_status || 0)
+      if (lockStatus !== 1) {
+        throw new Error('Another create request is in progress for this vendor and requester')
+      }
+
+      const duplicateRequestSql = await RequestRegisterPageSQL.checkExistingActiveRequestByVendorRequester({
+        VENDOR_ID: Number(dataItem.VENDOR_ID) || 0,
+        REQUEST_BY_EMPLOYEECODE: requesterEmpCode,
+      })
+      const duplicateRequestRows = await queryRows(duplicateRequestSql)
+      const existingActiveRequest = duplicateRequestRows[0]
+      if (existingActiveRequest) {
+        const existingRequestNumber = String(existingActiveRequest.REQUEST_NUMBER || existingActiveRequest.request_number || '').trim()
+        const existingStatus = String(existingActiveRequest.REQUEST_STATUS || existingActiveRequest.request_status || '').trim()
+        throw new Error(
+          existingRequestNumber
+            ? `Duplicate active request already exists: ${existingRequestNumber}${existingStatus ? ` (${existingStatus})` : ''}`
+            : 'Duplicate active request already exists for this vendor and requester'
+        )
+      }
+
       const statusSql = await RequestRegisterPageSQL.getStatusOptions()
-      const statusRows = (await MySQLExecute.search(statusSql)) as RowDataPacket[]
+      const statusRows = await queryRows(statusSql)
       const workflowStatuses = statusRows.filter((s: any) => !isRejectedStatus(s.value))
       const pendingAgreementStatus = workflowStatuses.find((s: any) => {
         const statusText = normalizeText(`${s.value || ''} ${s.label || ''}`.replace(/[_-]+/g, ' '))
@@ -66,11 +145,11 @@ export const RequestRegisterPageService = {
       const fetchAssigneesSql = await RequestRegisterPageSQL.getActiveAssigneesByGroupCode({
         GROUP_CODE: assignmentGroupCode,
       })
-      const assigneesRes = (await MySQLExecute.search(fetchAssigneesSql)) as RowDataPacket[]
+      const assigneesRes = await queryRows(fetchAssigneesSql)
       const activeAssignees = assigneesRes.map((row) => ({
-        empName: row.empName || row.empcode || '',
-        empCode: row.empcode || '',
-        empEmail: row.empEmail || '',
+        empName: row.empName || row.EMPNAME || row.empcode || row.EMPCODE || '',
+        empCode: row.empcode || row.EMPCODE || '',
+        empEmail: row.empEmail || row.EMPEMAIL || '',
       }))
 
       if (activeAssignees.length === 0) {
@@ -80,11 +159,10 @@ export const RequestRegisterPageService = {
       const lastAssignSql = await RequestRegisterPageSQL.getLastAssignedPicByVendorRegion({
         IS_OVERSEA: isOversea,
       })
-      const lastAssignRes = (await MySQLExecute.search(lastAssignSql)) as RowDataPacket[]
-      const lastAssignTo = lastAssignRes[0]?.assign_to || ''
+      const lastAssignRes = await queryRows(lastAssignSql)
+      const lastAssignTo = lastAssignRes[0]?.assign_to || lastAssignRes[0]?.ASSIGN_TO || ''
       const lastIdx = activeAssignees.findIndex((a: any) => a.empCode === lastAssignTo)
       const nextIndex = (lastIdx + 1) % activeAssignees.length
-      const requesterEmpCode = String(dataItem.REQUEST_BY_EMPLOYEECODE || dataItem.CREATE_BY || '').trim()
       const requesterAssignee = activeAssignees.find((a: any) => a.empCode === requesterEmpCode)
       const nextAssignee = isReRegisterRequest && requesterEmpCode
         ? {
@@ -101,7 +179,7 @@ export const RequestRegisterPageService = {
       }
 
       const sqlCreate = await RequestRegisterPageSQL.createRequest(dataItem)
-      const result = (await MySQLExecute.execute(sqlCreate)) as ResultSetHeader
+      const result = await executeSql(sqlCreate)
       const insertedId = result.insertId
 
       if (!insertedId) throw new Error('Failed to insert registration request')
@@ -112,7 +190,7 @@ export const RequestRegisterPageService = {
         REQUEST_NUMBER_YEAR: requestNumberYear,
         REQUEST_NUMBER_PREFIX: requestNumberPrefixFinal,
       })
-      const runningRows = (await MySQLExecute.search(runningSql)) as RowDataPacket[]
+      const runningRows = await queryRows(runningSql)
       const nextRunningNo = Number(runningRows[0]?.next_no || insertedId) || insertedId
       const requestNumber = formatRequestNumber(nextRunningNo, undefined, requestNumberPrefixFinal)
       const setRequestNumberSql = await RequestRegisterPageSQL.updateRequestNumber({
@@ -120,7 +198,7 @@ export const RequestRegisterPageService = {
         REQUEST_NUMBER: requestNumber,
         UPDATE_BY: dataItem.CREATE_BY || 'SYSTEM',
       })
-      await MySQLExecute.execute(setRequestNumberSql)
+      await executeSql(setRequestNumberSql)
 
       if (selectedVendorContactIds.length > 0) {
         const contactSqlList = await Promise.all(
@@ -133,7 +211,25 @@ export const RequestRegisterPageService = {
             })
           )
         )
-        await MySQLExecute.executeList(contactSqlList)
+        await executeSqlList(contactSqlList)
+      }
+
+      const uploadedFiles = Array.isArray(dataItem.UPLOADED_FILES) ? dataItem.UPLOADED_FILES : []
+      if (uploadedFiles.length > 0) {
+        const fileSqlList = await Promise.all(
+          uploadedFiles.map((file: any) => {
+            const fileName = Buffer.from(file.originalname || '', 'latin1').toString('utf8') || file.filename || ''
+            return RequestRegisterPageSQL.createDocument({
+              REQUEST_ID: insertedId,
+              FILE_NAME: fileName,
+              FILE_PATH: file.filename || '',
+              FILE_SIZE: file.size || 0,
+              FILE_TYPE: file.mimetype || '',
+              CREATE_BY: dataItem.CREATE_BY || 'SYSTEM',
+            })
+          })
+        )
+        await executeSqlList(fileSqlList)
       }
 
       const sqlList = []
@@ -189,11 +285,15 @@ export const RequestRegisterPageService = {
         )
       }
 
-      await MySQLExecute.executeList(sqlList)
+      await executeSqlList(sqlList)
 
       const firstStepSql = await RequestRegisterPageSQL.getApprovalSteps({ REQUEST_ID: insertedId })
-      const firstStepRows = (await MySQLExecute.search(firstStepSql)) as RowDataPacket[]
-      const firstStepId = firstStepRows[0]?.step_id || null
+      const firstStepRows = await queryRows(firstStepSql)
+      const resolveStepId = (step: any) => Number(step?.step_id || step?.STEP_ID || 0) || null
+      const firstStepId = resolveStepId(firstStepRows[0])
+      if (!firstStepId) {
+        throw new Error('Failed to resolve first approval step')
+      }
 
       const logSql = await RequestRegisterPageSQL.createApprovalLog({
         REQUEST_ID: insertedId,
@@ -202,41 +302,62 @@ export const RequestRegisterPageService = {
         ACTION_TYPE: 'submitted',
         REMARK: isReRegisterRequest ? 'Re-register request submitted by PO PIC' : 'Request submitted',
       })
-      await MySQLExecute.execute(logSql)
+      await executeSql(logSql)
 
       if (isReRegisterRequest) {
         const vendorStep = firstStepRows.find((step: any) => requiresVendorReply(step)) || firstStepRows[0]
+        const vendorStepId = resolveStepId(vendorStep) || firstStepId
+        if (!vendorStepId) {
+          throw new Error('Failed to resolve vendor approval step')
+        }
         const vendorRequestLogSql = await RequestRegisterPageSQL.createApprovalLog({
           REQUEST_ID: insertedId,
-          STEP_ID: vendorStep?.step_id || firstStepId,
+          STEP_ID: vendorStepId,
           ACTION_BY: dataItem.REQUEST_BY_EMPLOYEECODE || dataItem.CREATE_BY || 'SYSTEM',
           ACTION_TYPE: 'vendor_requested',
           REMARK: 'Re-register request skipped PO PIC review and sent agreement email to vendor',
         })
-        await MySQLExecute.execute(vendorRequestLogSql)
+        await executeSql(vendorRequestLogSql)
+      }
 
+      await conn.commit()
+      if (duplicateGuardLockKey) {
+        await conn.query('DO RELEASE_LOCK(?)', [duplicateGuardLockKey])
+        duplicateGuardLockKey = ''
+      }
+      conn.release()
+      conn = null
+
+      let message = isReRegisterRequest ? 'Re-register request created and sent to vendor successfully' : 'Request created successfully'
+
+      if (isReRegisterRequest) {
         const mailResult = await triggerVendorDocumentEmail(insertedId, 'Re-register')
         if (!mailResult?.sent) {
-          return {
-            Status: false,
-            Message: `Re-register request created but vendor email failed: ${mailResult?.reason || 'unknown error'}`,
-            ResultOnDb: { insertedId, request_number: requestNumber },
-            MethodOnDb: 'Create Re-register Request Email Failed',
-            TotalCountOnDb: 1,
-          }
+          message = `Re-register request created successfully, but vendor email failed: ${mailResult?.reason || 'unknown error'}`
         }
       } else {
-        RequestRegisterPageService.triggerCreationEmail(dataItem, vendorData, nextAssignee, insertedId, requestNumber, assignmentGroupCode).catch(console.error)
+        RequestRegisterPageService
+          .triggerCreationEmail(dataItem, vendorData, nextAssignee, insertedId, requestNumber, assignmentGroupCode)
+          .catch(console.error)
       }
 
       return {
         Status: true,
-        Message: isReRegisterRequest ? 'Re-register request created and sent to vendor successfully' : 'Request created successfully',
+        Message: message,
         ResultOnDb: { insertedId, request_number: requestNumber },
         MethodOnDb: 'Create Request Success',
         TotalCountOnDb: 1,
       }
     } catch (error: any) {
+      if (conn) {
+        await conn.rollback()
+        if (duplicateGuardLockKey) {
+          await conn.query('DO RELEASE_LOCK(?)', [duplicateGuardLockKey])
+          duplicateGuardLockKey = ''
+        }
+        conn.release()
+        conn = null
+      }
       console.error('Error in RequestRegisterPageService.createRequest:', error)
       return {
         Status: false,
@@ -245,6 +366,8 @@ export const RequestRegisterPageService = {
         MethodOnDb: 'Create Request Failed',
         TotalCountOnDb: 0,
       }
+    } finally {
+      if (conn) conn.release()
     }
   },
 
@@ -312,7 +435,7 @@ export const RequestRegisterPageService = {
 
       const stepsSql = await RequestRegisterPageSQL.getApprovalSteps({ REQUEST_ID: requestId })
       const steps = (await MySQLExecute.search(stepsSql)) as RowDataPacket[]
-      const currentStep = steps.find((s: any) => s.step_status === 'in_progress')
+      const currentStep = steps.find((s: any) => String(s.STEP_STATUS || s.step_status || '').toLowerCase() === 'in_progress')
 
       if (!currentStep || !isPicStep(currentStep)) {
         throw new Error('Request can only be edited when it is in the PIC checking step')

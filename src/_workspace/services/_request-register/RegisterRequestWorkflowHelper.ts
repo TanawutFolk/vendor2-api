@@ -26,7 +26,15 @@ export const normalizeText = (value: any) =>
 const normalizeActionToken = (value: any) => normalizeText(String(value || '').replace(/[-\s]+/g, '_'))
 
 export const resolveWorkflowAction = (dataItem: any) => {
-  const token = normalizeActionToken(dataItem?.workflow_action || dataItem?.action_type || dataItem?.negotiation_action || '')
+  const token = normalizeActionToken(
+    dataItem?.workflow_action ||
+      dataItem?.WORKFLOW_ACTION ||
+      dataItem?.action_type ||
+      dataItem?.ACTION_TYPE ||
+      dataItem?.negotiation_action ||
+      dataItem?.NEGOTIATION_ACTION ||
+      ''
+  )
 
   if (!token) return ''
   if (['approve', 'approved', 'agree', 'agreed', 'vendor_agreed', 'continue'].includes(token)) {
@@ -46,7 +54,7 @@ export const resolveWorkflowAction = (dataItem: any) => {
 }
 
 export const inferStepCode = (step: any) => {
-  if (step?.step_code) return String(step.step_code).trim().toUpperCase()
+  if (step?.step_code || step?.STEP_CODE) return String(step.step_code || step.STEP_CODE).trim().toUpperCase()
 
   const source = normalizeText(`${step?.DESCRIPTION || ''} ${step?.description || ''} ${step?.label || ''}`)
 
@@ -73,7 +81,7 @@ export const inferStepCode = (step: any) => {
 }
 
 export const inferActorType = (step: any) => {
-  if (step?.actor_type) return String(step.actor_type).trim().toUpperCase()
+  if (step?.actor_type || step?.ACTOR_TYPE) return String(step.actor_type || step.ACTOR_TYPE).trim().toUpperCase()
 
   const stepCode = inferStepCode(step)
   if (stepCode === 'PIC_REVIEW') return 'PIC'
@@ -86,7 +94,7 @@ export const inferActorType = (step: any) => {
 }
 
 export const resolveGroupCodeForStep = (step: any, isOversea: boolean) => {
-  if (step?.group_code) return String(step.group_code).trim().toUpperCase()
+  if (step?.group_code || step?.GROUP_CODE) return String(step.group_code || step.GROUP_CODE).trim().toUpperCase()
 
   switch (inferStepCode(step)) {
     case 'PIC_REVIEW':
@@ -111,16 +119,18 @@ export const isPicStep = (step: any) => inferActorType(step) === 'PIC'
 export const isAccountStep = (step: any) => inferActorType(step) === 'ACCOUNT'
 
 export const requiresVendorReply = (step: any) => {
-  if (step?.requiresVendorReply !== undefined && step?.requiresVendorReply !== null) {
-    return Number(step.requiresVendorReply) === 1
+  const requiresVendorReplyValue = step?.requiresVendorReply ?? step?.REQUIRES_VENDOR_REPLY
+  if (requiresVendorReplyValue !== undefined && requiresVendorReplyValue !== null) {
+    return Number(requiresVendorReplyValue) === 1
   }
 
-  return inferStepCode(step) === 'PIC_REVIEW'
+  return inferStepCode(step) === 'PIC_REVIEW' || isPicStep(step)
 }
 
 export const requiresVendorCode = (step: any) => {
-  if (step?.requiresVendorCode !== undefined && step?.requiresVendorCode !== null) {
-    return Number(step.requiresVendorCode) === 1
+  const requiresVendorCodeValue = step?.requiresVendorCode ?? step?.REQUIRES_VENDOR_CODE
+  if (requiresVendorCodeValue !== undefined && requiresVendorCodeValue !== null) {
+    return Number(requiresVendorCodeValue) === 1
   }
 
   return inferStepCode(step) === 'ACCOUNT_REGISTERED'

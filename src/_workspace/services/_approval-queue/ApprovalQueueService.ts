@@ -90,6 +90,51 @@ interface CriteriaRow extends RowDataPacket {
   uploaded_file_path?: string
 }
 
+const normalizeApprovalStep = (step: any): ApprovalStep => ({
+  ...step,
+  step_id: Number(step?.step_id ?? step?.STEP_ID ?? 0),
+  request_id: Number(step?.request_id ?? step?.REQUEST_ID ?? 0),
+  step_order: Number(step?.step_order ?? step?.STEP_ORDER ?? 0),
+  approver_id: String(step?.approver_id ?? step?.APPROVER_ID ?? ''),
+  step_status: String(step?.step_status ?? step?.STEP_STATUS ?? '') as ApprovalStepStatus,
+  DESCRIPTION: step?.DESCRIPTION ?? step?.description ?? '',
+  step_code: String(step?.step_code ?? step?.STEP_CODE ?? ''),
+  actor_type: String(step?.actor_type ?? step?.ACTOR_TYPE ?? ''),
+  group_code: String(step?.group_code ?? step?.GROUP_CODE ?? ''),
+  assignment_mode: String(step?.assignment_mode ?? step?.ASSIGNMENT_MODE ?? ''),
+}) as ApprovalStep
+
+const normalizeApprovalLog = (log: any) => ({
+  ...log,
+  log_id: Number(log?.log_id ?? log?.LOG_ID ?? 0),
+  request_id: Number(log?.request_id ?? log?.REQUEST_ID ?? 0),
+  step_id: Number(log?.step_id ?? log?.STEP_ID ?? 0),
+  action_by: String(log?.action_by ?? log?.ACTION_BY ?? ''),
+  action_type: String(log?.action_type ?? log?.ACTION_TYPE ?? ''),
+  remark: log?.remark ?? log?.REMARK ?? '',
+  action_date: log?.action_date ?? log?.ACTION_DATE ?? null,
+})
+
+const normalizeRequestRecord = (request: any): RequestRecord => ({
+  ...request,
+  vendor_id: Number(request?.vendor_id ?? request?.VENDOR_ID ?? 0) || undefined,
+  assign_to: String(request?.assign_to ?? request?.ASSIGN_TO ?? ''),
+  request_number: String(request?.request_number ?? request?.REQUEST_NUMBER ?? ''),
+  CREATE_DATE: request?.CREATE_DATE ?? request?.create_date,
+  vendor_code_selector: String(request?.vendor_code_selector ?? request?.VENDOR_CODE_SELECTOR ?? ''),
+  vendor_region: String(request?.vendor_region ?? request?.VENDOR_REGION ?? ''),
+}) as RequestRecord
+
+const normalizeSelectionRecord = (selection: any): SelectionRecord | null => {
+  if (!selection) return null
+
+  return {
+    ...selection,
+    selection_id: Number(selection?.selection_id ?? selection?.SELECTION_ID ?? 0),
+    action_required_json: selection?.action_required_json ?? selection?.ACTION_REQUIRED_JSON,
+  } as SelectionRecord
+}
+
 type SqlStatement = Awaited<ReturnType<typeof ApprovalQueueSQL.updateStatus>>
 type SqlList = SqlStatement[]
 type PostCommitTask = () => Promise<void>
@@ -268,7 +313,7 @@ const createWorkflowResolver = (context: WorkflowContext) => {
 
     const approverSql = await ApprovalQueueSQL.getApproverByGroupCode({ GROUP_CODE: safeGroupCode })
     const approverRes = (await MySQLExecute.search(approverSql)) as RowDataPacket[]
-    const approver = String(approverRes[0]?.empcode || '')
+    const approver = String(approverRes[0]?.empcode || approverRes[0]?.EMPCODE || '')
     approverByGroupCache.set(safeGroupCode, approver)
     return approver
   }
@@ -292,7 +337,7 @@ const createWorkflowResolver = (context: WorkflowContext) => {
     if (selectionCache !== undefined) return selectionCache
     const selectionSql = await ApprovalQueueSQL.getSelection({ REQUEST_ID: context.dataItem.REQUEST_ID })
     const selectionRes = (await MySQLExecute.search(selectionSql)) as SelectionRecord[]
-    selectionCache = selectionRes[0] || null
+    selectionCache = normalizeSelectionRecord(selectionRes[0])
     return selectionCache
   }
 
@@ -361,17 +406,17 @@ const loadWorkflowContext = async (dataItem: UpdateStatusPayload): Promise<Workf
     })(),
   ])
 
-  const request = checkRes[0] || ({} as RequestRecord)
-  const currentStep = stepsRes.find((step) => step.step_status === 'in_progress')
+  const steps = stepsRes.map(normalizeApprovalStep)
+  const request = normalizeRequestRecord(checkRes[0] || {})
 
   return {
     dataItem,
     request,
-    steps: stepsRes,
-    currentStep,
+    steps,
+    currentStep: stepsRes.find((step) => String(step.STEP_STATUS || step.step_status || '').toLowerCase() === 'in_progress'),
     isOversea: String(request.vendor_region || '').toLowerCase() === 'oversea',
     vendor_id: request.vendor_id,
-    requesterCode: String(requesterRes[0]?.Request_By_EmployeeCode || '').trim(),
+    requesterCode: String(requesterRes[0]?.Request_By_EmployeeCode || requesterRes[0]?.REQUEST_BY_EMPLOYEECODE || '').trim(),
     selectedVendorCode: String(request.vendor_code_selector || ''),
   }
 }
@@ -380,7 +425,7 @@ const hasVendorRequestLog = async (context: WorkflowContext) => {
   if (!context.currentStep || !requiresVendorReply(context.currentStep)) return false
 
   const logsSql = await ApprovalQueueSQL.getApprovalLogs({ REQUEST_ID: context.dataItem.REQUEST_ID })
-  const logs = (await MySQLExecute.search(logsSql)) as RowDataPacket[]
+  const logs = ((await MySQLExecute.search(logsSql)) as RowDataPacket[]).map(normalizeApprovalLog)
   return logs.some((log) => String(log.step_id || '') === String(context.currentStep?.step_id || '') && log.action_type === 'vendor_requested')
 }
 
@@ -560,22 +605,11 @@ const handleVendorReplyRequest = async (context: WorkflowContext, resolver: Work
     sqlList.push(
       await ApprovalQueueSQL.updateApprovalStep({
         STEP_ID: pendingAgreementStep.step_id,
-        STEP_STATUS: 'completed',
+        STEP_STATUS: 'in_progress',
         UPDATE_BY: dataItem.UPDATE_BY || dataItem.APPROVE_BY || 'SYSTEM',
       })
     )
-    sqlList.push(
-      await ApprovalQueueSQL.createApprovalLog({
-        REQUEST_ID: dataItem.REQUEST_ID,
-        STEP_ID: pendingAgreementStep.step_id,
-        ACTION_BY: dataItem.APPROVE_BY || dataItem.UPDATE_BY || 'SYSTEM',
-        ACTION_TYPE: 'approved',
-        REMARK: 'Pending Agreement auto-completed after sending vendor email',
-      })
-    )
-  }
-
-  if (agreementReachedStep) {
+  } else if (agreementReachedStep) {
     const agreementReachedApprover = await resolver.resolveStepApprover(agreementReachedStep)
     if (agreementReachedApprover && agreementReachedApprover !== agreementReachedStep.approver_id) {
       sqlList.push(
@@ -984,12 +1018,13 @@ export const ApprovalQueueService = {
 
       const checkSql = await ApprovalQueueSQL.getRequestStatusAndAssign({ REQUEST_ID: requestId })
       const checkRes = (await MySQLExecute.search(checkSql)) as RowDataPacket[]
-      const request = checkRes[0]
-      if (!request) throw new Error('Request not found')
+      const requestRaw = checkRes[0]
+      if (!requestRaw) throw new Error('Request not found')
+      const request = normalizeRequestRecord(requestRaw)
 
       const stepsSql = await ApprovalQueueSQL.getApprovalSteps({ REQUEST_ID: requestId })
-      const steps = (await MySQLExecute.search(stepsSql)) as ApprovalStep[]
-      const currentStep = steps.find((step) => step.step_status === 'in_progress')
+      const steps = ((await MySQLExecute.search(stepsSql)) as ApprovalStep[]).map(normalizeApprovalStep)
+      const currentStep = steps.find((step) => String(step.STEP_STATUS || step.step_status || '').toLowerCase() === 'in_progress')
 
       if (!currentStep || !isPicStep(currentStep)) {
         throw new Error('Request can only be edited when it is in the PIC checking step')
@@ -1098,12 +1133,12 @@ export const ApprovalQueueService = {
 
       const requestSql = await ApprovalQueueSQL.getById({ REQUEST_ID: requestId })
       const requestRes = (await MySQLExecute.search(requestSql)) as RowDataPacket[]
-      const request = requestRes[0] || null
+      const request = requestRes[0] ? normalizeRequestRecord(requestRes[0]) : null
       if (!request) throw new Error('Request not found')
 
       const stepsSql = await ApprovalQueueSQL.getApprovalSteps({ REQUEST_ID: requestId })
-      const steps = (await MySQLExecute.search(stepsSql)) as ApprovalStep[]
-      const currentStep = steps.find((step) => step.step_status === 'in_progress')
+      const steps = ((await MySQLExecute.search(stepsSql)) as ApprovalStep[]).map(normalizeApprovalStep)
+      const currentStep = steps.find((step) => String(step.STEP_STATUS || step.step_status || '').toLowerCase() === 'in_progress')
 
       const isOversea = normalizeText(request.vendor_region) === 'oversea'
       const picGroupCode = isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
@@ -1176,8 +1211,8 @@ export const ApprovalQueueService = {
   completeRegistration: async (dataItem: CompleteRegistrationPayload) => {
     try {
       const stepsSql = await ApprovalQueueSQL.getApprovalSteps(dataItem)
-      const steps = (await MySQLExecute.search(stepsSql)) as ApprovalStep[]
-      const currentStep = steps.find((step) => step.step_status === 'in_progress')
+      const steps = ((await MySQLExecute.search(stepsSql)) as ApprovalStep[]).map(normalizeApprovalStep)
+      const currentStep = steps.find((step) => String(step.STEP_STATUS || step.step_status || '').toLowerCase() === 'in_progress')
 
       const sqlList = []
       if (currentStep) {

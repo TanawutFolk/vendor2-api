@@ -411,6 +411,31 @@ export const RequestRegisterPageSQL = {
     return sql
   },
 
+  checkExistingActiveRequestByVendorRequester: async (dataItem: RegisterRequestDataItem) => {
+    let sql = `
+                            SELECT
+                                       REQUEST_ID
+                                     , REQUEST_NUMBER
+                                     , REQUEST_STATUS
+                            FROM
+                                       request_register_vendor
+                            WHERE
+                                       VENDOR_ID = dataItem.VENDOR_ID
+                                       AND REQUEST_BY_EMPLOYEECODE = 'dataItem.REQUEST_BY_EMPLOYEECODE'
+                                       AND INUSE = 1
+                                       AND COALESCE(REQUEST_STATUS, '') NOT IN ('Completed', 'Rejected')
+                            ORDER BY
+                                       REQUEST_ID DESC
+                            LIMIT
+                                       1
+        `
+
+    sql = sql.replaceAll('dataItem.VENDOR_ID', (dataItem['VENDOR_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_BY_EMPLOYEECODE', dataItem['REQUEST_BY_EMPLOYEECODE'] || '')
+
+    return sql
+  },
+
   createRequestVendorContact: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             INSERT INTO request_register_vendor_contacts (
@@ -799,7 +824,7 @@ export const RequestRegisterPageSQL = {
                                      , 'dataItem.GPR_C_CIRCULAR_JSON'
                                      , 'dataItem.ACTION_REQUIRED_JSON'
                                      ,  dataItem.COMPLETION_DATE_NULL
-                                     , 'dataItem.UPDATE_BY'
+                                     , 'dataItem.CREATE_BY'
                                      , 'dataItem.UPDATE_BY'
                             )
         `
@@ -834,6 +859,7 @@ export const RequestRegisterPageSQL = {
       sql = sql.replaceAll('dataItem.COMPLETION_DATE_NULL', 'NULL')
     }
 
+    sql = sql.replaceAll('dataItem.CREATE_BY', esc(d['CREATE_BY'] || d['UPDATE_BY'] || 'SYSTEM'))
     sql = sql.replaceAll('dataItem.UPDATE_BY', esc(d['UPDATE_BY'] || 'SYSTEM'))
     return sql
   },
@@ -948,8 +974,22 @@ export const RequestRegisterPageSQL = {
 
   insertFinancial: (dataItem: RegisterRequestDataItem) => {
     let sql = `
-                            INSERT INTO vendor_selection_financials (SELECTION_ID, YEAR, TOTAL_REVENUE, NET_PROFIT)
-                            VALUES (dataItem.SELECTION_ID, 'dataItem.YEAR', dataItem.TOTAL_REVENUE, dataItem.NET_PROFIT)
+                            INSERT INTO vendor_selection_financials (
+                                       SELECTION_ID
+                                     , YEAR
+                                     , TOTAL_REVENUE
+                                     , NET_PROFIT
+                                     , CREATE_BY
+                                     , UPDATE_BY
+                            )
+                            VALUES (
+                                       dataItem.SELECTION_ID
+                                     , 'dataItem.YEAR'
+                                     , dataItem.TOTAL_REVENUE
+                                     , dataItem.NET_PROFIT
+                                     , 'dataItem.CREATE_BY'
+                                     , 'dataItem.UPDATE_BY'
+                            )
         `
     const esc = (str: any) => String(str || '').replace(/'/g, "\\'")
     sql = sql.replaceAll('dataItem.SELECTION_ID', (dataItem.SELECTION_ID || 0).toString())
@@ -960,6 +1000,8 @@ export const RequestRegisterPageSQL = {
     const pro = parseFloat(dataItem.NET_PROFIT as string)
     sql = sql.replaceAll('dataItem.TOTAL_REVENUE', isNaN(rev) ? 'NULL' : String(rev))
     sql = sql.replaceAll('dataItem.NET_PROFIT', isNaN(pro) ? 'NULL' : String(pro))
+    sql = sql.replaceAll('dataItem.CREATE_BY', esc(dataItem.CREATE_BY || dataItem.UPDATE_BY || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM'))
 
     return sql
   },

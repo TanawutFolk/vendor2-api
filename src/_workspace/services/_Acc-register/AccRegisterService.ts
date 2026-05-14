@@ -8,7 +8,7 @@ export const AccRegisterService = {
     try {
       const stepsSql = await AccRegisterSQL.getApprovalSteps(dataItem)
       const steps = (await MySQLExecute.search(stepsSql)) as RowDataPacket[]
-      const currentStep = steps.find((s: any) => s.step_status === 'in_progress')
+      const currentStep = steps.find((s: any) => String(s.STEP_STATUS || s.step_status || '').toLowerCase() === 'in_progress')
 
       const sqlList = []
       if (currentStep) {

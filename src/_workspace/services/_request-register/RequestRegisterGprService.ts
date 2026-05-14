@@ -157,6 +157,8 @@ export const RequestRegisterGprService = {
             YEAR: sp.year || '',
             TOTAL_REVENUE: sp.total_revenue || '',
             NET_PROFIT: sp.net_profit || '',
+            CREATE_BY: formData.CREATE_BY || formData.UPDATE_BY || 'SYSTEM',
+            UPDATE_BY: formData.UPDATE_BY || formData.CREATE_BY || 'SYSTEM',
           }))
         }
       }

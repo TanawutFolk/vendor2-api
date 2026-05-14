@@ -5,11 +5,12 @@ import path from 'path'
 // Base path for Selection Supplier file storage.
 // Production: use a server/network share path.
 // Dev/Test: uses local C: drive.
-const SELECTION_FILE_BASE_PATH = process.env.SELECTION_FILE_BASE_PATH
-  || 'C:\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier\\01.Selection_File'
+const DEFAULT_SELECTION_FILE_BASE_PATH = 'C:\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier\\01.Selection_File'
 
 // Upload directory where multer stores temporary files
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads', 'documents')
+
+const getSelectionFileBasePath = () => process.env.SELECTION_FILE_BASE_PATH || DEFAULT_SELECTION_FILE_BASE_PATH
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -23,6 +24,12 @@ const sanitizeForFileName = (text: string): string =>
     .replace(/\s+/g, '_')           // spaces → underscores
     .replace(/_+/g, '_')            // collapse multiple underscores
     .replace(/^_|_$/g, '')          // trim leading/trailing underscores
+
+const ensureFileExists = (filePath: string, context: string) => {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`${context} file not found: ${filePath}`)
+  }
+}
 
 // ── Service ──────────────────────────────────────────────────────────────────
 
@@ -39,7 +46,7 @@ export const SelectionFileService = {
    */
   createFolderStructure(requestNumber: string, year?: number) {
     const folderYear = year || new Date().getFullYear()
-    const requestPath = path.join(SELECTION_FILE_BASE_PATH, String(folderYear), requestNumber)
+    const requestPath = path.join(getSelectionFileBasePath(), String(folderYear), requestNumber)
     const sendingPath = path.join(requestPath, '00.Sending')
     const receivingPath = path.join(requestPath, '01.Receiving')
 
@@ -60,20 +67,18 @@ export const SelectionFileService = {
    */
   copyToSending(requestNumber: string, uploadedFileName: string, originalName: string, year?: number) {
     const folderYear = year || new Date().getFullYear()
-    const sendingPath = path.join(SELECTION_FILE_BASE_PATH, String(folderYear), requestNumber, '00.Sending')
+    const sendingPath = path.join(getSelectionFileBasePath(), String(folderYear), requestNumber, '00.Sending')
 
     // Ensure folder exists (in case called independently)
     fs.mkdirSync(sendingPath, { recursive: true })
 
     const sourcePath = path.join(UPLOADS_DIR, uploadedFileName)
-    const destPath = path.join(sendingPath, originalName)
+    const safeOriginalName = sanitizeForFileName(originalName) || path.basename(sourcePath)
+    const destPath = path.join(sendingPath, safeOriginalName)
 
-    if (fs.existsSync(sourcePath)) {
-      fs.copyFileSync(sourcePath, destPath)
-      console.log(`[SelectionFile] Copied to Sending: ${destPath}`)
-    } else {
-      console.warn(`[SelectionFile] Source file not found for Sending: ${sourcePath}`)
-    }
+    ensureFileExists(sourcePath, 'Sending source')
+    fs.copyFileSync(sourcePath, destPath)
+    console.log(`[SelectionFile] Copied to Sending: ${destPath}`)
 
     return destPath
   },
@@ -99,22 +104,21 @@ export const SelectionFileService = {
     year?: number,
   ) {
     const folderYear = year || new Date().getFullYear()
-    const receivingPath = path.join(SELECTION_FILE_BASE_PATH, String(folderYear), requestNumber, '01.Receiving')
+    const receivingPath = path.join(getSelectionFileBasePath(), String(folderYear), requestNumber, '01.Receiving')
 
     // Ensure folder exists
     fs.mkdirSync(receivingPath, { recursive: true })
 
     // Build file name: "4.1_Compliant_of_the_law_original.pdf"
+    const sanitizedCriteriaNo = sanitizeForFileName(criteriaNo)
     const sanitizedDetail = sanitizeForFileName(criteriaDetail)
-    const newFileName = `${criteriaNo}_${sanitizedDetail}_${originalName}`
+    const sanitizedOriginalName = sanitizeForFileName(originalName) || path.basename(sourceFilePath)
+    const newFileName = `${sanitizedCriteriaNo}_${sanitizedDetail}_${sanitizedOriginalName}`
     const destPath = path.join(receivingPath, newFileName)
 
-    if (fs.existsSync(sourceFilePath)) {
-      fs.copyFileSync(sourceFilePath, destPath)
-      console.log(`[SelectionFile] Saved to Receiving: ${destPath}`)
-    } else {
-      console.warn(`[SelectionFile] Source file not found for Receiving: ${sourceFilePath}`)
-    }
+    ensureFileExists(sourceFilePath, 'Receiving source')
+    fs.copyFileSync(sourceFilePath, destPath)
+    console.log(`[SelectionFile] Saved to Receiving: ${destPath}`)
 
     return { destPath, newFileName }
   },
@@ -133,7 +137,7 @@ export const SelectionFileService = {
     year?: number,
   ) {
     const folderYear = year || new Date().getFullYear()
-    const sendingPath = path.join(SELECTION_FILE_BASE_PATH, String(folderYear), requestNumber, '00.Sending')
+    const sendingPath = path.join(getSelectionFileBasePath(), String(folderYear), requestNumber, '00.Sending')
 
     fs.mkdirSync(sendingPath, { recursive: true })
 
@@ -150,7 +154,7 @@ export const SelectionFileService = {
         fs.copyFileSync(attachment.path, destPath)
       } else {
         console.warn(`[SelectionFile] Skipping attachment "${fileName}" — no content or valid path`)
-        continue
+        throw new Error(`Attachment source not found or empty: ${fileName}`)
       }
 
       console.log(`[SelectionFile] Copied attachment to Sending: ${destPath}`)

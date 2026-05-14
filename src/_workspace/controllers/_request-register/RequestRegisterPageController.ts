@@ -46,7 +46,9 @@ export const RequestRegisterPageController = {
         VENDOR_ID: vendor_id,
         VENDOR_CONTACT_ID: vendorContactIds[0] || dataItem.VENDOR_CONTACT_ID || null,
         VENDOR_CONTACT_IDS: vendorContactIds,
+        UPLOADED_FILES: files,
         REQUEST_BY_EMPLOYEECODE: dataItem.REQUEST_BY_EMPLOYEECODE || '',
+        REQUEST_BY_EMAIL: dataItem.REQUEST_BY_EMAIL || '',
         SUPPORTPRODUCT_PROCESS: dataItem.SUPPORTPRODUCT_PROCESS || dataItem.SUPPORT_TYPE || '',
         PURCHASE_FREQUENCY: dataItem.PURCHASE_FREQUENCY || '',
         REQUESTER_REMARK: dataItem.REQUESTER_REMARK || '',
@@ -80,22 +82,6 @@ export const RequestRegisterPageController = {
         } as ResponseI)
       }
 
-      // Insert each uploaded file into the request_register_document table
-      if (files.length > 0) {
-        for (const file of files) {
-          // Multer reads originalname as latin1 bytes Ã¢â‚¬â€ decode back to utf8
-          // so Thai/Japanese/etc. filenames are stored correctly in the DB.
-          const file_name = Buffer.from(file.originalname, 'latin1').toString('utf8')
-          await RequestRegisterPageModel.createDocument({
-            REQUEST_ID: insertedId,
-            FILE_NAME: file_name || path.basename(file.path),
-            FILE_PATH: file.filename || path.basename(file.path),
-            FILE_SIZE: file.size || 0,
-            FILE_TYPE: file.mimetype || '',
-            CREATE_BY: normalizedCreator,
-          })
-        }
-      }
       return res.status(200).json({
         Status: true,
         ResultOnDb: { request_id: insertedId, request_number: createResultData?.request_number || '' },
@@ -103,6 +89,7 @@ export const RequestRegisterPageController = {
         MethodOnDb: 'Create Registration Request',
         Message: createResult?.Message || 'Create Request Register Success',
       } as ResponseI)
+
     } catch (error: any) {
       console.error('Create Registration Request Error:', error)
       return res.status(200).json({
@@ -505,7 +492,7 @@ export const RequestRegisterPageController = {
       dataItem = req.body
     }
 
-    const { REQUEST_ID, CREATE_BY } = dataItem
+    const { REQUEST_ID, CREATE_BY, DOCUMENT_SCOPE } = dataItem
 
     try {
       const reqId = parseInt(REQUEST_ID as string)
@@ -528,9 +515,27 @@ export const RequestRegisterPageController = {
         } as ResponseI)
       }
       const file_name = Buffer.from(file.originalname, 'latin1').toString('utf8')
+      const documentScope = String(DOCUMENT_SCOPE || '').trim().toUpperCase()
+      const isGprDocument = documentScope.startsWith('GPR')
+      const persistedFileName = isGprDocument ? `[GPR] ${file_name || path.basename(file.path)}` : (file_name || path.basename(file.path))
+      const { CRITERIA_NO, CRITERIA_DETAIL, REQUEST_NUMBER } = dataItem
+      if (isGprDocument && (!CRITERIA_NO || !REQUEST_NUMBER)) {
+        throw new Error('Missing CRITERIA_NO or REQUEST_NUMBER for GPR criteria file upload')
+      }
+
+      const selectionFileResult = CRITERIA_NO && REQUEST_NUMBER
+        ? SelectionFileService.saveToReceiving(
+            String(REQUEST_NUMBER),
+            file!.path,
+            String(CRITERIA_NO),
+            String(CRITERIA_DETAIL || ''),
+            file_name || path.basename(file!.path),
+          )
+        : null
+
       const createDocumentResult = await RequestRegisterPageModel.createDocument({
         REQUEST_ID: reqId,
-        FILE_NAME: file_name || path.basename(file.path),
+        FILE_NAME: persistedFileName,
         FILE_PATH: file.filename || path.basename(file.path),
         FILE_SIZE: file.size || 0,
         FILE_TYPE: file.mimetype || '',
@@ -559,19 +564,18 @@ export const RequestRegisterPageController = {
         } as ResponseI)
       }
 
-      // ── Selection File: Save criteria uploads directly to 01.Receiving ──
-      const { CRITERIA_NO, CRITERIA_DETAIL, REQUEST_NUMBER } = dataItem
-      if (CRITERIA_NO && REQUEST_NUMBER) {
+      // â”€â”€ Selection File: Save criteria uploads directly to 01.Receiving â”€â”€
+      if (false && CRITERIA_NO && REQUEST_NUMBER) {
         try {
           SelectionFileService.saveToReceiving(
             String(REQUEST_NUMBER),
-            file.path,
+            file!.path,
             String(CRITERIA_NO),
             String(CRITERIA_DETAIL || ''),
-            file_name || path.basename(file.path),
+            file_name || path.basename(file!.path),
           )
         } catch (selectionFileError: any) {
-          // Never block the document upload — log warning only
+          // Never block the document upload â€” log warning only
           console.warn('[SelectionFile] Failed to save to Receiving:', selectionFileError?.message)
         }
       }
@@ -582,6 +586,8 @@ export const RequestRegisterPageController = {
           document_id,
           file_path: file.filename || path.basename(file.path),
           file_name: file_name || path.basename(file.path),
+          selection_file_path: selectionFileResult?.destPath || '',
+          selection_file_name: selectionFileResult?.newFileName || '',
         },
         TotalCountOnDb: 1,
         MethodOnDb: 'Add Document',
