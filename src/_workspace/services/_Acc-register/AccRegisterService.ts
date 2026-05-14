@@ -3,12 +3,18 @@ import { AccRegisterSQL } from '../../sql/_Acc-register/AccRegisterSQL'
 import { RowDataPacket } from 'mysql2'
 import { triggerCompletionEmail } from '../_request-register/RegisterRequestNotificationHelper'
 
+const normalizeApprovalStep = (step: any) => ({
+  ...step,
+  step_id: Number(step?.step_id || step?.STEP_ID || 0),
+  step_status: String(step?.step_status || step?.STEP_STATUS || ''),
+})
+
 export const AccRegisterService = {
   completeRegistration: async (dataItem: any) => {
     try {
       const stepsSql = await AccRegisterSQL.getApprovalSteps(dataItem)
-      const steps = (await MySQLExecute.search(stepsSql)) as RowDataPacket[]
-      const currentStep = steps.find((s: any) => String(s.STEP_STATUS || s.step_status || '').toLowerCase() === 'in_progress')
+      const steps = ((await MySQLExecute.search(stepsSql)) as RowDataPacket[]).map(normalizeApprovalStep)
+      const currentStep = steps.find((s: any) => String(s.step_status || '').toLowerCase() === 'in_progress')
 
       const sqlList = []
       if (currentStep) {

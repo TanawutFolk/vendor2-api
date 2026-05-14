@@ -2,6 +2,7 @@ import { RequestRegisterPageModel } from '@src/_workspace/models/_request-regist
 import { SelectionFileService } from '@src/_workspace/services/_request-register/SelectionFileService'
 import { ResponseI } from '@src/types/ResponseI'
 import { Request, Response } from 'express'
+import fs from 'fs'
 import path from 'path'
 
 const parseVendorContactIds = (dataItem: any): string[] => {
@@ -12,6 +13,11 @@ const parseVendorContactIds = (dataItem: any): string[] => {
     .flatMap((value) => String(value || '').split(','))
     .map((value) => value.trim())
     .filter((value) => value && Number(value) > 0)
+}
+
+const removeTempUpload = (filePath?: string) => {
+  if (!filePath || !fs.existsSync(filePath)) return
+  fs.unlinkSync(filePath)
 }
 
 export const RequestRegisterPageController = {
@@ -60,6 +66,7 @@ export const RequestRegisterPageController = {
       })
 
       if (!createResult?.Status) {
+        files.forEach((uploadedFile) => removeTempUpload(uploadedFile?.path))
         return res.status(200).json({
           Status: false,
           ResultOnDb: {},
@@ -73,6 +80,7 @@ export const RequestRegisterPageController = {
       const insertedId = Number(createResultData?.insertedId || 0)
 
       if (!insertedId || Number.isNaN(insertedId)) {
+        files.forEach((uploadedFile) => removeTempUpload(uploadedFile?.path))
         return res.status(200).json({
           Status: false,
           ResultOnDb: {},
@@ -91,6 +99,8 @@ export const RequestRegisterPageController = {
       } as ResponseI)
 
     } catch (error: any) {
+      const files = (req.files as any[]) || []
+      files.forEach((uploadedFile) => removeTempUpload(uploadedFile?.path))
       console.error('Create Registration Request Error:', error)
       return res.status(200).json({
         Status: false,
@@ -497,6 +507,7 @@ export const RequestRegisterPageController = {
     try {
       const reqId = parseInt(REQUEST_ID as string)
       if (!reqId || isNaN(reqId)) {
+        removeTempUpload(file?.path)
         return res.status(400).json({
           Status: false,
           ResultOnDb: {},
@@ -516,27 +527,38 @@ export const RequestRegisterPageController = {
       }
       const file_name = Buffer.from(file.originalname, 'latin1').toString('utf8')
       const documentScope = String(DOCUMENT_SCOPE || '').trim().toUpperCase()
-      const isGprDocument = documentScope.startsWith('GPR')
-      const persistedFileName = isGprDocument ? `[GPR] ${file_name || path.basename(file.path)}` : (file_name || path.basename(file.path))
+      const persistedFileName = file_name || path.basename(file.path)
       const { CRITERIA_NO, CRITERIA_DETAIL, REQUEST_NUMBER } = dataItem
-      if (isGprDocument && (!CRITERIA_NO || !REQUEST_NUMBER)) {
+      if (documentScope === 'GPR_CRITERIA' && (!CRITERIA_NO || !REQUEST_NUMBER)) {
         throw new Error('Missing CRITERIA_NO or REQUEST_NUMBER for GPR criteria file upload')
       }
+      if (documentScope === 'GPR_PDF' && !REQUEST_NUMBER) {
+        throw new Error('Missing REQUEST_NUMBER for GPR PDF upload')
+      }
 
-      const selectionFileResult = CRITERIA_NO && REQUEST_NUMBER
+      const selectionFileResult = documentScope === 'GPR_CRITERIA'
         ? SelectionFileService.saveToReceiving(
+          String(REQUEST_NUMBER),
+          file.path,
+          String(CRITERIA_NO),
+          String(CRITERIA_DETAIL || ''),
+          file_name || path.basename(file.path),
+        )
+        : documentScope === 'GPR_PDF'
+          ? SelectionFileService.saveToSending(
             String(REQUEST_NUMBER),
-            file!.path,
-            String(CRITERIA_NO),
-            String(CRITERIA_DETAIL || ''),
-            file_name || path.basename(file!.path),
+            file.path,
+            file_name || path.basename(file.path),
           )
-        : null
+          : null
+
+      const storedFilePath = selectionFileResult?.destPath || file.filename || path.basename(file.path)
+      const storedFileName = selectionFileResult?.newFileName || file_name || path.basename(file.path)
 
       const createDocumentResult = await RequestRegisterPageModel.createDocument({
         REQUEST_ID: reqId,
         FILE_NAME: persistedFileName,
-        FILE_PATH: file.filename || path.basename(file.path),
+        FILE_PATH: storedFilePath,
         FILE_SIZE: file.size || 0,
         FILE_TYPE: file.mimetype || '',
         CREATE_BY: CREATE_BY || 'SYSTEM',
@@ -584,8 +606,8 @@ export const RequestRegisterPageController = {
         Status: true,
         ResultOnDb: {
           document_id,
-          file_path: file.filename || path.basename(file.path),
-          file_name: file_name || path.basename(file.path),
+          file_path: storedFilePath,
+          file_name: storedFileName,
           selection_file_path: selectionFileResult?.destPath || '',
           selection_file_name: selectionFileResult?.newFileName || '',
         },
@@ -594,6 +616,7 @@ export const RequestRegisterPageController = {
         Message: 'Document added successfully',
       } as ResponseI)
     } catch (error: any) {
+      removeTempUpload(file?.path)
       console.error('Add Document Error:', error)
       res.status(200).json({
         Status: false,

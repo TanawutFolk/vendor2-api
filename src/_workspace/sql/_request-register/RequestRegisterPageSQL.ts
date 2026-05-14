@@ -59,6 +59,7 @@ export interface RegisterRequestDataItem {
   gpr_c_pc_pic_email?: string
   gpr_c_circular_json?: string
   action_required_json?: string
+  gpr_43_acceptance_status?: string
   completion_date_null?: string
   year?: string
   total_revenue?: number | string
@@ -202,8 +203,16 @@ export const RequestRegisterPageSQL = {
                             FROM
                                        request_register_vendor
                             WHERE
-                                       REQUEST_NUMBER LIKE '%-dataItem.YEAR-dataItem.PREFIX%'
-                                       AND REQUEST_NUMBER REGEXP '-dataItem.PREFIX[0-9]+$'
+                                       (
+                                           REQUEST_NUMBER LIKE 'Selection-dataItem.YEAR-dataItem.PREFIX%'
+                                           OR REQUEST_NUMBER LIKE 'Register-dataItem.YEAR-dataItem.PREFIX%'
+                                           OR REQUEST_NUMBER LIKE 'Register_Selection-dataItem.YEAR-dataItem.PREFIX%'
+                                       )
+                                       AND (
+                                           REQUEST_NUMBER REGEXP '^Selection-dataItem.YEAR-dataItem.PREFIX[0-9]+$'
+                                           OR REQUEST_NUMBER REGEXP '^Register-dataItem.YEAR-dataItem.PREFIX[0-9]+$'
+                                           OR REQUEST_NUMBER REGEXP '^Register_Selection-dataItem.YEAR-dataItem.PREFIX[0-9]+$'
+                                       )
         `
 
     sql = sql.replaceAll('dataItem.YEAR', year)
@@ -329,6 +338,7 @@ export const RequestRegisterPageSQL = {
                                      , rvs.GPR_C_PC_PIC_EMAIL
                                      , rvs.GPR_C_CIRCULAR_JSON
                                      , rvs.ACTION_REQUIRED_JSON
+                                     , rvs.GPR_43_ACCEPTANCE_STATUS
                                      , v.COMPANY_NAME
                                      , v.ADDRESS
                                      , v.VENDOR_REGION
@@ -511,12 +521,14 @@ export const RequestRegisterPageSQL = {
                             )
         `
 
+    const esc = (str: any) => String(str || '').replace(/\\/g, '\\\\').replace(/'/g, "\\'")
+
     sql = sql.replaceAll('dataItem.REQUEST_ID', requestId.toString())
-    sql = sql.replaceAll('dataItem.FILE_NAME', dataItem['FILE_NAME'] || '')
-    sql = sql.replaceAll('dataItem.FILE_PATH', dataItem['FILE_PATH'] || '')
+    sql = sql.replaceAll('dataItem.FILE_NAME', esc(dataItem['FILE_NAME']))
+    sql = sql.replaceAll('dataItem.FILE_PATH', esc(dataItem['FILE_PATH']))
     sql = sql.replaceAll('dataItem.FILE_SIZE', (dataItem['FILE_SIZE'] || 0).toString())
-    sql = sql.replaceAll('dataItem.FILE_TYPE', dataItem['FILE_TYPE'] || '')
-    sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || '')
+    sql = sql.replaceAll('dataItem.FILE_TYPE', esc(dataItem['FILE_TYPE']))
+    sql = sql.replaceAll('dataItem.CREATE_BY', esc(dataItem['CREATE_BY']))
 
     return sql
   },
@@ -799,6 +811,7 @@ export const RequestRegisterPageSQL = {
                                      , GPR_C_PC_PIC_EMAIL
                                      , GPR_C_CIRCULAR_JSON
                                      , ACTION_REQUIRED_JSON
+                                     , GPR_43_ACCEPTANCE_STATUS
                                      , COMPLETION_DATE
                                      , CREATE_BY
                                      , UPDATE_BY
@@ -823,6 +836,7 @@ export const RequestRegisterPageSQL = {
                                      , 'dataItem.GPR_C_PC_PIC_EMAIL'
                                      , 'dataItem.GPR_C_CIRCULAR_JSON'
                                      , 'dataItem.ACTION_REQUIRED_JSON'
+                                     , 'dataItem.GPR_43_ACCEPTANCE_STATUS'
                                      ,  dataItem.COMPLETION_DATE_NULL
                                      , 'dataItem.CREATE_BY'
                                      , 'dataItem.UPDATE_BY'
@@ -852,6 +866,7 @@ export const RequestRegisterPageSQL = {
     sql = sql.replaceAll('dataItem.GPR_C_PC_PIC_EMAIL', esc(d['GPR_C_PC_PIC_EMAIL']))
     sql = sql.replaceAll('dataItem.GPR_C_CIRCULAR_JSON', esc(d['GPR_C_CIRCULAR_JSON']))
     sql = sql.replaceAll('dataItem.ACTION_REQUIRED_JSON', esc(d['ACTION_REQUIRED_JSON']))
+    sql = sql.replaceAll('dataItem.GPR_43_ACCEPTANCE_STATUS', esc(d['GPR_43_ACCEPTANCE_STATUS']))
 
     if (d['COMPLETION_DATE']) {
       sql = sql.replaceAll('dataItem.COMPLETION_DATE_NULL', `'${esc(d['COMPLETION_DATE'])}'`)
@@ -888,6 +903,7 @@ export const RequestRegisterPageSQL = {
                                      , GPR_C_PC_PIC_EMAIL = 'dataItem.GPR_C_PC_PIC_EMAIL'
                                      , GPR_C_CIRCULAR_JSON = 'dataItem.GPR_C_CIRCULAR_JSON'
                                      , ACTION_REQUIRED_JSON = 'dataItem.ACTION_REQUIRED_JSON'
+                                     , GPR_43_ACCEPTANCE_STATUS = 'dataItem.GPR_43_ACCEPTANCE_STATUS'
                                      , COMPLETION_DATE = dataItem.COMPLETION_DATE_NULL
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
@@ -917,6 +933,7 @@ export const RequestRegisterPageSQL = {
     sql = sql.replaceAll('dataItem.GPR_C_PC_PIC_EMAIL', esc(d['GPR_C_PC_PIC_EMAIL']))
     sql = sql.replaceAll('dataItem.GPR_C_CIRCULAR_JSON', esc(d['GPR_C_CIRCULAR_JSON']))
     sql = sql.replaceAll('dataItem.ACTION_REQUIRED_JSON', esc(d['ACTION_REQUIRED_JSON']))
+    sql = sql.replaceAll('dataItem.GPR_43_ACCEPTANCE_STATUS', esc(d['GPR_43_ACCEPTANCE_STATUS']))
 
     if (d['COMPLETION_DATE']) {
       sql = sql.replaceAll('dataItem.COMPLETION_DATE_NULL', `'${esc(d['COMPLETION_DATE'])}'`)

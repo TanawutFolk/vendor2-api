@@ -83,23 +83,6 @@ export const RequestRegisterPageService = {
       if (selectedVendorContactIds.length > 0) {
         dataItem.VENDOR_CONTACT_ID = selectedVendorContactIds[0]
       }
-
-      let contactNames: string[] = []
-      let contactEmails: string[] = []
-      let contactTels: string[] = []
-      if (selectedVendorContactIds.length > 0) {
-        const contactSql = `SELECT CONTACT_NAME, EMAIL, TEL_PHONE FROM vendor_contacts WHERE VENDOR_CONTACT_ID IN (${selectedVendorContactIds.map(id => Number(id)).join(',')}) AND INUSE = 1`
-        const contactRows = await queryRows(contactSql)
-        for (const row of contactRows) {
-          if (row.CONTACT_NAME) contactNames.push(row.CONTACT_NAME)
-          if (row.EMAIL) contactEmails.push(row.EMAIL)
-          if (row.TEL_PHONE) contactTels.push(row.TEL_PHONE)
-        }
-        if (contactNames.length > 0) vendorData.contact_name = contactNames.join(', ')
-        if (contactEmails.length > 0) vendorData.email = contactEmails.join('; ')
-        if (contactTels.length > 0) vendorData.tel_phone = contactTels.join(', ')
-      }
-
       const requesterEmpCode = String(dataItem.REQUEST_BY_EMPLOYEECODE || dataItem.CREATE_BY || '').trim()
       if (!requesterEmpCode) {
         throw new Error('Requester employee code is required')
@@ -435,7 +418,7 @@ export const RequestRegisterPageService = {
 
       const stepsSql = await RequestRegisterPageSQL.getApprovalSteps({ REQUEST_ID: requestId })
       const steps = (await MySQLExecute.search(stepsSql)) as RowDataPacket[]
-      const currentStep = steps.find((s: any) => String(s.STEP_STATUS || s.step_status || '').toLowerCase() === 'in_progress')
+      const currentStep = steps.find((s: any) => s.step_status === 'in_progress')
 
       if (!currentStep || !isPicStep(currentStep)) {
         throw new Error('Request can only be edited when it is in the PIC checking step')

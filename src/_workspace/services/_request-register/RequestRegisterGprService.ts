@@ -4,6 +4,29 @@ import { GprCApprovalService } from '../_approval-GPRC/GprCApprovalService'
 
 const normalizeValue = (value: any) => String(value || '').trim()
 
+const getValue = (row: any, ...keys: string[]) => {
+  for (const key of keys) {
+    if (row && row[key] !== undefined && row[key] !== null) return row[key]
+  }
+  return ''
+}
+
+const normalizeGpr43AcceptanceStatus = (value: any) => {
+  const normalized = normalizeValue(value).replace(/[_-]+/g, ' ').toUpperCase()
+  if (['ACCEPT', 'ACCEPTED', 'AGREE', 'AGREED'].includes(normalized)) return 'ACCEPT'
+  if (['NOT ACCEPT', 'NOT ACCEPTED', 'DISAGREE', 'DISAGREED', 'REJECT', 'REJECTED'].includes(normalized)) return 'NOT_ACCEPT'
+  return normalized || ''
+}
+
+const resolveGpr43AcceptanceStatus = (formData: any) => {
+  const explicitStatus = normalizeGpr43AcceptanceStatus(formData?.gpr_43_acceptance_status)
+  if (explicitStatus) return explicitStatus
+
+  const criteriaRows = Array.isArray(formData?.criteria) ? formData.criteria : []
+  const gpr43Row = criteriaRows.find((item: any) => normalizeValue(item?.no) === '4.3')
+  return normalizeGpr43AcceptanceStatus(gpr43Row?.remark)
+}
+
 const parseStoredObject = (raw: any): Record<string, any> => {
   if (!raw) return {}
 
@@ -53,8 +76,8 @@ const resolveMemberByEmpCode = async (empcode: string) => {
     throw new Error(`Employee code not found in person.member_fed: ${safeEmpCode}`)
   }
 
-  const name = [member.empName, member.empSurname].map(normalizeValue).filter(Boolean).join(' ')
-  const email = normalizeValue(member.empEmail)
+  const name = [getValue(member, 'empName', 'EMPNAME'), getValue(member, 'empSurname', 'EMPSURNAME')].map(normalizeValue).filter(Boolean).join(' ')
+  const email = normalizeValue(getValue(member, 'empEmail', 'EMPEMAIL'))
 
   if (!email) {
     throw new Error(`Employee code has no email in person.member_fed: ${safeEmpCode}`)
@@ -125,6 +148,7 @@ export const RequestRegisterGprService = {
         GPR_C_PC_PIC_EMAIL: rawFormData.gpr_c_pc_pic_email || '',
         GPR_C_CIRCULAR_JSON: JSON.stringify(circularList.slice(0, 6)),
         ACTION_REQUIRED_JSON: JSON.stringify(rawFormData.action_required_setup || {}),
+        GPR_43_ACCEPTANCE_STATUS: resolveGpr43AcceptanceStatus(rawFormData),
         COMPLETION_DATE: rawFormData.completion_date || '',
         CREATE_BY: dataItem.CREATE_BY || updateBy,
         UPDATE_BY: updateBy,
@@ -133,7 +157,7 @@ export const RequestRegisterGprService = {
       const sqlList = []
       const checkSql = await RequestRegisterPageSQL.checkSelectionExists(formData)
       const checkRes = (await MySQLExecute.search(checkSql)) as any[]
-      let selection_id = checkRes[0]?.selection_id
+      let selection_id = getValue(checkRes[0], 'selection_id', 'SELECTION_ID')
 
       if (selection_id) {
         formData.SELECTION_ID = selection_id
@@ -207,7 +231,7 @@ export const RequestRegisterGprService = {
 
       const requesterSql = await RequestRegisterPageSQL.getRequesterByRequestId({ REQUEST_ID: reqId })
       const requesterRes = (await MySQLExecute.search(requesterSql)) as any[]
-      const requesterCode = String(requesterRes[0]?.Request_By_EmployeeCode || '').trim()
+      const requesterCode = String(getValue(requesterRes[0], 'Request_By_EmployeeCode', 'REQUEST_BY_EMPLOYEECODE')).trim()
 
       if (!requesterCode) {
         throw new Error('Requester not found for this request')
@@ -252,7 +276,7 @@ export const RequestRegisterGprService = {
 
       const checkSql = await RequestRegisterPageSQL.checkSelectionExists(formData)
       const checkRes = (await MySQLExecute.search(checkSql)) as any[]
-      const selection_id = checkRes[0]?.selection_id
+      const selection_id = getValue(checkRes[0], 'selection_id', 'SELECTION_ID')
 
       if (selection_id) {
         formData.SELECTION_ID = selection_id
@@ -319,15 +343,15 @@ export const RequestRegisterGprService = {
     const selRes = (await MySQLExecute.search(selectionSql)) as any[]
     if (!selRes[0]) return null
 
-    const selection_id = selRes[0].selection_id
+    const selection_id = getValue(selRes[0], 'selection_id', 'SELECTION_ID')
     const finSql = await RequestRegisterPageSQL.getFinancials({ SELECTION_ID: selection_id })
     const critSql = await RequestRegisterPageSQL.getCriteria({ SELECTION_ID: selection_id })
 
     const [finRes, critRes] = await Promise.all([MySQLExecute.search(finSql) as Promise<any[]>, MySQLExecute.search(critSql) as Promise<any[]>])
 
-    const actionRequiredSetup = parseStoredObject(selRes[0]?.action_required_json)
+    const actionRequiredSetup = parseStoredObject(getValue(selRes[0], 'action_required_json', 'ACTION_REQUIRED_JSON'))
     const meta = parseStoredObject(actionRequiredSetup?._meta)
-    const circularMembers = parseCircularMembers(selRes[0]?.gpr_c_circular_json)
+    const circularMembers = parseCircularMembers(getValue(selRes[0], 'gpr_c_circular_json', 'GPR_C_CIRCULAR_JSON'))
 
     return {
       ...selRes[0],
@@ -335,6 +359,7 @@ export const RequestRegisterGprService = {
       gpr_c_approver_empcode: normalizeValue(meta.gpr_c_approver_empcode),
       gpr_c_circular_empcodes: circularMembers.map((item) => item.empcode).filter(Boolean),
       gpr_c_circular_members: circularMembers,
+      gpr_43_acceptance_status: normalizeGpr43AcceptanceStatus(getValue(selRes[0], 'gpr_43_acceptance_status', 'GPR_43_ACCEPTANCE_STATUS')),
       sales_profit: finRes,
       criteria: critRes,
     }

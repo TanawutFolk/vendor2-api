@@ -31,6 +31,31 @@ const ensureFileExists = (filePath: string, context: string) => {
   }
 }
 
+const resolveUniquePath = (destPath: string) => {
+  if (!fs.existsSync(destPath)) return destPath
+
+  const parsed = path.parse(destPath)
+  let counter = 1
+  let candidate = path.join(parsed.dir, `${parsed.name}_${counter}${parsed.ext}`)
+  while (fs.existsSync(candidate)) {
+    counter += 1
+    candidate = path.join(parsed.dir, `${parsed.name}_${counter}${parsed.ext}`)
+  }
+  return candidate
+}
+
+const moveFile = (sourcePath: string, destPath: string) => {
+  const finalDestPath = resolveUniquePath(destPath)
+  try {
+    fs.renameSync(sourcePath, finalDestPath)
+  } catch (error: any) {
+    if (error?.code !== 'EXDEV') throw error
+    fs.copyFileSync(sourcePath, finalDestPath)
+    fs.unlinkSync(sourcePath)
+  }
+  return finalDestPath
+}
+
 // ── Service ──────────────────────────────────────────────────────────────────
 
 export const SelectionFileService = {
@@ -83,10 +108,24 @@ export const SelectionFileService = {
     return destPath
   },
 
+  saveToSending(requestNumber: string, sourceFilePath: string, originalName: string, year?: number) {
+    const folderYear = year || new Date().getFullYear()
+    const sendingPath = path.join(getSelectionFileBasePath(), String(folderYear), requestNumber, '00.Sending')
+
+    fs.mkdirSync(sendingPath, { recursive: true })
+
+    const safeOriginalName = sanitizeForFileName(originalName) || path.basename(sourceFilePath)
+    const destPath = path.join(sendingPath, safeOriginalName)
+
+    ensureFileExists(sourceFilePath, 'Sending source')
+    const finalDestPath = moveFile(sourceFilePath, destPath)
+    console.log(`[SelectionFile] Saved to Sending: ${finalDestPath}`)
+
+    return { destPath: finalDestPath, newFileName: path.basename(finalDestPath) }
+  },
+
   /**
-   * Save a file directly to 01.Receiving with criteria-based naming.
-   * File name format: {criteriaNo}_{criteriaDetail}_{originalName}
-   * e.g. "4.1_Compliant_of_the_law_certificate.pdf"
+   * Save a file directly to 01.Receiving using only the uploaded file name.
    *
    * @param requestNumber  - e.g. "RQ-2026-001"
    * @param sourceFilePath - absolute path to the temp file (from multer)
@@ -109,18 +148,14 @@ export const SelectionFileService = {
     // Ensure folder exists
     fs.mkdirSync(receivingPath, { recursive: true })
 
-    // Build file name: "4.1_Compliant_of_the_law_original.pdf"
-    const sanitizedCriteriaNo = sanitizeForFileName(criteriaNo)
-    const sanitizedDetail = sanitizeForFileName(criteriaDetail)
     const sanitizedOriginalName = sanitizeForFileName(originalName) || path.basename(sourceFilePath)
-    const newFileName = `${sanitizedCriteriaNo}_${sanitizedDetail}_${sanitizedOriginalName}`
-    const destPath = path.join(receivingPath, newFileName)
+    const destPath = path.join(receivingPath, sanitizedOriginalName)
 
     ensureFileExists(sourceFilePath, 'Receiving source')
-    fs.copyFileSync(sourceFilePath, destPath)
-    console.log(`[SelectionFile] Saved to Receiving: ${destPath}`)
+    const finalDestPath = moveFile(sourceFilePath, destPath)
+    console.log(`[SelectionFile] Saved to Receiving: ${finalDestPath}`)
 
-    return { destPath, newFileName }
+    return { destPath: finalDestPath, newFileName: path.basename(finalDestPath) }
   },
 
   /**

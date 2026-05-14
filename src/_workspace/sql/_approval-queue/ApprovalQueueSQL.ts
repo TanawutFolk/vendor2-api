@@ -125,6 +125,7 @@ export const ApprovalQueueSQL = {
                                      , rvs.GPR_C_PC_PIC_EMAIL
                                      , rvs.GPR_C_CIRCULAR_JSON
                                      , rvs.ACTION_REQUIRED_JSON
+                                     , rvs.GPR_43_ACCEPTANCE_STATUS
                                      , rr.REQUEST_BY_EMPLOYEECODE AS EMPLOYEE_CODE
                                      , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS FULL_NAME
                                      , m.EMPDEPT AS EMPLOYEE_DEPT
@@ -482,6 +483,7 @@ export const ApprovalQueueSQL = {
                                      , rvs.GPR_C_PC_PIC_EMAIL
                                      , rvs.GPR_C_CIRCULAR_JSON
                                      , rvs.ACTION_REQUIRED_JSON
+                                     , rvs.GPR_43_ACCEPTANCE_STATUS
                                      , v.VENDOR_REGION
                             FROM
                                        request_register_vendor rr
@@ -753,6 +755,7 @@ export const ApprovalQueueSQL = {
                                      , rvs.GPR_C_PC_PIC_EMAIL
                                      , rvs.GPR_C_CIRCULAR_JSON
                                      , rvs.ACTION_REQUIRED_JSON
+                                     , rvs.GPR_43_ACCEPTANCE_STATUS
 
                                      -- Vendor Info
                                      , v.COMPANY_NAME

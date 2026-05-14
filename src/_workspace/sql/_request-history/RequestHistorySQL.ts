@@ -112,6 +112,7 @@ export const RequestHistorySQL = {
                                      , rvs.GPR_C_PC_PIC_EMAIL
                                      , rvs.GPR_C_CIRCULAR_JSON
                                      , rvs.ACTION_REQUIRED_JSON
+                                     , rvs.GPR_43_ACCEPTANCE_STATUS
 
                                      -- Vendor Info
                                      , v.COMPANY_NAME

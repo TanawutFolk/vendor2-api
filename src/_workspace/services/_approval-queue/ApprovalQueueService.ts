@@ -80,6 +80,7 @@ interface SelectionRecord extends RowDataPacket {
   [key: string]: any
   selection_id?: number
   action_required_json?: string
+  gpr_43_acceptance_status?: string
 }
 
 interface CriteriaRow extends RowDataPacket {
@@ -132,6 +133,7 @@ const normalizeSelectionRecord = (selection: any): SelectionRecord | null => {
     ...selection,
     selection_id: Number(selection?.selection_id ?? selection?.SELECTION_ID ?? 0),
     action_required_json: selection?.action_required_json ?? selection?.ACTION_REQUIRED_JSON,
+    gpr_43_acceptance_status: String(selection?.gpr_43_acceptance_status ?? selection?.GPR_43_ACCEPTANCE_STATUS ?? ''),
   } as SelectionRecord
 }
 
@@ -235,26 +237,41 @@ const getGprCApproverEmpCodeFromSelection = (selection: SelectionRecord | null) 
   return String(meta?.gpr_c_approver_empcode || '').trim()
 }
 
-const NEED_CRITERIA = new Set(['4.1', '4.2', '4.3', '4.4', '4.5'])
-const OPTIONAL_CRITERIA = new Set(['4.6', '4.7', '4.8', '4.9', '4.10', '4.11', '4.12', '4.13'])
+const NEED_CRITERIA = new Set(['4.1', '4.2', '4.3', '4.4', '4.5', '4.11'])
+const OPTIONAL_CRITERIA = new Set(['4.6', '4.7', '4.8', '4.9', '4.10', '4.12', '4.13'])
+const OPTIONAL_REQUIRED_COUNT = 3
 
-const evaluateGprCriteria = (criteriaRows: CriteriaRow[]) => {
+const normalizeGpr43AcceptanceStatus = (value: unknown) => {
+  const normalized = normalizeText(String(value || '').replace(/[_-]+/g, ' '))
+  if (['accept', 'accepted', 'agree', 'agreed'].includes(normalized)) return 'ACCEPT'
+  if (['not accept', 'not accepted', 'disagree', 'disagreed', 'reject', 'rejected'].includes(normalized)) return 'NOT_ACCEPT'
+  return normalized.toUpperCase()
+}
+
+const evaluateGprCriteria = (criteriaRows: CriteriaRow[], selection?: SelectionRecord | null) => {
   const rows = Array.isArray(criteriaRows) ? criteriaRows : []
   const normalizedRows = rows.map((row) => ({
     no: String(row?.no || row?.criteria_no || '').trim(),
+    remark: String(row?.remark || row?.REMARK || '').trim(),
     uploaded_file: String(row?.uploaded_file || row?.uploaded_file_path || '').trim(),
   }))
+  const gpr43Status =
+    normalizeGpr43AcceptanceStatus(selection?.gpr_43_acceptance_status) ||
+    normalizeGpr43AcceptanceStatus(normalizedRows.find((row) => row.no === '4.3')?.remark)
 
-  const needRows = normalizedRows.filter((row) => NEED_CRITERIA.has(row.no))
+  const needRows = normalizedRows.filter((row) => NEED_CRITERIA.has(row.no) && row.no !== '4.3')
   const optionalRows = normalizedRows.filter((row) => OPTIONAL_CRITERIA.has(row.no))
 
-  const needPassed = NEED_CRITERIA.size > 0 && needRows.length === NEED_CRITERIA.size && needRows.every((row) => !!row.uploaded_file)
+  const needFileCriteriaCount = NEED_CRITERIA.size - 1
+  const gpr43Accepted = gpr43Status === 'ACCEPT'
+  const needPassed = needFileCriteriaCount > 0 && needRows.length === needFileCriteriaCount && needRows.every((row) => !!row.uploaded_file) && gpr43Accepted
 
   const optionalUploaded = optionalRows.filter((row) => !!row.uploaded_file).length
-  const optionalPassed = optionalUploaded >= 4
+  const optionalPassed = optionalUploaded >= OPTIONAL_REQUIRED_COUNT
 
   return {
     hasCriteria: normalizedRows.length > 0,
+    gpr43Accepted,
     needPassed,
     optionalPassed,
     passed: needPassed && optionalPassed,
@@ -413,7 +430,7 @@ const loadWorkflowContext = async (dataItem: UpdateStatusPayload): Promise<Workf
     dataItem,
     request,
     steps,
-    currentStep: stepsRes.find((step) => String(step.STEP_STATUS || step.step_status || '').toLowerCase() === 'in_progress'),
+    currentStep: steps.find((step) => String(step.step_status || '').toLowerCase() === 'in_progress'),
     isOversea: String(request.vendor_region || '').toLowerCase() === 'oversea',
     vendor_id: request.vendor_id,
     requesterCode: String(requesterRes[0]?.Request_By_EmployeeCode || requesterRes[0]?.REQUEST_BY_EMPLOYEECODE || '').trim(),
@@ -471,13 +488,18 @@ const validateCurrentStep = async (context: WorkflowContext, resolver: WorkflowR
     if (attemptingApprove) {
       const criteriaSql = await ApprovalQueueSQL.getCriteria({ SELECTION_ID: selection.selection_id })
       const criteriaRes = (await MySQLExecute.search(criteriaSql)) as CriteriaRow[]
-      const gprEval = evaluateGprCriteria(criteriaRes)
+      const gprEval = evaluateGprCriteria(criteriaRes, selection)
 
       if (!gprEval.hasCriteria) {
         throw new Error('Approval blocked: Please fill GPR form before proceeding.')
       }
       if (!gprEval.passed) {
-        throw new Error('Approval blocked: GPR form does not pass criteria (4.1-4.5 need all files and 4.6-4.13 need at least 4 files).')
+        throw new Error('Approval blocked: GPR form does not pass criteria (4.3 must be ACCEPT, 4.1/4.2/4.4/4.5/4.11 need files, and optional criteria need at least 3 files).')
+      }
+    } else if (isIssueGprBStatus(newStatus)) {
+      const gpr43Status = normalizeGpr43AcceptanceStatus(selection.gpr_43_acceptance_status)
+      if (gpr43Status !== 'NOT_ACCEPT') {
+        throw new Error('GPR B can be sent to vendor only when item 4.3 is NOT_ACCEPT.')
       }
     }
   }
@@ -1024,7 +1046,7 @@ export const ApprovalQueueService = {
 
       const stepsSql = await ApprovalQueueSQL.getApprovalSteps({ REQUEST_ID: requestId })
       const steps = ((await MySQLExecute.search(stepsSql)) as ApprovalStep[]).map(normalizeApprovalStep)
-      const currentStep = steps.find((step) => String(step.STEP_STATUS || step.step_status || '').toLowerCase() === 'in_progress')
+      const currentStep = steps.find((step) => String(step.step_status || '').toLowerCase() === 'in_progress')
 
       if (!currentStep || !isPicStep(currentStep)) {
         throw new Error('Request can only be edited when it is in the PIC checking step')
@@ -1138,7 +1160,7 @@ export const ApprovalQueueService = {
 
       const stepsSql = await ApprovalQueueSQL.getApprovalSteps({ REQUEST_ID: requestId })
       const steps = ((await MySQLExecute.search(stepsSql)) as ApprovalStep[]).map(normalizeApprovalStep)
-      const currentStep = steps.find((step) => String(step.STEP_STATUS || step.step_status || '').toLowerCase() === 'in_progress')
+      const currentStep = steps.find((step) => String(step.step_status || '').toLowerCase() === 'in_progress')
 
       const isOversea = normalizeText(request.vendor_region) === 'oversea'
       const picGroupCode = isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
@@ -1212,7 +1234,7 @@ export const ApprovalQueueService = {
     try {
       const stepsSql = await ApprovalQueueSQL.getApprovalSteps(dataItem)
       const steps = ((await MySQLExecute.search(stepsSql)) as ApprovalStep[]).map(normalizeApprovalStep)
-      const currentStep = steps.find((step) => String(step.STEP_STATUS || step.step_status || '').toLowerCase() === 'in_progress')
+      const currentStep = steps.find((step) => String(step.step_status || '').toLowerCase() === 'in_progress')
 
       const sqlList = []
       if (currentStep) {

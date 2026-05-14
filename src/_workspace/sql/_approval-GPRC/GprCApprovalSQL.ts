@@ -1147,10 +1147,11 @@ export const GprCApprovalSQL = {
                                      , rvs.GPR_C_APPROVER_NAME
                                      , rvs.GPR_C_APPROVER_EMAIL
                                      , rvs.GPR_C_PC_PIC_NAME
-                                     , rvs.GPR_C_PC_PIC_EMAIL
-                                     , rvs.GPR_C_CIRCULAR_JSON
-                                     , rvs.ACTION_REQUIRED_JSON
-                                     , v.VENDOR_REGION
+                                      , rvs.GPR_C_PC_PIC_EMAIL
+                                      , rvs.GPR_C_CIRCULAR_JSON
+                                      , rvs.ACTION_REQUIRED_JSON
+                                      , rvs.GPR_43_ACCEPTANCE_STATUS
+                                      , v.VENDOR_REGION
                             FROM
                                        request_register_vendor rr
                                             LEFT JOIN

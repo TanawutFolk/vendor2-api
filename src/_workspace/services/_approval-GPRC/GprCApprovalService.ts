@@ -14,6 +14,14 @@ const getValue = (row: any, ...keys: string[]) => {
   return ''
 }
 
+const normalizeMainApprovalStep = (step: any) => ({
+  ...step,
+  step_id: Number(getValue(step, 'step_id', 'STEP_ID') || 0),
+  step_order: Number(getValue(step, 'step_order', 'STEP_ORDER') || 0),
+  step_status: normalizeValue(getValue(step, 'step_status', 'STEP_STATUS')),
+  DESCRIPTION: normalizeValue(getValue(step, 'DESCRIPTION', 'description')),
+})
+
 const normalizeGroupToken = (value: string) =>
   normalizeValue(value)
     .toUpperCase()
@@ -365,7 +373,7 @@ const notifyActionRequired = async (requestId: number, step: any, action: any) =
 
 const markMainIssueGprCApproved = async (requestId: number, actionBy: string, remark: string) => {
   const stepsSql = await GprCApprovalSQL.getApprovalSteps({ REQUEST_ID: requestId })
-  const steps = (await MySQLExecute.search(stepsSql)) as RowDataPacket[]
+  const steps = ((await MySQLExecute.search(stepsSql)) as RowDataPacket[]).map(normalizeMainApprovalStep)
   const currentStep = steps.find((step: any) => String(step.step_status || '').toLowerCase() === 'in_progress')
   if (!currentStep) return
 
@@ -427,11 +435,11 @@ const markMainIssueGprCApproved = async (requestId: number, actionBy: string, re
 
 const markMainIssueGprCRejected = async (requestId: number, actionBy: string, remark: string) => {
   const stepsSql = await GprCApprovalSQL.getApprovalSteps({ REQUEST_ID: requestId })
-  const steps = (await MySQLExecute.search(stepsSql)) as RowDataPacket[]
+  const steps = ((await MySQLExecute.search(stepsSql)) as RowDataPacket[]).map(normalizeMainApprovalStep)
   const currentStep = steps.find((step: any) => String(step.step_status || '').toLowerCase() === 'in_progress')
   const contextSql = await GprCApprovalSQL.getRequestStatusContext({ REQUEST_ID: requestId })
   const contextRows = (await MySQLExecute.search(contextSql)) as RowDataPacket[]
-  const vendorId = contextRows[0]?.vendor_id
+  const vendorId = getValue(contextRows[0], 'vendor_id', 'VENDOR_ID')
 
   const sqlList = [
     await GprCApprovalSQL.updateStatus({
