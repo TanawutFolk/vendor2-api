@@ -191,18 +191,18 @@ export const ApprovalQueueSQL = {
                                                 (
                                                            SELECT
                                                                       JSON_ARRAYAGG(
-                                                                           JSON_OBJECT(
-                                                                               'document_id', rrd.DOCUMENT_ID,
-                                                                               'file_name', rrd.FILE_NAME,
-                                                                               'file_path', rrd.FILE_PATH,
-                                                                               'file_size', rrd.FILE_SIZE,
-                                                                               'file_type', rrd.FILE_TYPE
-                                                                           )
+                                                JSON_OBJECT(
+                                                  'document_id', rrf.REQUEST_FILE_ID,
+                                                  'file_name', rrf.FILE_NAME,
+                                                  'file_path', rrf.FILE_PATH,
+                                                  'file_size', rrf.FILE_SIZE,
+                                                  'file_type', rrf.FILE_TYPE
+                                                )
                                                                       )
                                                            FROM
-                                                                      request_register_document rrd
+                                                                      request_register_file rrf
                                                            WHERE
-                                                                      rrd.REQUEST_ID = rr.REQUEST_ID AND rrd.INUSE = 1
+                                                                      rrf.REQUEST_ID = rr.REQUEST_ID AND rrf.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS documents
@@ -817,18 +817,18 @@ export const ApprovalQueueSQL = {
                                                 (
                                                            SELECT
                                                                       JSON_ARRAYAGG(
-                                                                           JSON_OBJECT(
-                                                                               'document_id', rrd.DOCUMENT_ID,
-                                                                               'file_name', rrd.FILE_NAME,
-                                                                               'file_path', rrd.FILE_PATH,
-                                                                               'file_size', rrd.FILE_SIZE,
-                                                                               'file_type', rrd.FILE_TYPE
-                                                                           )
+                                                JSON_OBJECT(
+                                                  'document_id', rrf.REQUEST_FILE_ID,
+                                                  'file_name', rrf.FILE_NAME,
+                                                  'file_path', rrf.FILE_PATH,
+                                                  'file_size', rrf.FILE_SIZE,
+                                                  'file_type', rrf.FILE_TYPE
+                                                )
                                                                       )
                                                            FROM
-                                                                      request_register_document rrd
+                                                                      request_register_file rrf
                                                            WHERE
-                                                                      rrd.REQUEST_ID = rr.REQUEST_ID AND rrd.INUSE = 1
+                                                                      rrf.REQUEST_ID = rr.REQUEST_ID AND rrf.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS documents

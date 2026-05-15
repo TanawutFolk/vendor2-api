@@ -1137,8 +1137,6 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
     const picName = resolveDisplayName([picProfile?.fullName], 'PIC')
     const picTel = ''
 
-    if (!picEmail) return
-
     const approverEmail = await resolveAssignedEmail(currentStep?.approver_id)
     const requester = await resolveRequesterMailProfile(vd)
     const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
@@ -1154,12 +1152,21 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
       currentStepDesc.includes('check document') ||
       currentStepDesc.includes('check all document')
 
+    const isPicReject = currentStepCode === 'PIC_REVIEW'
+
     const ccSources = isCheckerReject
       ? [checkerPicCc, requester.email ? [requester.email] : [], poPicContext.peerPicCc]
-      : [poPicContext.peerPicCc, requester.email ? [requester.email] : [], approverEmail ? [approverEmail] : []]
+      : isPicReject
+        ? [picEmail ? [picEmail] : []]
+        : [poPicContext.peerPicCc, requester.email ? [requester.email] : [], approverEmail ? [approverEmail] : []]
+
+    const primaryToEmail = isPicReject ? requester.email : picEmail
+    const recipientName = isPicReject ? requester.name : picName
+
+    if (!primaryToEmail) return
 
     const ccEmails = excludeEmails(
-      mergeUniqueEmails(...ccSources).filter((email) => email !== normalizeEmail(picEmail)),
+      mergeUniqueEmails(...ccSources).filter((email) => email !== normalizeEmail(primaryToEmail)),
       [vd.vendor_email, vd.vendor_main_email]
     )
 
@@ -1167,8 +1174,8 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
     const rejectRemark = dataItem.APPROVER_REMARK || ''
 
     const emailHtml = rejectTemplate({
-      toEmail: picEmail,
-      recipientName: picName,
+      toEmail: primaryToEmail,
+      recipientName,
       ccEmailLine1: approverEmail,
       ccEmailLine2: ccEmails.filter((email) => email !== approverEmail).join('; '),
       requestNumber,
@@ -1189,7 +1196,7 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
     await sendTemplatedEmail({
       templateName: isCheckerReject ? 'emailReject2Template' : 'emailReject1Template',
       emailHtml,
-      toEmail: picEmail,
+      toEmail: primaryToEmail,
       subject: isCheckerReject
         ? `[RECHECK] Register vendor "${requestNumber}" requires recheck`
         : `[REJECT] Register vendor "${requestNumber}" has been rejected`,

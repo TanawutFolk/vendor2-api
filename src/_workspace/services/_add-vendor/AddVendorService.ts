@@ -6,7 +6,7 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2'
 
 export const AddVendorService = {
   checkBlacklist: async (dataItem: any) => {
-    const companyName = String(dataItem.COMPANY_NAME || '').trim()
+    const companyName = String(dataItem.COMPANY_NAME || dataItem.company_name || '').trim()
     const normalizedName = normalizeName(companyName)
     const blacklistResult = normalizedName ? ((await MySQLExecute.search(BlacklistSQL.checkBlacklist(normalizedName))) as RowDataPacket[]) : []
 

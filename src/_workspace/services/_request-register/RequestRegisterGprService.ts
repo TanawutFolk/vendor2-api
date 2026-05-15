@@ -204,7 +204,7 @@ export const RequestRegisterGprService = {
       const resultData = await MySQLExecute.executeList(sqlList)
       return {
         Status: true,
-        Message: 'GPR Form saved successfully',
+        Message: 'Selection Sheet saved successfully',
         ResultOnDb: resultData,
         MethodOnDb: 'Save GPR Form',
         TotalCountOnDb: 1,
@@ -214,7 +214,7 @@ export const RequestRegisterGprService = {
         Status: false,
         Message: error?.message || 'Save failed',
         ResultOnDb: [],
-        MethodOnDb: 'Save GPR Form Failed',
+        MethodOnDb: 'Save Selection Sheet Failed Contact TANAWUT PATRAWAN',
         TotalCountOnDb: 0,
       }
     }

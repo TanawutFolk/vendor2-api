@@ -358,6 +358,18 @@ export const RequestRegisterPageService = {
     return triggerCreationEmailHelper(dataItem, vendorData, nextAssignee, insertedId, persistedRequestNumber, assigneeGroupCode)
   },
 
+  getBusinessCategories: async (dataItem: any = {}) => {
+    const sql = await RequestRegisterPageSQL.getBusinessCategories(dataItem)
+    const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
+    return resultData
+  },
+
+  getCurrencies: async (dataItem: any = {}) => {
+    const sql = await RequestRegisterPageSQL.getCurrencies(dataItem)
+    const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
+    return resultData
+  },
+
   createDocument: async (dataItem: any) => {
     try {
       const sql = await RequestRegisterPageSQL.createDocument(dataItem)

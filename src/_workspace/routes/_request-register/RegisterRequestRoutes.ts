@@ -4,6 +4,8 @@ import { uploadRequestDocuments, uploadSingleRequestDocument } from '../_shared/
 
 const requestRegisterRoutes = Router()
 
+requestRegisterRoutes.post('/dropdown/business-categories', RequestRegisterPageController.getBusinessCategories)
+requestRegisterRoutes.post('/dropdown/currencies', RequestRegisterPageController.getCurrencies)
 requestRegisterRoutes.post('/createRequestVendor', uploadRequestDocuments, RequestRegisterPageController.create)
 requestRegisterRoutes.post('/updateRequest', RequestRegisterPageController.updateRequest)
 requestRegisterRoutes.post('/sendAgreementEmail', RequestRegisterPageController.sendAgreementEmail)

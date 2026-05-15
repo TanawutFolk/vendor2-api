@@ -2,6 +2,8 @@ import { RequestRegisterPageService } from '../../services/_request-register/Req
 
 export const RequestRegisterPageModel = {
   createRequest: async (dataItem: any) => RequestRegisterPageService.createRequest(dataItem),
+  getBusinessCategories: async (dataItem: any = {}) => RequestRegisterPageService.getBusinessCategories(dataItem),
+  getCurrencies: async (dataItem: any = {}) => RequestRegisterPageService.getCurrencies(dataItem),
   createDocument: async (dataItem: any) => RequestRegisterPageService.createDocument(dataItem),
   updateRequest: async (dataItem: any) => RequestRegisterPageService.updateRequest(dataItem),
   sendAgreementEmail: async (dataItem: any) => RequestRegisterPageService.sendAgreementEmail(dataItem),

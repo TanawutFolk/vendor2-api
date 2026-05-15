@@ -9,9 +9,18 @@ export const CheckDuplicateSchema = z.object({
   postal_code: z.string().min(1, 'Postal Code is required'),
 })
 
-export const CheckBlacklistSchema = z.object({
-  company_name: z.string().min(1, 'Company Name is required'),
-})
+export const CheckBlacklistSchema = z
+  .object({
+    company_name: z.string().min(1, 'Company Name is required').optional(),
+    COMPANY_NAME: z.string().min(1, 'Company Name is required').optional(),
+  })
+  .refine(data => {
+    const companyName = String(data.company_name || data.COMPANY_NAME || '').trim()
+    return companyName.length > 0
+  }, {
+    message: 'Company Name is required',
+    path: ['COMPANY_NAME'],
+  })
 
 // Contact Schema
 const ContactSchema = z.object({

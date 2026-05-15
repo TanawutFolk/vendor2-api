@@ -21,6 +21,50 @@ const removeTempUpload = (filePath?: string) => {
 }
 
 export const RequestRegisterPageController = {
+  getBusinessCategories: async (_req: Request, res: Response) => {
+    try {
+      const result = await RequestRegisterPageModel.getBusinessCategories()
+
+      return res.status(200).json({
+        Status: true,
+        ResultOnDb: result,
+        TotalCountOnDb: result.length,
+        MethodOnDb: 'Get Business Categories',
+        Message: 'Search Data Success',
+      } as ResponseI)
+    } catch (error: any) {
+      return res.status(200).json({
+        Status: false,
+        ResultOnDb: [],
+        TotalCountOnDb: 0,
+        MethodOnDb: 'Get Business Categories',
+        Message: error?.message || 'Failed to get business categories',
+      } as ResponseI)
+    }
+  },
+
+  getCurrencies: async (_req: Request, res: Response) => {
+    try {
+      const result = await RequestRegisterPageModel.getCurrencies()
+
+      return res.status(200).json({
+        Status: true,
+        ResultOnDb: result,
+        TotalCountOnDb: result.length,
+        MethodOnDb: 'Get Currencies',
+        Message: 'Search Data Success',
+      } as ResponseI)
+    } catch (error: any) {
+      return res.status(200).json({
+        Status: false,
+        ResultOnDb: [],
+        TotalCountOnDb: 0,
+        MethodOnDb: 'Get Currencies',
+        Message: error?.message || 'Failed to get currencies',
+      } as ResponseI)
+    }
+  },
+
   create: async (req: Request, res: Response) => {
     let dataItem
 
@@ -536,6 +580,8 @@ export const RequestRegisterPageController = {
         throw new Error('Missing REQUEST_NUMBER for GPR PDF upload')
       }
 
+      const isSelectionDocument = documentScope === 'GPR_CRITERIA' || documentScope === 'GPR_PDF'
+
       const selectionFileResult = documentScope === 'GPR_CRITERIA'
         ? SelectionFileService.saveToReceiving(
           String(REQUEST_NUMBER),
@@ -555,35 +601,39 @@ export const RequestRegisterPageController = {
       const storedFilePath = selectionFileResult?.destPath || file.filename || path.basename(file.path)
       const storedFileName = selectionFileResult?.newFileName || file_name || path.basename(file.path)
 
-      const createDocumentResult = await RequestRegisterPageModel.createDocument({
-        REQUEST_ID: reqId,
-        FILE_NAME: persistedFileName,
-        FILE_PATH: storedFilePath,
-        FILE_SIZE: file.size || 0,
-        FILE_TYPE: file.mimetype || '',
-        CREATE_BY: CREATE_BY || 'SYSTEM',
-      })
+      let document_id = 0
 
-      if (!createDocumentResult?.Status) {
-        return res.status(200).json({
-          Status: false,
-          ResultOnDb: {},
-          TotalCountOnDb: 0,
-          MethodOnDb: 'Add Document',
-          Message: createDocumentResult?.Message || 'Failed to add document',
-        } as ResponseI)
-      }
+      if (!isSelectionDocument) {
+        const createDocumentResult = await RequestRegisterPageModel.createDocument({
+          REQUEST_ID: reqId,
+          FILE_NAME: persistedFileName,
+          FILE_PATH: storedFilePath,
+          FILE_SIZE: file.size || 0,
+          FILE_TYPE: file.mimetype || '',
+          CREATE_BY: CREATE_BY || 'SYSTEM',
+        })
 
-      const document_id = Number((createDocumentResult?.ResultOnDb as any)?.document_id || 0)
+        if (!createDocumentResult?.Status) {
+          return res.status(200).json({
+            Status: false,
+            ResultOnDb: {},
+            TotalCountOnDb: 0,
+            MethodOnDb: 'Add Document',
+            Message: createDocumentResult?.Message || 'Failed to add document',
+          } as ResponseI)
+        }
 
-      if (!document_id || Number.isNaN(document_id)) {
-        return res.status(200).json({
-          Status: false,
-          ResultOnDb: {},
-          TotalCountOnDb: 0,
-          MethodOnDb: 'Add Document',
-          Message: 'Document was created but document_id was not returned correctly',
-        } as ResponseI)
+        document_id = Number((createDocumentResult?.ResultOnDb as any)?.document_id || 0)
+
+        if (!document_id || Number.isNaN(document_id)) {
+          return res.status(200).json({
+            Status: false,
+            ResultOnDb: {},
+            TotalCountOnDb: 0,
+            MethodOnDb: 'Add Document',
+            Message: 'Document was created but document_id was not returned correctly',
+          } as ResponseI)
+        }
       }
 
       // â”€â”€ Selection File: Save criteria uploads directly to 01.Receiving â”€â”€

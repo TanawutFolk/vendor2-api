@@ -502,7 +502,7 @@ export const RequestRegisterPageSQL = {
     }
 
     let sql = `
-                            INSERT INTO request_register_document (
+                            INSERT INTO request_register_file (
                                        REQUEST_ID
                                      , FILE_NAME
                                      , FILE_PATH
@@ -579,6 +579,35 @@ export const RequestRegisterPageSQL = {
                                        SORT_ORDER ASC
         `
     return sql
+  },
+
+  getBusinessCategories: async (_dataItem?: any) => {
+    return `
+                            SELECT
+                                       BUSINESS_CATEGORY_NAME AS value
+                                     , BUSINESS_CATEGORY_NAME AS label
+                                     , BUSINESS_CATEGORY_ID
+                                     , DESCRIPTION
+                            FROM
+                                       business_category
+                            WHERE
+                                       INUSE = 1
+                            ORDER BY
+                                       BUSINESS_CATEGORY_NAME ASC
+        `
+  },
+
+  getCurrencies: async (_dataItem?: any) => {
+    return `
+                            SELECT
+                                       CURRENCY_NAME AS value
+                                     , CURRENCY_NAME AS label
+                                     , CURRENCY_ID
+                            FROM
+                                       info_currency
+                            ORDER BY
+                                       CURRENCY_NAME ASC
+        `
   },
 
   createApprovalStep: async (dataItem: RegisterRequestDataItem) => {

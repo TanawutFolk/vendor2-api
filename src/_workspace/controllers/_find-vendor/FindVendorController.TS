@@ -193,7 +193,7 @@ export const FindVendorController = {
         }
 
         try {
-            const vendor_id = parseInt(dataItem.VENDOR_ID as string)
+            const vendor_id = parseInt(String(dataItem.VENDOR_ID ?? dataItem.vendor_id ?? ''))
 
             if (!vendor_id || isNaN(vendor_id)) {
                 return res.status(400).json({
@@ -280,7 +280,7 @@ export const FindVendorController = {
         }
 
         try {
-            const vendor_id = parseInt(dataItem.VENDOR_ID as string)
+            const vendor_id = parseInt(String(dataItem.VENDOR_ID ?? dataItem.vendor_id ?? ''))
 
             if (!vendor_id || isNaN(vendor_id)) {
                 return res.status(400).json({
