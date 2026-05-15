@@ -56,9 +56,70 @@ const moveFile = (sourcePath: string, destPath: string) => {
   return finalDestPath
 }
 
+const resolveManagedFilePath = (filePath: string) => path.normalize(path.resolve(String(filePath || '')))
+
+const findSelectionFileByRequestNumber = (requestNumber: string, candidateFileName: string) => {
+  const normalizedRequestNumber = String(requestNumber || '').trim()
+  const normalizedCandidateFileName = String(candidateFileName || '').trim()
+
+  if (!normalizedRequestNumber || !normalizedCandidateFileName) return ''
+
+  const basePath = getSelectionFileBasePath()
+  if (!fs.existsSync(basePath)) return ''
+
+  const yearFolders = fs.readdirSync(basePath, { withFileTypes: true }).filter(entry => entry.isDirectory())
+
+  for (const yearFolder of yearFolders) {
+    const receivingPath = path.join(basePath, yearFolder.name, normalizedRequestNumber, '01.Receiving')
+    if (!fs.existsSync(receivingPath)) continue
+
+    const matchedFilePath = path.join(receivingPath, normalizedCandidateFileName)
+    if (fs.existsSync(matchedFilePath)) {
+      return matchedFilePath
+    }
+  }
+
+  return ''
+}
+
 // ── Service ──────────────────────────────────────────────────────────────────
 
 export const SelectionFileService = {
+  getBasePath() {
+    return getSelectionFileBasePath()
+  },
+
+  isManagedSelectionFilePath(filePath: string) {
+    const normalizedFilePath = resolveManagedFilePath(filePath).toLowerCase()
+    const normalizedBasePath = resolveManagedFilePath(getSelectionFileBasePath()).toLowerCase()
+    const relativePath = path.relative(normalizedBasePath, normalizedFilePath)
+
+    return Boolean(relativePath) && !relativePath.startsWith('..') && !path.isAbsolute(relativePath)
+  },
+
+  resolveDownloadPath(filePath: string, fileName?: string, requestNumber?: string) {
+    const normalizedFilePath = String(filePath || '').trim()
+    const normalizedFileName = String(fileName || '').trim()
+    const normalizedRequestNumber = String(requestNumber || '').trim()
+
+    if (normalizedFilePath && this.isManagedSelectionFilePath(normalizedFilePath)) {
+      const resolvedPath = resolveManagedFilePath(normalizedFilePath)
+      if (fs.existsSync(resolvedPath)) {
+        return resolvedPath
+      }
+    }
+
+    const candidateFileName = normalizedFileName || path.basename(normalizedFilePath)
+    if (normalizedRequestNumber && candidateFileName) {
+      const matchedPath = findSelectionFileByRequestNumber(normalizedRequestNumber, candidateFileName)
+      if (matchedPath) {
+        return matchedPath
+      }
+    }
+
+    return ''
+  },
+
   /**
    * Create the folder structure for a request:
    *   {basePath}/{year}/{requestNumber}/00.Sending

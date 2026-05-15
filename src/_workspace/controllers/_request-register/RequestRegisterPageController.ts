@@ -677,4 +677,57 @@ export const RequestRegisterPageController = {
       } as ResponseI)
     }
   },
+
+  downloadSelectionDocument: async (req: Request, res: Response) => {
+    const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
+
+    try {
+      const rawFilePath = String(dataItem.FILE_PATH || dataItem.file_path || '').trim()
+      const rawFileName = String(dataItem.FILE_NAME || dataItem.file_name || '').trim()
+      const rawRequestNumber = String(dataItem.REQUEST_NUMBER || dataItem.request_number || '').trim()
+
+      if (!rawFilePath) {
+        return res.status(400).json({
+          Status: false,
+          ResultOnDb: {},
+          TotalCountOnDb: 0,
+          MethodOnDb: 'Download Selection Document',
+          Message: 'Missing file_path',
+        } as ResponseI)
+      }
+
+      const resolvedPath = SelectionFileService.resolveDownloadPath(rawFilePath, rawFileName, rawRequestNumber)
+      if (!resolvedPath) {
+        return res.status(400).json({
+          Status: false,
+          ResultOnDb: {},
+          TotalCountOnDb: 0,
+          MethodOnDb: 'Download Selection Document',
+          Message: 'Invalid selection document path',
+        } as ResponseI)
+      }
+
+      if (!fs.existsSync(resolvedPath)) {
+        return res.status(404).json({
+          Status: false,
+          ResultOnDb: {},
+          TotalCountOnDb: 0,
+          MethodOnDb: 'Download Selection Document',
+          Message: 'Selection document not found',
+        } as ResponseI)
+      }
+
+      return res.download(resolvedPath, rawFileName || path.basename(resolvedPath))
+    } catch (error: any) {
+      console.error('Download Selection Document Error:', error)
+
+      return res.status(200).json({
+        Status: false,
+        ResultOnDb: {},
+        TotalCountOnDb: 0,
+        MethodOnDb: 'Download Selection Document',
+        Message: error?.message || 'Failed to download selection document',
+      } as ResponseI)
+    }
+  },
 }

@@ -17,5 +17,6 @@ requestRegisterRoutes.post('/saveGprCNotification', RequestRegisterPageControlle
 requestRegisterRoutes.post('/gpr-c/get-flow', RequestRegisterPageController.gprCGetFlow)
 requestRegisterRoutes.post('/gpr-c/submit-setup', RequestRegisterPageController.gprCSubmitSetup)
 requestRegisterRoutes.post('/addDocument', uploadSingleRequestDocument, RequestRegisterPageController.addDocument)
+requestRegisterRoutes.post('/downloadSelectionDocument', RequestRegisterPageController.downloadSelectionDocument)
 
 export default requestRegisterRoutes

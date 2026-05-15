@@ -710,6 +710,7 @@ export const RequestRegisterPageSQL = {
                                        REQUEST_ID
                                      , STEP_ID
                                      , ACTION_BY
+                                     , ACTION_BY_NAME
                                      , ACTION_TYPE
                                      , REMARK
                                      , ACTION_DATE
@@ -717,6 +718,7 @@ export const RequestRegisterPageSQL = {
                                         dataItem.REQUEST_ID
                                      ,  dataItem.STEP_ID
                                      , 'dataItem.ACTION_BY'
+                                     , (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM Person.MEMBER_FED pm WHERE pm.EMPCODE = 'dataItem.ACTION_BY' LIMIT 1)
                                      , 'dataItem.ACTION_TYPE'
                                      , 'dataItem.REMARK'
                                      ,  NOW()

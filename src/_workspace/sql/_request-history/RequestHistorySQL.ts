@@ -228,6 +228,7 @@ export const RequestHistorySQL = {
                                                                                'log_id', ral.LOG_ID,
                                                                                'step_id', ral.STEP_ID,
                                                                                'action_by', ral.ACTION_BY,
+                                                                               'action_by_name', COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM Person.MEMBER_FED pm WHERE pm.EMPCODE = ral.ACTION_BY LIMIT 1)),
                                                                                'action_type', ral.ACTION_TYPE,
                                                                                'remark', ral.REMARK,
                                                                                'action_date', ral.ACTION_DATE
@@ -329,7 +330,7 @@ export const RequestHistorySQL = {
                                      , ral.ACTION_TYPE
                                      , ral.REMARK
                                      , ral.ACTION_DATE
-                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS action_by_name
+                                     , COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), CONCAT(m.EMPNAME, ' ', m.EMPSURNAME)) AS action_by_name
                             FROM
                                        request_approval_log ral
                                             LEFT JOIN

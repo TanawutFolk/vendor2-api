@@ -211,7 +211,15 @@ export const ApprovalQueueController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt((dataItem.REQUEST_ID ?? dataItem.request_id) as string)
+      const requestStatus = dataItem.REQUEST_STATUS ?? dataItem.request_status ?? ''
+      const workflowAction = dataItem.WORKFLOW_ACTION ?? dataItem.workflow_action ?? ''
+      const actionType = dataItem.ACTION_TYPE ?? dataItem.action_type ?? ''
+      const negotiationAction = dataItem.NEGOTIATION_ACTION ?? dataItem.negotiation_action ?? ''
+      const approveBy = dataItem.APPROVE_BY ?? dataItem.approve_by ?? ''
+      const approverRemark = dataItem.APPROVER_REMARK ?? dataItem.approver_remark ?? ''
+      const updateBy = dataItem.UPDATE_BY ?? dataItem.update_by ?? 'SYSTEM'
+      const isFinalStep = dataItem.ISFINALSTEP === true || dataItem.ISFINALSTEP === 'true' || dataItem.isFinalStep === true || dataItem.isFinalStep === 'true'
 
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
@@ -224,18 +232,17 @@ export const ApprovalQueueController = {
       }
 
       // approve_date: set to 'NOW()' (DB CURRENT_TIMESTAMP) when Rejected, or when it's the final step
-      const isFinalStep = dataItem.ISFINALSTEP === true || dataItem.ISFINALSTEP === 'true'
-      const isFinalStepOrRejected = dataItem.REQUEST_STATUS === 'Rejected' || isFinalStep
+      const isFinalStepOrRejected = requestStatus === 'Rejected' || isFinalStep
       const result = await ApprovalQueueModel.updateStatus({
         REQUEST_ID: request_id,
-        REQUEST_STATUS: dataItem.REQUEST_STATUS || '',
-        WORKFLOW_ACTION: dataItem.WORKFLOW_ACTION || '',
-        ACTION_TYPE: dataItem.ACTION_TYPE || '',
-        NEGOTIATION_ACTION: dataItem.NEGOTIATION_ACTION || '',
-        APPROVE_BY: dataItem.APPROVE_BY || '',
+        REQUEST_STATUS: requestStatus,
+        WORKFLOW_ACTION: workflowAction,
+        ACTION_TYPE: actionType,
+        NEGOTIATION_ACTION: negotiationAction,
+        APPROVE_BY: approveBy,
         APPROVE_DATE: isFinalStepOrRejected ? 'NOW()' : null,
-        APPROVER_REMARK: dataItem.APPROVER_REMARK || '',
-        UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
+        APPROVER_REMARK: approverRemark,
+        UPDATE_BY: updateBy,
         ISFINALSTEP: isFinalStep,
       })
 

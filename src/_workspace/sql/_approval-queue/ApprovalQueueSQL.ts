@@ -245,6 +245,7 @@ export const ApprovalQueueSQL = {
                                                                                'log_id', ral.LOG_ID,
                                                                                'step_id', ral.STEP_ID,
                                                                                'action_by', ral.ACTION_BY,
+                                                                               'action_by_name', COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM Person.MEMBER_FED pm WHERE pm.EMPCODE = ral.ACTION_BY LIMIT 1)),
                                                                                'action_type', ral.ACTION_TYPE,
                                                                                'remark', ral.REMARK,
                                                                                'action_date', ral.ACTION_DATE
@@ -421,6 +422,7 @@ export const ApprovalQueueSQL = {
                                        REQUEST_ID
                                      , STEP_ID
                                      , ACTION_BY
+                                     , ACTION_BY_NAME
                                      , ACTION_TYPE
                                      , REMARK
                                      , ACTION_DATE
@@ -428,6 +430,7 @@ export const ApprovalQueueSQL = {
                                         dataItem.REQUEST_ID
                                      ,  dataItem.STEP_ID
                                      , 'dataItem.ACTION_BY'
+                                     , (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM Person.MEMBER_FED pm WHERE pm.EMPCODE = 'dataItem.ACTION_BY' LIMIT 1)
                                      , 'dataItem.ACTION_TYPE'
                                      , 'dataItem.REMARK'
                                      ,  NOW()
@@ -453,7 +456,7 @@ export const ApprovalQueueSQL = {
                                      , ral.ACTION_TYPE
                                      , ral.REMARK
                                      , ral.ACTION_DATE
-                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS action_by_name
+                                     , COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), CONCAT(m.EMPNAME, ' ', m.EMPSURNAME)) AS action_by_name
                             FROM
                                        request_approval_log ral
                                             LEFT JOIN
@@ -871,6 +874,7 @@ export const ApprovalQueueSQL = {
                                                                                'log_id', ral.LOG_ID,
                                                                                'step_id', ral.STEP_ID,
                                                                                'action_by', ral.ACTION_BY,
+                                                                               'action_by_name', COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM Person.MEMBER_FED pm WHERE pm.EMPCODE = ral.ACTION_BY LIMIT 1)),
                                                                                'action_type', ral.ACTION_TYPE,
                                                                                'remark', ral.REMARK,
                                                                                'action_date', ral.ACTION_DATE
