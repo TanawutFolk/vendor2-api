@@ -37,9 +37,12 @@ import {
 
 const SYSTEM_ORIGIN = process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'
 
-const DEFAULT_VENDOR_DOCUMENT_LOCAL_PATH = 'C:\\VendorTest\\01.New (Full)\\Local\\00.Sending'
-const DEFAULT_VENDOR_DOCUMENT_OVERSEA_PATH = 'C:\\VendorTest\\01.New (Full)\\Oversea\\00.Sending'
-const DEFAULT_VENDOR_DOCUMENT_FORM_B_PATH = 'C:\\VendorTest\\00.Purchase Form\\FORM B.xlsx'
+const DEFAULT_VENDOR_DOCUMENT_LOCAL_PATH =
+  'C:\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier\\00.DocumentSet\\01.New (Full)\\Local\\00.Sending'
+const DEFAULT_VENDOR_DOCUMENT_OVERSEA_PATH =
+  'C:\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier\\00.DocumentSet\\01.New (Full)\\Oversea\\00.Sending'
+const DEFAULT_VENDOR_DOCUMENT_FORM_B_PATH =
+  'C:\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier\\00.DocumentSet\\00.Purchase Form\\FORM B.xlsx'
 const VENDOR_DOCUMENT_ATTACHMENT_EXTENSIONS = new Set(['.pdf', '.xlsx', '.xls', '.doc', '.docx'])
 
 const getVendorDocumentLocalPath = () => process.env.VENDOR_DOCUMENT_LOCAL_PATH || DEFAULT_VENDOR_DOCUMENT_LOCAL_PATH
