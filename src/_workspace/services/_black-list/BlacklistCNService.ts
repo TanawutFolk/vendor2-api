@@ -39,9 +39,10 @@ export const BlacklistCNService = {
 
       conn = await connection()
       await conn.beginTransaction()
-      await conn.query(BlacklistSQL.deleteCn())
+      await conn.query(BlacklistSQL.deactivateCnAliases(updateBy))
+      await conn.query(BlacklistSQL.deactivateCn(updateBy))
 
-      let executionCount = 1
+      let executionCount = 2
 
       for (const row of parsedRows) {
         const sqlInsertVendor = BlacklistSQL.insertCn({

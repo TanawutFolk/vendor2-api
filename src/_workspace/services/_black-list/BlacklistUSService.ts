@@ -83,7 +83,7 @@ export const BlacklistUSService = {
 
       conn = await connection()
       await conn.beginTransaction()
-      await conn.query(BlacklistSQL.deleteUs())
+      await conn.query(BlacklistSQL.deactivateUs(updateBy))
 
       let executionCount = 1
 

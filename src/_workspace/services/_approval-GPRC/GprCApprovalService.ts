@@ -3,7 +3,14 @@ import { ResultSetHeader, RowDataPacket } from 'mysql2'
 import sendEmail from '@src/config/sendEmail'
 import { emailActionRequiredTemplate, emailGprCStepApprovalTemplate, emailGprCRequesterSetupTemplate, emailUserCheckerApproverGPRCTemplate } from '@src/config/mailTemplate'
 import { GprCApprovalSQL } from '../../sql/_approval-GPRC/GprCApprovalSQL'
-import { GROUP_CODE, mergeUniqueEmails, normalizeEmail, resolveRequestNumber } from '../_request-register/RegisterRequestWorkflowHelper'
+import {
+  GROUP_CODE,
+  inferStepCode,
+  mergeUniqueEmails,
+  normalizeEmail,
+  resolveRequestNumber,
+  WORKFLOW_STEP_CODE,
+} from '../_request-register/RegisterRequestWorkflowHelper'
 
 const normalizeValue = (value: any) => String(value || '').trim()
 
@@ -19,6 +26,7 @@ const normalizeMainApprovalStep = (step: any) => ({
   step_id: Number(getValue(step, 'step_id', 'STEP_ID') || 0),
   step_order: Number(getValue(step, 'step_order', 'STEP_ORDER') || 0),
   step_status: normalizeValue(getValue(step, 'step_status', 'STEP_STATUS')),
+  step_code: normalizeValue(getValue(step, 'step_code', 'STEP_CODE')),
   DESCRIPTION: normalizeValue(getValue(step, 'DESCRIPTION', 'description')),
 })
 
@@ -199,7 +207,7 @@ const ensureFlow = async (requestId: number, updateBy: string) => {
   const insertSql = GprCApprovalSQL.insertFlow({
     REQUEST_ID: requestId,
     SELECTION_ID: selectionId || '',
-    FLOW_STATUS: 'REQUESTER_SETUP',
+    FLOW_STATUS: 'requester_setup',
     CURRENT_STEP_CODE: 'REQUESTER_SETUP',
     REQUESTER_EMPCODE: requesterEmpcode,
     CREATE_BY: updateBy,
@@ -377,15 +385,14 @@ const markMainIssueGprCApproved = async (requestId: number, actionBy: string, re
   const currentStep = steps.find((step: any) => String(step.step_status || '').toLowerCase() === 'in_progress')
   if (!currentStep) return
 
-  const currentDesc = normalizeValue(currentStep.DESCRIPTION).toLowerCase()
-  if (!currentDesc.includes('issue gpr c')) return
+  if (inferStepCode(currentStep) !== WORKFLOW_STEP_CODE.ISSUE_GPR_C) return
 
   const pendingSteps = steps
     .filter((step: any) => String(step.step_status || '').toLowerCase() === 'pending' && Number(step.step_order) > Number(currentStep.step_order))
     .sort((a: any, b: any) => Number(a.step_order || 0) - Number(b.step_order || 0))
   const nextStep =
-    pendingSteps.find((step: any) => normalizeValue(step.DESCRIPTION).toLowerCase().includes('agreement reached')) ||
-    pendingSteps.find((step: any) => normalizeValue(step.DESCRIPTION).toLowerCase().includes('checker')) ||
+    pendingSteps.find((step: any) => inferStepCode(step) === WORKFLOW_STEP_CODE.AGREEMENT_REACHED) ||
+    pendingSteps.find((step: any) => inferStepCode(step) === WORKFLOW_STEP_CODE.DOC_CHECK) ||
     pendingSteps[0]
 
   const sqlList = [
@@ -647,7 +654,7 @@ export const GprCApprovalService = {
           GPR_C_FLOW_ID: flowId,
           REQUEST_ID: requestId,
           SELECTION_ID: selectionId || '',
-          FLOW_STATUS: 'IN_PROGRESS',
+          FLOW_STATUS: 'in_progress',
           CURRENT_STEP_CODE: 'REQUESTER_APPROVER',
           REQUESTER_EMPCODE: requesterEmpcode,
           REQUESTER_SUBMITTED_AT: 'NOW()',
@@ -676,7 +683,7 @@ export const GprCApprovalService = {
             APPROVER_EMPCODE: step.approver.empcode,
             APPROVER_NAME: step.approver.name,
             APPROVER_EMAIL: step.approver.email,
-            STEP_STATUS: step.order === 1 ? 'IN_PROGRESS' : 'PENDING',
+            STEP_STATUS: step.order === 1 ? 'in_progress' : 'pending',
             CREATE_BY: updateBy,
             UPDATE_BY: updateBy,
           })
@@ -719,7 +726,7 @@ export const GprCApprovalService = {
       const sqlList = [
         GprCApprovalSQL.updateStepAction({
           GPR_C_STEP_ID: currentStep.GPR_C_STEP_ID || currentStep.gpr_c_step_id,
-          STEP_STATUS: 'APPROVED',
+          STEP_STATUS: 'approved',
           ACTION_BY: actionBy,
           ACTION_TYPE: actionType,
           ACTION_REMARK: remark,
@@ -737,7 +744,7 @@ export const GprCApprovalService = {
         sqlList.push(
           GprCApprovalSQL.updateFlowStatus({
             GPR_C_FLOW_ID: flowId,
-            FLOW_STATUS: 'IN_PROGRESS',
+            FLOW_STATUS: 'in_progress',
             CURRENT_STEP_CODE: nextStep.STEP_CODE || nextStep.step_code,
             UPDATE_BY: actionBy,
           })
@@ -748,7 +755,7 @@ export const GprCApprovalService = {
         sqlList.push(
           GprCApprovalSQL.updateFlowStatus({
             GPR_C_FLOW_ID: flowId,
-            FLOW_STATUS: 'APPROVED',
+            FLOW_STATUS: 'approved',
             CURRENT_STEP_CODE: null as any,
             COMPLETED_AT: 'NOW()',
             UPDATE_BY: actionBy,
@@ -782,7 +789,7 @@ export const GprCApprovalService = {
       await MySQLExecute.executeList([
         GprCApprovalSQL.updateStepAction({
           GPR_C_STEP_ID: currentStep.GPR_C_STEP_ID || currentStep.gpr_c_step_id,
-          STEP_STATUS: 'REJECTED',
+          STEP_STATUS: 'rejected',
           ACTION_BY: actionBy,
           ACTION_TYPE: 'REJECTED',
           ACTION_REMARK: remark,
@@ -794,7 +801,7 @@ export const GprCApprovalService = {
         }),
         GprCApprovalSQL.updateFlowStatus({
           GPR_C_FLOW_ID: flowId,
-          FLOW_STATUS: 'REJECTED',
+          FLOW_STATUS: 'rejected',
           CURRENT_STEP_CODE: null as any,
           REJECTED_AT: 'NOW()',
           REJECTED_BY: actionBy,
@@ -840,7 +847,7 @@ export const GprCApprovalService = {
         PIC_NAME: normalizeValue(dataItem.PIC_NAME),
         PIC_EMAIL: picEmail,
         REQUIRED_DETAIL: normalizeValue(dataItem.REQUIRED_DETAIL || dataItem.REMARK),
-        RESULT_STATUS: 'PENDING',
+        RESULT_STATUS: 'pending',
         CREATE_BY: actionBy,
         UPDATE_BY: actionBy,
       })
@@ -875,7 +882,7 @@ export const GprCApprovalService = {
       if (!actionRequiredId) throw new Error('Missing action_required_id')
       const updateBy = normalizeValue(dataItem.RESULT_BY || dataItem.UPDATE_BY)
       if (!updateBy) throw new Error('Missing result_by')
-      const status = normalizeValue(dataItem.RESULT_STATUS || 'COMPLETED').toUpperCase()
+      const status = normalizeValue(dataItem.RESULT_STATUS || 'completed').toLowerCase()
       await MySQLExecute.execute(
         GprCApprovalSQL.updateActionRequiredResult({
           ACTION_REQUIRED_ID: actionRequiredId,

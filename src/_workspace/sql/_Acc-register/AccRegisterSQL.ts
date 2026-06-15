@@ -1,4 +1,6 @@
-export interface RegisterRequestDataItem {
+import type { AuditFields } from '../../types/AuditFields'
+
+export interface RegisterRequestDataItem extends Partial<AuditFields> {
   [key: string]: any
   request_id?: number | string
   request_number?: string
@@ -90,6 +92,8 @@ export const AccRegisterSQL = {
                             SELECT 
                                        ras.STEP_ID
                                      , ras.REQUEST_ID
+                                     , ras.WORKFLOW_STEP_ID
+                                     , ras.STATUS_ID
                                      , ras.STEP_ORDER
                                      , ras.APPROVER_ID
                                      , ras.STEP_STATUS
@@ -102,9 +106,13 @@ export const AccRegisterSQL = {
                                      , ras.CREATE_DATE
                                      , ras.UPDATE_BY
                                      , ras.UPDATE_DATE
+                                     , mrs.STATUS_VALUE AS master_status_value
+                                     , mrs.STATUS_LABEL AS master_status_label
                                      , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS approver_name
                             FROM
                                        request_approval_step ras
+                                            INNER JOIN
+                                       m_request_status mrs ON mrs.STATUS_ID = ras.STATUS_ID
                                             LEFT JOIN
                                        Person.MEMBER_FED m ON m.EMPCODE = ras.APPROVER_ID
                             WHERE
@@ -122,7 +130,7 @@ export const AccRegisterSQL = {
   updateApprovalStep: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE request_approval_step SET
-                                       STEP_STATUS = 'dataItem.STEP_STATUS'
+                                       STEP_STATUS = LOWER('dataItem.STEP_STATUS')
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
@@ -146,14 +154,32 @@ export const AccRegisterSQL = {
                                      , ACTION_TYPE
                                      , REMARK
                                      , ACTION_DATE
+                                     , DESCRIPTION
+                                     , CREATE_BY
+                                     , UPDATE_BY
+                                     , CREATE_DATE
+                                     , UPDATE_DATE
+                                     , INUSE
                             ) VALUES (
                                         dataItem.REQUEST_ID
                                      ,  dataItem.STEP_ID
                                      , 'dataItem.ACTION_BY'
-                                     , (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM Person.MEMBER_FED pm WHERE pm.EMPCODE = 'dataItem.ACTION_BY' LIMIT 1)
+                                     , COALESCE(
+                                           (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME)
+                                            FROM Person.MEMBER_FED pm
+                                            WHERE pm.EMPCODE = 'dataItem.ACTION_BY'
+                                            LIMIT 1),
+                                           'dataItem.ACTION_BY'
+                                       )
                                      , 'dataItem.ACTION_TYPE'
                                      , 'dataItem.REMARK'
                                      ,  NOW()
+                                     , LEFT('dataItem.REMARK', 100)
+                                     , 'dataItem.ACTION_BY'
+                                     , 'dataItem.ACTION_BY'
+                                     , NOW()
+                                     , NOW()
+                                     , 1
                             )
         `
 
@@ -169,8 +195,16 @@ export const AccRegisterSQL = {
   completeRegistration: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE request_register_vendor SET
-                                       VENDOR_CODE = 'dataItem.VENDOR_CODE'
+                                       APPROVED_VENDOR_CODE = 'dataItem.VENDOR_CODE'
+                                     , VENDOR_CODE = 'dataItem.VENDOR_CODE'
                                      , REQUEST_STATUS = 'Completed'
+                                     , REQUEST_STATE = 'completed'
+                                     , CURRENT_STATUS_ID = (
+                                           SELECT STATUS_ID FROM m_request_status
+                                           WHERE STEP_CODE = 'ACCOUNT_REGISTERED'
+                                           LIMIT 1
+                                       )
+                                     , CURRENT_STEP_ID = NULL
                                      , APPROVE_BY = 'dataItem.UPDATE_BY'
                                      , APPROVE_DATE = NOW()
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
@@ -189,7 +223,8 @@ export const AccRegisterSQL = {
   updateRequestVendorCode: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE request_register_vendor SET
-                                       VENDOR_CODE = 'dataItem.VENDOR_CODE'
+                                       APPROVED_VENDOR_CODE = 'dataItem.VENDOR_CODE'
+                                     , VENDOR_CODE = 'dataItem.VENDOR_CODE'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
@@ -235,6 +270,13 @@ export const AccRegisterSQL = {
     let sql = `
                             UPDATE request_register_vendor SET
                                        REQUEST_STATUS = 'Completed'
+                                     , REQUEST_STATE = 'completed'
+                                     , CURRENT_STATUS_ID = (
+                                           SELECT STATUS_ID FROM m_request_status
+                                           WHERE STEP_CODE = 'ACCOUNT_REGISTERED'
+                                           LIMIT 1
+                                       )
+                                     , CURRENT_STEP_ID = NULL
                                      , APPROVE_DATE = NOW()
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()

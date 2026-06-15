@@ -9,9 +9,9 @@ import {
   inferStepCode,
   isPicStep,
   isRejectedStatus,
-  normalizeText,
   requiresVendorReply,
   resolveGroupCodeForStep,
+  WORKFLOW_STEP_CODE,
 } from './RegisterRequestWorkflowHelper'
 import { sendAgreementEmail as sendAgreementEmailHelper, triggerCreationEmail as triggerCreationEmailHelper, triggerVendorDocumentEmail } from './RegisterRequestNotificationHelper'
 import { RequestRegisterGprService } from './RequestRegisterGprService'
@@ -115,14 +115,17 @@ export const RequestRegisterPageService = {
       const statusSql = await RequestRegisterPageSQL.getStatusOptions()
       const statusRows = await queryRows(statusSql)
       const workflowStatuses = statusRows.filter((s: any) => !isRejectedStatus(s.value))
-      const pendingAgreementStatus = workflowStatuses.find((s: any) => {
-        const statusText = normalizeText(`${s.value || ''} ${s.label || ''}`.replace(/[_-]+/g, ' '))
-        return statusText.includes('pending agreement')
-      })
-      const hasAgreementReachedStatus = workflowStatuses.some((s: any) => {
-        const statusText = normalizeText(`${s.value || ''} ${s.label || ''}`.replace(/[_-]+/g, ' '))
-        return statusText.includes('agreement reached')
-      })
+      const getConfiguredStepCode = (status: any) =>
+        inferStepCode({
+          step_code: status.stepCode,
+          DESCRIPTION: status.label || status.value,
+        })
+      const pendingAgreementStatus = workflowStatuses.find(
+        (status: any) => getConfiguredStepCode(status) === WORKFLOW_STEP_CODE.PENDING_AGREEMENT
+      )
+      const hasAgreementReachedStatus = workflowStatuses.some(
+        (status: any) => getConfiguredStepCode(status) === WORKFLOW_STEP_CODE.AGREEMENT_REACHED
+      )
       const reRegisterInitialStatus = pendingAgreementStatus?.value || pendingAgreementStatus?.label || 'Pending Agreement'
 
       const fetchAssigneesSql = await RequestRegisterPageSQL.getActiveAssigneesByGroupCode({
@@ -224,7 +227,7 @@ export const RequestRegisterPageService = {
 
         const stepCode = inferStepCode({
           step_code: ws.stepCode,
-          DESCRIPTION: ws.label,
+          DESCRIPTION: ws.label || ws.value,
         })
         const actorType = inferActorType({
           actor_type: ws.actorType,
@@ -233,13 +236,16 @@ export const RequestRegisterPageService = {
         })
         const groupCode = (isOversea ? ws.defaultGroupCodeOversea : ws.defaultGroupCodeLocal) || resolveGroupCodeForStep({ step_code: stepCode, actor_type: actorType }, isOversea)
         const isPicOwnedStep = actorType === 'PIC'
-        const statusText = normalizeText(`${ws.value || ''} ${ws.label || ''}`.replace(/[_-]+/g, ' '))
-        const isPendingAgreementStep = statusText.includes('pending agreement')
-        const isAgreementReachedStep = statusText.includes('agreement reached')
+        const isRequestSubmittedStep = stepCode === WORKFLOW_STEP_CODE.REQUEST_SUBMITTED
+        const isPicReviewStep = stepCode === WORKFLOW_STEP_CODE.PIC_REVIEW
+        const isPendingAgreementStep = stepCode === WORKFLOW_STEP_CODE.PENDING_AGREEMENT
+        const isAgreementReachedStep = stepCode === WORKFLOW_STEP_CODE.AGREEMENT_REACHED
         const isVendorRequestStep = requiresVendorReply({ ...ws, step_code: stepCode, actor_type: actorType })
 
         if (isReRegisterRequest) {
-          if (isVendorRequestStep) {
+          if (isRequestSubmittedStep) {
+            initialStatus = 'completed'
+          } else if (isPicReviewStep || isVendorRequestStep) {
             initialStatus = 'approved'
           } else if (isPendingAgreementStep) {
             initialStatus = 'completed'
@@ -248,13 +254,15 @@ export const RequestRegisterPageService = {
             reRegisterInProgressAssigned = true
           }
         } else {
-          if (stepOrder === 1) initialStatus = 'completed'
-          else if (stepOrder === 2) initialStatus = 'in_progress'
+          if (isRequestSubmittedStep) initialStatus = 'completed'
+          else if (isPicReviewStep) initialStatus = 'in_progress'
         }
 
         sqlList.push(
           await RequestRegisterPageSQL.createApprovalStep({
             REQUEST_ID: insertedId,
+            WORKFLOW_STEP_ID: ws.workflowStepId,
+            STATUS_ID: ws.statusId,
             STEP_ORDER: stepOrder,
             APPROVER_ID: stepOrder <= 2 || isPicOwnedStep ? nextAssignee.empCode : '',
             STEP_STATUS: initialStatus,
@@ -269,6 +277,12 @@ export const RequestRegisterPageService = {
       }
 
       await executeSqlList(sqlList)
+      await executeSql(
+        await RequestRegisterPageSQL.syncRequestWorkflowState({
+          REQUEST_ID: insertedId,
+          UPDATE_BY: dataItem.CREATE_BY || 'SYSTEM',
+        })
+      )
 
       const firstStepSql = await RequestRegisterPageSQL.getApprovalSteps({ REQUEST_ID: insertedId })
       const firstStepRows = await queryRows(firstStepSql)
@@ -397,7 +411,35 @@ export const RequestRegisterPageService = {
   },
 
   createApprovalStep: async (dataItem: any) => {
-    const sql = await RequestRegisterPageSQL.createApprovalStep(dataItem)
+    const stepCode = String(dataItem.STEP_CODE || '').trim().toUpperCase()
+    if (!stepCode) throw new Error('STEP_CODE is required')
+    if (!/^[A-Z0-9_]+$/.test(stepCode)) throw new Error('Invalid STEP_CODE format')
+
+    const [statusRows, requestRows] = await Promise.all([
+      MySQLExecute.search(await RequestRegisterPageSQL.getStatusByStepCode({ STEP_CODE: stepCode })) as Promise<RowDataPacket[]>,
+      MySQLExecute.search(
+        await RequestRegisterPageSQL.getRequestVendorRegion({ REQUEST_ID: dataItem.REQUEST_ID })
+      ) as Promise<RowDataPacket[]>,
+    ])
+    const status = statusRows[0]
+    if (!status) throw new Error(`Unknown or inactive STEP_CODE: ${stepCode}`)
+    const request = requestRows[0]
+    if (!request) throw new Error('Request not found')
+
+    const isOversea = String(request.VENDOR_REGION || '').trim().toLowerCase() === 'oversea'
+    const groupCode = isOversea
+      ? status.DEFAULT_GROUP_CODE_OVERSEA
+      : status.DEFAULT_GROUP_CODE_LOCAL
+
+    const sql = await RequestRegisterPageSQL.createApprovalStep({
+      ...dataItem,
+      WORKFLOW_STEP_ID: status.WORKFLOW_STEP_ID,
+      STATUS_ID: status.STATUS_ID,
+      STEP_CODE: status.STEP_CODE,
+      ACTOR_TYPE: status.ACTOR_TYPE || '',
+      GROUP_CODE: groupCode || '',
+      DESCRIPTION: dataItem.DESCRIPTION || status.STATUS_LABEL || status.STATUS_VALUE,
+    })
     const result = (await MySQLExecute.execute(sql)) as ResultSetHeader
     return result.insertId
   },

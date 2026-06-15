@@ -28,6 +28,7 @@ export const AssigneesService = {
       const groupCode = String(dataItem.GROUP_CODE || '')
         .trim()
         .toUpperCase()
+      const updateBy = String(dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM').trim() || 'SYSTEM'
       const inUse = dataItem.INUSE === 0 || dataItem.INUSE === '0' || dataItem.INUSE === false ? 0 : 1
 
       if (!empcode) throw new Error('Employee code is required')
@@ -53,6 +54,7 @@ export const AssigneesService = {
           ...dataItem,
           EMPCODE: empcode,
           GROUP_CODE: groupCode,
+          UPDATE_BY: updateBy,
           INUSE: inUse,
         })
         method = 'Update Assignee'
@@ -61,6 +63,8 @@ export const AssigneesService = {
           ...dataItem,
           EMPCODE: empcode,
           GROUP_CODE: groupCode,
+          CREATE_BY: updateBy,
+          UPDATE_BY: updateBy,
           INUSE: inUse,
         })
         method = 'Create Assignee'

@@ -5,6 +5,9 @@ export interface AssigneesDataItem {
   EMPEMAIL?: string
   GROUP_CODE?: string
   GROUP_NAME?: string
+  DESCRIPTION?: string
+  CREATE_BY?: string
+  UPDATE_BY?: string
   INUSE?: number | string
   KEYWORD?: string
   IN_USE?: string | number
@@ -163,6 +166,9 @@ export const AssigneesSQL = {
                                      , EMPEMAIL
                                      , GROUP_CODE
                                      , GROUP_NAME
+                                     , DESCRIPTION
+                                     , CREATE_BY
+                                     , UPDATE_BY
                                      , INUSE
                             )
                             VALUES (
@@ -171,6 +177,9 @@ export const AssigneesSQL = {
                                      , 'dataItem.EMPEMAIL'
                                      , 'dataItem.GROUP_CODE'
                                      , 'dataItem.GROUP_NAME'
+                                     , LEFT(CONCAT('dataItem.GROUP_NAME', ': ', 'dataItem.EMPNAME'), 100)
+                                     , 'dataItem.CREATE_BY'
+                                     , 'dataItem.UPDATE_BY'
                                      ,  dataItem.INUSE
                             )
         `
@@ -179,6 +188,8 @@ export const AssigneesSQL = {
     sql = sql.replaceAll('dataItem.EMPEMAIL', esc(dataItem.EMPEMAIL))
     sql = sql.replaceAll('dataItem.GROUP_CODE', esc(dataItem.GROUP_CODE))
     sql = sql.replaceAll('dataItem.GROUP_NAME', esc(dataItem.GROUP_NAME))
+    sql = sql.replaceAll('dataItem.CREATE_BY', esc(dataItem.CREATE_BY || dataItem.UPDATE_BY || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM'))
     sql = sql.replaceAll('dataItem.INUSE', (dataItem.INUSE !== undefined ? dataItem.INUSE : 1).toString())
 
     return sql
@@ -192,6 +203,9 @@ export const AssigneesSQL = {
                                      , EMPEMAIL = 'dataItem.EMPEMAIL'
                                      , GROUP_CODE = 'dataItem.GROUP_CODE'
                                      , GROUP_NAME = 'dataItem.GROUP_NAME'
+                                     , DESCRIPTION = LEFT(CONCAT('dataItem.GROUP_NAME', ': ', 'dataItem.EMPNAME'), 100)
+                                     , UPDATE_BY = 'dataItem.UPDATE_BY'
+                                     , UPDATE_DATE = NOW()
                                      , INUSE = dataItem.INUSE
                             WHERE
                                        ASSIGNEES_ID = dataItem.ASSIGNEES_ID
@@ -201,6 +215,7 @@ export const AssigneesSQL = {
     sql = sql.replaceAll('dataItem.EMPEMAIL', esc(dataItem.EMPEMAIL))
     sql = sql.replaceAll('dataItem.GROUP_CODE', esc(dataItem.GROUP_CODE))
     sql = sql.replaceAll('dataItem.GROUP_NAME', esc(dataItem.GROUP_NAME))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', esc(dataItem.UPDATE_BY || 'SYSTEM'))
     sql = sql.replaceAll('dataItem.INUSE', (dataItem.INUSE !== undefined ? dataItem.INUSE : 1).toString())
     sql = sql.replaceAll('dataItem.ASSIGNEES_ID', (dataItem.ASSIGNEES_ID || 0).toString())
 

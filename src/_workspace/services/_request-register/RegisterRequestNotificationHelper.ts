@@ -573,9 +573,8 @@ export const selectApprovalNotificationByStep = (
   requestNumber: string
 ): { templateName: string; emailHtml: string; emailSubject: string } => {
   const stepCode = inferStepCode(step)
-  const nextDesc = normalizeText(step?.DESCRIPTION)
 
-  if (stepCode === 'PO_GM_APPROVAL' || nextDesc.includes('general manager')) {
+  if (stepCode === 'PO_GM_APPROVAL') {
     return {
       templateName: 'emailToPMGMTemplate',
       emailHtml: emailToPMGMTemplate({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'PO GM' }),
@@ -583,7 +582,7 @@ export const selectApprovalNotificationByStep = (
     }
   }
 
-  if (stepCode === 'PO_MGR_APPROVAL' || nextDesc.includes('manager') || nextDesc.includes('mgr')) {
+  if (stepCode === 'PO_MGR_APPROVAL') {
     return {
       templateName: 'emailToPMMgrTemplate',
       emailHtml: emailToPMMgrTemplate({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'PO Mgr' }),
@@ -591,7 +590,7 @@ export const selectApprovalNotificationByStep = (
     }
   }
 
-  if (stepCode === 'MD_APPROVAL' || nextDesc.includes('md') || nextDesc.includes('director')) {
+  if (stepCode === 'MD_APPROVAL') {
     return {
       templateName: 'emailToMDTemplate',
       emailHtml: emailToMDTemplate({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'MD' }),
@@ -599,7 +598,7 @@ export const selectApprovalNotificationByStep = (
     }
   }
 
-  if (stepCode === 'ACCOUNT_REGISTERED' || nextDesc.includes('account')) {
+  if (stepCode === 'ACCOUNT_REGISTERED') {
     return {
       templateName: 'emailToAccountPICTemplate',
       emailHtml: emailToAccountPICTemplate({ ...baseEmailData, recipientName: 'Account PIC' }),
@@ -607,12 +606,7 @@ export const selectApprovalNotificationByStep = (
     }
   }
 
-  if (
-    stepCode === 'DOC_CHECK' ||
-    nextDesc.includes('checker') ||
-    nextDesc.includes('check all document') ||
-    nextDesc.includes('check document')
-  ) {
+  if (stepCode === 'DOC_CHECK') {
     return {
       templateName: 'emailToCheckerPICTemplate',
       emailHtml: emailToCheckerPICTemplate({ ...baseEmailData, recipientName: 'PO Checker' }),
@@ -916,14 +910,9 @@ export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynami
     const requester = await resolveRequesterMailProfile(vd)
 
     const nextStepCode = inferStepCode(nextStep)
-    const nextStepDesc = normalizeText(nextStep?.DESCRIPTION)
-    const isDocumentCheckerStep =
-      nextStepCode === 'DOC_CHECK' ||
-      nextStepDesc.includes('checker') ||
-      nextStepDesc.includes('check all document')
+    const isDocumentCheckerStep = nextStepCode === 'DOC_CHECK'
     const isPmMgrAndAbove = ['PO_MGR_APPROVAL', 'PO_GM_APPROVAL', 'MD_APPROVAL'].includes(nextStepCode)
     const isAccountStep = nextStepCode === 'ACCOUNT_REGISTERED'
-    const isDefaultStep = !isDocumentCheckerStep && !isPmMgrAndAbove && !isAccountStep
 
     const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
     const checkerPicCc = await getPoCheckerMainEmails()
@@ -1148,12 +1137,7 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
     const checkerPicCc = await getPoCheckerMainEmails()
 
     const currentStepCode = inferStepCode(currentStep)
-    const currentStepDesc = normalizeText(currentStep?.DESCRIPTION)
-    const isCheckerReject =
-      currentStepCode === 'DOC_CHECK' ||
-      currentStepDesc.includes('checker') ||
-      currentStepDesc.includes('check document') ||
-      currentStepDesc.includes('check all document')
+    const isCheckerReject = currentStepCode === 'DOC_CHECK'
 
     const isPicReject = currentStepCode === 'PIC_REVIEW'
 

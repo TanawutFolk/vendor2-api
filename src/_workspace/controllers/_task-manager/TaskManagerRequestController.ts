@@ -1,7 +1,6 @@
 import { TaskManagerRequestModel } from '@src/_workspace/models/_task-manager/TaskManagerRequestModel'
 import { ResponseI } from '@src/types/ResponseI'
 import { Request, Response } from 'express'
-import getSqlWhere_aggrid from '@src/helpers/getSqlWhere_aggrid'
 
 export const TaskManagerRequestController = {
   searchAllTask: async (req: Request, res: Response) => {
@@ -14,14 +13,6 @@ export const TaskManagerRequestController = {
     }
 
     try {
-      // Table mapping for AG Grid SearchFilters
-      const tableIds = [
-        { table: 't', id: 'request_status', Fns: '=' },
-        { table: 't', id: 'company_name', Fns: 'LIKE' },
-        { table: 't', id: 'current_owner_empcode', Fns: 'LIKE' },
-      ]
-
-      // Filter out null/empty values from SearchFilters before passing to helper
       if (dataItem.SEARCHFILTERS && Array.isArray(dataItem.SEARCHFILTERS)) {
         dataItem.SEARCHFILTERS = dataItem.SEARCHFILTERS.filter((item: any) => item.value !== null && item.value !== undefined && item.value !== '')
       }

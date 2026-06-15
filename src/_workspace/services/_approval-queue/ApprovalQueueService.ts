@@ -14,6 +14,7 @@ import {
   resolveWorkflowAction,
   resolveGroupCodeForStep,
   WORKFLOW_ACTION,
+  WORKFLOW_STEP_CODE,
 } from '../_request-register/RegisterRequestWorkflowHelper'
 import {
   triggerApprovalEmails,
@@ -26,12 +27,15 @@ import {
 } from '../_request-register/RegisterRequestNotificationHelper'
 import { SelectionFileService } from '../_request-register/SelectionFileService'
 import { GprCApprovalService } from '../_approval-GPRC/GprCApprovalService'
+import { isTaskManagerReassignable } from '../_task-manager/TaskManagerRules'
 
 type ApprovalStepStatus = 'pending' | 'in_progress' | 'approved' | 'rejected' | 'skipped' | 'completed'
 
 interface ApprovalStep extends RowDataPacket {
   [key: string]: any
   step_id: number
+  workflow_step_id?: number
+  status_id?: number
   step_order: number
   step_status: ApprovalStepStatus
   step_code?: string
@@ -63,6 +67,10 @@ interface RequestRecord extends RowDataPacket {
   CREATE_DATE?: string | Date
   vendor_code_selector?: string
   vendor_region?: string
+  request_status?: string
+  request_state?: string
+  current_status_id?: number
+  current_step_id?: number
 }
 
 interface WorkflowContext {
@@ -94,6 +102,8 @@ interface CriteriaRow extends RowDataPacket {
 const normalizeApprovalStep = (step: any): ApprovalStep => ({
   ...step,
   step_id: Number(step?.step_id ?? step?.STEP_ID ?? 0),
+  workflow_step_id: Number(step?.workflow_step_id ?? step?.WORKFLOW_STEP_ID ?? 0) || undefined,
+  status_id: Number(step?.status_id ?? step?.STATUS_ID ?? 0) || undefined,
   request_id: Number(step?.request_id ?? step?.REQUEST_ID ?? 0),
   step_order: Number(step?.step_order ?? step?.STEP_ORDER ?? 0),
   approver_id: String(step?.approver_id ?? step?.APPROVER_ID ?? ''),
@@ -114,6 +124,12 @@ const normalizeApprovalLog = (log: any) => ({
   action_type: String(log?.action_type ?? log?.ACTION_TYPE ?? ''),
   remark: log?.remark ?? log?.REMARK ?? '',
   action_date: log?.action_date ?? log?.ACTION_DATE ?? null,
+  DESCRIPTION: log?.DESCRIPTION ?? log?.description ?? log?.REMARK ?? log?.remark ?? '',
+  CREATE_BY: String(log?.CREATE_BY ?? log?.create_by ?? log?.ACTION_BY ?? log?.action_by ?? 'SYSTEM'),
+  UPDATE_BY: String(log?.UPDATE_BY ?? log?.update_by ?? log?.ACTION_BY ?? log?.action_by ?? 'SYSTEM'),
+  CREATE_DATE: log?.CREATE_DATE ?? log?.create_date ?? log?.ACTION_DATE ?? log?.action_date ?? null,
+  UPDATE_DATE: log?.UPDATE_DATE ?? log?.update_date ?? log?.ACTION_DATE ?? log?.action_date ?? null,
+  INUSE: Number(log?.INUSE ?? log?.inuse ?? 1),
 })
 
 const normalizeRequestRecord = (request: any): RequestRecord => ({
@@ -124,6 +140,10 @@ const normalizeRequestRecord = (request: any): RequestRecord => ({
   CREATE_DATE: request?.CREATE_DATE ?? request?.create_date,
   vendor_code_selector: String(request?.vendor_code_selector ?? request?.VENDOR_CODE_SELECTOR ?? ''),
   vendor_region: String(request?.vendor_region ?? request?.VENDOR_REGION ?? ''),
+  request_status: String(request?.request_status ?? request?.REQUEST_STATUS ?? ''),
+  request_state: String(request?.request_state ?? request?.REQUEST_STATE ?? ''),
+  current_status_id: Number(request?.current_status_id ?? request?.CURRENT_STATUS_ID ?? 0) || undefined,
+  current_step_id: Number(request?.current_step_id ?? request?.CURRENT_STEP_ID ?? 0) || undefined,
 }) as RequestRecord
 
 const normalizeSelectionRecord = (selection: any): SelectionRecord | null => {
@@ -193,19 +213,22 @@ const DISAGREE_NEXT: Partial<Record<StepType, StepType[]>> = {
 const normalizeStatusText = (value: unknown) => normalizeText(String(value || '').replace(/[_-]+/g, ' '))
 
 const getStepType = (step?: Partial<ApprovalStep>): StepType => {
-  const desc = normalizeStatusText(step?.DESCRIPTION)
-  const stepCode = String(step?.step_code || '')
-    .trim()
-    .toUpperCase()
-
-  if (desc.includes('pending agreement')) return StepType.PENDING_AGREEMENT
-  if (desc.includes('agreement reached')) return StepType.AGREEMENT_REACHED
-  if (desc.includes('issue gpr b')) return StepType.ISSUE_GPR_B
-  if (desc.includes('issue gpr c')) return StepType.ISSUE_GPR_C
-  if (desc.includes('vendor disagre')) return StepType.VENDOR_DISAGREED
-  if (stepCode === 'DOC_CHECK' || desc.includes('check all document') || desc.includes('checker')) return StepType.DOCUMENT_CHECK
-
-  return StepType.OTHER
+  switch (inferStepCode(step)) {
+    case WORKFLOW_STEP_CODE.PENDING_AGREEMENT:
+      return StepType.PENDING_AGREEMENT
+    case WORKFLOW_STEP_CODE.AGREEMENT_REACHED:
+      return StepType.AGREEMENT_REACHED
+    case WORKFLOW_STEP_CODE.ISSUE_GPR_B:
+      return StepType.ISSUE_GPR_B
+    case WORKFLOW_STEP_CODE.ISSUE_GPR_C:
+      return StepType.ISSUE_GPR_C
+    case WORKFLOW_STEP_CODE.VENDOR_DISAGREED:
+      return StepType.VENDOR_DISAGREED
+    case WORKFLOW_STEP_CODE.DOC_CHECK:
+      return StepType.DOCUMENT_CHECK
+    default:
+      return StepType.OTHER
+  }
 }
 
 const isStepType = (step: ApprovalStep | undefined, ...types: StepType[]) => (step ? types.includes(getStepType(step)) : false)
@@ -381,19 +404,8 @@ const createWorkflowResolver = (context: WorkflowContext) => {
       return String(step.approver_id)
     }
 
-    const stepCode = inferStepCode(step)
-    const desc = (step.DESCRIPTION || '').toLowerCase()
-    if (stepCode === 'DOC_CHECK' || desc.includes('checker') || desc.includes('check all document')) {
-      return getApproverByGroup(GROUP_CODE.PO_CHECKER_MAIN)
-    }
-    if (stepGroupCode || desc.includes('gm') || desc.includes('general manager')) {
-      return getApproverByGroup(stepGroupCode || GROUP_CODE.PO_GM)
-    }
-    if (desc.includes('mgr') || desc.includes('manager')) return getApproverByGroup(GROUP_CODE.PO_MGR)
-    if (desc.includes('md') || desc.includes('director')) return getApproverByGroup(GROUP_CODE.MD)
-    if (desc.includes('account')) {
-      return getApproverByGroup(context.isOversea ? GROUP_CODE.ACC_OVERSEA_MAIN : GROUP_CODE.ACC_LOCAL_MAIN)
-    }
+    if (stepGroupCode) return getApproverByGroup(stepGroupCode)
+
     return ''
   }
 
@@ -1147,11 +1159,12 @@ export const ApprovalQueueService = {
         .toUpperCase()
       const toEmpCode = String(dataItem.TO_EMPCODE || '').trim()
       const updateBy = dataItem.UPDATE_BY || dataItem.CHANGED_BY || 'SYSTEM'
-      const reason = dataItem.REASON || ''
+      const reason = String(dataItem.REASON || '').trim()
 
       if (!requestId) throw new Error('Missing request_id')
       if (scope !== 'REQUEST_PIC') throw new Error('Task Manager can only reassign PO PIC')
       if (!toEmpCode) throw new Error('Missing to_empcode')
+      if (!reason) throw new Error('Reassignment reason is required')
 
       const requestSql = await ApprovalQueueSQL.getById({ REQUEST_ID: requestId })
       const requestRes = (await MySQLExecute.search(requestSql)) as RowDataPacket[]
@@ -1161,6 +1174,11 @@ export const ApprovalQueueService = {
       const stepsSql = await ApprovalQueueSQL.getApprovalSteps({ REQUEST_ID: requestId })
       const steps = ((await MySQLExecute.search(stepsSql)) as ApprovalStep[]).map(normalizeApprovalStep)
       const currentStep = steps.find((step) => String(step.step_status || '').toLowerCase() === 'in_progress')
+
+      if (!isTaskManagerReassignable(request.request_status, Boolean(currentStep))) {
+        throw new Error('Only requests with an active workflow step can be reassigned')
+      }
+      if (toEmpCode === request.assign_to) throw new Error('The selected employee is already assigned to this request')
 
       const isOversea = normalizeText(request.vendor_region) === 'oversea'
       const picGroupCode = isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
@@ -1172,14 +1190,18 @@ export const ApprovalQueueService = {
       })
       const assigneeRes = (await MySQLExecute.search(assigneeSql)) as RowDataPacket[]
       const targetAssignee = assigneeRes[0] || null
-      if (!targetAssignee || Number(targetAssignee.INUSE) !== 1) throw new Error(`Target assignee must belong to group ${picGroupCode}`)
+      const targetActive = Number(targetAssignee?.inuse ?? targetAssignee?.INUSE ?? 0)
+      if (!targetAssignee || targetActive !== 1) throw new Error(`Target assignee must belong to group ${picGroupCode}`)
+      const targetEmpCode = String(targetAssignee.empcode ?? targetAssignee.EMPCODE ?? '').trim()
+      const targetEmail = String(targetAssignee.empEmail ?? targetAssignee.EMPEMAIL ?? '').trim()
+      if (!targetEmpCode) throw new Error('Target assignee employee code is missing')
 
       const sqlList = []
       sqlList.push(
         await ApprovalQueueSQL.updateRequestPicAssignee({
           REQUEST_ID: requestId,
-          ASSIGN_TO: targetAssignee.empcode,
-          PIC_EMAIL: targetAssignee.empEmail || '',
+          ASSIGN_TO: targetEmpCode,
+          PIC_EMAIL: targetEmail,
           UPDATE_BY: updateBy,
         })
       )
@@ -1189,10 +1211,10 @@ export const ApprovalQueueService = {
           REQUEST_ID: requestId,
           STEP_ID: currentStep?.step_id,
           SCOPE: scope,
-          STEP_CODE: 'PIC_REVIEW',
+          STEP_CODE: currentStep?.step_code || 'REQUEST_PIC',
           GROUP_CODE: picGroupCode,
           FROM_EMPCODE: request.assign_to || '',
-          TO_EMPCODE: targetAssignee.empcode,
+          TO_EMPCODE: targetEmpCode,
           REASON: reason,
           DESCRIPTION: 'PO PIC reassigned',
           CHANGED_BY: updateBy,
@@ -1207,7 +1229,7 @@ export const ApprovalQueueService = {
           STEP_ID: currentStep?.step_id,
           ACTION_BY: updateBy,
           ACTION_TYPE: 'reassigned_pic',
-          REMARK: reason || `Reassigned to ${targetAssignee.empcode}`,
+          REMARK: reason,
         })
       )
 

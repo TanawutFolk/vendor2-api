@@ -62,6 +62,7 @@ export const AddVendorSQL = {
                                      , EMAILMAIN
                                      , ADDRESS
                                      , NOTE
+                                     , DESCRIPTION
                                      , CREATE_BY
                                      , UPDATE_BY
                                      , INUSE
@@ -77,6 +78,7 @@ export const AddVendorSQL = {
                                      , 'dataItem.EMAILMAIN'
                                      , 'dataItem.ADDRESS'
                                      , 'dataItem.NOTE'
+                                     , LEFT(COALESCE(NULLIF('dataItem.NOTE', ''), 'dataItem.COMPANY_NAME'), 100)
                                      , 'dataItem.CREATE_BY'
                                      , 'dataItem.CREATE_BY'
                                      ,  1
@@ -107,6 +109,7 @@ export const AddVendorSQL = {
                                      , TEL_PHONE
                                      , EMAIL
                                      , POSITION
+                                     , DESCRIPTION
                                      , CREATE_BY
                                      , UPDATE_BY
                                      , INUSE
@@ -117,6 +120,7 @@ export const AddVendorSQL = {
                                      , 'dataItem.TEL_PHONE'
                                      , 'dataItem.EMAIL'
                                      , 'dataItem.POSITION'
+                                     , LEFT('dataItem.CONTACT_NAME', 100)
                                      , 'dataItem.CREATE_BY'
                                      , 'dataItem.CREATE_BY'
                                      ,  1
@@ -142,6 +146,7 @@ export const AddVendorSQL = {
                                      , MAKER_NAME
                                      , PRODUCT_NAME
                                      , MODEL_LIST
+                                     , DESCRIPTION
                                      , CREATE_BY
                                      , UPDATE_BY
                                      , INUSE
@@ -152,6 +157,7 @@ export const AddVendorSQL = {
                                      , 'dataItem.MAKER_NAME'
                                      , 'dataItem.PRODUCT_NAME'
                                      , 'dataItem.MODEL_LIST'
+                                     , LEFT(CONCAT_WS(' / ', 'dataItem.PRODUCT_NAME', 'dataItem.MAKER_NAME', 'dataItem.MODEL_LIST'), 100)
                                      , 'dataItem.CREATE_BY'
                                      , 'dataItem.CREATE_BY'
                                      ,  1
@@ -211,12 +217,14 @@ export const AddVendorSQL = {
     let sql = `
                             INSERT INTO master_product_groups (
                                        GROUP_NAME
+                                     , DESCRIPTION
                                      , CREATE_BY
                                      , UPDATE_BY
                                      , INUSE
                             )
                             VALUES (
                                        'dataItem.GROUP_NAME'
+                                     , LEFT('dataItem.GROUP_NAME', 100)
                                      , 'dataItem.CREATE_BY'
                                      , 'dataItem.CREATE_BY'
                                      ,  1

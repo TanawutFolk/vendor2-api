@@ -41,7 +41,7 @@ export const FindVendorSQL = {
                     FROM request_register_vendor rrv_ip
                     WHERE rrv_ip.VENDOR_ID = v.VENDOR_ID
                       AND rrv_ip.INUSE = 1
-                      AND rrv_ip.REQUEST_STATUS NOT IN ('Completed', 'Rejected', 'Vendor Disagreed', 'Cancelled')
+                      AND rrv_ip.REQUEST_STATE = 'in_progress'
                 ) THEN 'In Progress'
                 ELSE IFNULL(vmr.STATUS_CHECK, 'Not Registered')
             END
@@ -110,7 +110,7 @@ export const FindVendorSQL = {
                                      , (
                                           SELECT rrv.APPROVER_REMARK
                                           FROM request_register_vendor rrv
-                                          WHERE rrv.VENDOR_ID = v.VENDOR_ID AND rrv.REQUEST_STATUS = 'Rejected'
+                                          WHERE rrv.VENDOR_ID = v.VENDOR_ID AND rrv.REQUEST_STATE = 'rejected'
                                           ORDER BY rrv.REQUEST_ID DESC LIMIT 1
                                      ) AS reject_reason
                                      
@@ -209,7 +209,7 @@ export const FindVendorSQL = {
                     FROM request_register_vendor rrv_ip
                     WHERE rrv_ip.VENDOR_ID = v.VENDOR_ID
                       AND rrv_ip.INUSE = 1
-                      AND rrv_ip.REQUEST_STATUS NOT IN ('Completed', 'Rejected', 'Vendor Disagreed', 'Cancelled')
+                      AND rrv_ip.REQUEST_STATE = 'in_progress'
                 ) THEN 'In Progress'
                 ELSE IFNULL(vmr.STATUS_CHECK, 'Not Registered')
             END
@@ -325,6 +325,7 @@ export const FindVendorSQL = {
                                      , ADDRESS = 'dataItem.ADDRESS'
                                      , TEL_CENTER = 'dataItem.TEL_CENTER'
                                      , EMAILMAIN = 'dataItem.EMAILMAIN'
+                                     , DESCRIPTION = LEFT(COALESCE(NULLIF(DESCRIPTION, ''), 'dataItem.COMPANY_NAME'), 100)
                                      , INUSE = dataItem.INUSE
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
@@ -355,6 +356,7 @@ export const FindVendorSQL = {
                                      , TEL_PHONE = 'dataItem.TEL_PHONE'
                                      , EMAIL = 'dataItem.EMAIL'
                                      , POSITION = 'dataItem.POSITION'
+                                     , DESCRIPTION = LEFT('dataItem.CONTACT_NAME', 100)
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
@@ -379,6 +381,7 @@ export const FindVendorSQL = {
                                      , TEL_PHONE
                                      , EMAIL
                                      , POSITION
+                                     , DESCRIPTION
                                      , CREATE_BY
                                      , CREATE_DATE
                                      , UPDATE_BY
@@ -390,6 +393,7 @@ export const FindVendorSQL = {
                                      , 'dataItem.TEL_PHONE'
                                      , 'dataItem.EMAIL'
                                      , 'dataItem.POSITION'
+                                     , LEFT('dataItem.CONTACT_NAME', 100)
                                      , 'dataItem.UPDATE_BY'
                                      ,  NOW()
                                      , 'dataItem.UPDATE_BY'
@@ -415,6 +419,7 @@ export const FindVendorSQL = {
                                      , MAKER_NAME = 'dataItem.MAKER_NAME'
                                      , PRODUCT_NAME = 'dataItem.PRODUCT_NAME'
                                      , MODEL_LIST = 'dataItem.MODEL_LIST'
+                                     , DESCRIPTION = LEFT(CONCAT_WS(' / ', 'dataItem.PRODUCT_NAME', 'dataItem.MAKER_NAME', 'dataItem.MODEL_LIST'), 100)
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
@@ -439,6 +444,7 @@ export const FindVendorSQL = {
                                      , MAKER_NAME
                                      , PRODUCT_NAME
                                      , MODEL_LIST
+                                     , DESCRIPTION
                                      , CREATE_BY
                                      , CREATE_DATE
                                      , UPDATE_BY
@@ -450,6 +456,7 @@ export const FindVendorSQL = {
                                      , 'dataItem.MAKER_NAME'
                                      , 'dataItem.PRODUCT_NAME'
                                      , 'dataItem.MODEL_LIST'
+                                     , LEFT(CONCAT_WS(' / ', 'dataItem.PRODUCT_NAME', 'dataItem.MAKER_NAME', 'dataItem.MODEL_LIST'), 100)
                                      , 'dataItem.UPDATE_BY'
                                      ,  NOW()
                                      , 'dataItem.UPDATE_BY'
@@ -572,7 +579,7 @@ export const FindVendorSQL = {
                     FROM request_register_vendor rrv_ip
                     WHERE rrv_ip.VENDOR_ID = v.VENDOR_ID
                       AND rrv_ip.INUSE = 1
-                      AND rrv_ip.REQUEST_STATUS NOT IN ('Completed', 'Rejected', 'Vendor Disagreed', 'Cancelled')
+                      AND rrv_ip.REQUEST_STATE = 'in_progress'
                 ) THEN 'In Progress'
                 ELSE IFNULL(vmr.STATUS_CHECK, 'Not Registered')
             END
@@ -617,7 +624,7 @@ export const FindVendorSQL = {
                                      , (
                                           SELECT rrv.APPROVER_REMARK
                                           FROM request_register_vendor rrv
-                                          WHERE rrv.VENDOR_ID = v.VENDOR_ID AND rrv.REQUEST_STATUS = 'Rejected'
+                                          WHERE rrv.VENDOR_ID = v.VENDOR_ID AND rrv.REQUEST_STATE = 'rejected'
                                           ORDER BY rrv.REQUEST_ID DESC LIMIT 1
                                      ) AS reject_reason
                                      
@@ -757,7 +764,11 @@ export const FindVendorSQL = {
 
   // Staging Prones - Truncate
   truncateStagingPrones: (dataItem?: any) => {
-    let sql = `TRUNCATE TABLE staging_prones_data`
+    let sql = `
+      UPDATE staging_prones_data
+      SET INUSE = 0, UPDATE_BY = 'SYSTEM', UPDATE_DATE = NOW()
+      WHERE INUSE = 1
+    `
     return sql
   },
 
@@ -766,7 +777,7 @@ export const FindVendorSQL = {
     const escape = FindVendorSQL.escapeSql
     const values = rows
       .map((row: any, index: number) => {
-        let valueSql = `('dataItem.CUSTOMER_CODE_${index}', 'dataItem.CUSTOMER_NAME_${index}', 'dataItem.CUSTOMER_ADDRESS1_${index}', 'dataItem.CUSTOMER_ADDRESS2_${index}', 'dataItem.CUSTOMER_ADDRESS3_${index}', 'dataItem.CUSTOMER_TEL_${index}')`
+        let valueSql = `('dataItem.CUSTOMER_CODE_${index}', 'dataItem.CUSTOMER_NAME_${index}', 'dataItem.CUSTOMER_ADDRESS1_${index}', 'dataItem.CUSTOMER_ADDRESS2_${index}', 'dataItem.CUSTOMER_ADDRESS3_${index}', 'dataItem.CUSTOMER_TEL_${index}', LEFT('dataItem.CUSTOMER_NAME_${index}', 100), 'SYSTEM', 'SYSTEM', NOW(), NOW(), 1)`
         valueSql = valueSql.replaceAll(`dataItem.CUSTOMER_CODE_${index}`, escape(row.CUSTOMER_CODE))
         valueSql = valueSql.replaceAll(`dataItem.CUSTOMER_NAME_${index}`, escape(row.CUSTOMER_NAME))
         valueSql = valueSql.replaceAll(`dataItem.CUSTOMER_ADDRESS1_${index}`, escape(row.CUSTOMER_ADDRESS1))
@@ -785,6 +796,12 @@ export const FindVendorSQL = {
                                      , CUSTOMER_ADDRESS2
                                      , CUSTOMER_ADDRESS3
                                      , CUSTOMER_TEL
+                                     , DESCRIPTION
+                                     , CREATE_BY
+                                     , UPDATE_BY
+                                     , CREATE_DATE
+                                     , UPDATE_DATE
+                                     , INUSE
                             ) VALUES dataItem.VALUES
         `
     sql = sql.replaceAll('dataItem.VALUES', values)
@@ -793,7 +810,7 @@ export const FindVendorSQL = {
 
   // Vendor Matching - Get staging prones data (from MySQL)
   getStagingPronesData: (dataItem?: any) => {
-    let sql = `SELECT CUSTOMER_CODE, CUSTOMER_NAME, CUSTOMER_ADDRESS1, CUSTOMER_ADDRESS2, CUSTOMER_ADDRESS3, CUSTOMER_TEL FROM staging_prones_data`
+    let sql = `SELECT CUSTOMER_CODE, CUSTOMER_NAME, CUSTOMER_ADDRESS1, CUSTOMER_ADDRESS2, CUSTOMER_ADDRESS3, CUSTOMER_TEL FROM staging_prones_data WHERE INUSE = 1`
     return sql
   },
 
@@ -805,7 +822,11 @@ export const FindVendorSQL = {
 
   // Vendor Matching - Truncate match result
   truncateMatchResult: (dataItem?: any) => {
-    let sql = `TRUNCATE TABLE vendor_match_result`
+    let sql = `
+      UPDATE vendor_match_result
+      SET INUSE = 0, UPDATE_BY = 'SYSTEM', UPDATE_DATE = NOW()
+      WHERE INUSE = 1
+    `
     return sql
   },
 
@@ -814,7 +835,7 @@ export const FindVendorSQL = {
     const escape = FindVendorSQL.escapeSql
     const values = rows
       .map((row: any, index: number) => {
-        let valueSql = `(dataItem.VENDOR_ID_${index}, 'dataItem.STATUS_CHECK_${index}', 'dataItem.PRONES_CODE_${index}', 'dataItem.PRONES_NAME_${index}', 'dataItem.MATCH_METHOD_${index}', NOW())`
+        let valueSql = `(dataItem.VENDOR_ID_${index}, 'dataItem.STATUS_CHECK_${index}', 'dataItem.PRONES_CODE_${index}', 'dataItem.PRONES_NAME_${index}', 'dataItem.MATCH_METHOD_${index}', NOW(), LEFT('dataItem.MATCH_METHOD_${index}', 100), 'SYSTEM', 'SYSTEM', NOW(), NOW(), 1)`
         valueSql = valueSql.replaceAll(`dataItem.VENDOR_ID_${index}`, (Number(row.VENDOR_ID) || 0).toString())
         valueSql = valueSql.replaceAll(`dataItem.STATUS_CHECK_${index}`, escape(row.STATUS_CHECK))
         valueSql = valueSql.replaceAll(`dataItem.PRONES_CODE_${index}`, escape(row.PRONES_CODE))
@@ -832,7 +853,23 @@ export const FindVendorSQL = {
                                      , PRONES_NAME
                                      , MATCH_METHOD
                                      , LAST_UPDATED
+                                     , DESCRIPTION
+                                     , CREATE_BY
+                                     , UPDATE_BY
+                                     , CREATE_DATE
+                                     , UPDATE_DATE
+                                     , INUSE
                             ) VALUES dataItem.VALUES
+                            ON DUPLICATE KEY UPDATE
+                                       STATUS_CHECK = VALUES(STATUS_CHECK)
+                                     , PRONES_CODE = VALUES(PRONES_CODE)
+                                     , PRONES_NAME = VALUES(PRONES_NAME)
+                                     , MATCH_METHOD = VALUES(MATCH_METHOD)
+                                     , LAST_UPDATED = VALUES(LAST_UPDATED)
+                                     , DESCRIPTION = VALUES(DESCRIPTION)
+                                     , UPDATE_BY = VALUES(UPDATE_BY)
+                                     , UPDATE_DATE = NOW()
+                                     , INUSE = 1
         `
     sql = sql.replaceAll('dataItem.VALUES', values)
     return sql
@@ -841,14 +878,14 @@ export const FindVendorSQL = {
   // Vendor Matching - Get match result by vendor_id
   getMatchResultByVendorIds: (dataItem: { VENDORIDS: number[] }) => {
     const ids = dataItem.VENDORIDS.map(id => Number(id) || 0).join(',')
-    let sql = `SELECT VENDOR_ID, STATUS_CHECK, PRONES_CODE, PRONES_NAME, MATCH_METHOD FROM vendor_match_result WHERE VENDOR_ID IN (dataItem.VENDOR_IDS)`
+    let sql = `SELECT VENDOR_ID, STATUS_CHECK, PRONES_CODE, PRONES_NAME, MATCH_METHOD FROM vendor_match_result WHERE VENDOR_ID IN (dataItem.VENDOR_IDS) AND INUSE = 1`
     sql = sql.replaceAll('dataItem.VENDOR_IDS', ids)
     return sql
   },
 
   // Vendor Matching - Get all match results
   getAllMatchResults: (dataItem?: any) => {
-    let sql = `SELECT VENDOR_ID, STATUS_CHECK, PRONES_CODE, PRONES_NAME, MATCH_METHOD FROM vendor_match_result`
+    let sql = `SELECT VENDOR_ID, STATUS_CHECK, PRONES_CODE, PRONES_NAME, MATCH_METHOD FROM vendor_match_result WHERE INUSE = 1`
     return sql
   },
 }

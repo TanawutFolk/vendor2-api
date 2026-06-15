@@ -95,6 +95,62 @@ const buildActionRequiredMeta = (existingActionRequired: any, meta: Record<strin
   _meta: meta,
 })
 
+const GPR_ACTION_SETUP_STAGES = ['engineer', 'emr', 'qms', 'pm_manager'] as const
+
+const buildNormalizedGprSetupSql = async (
+  selectionId: number,
+  circularMembersRaw: any[],
+  actionRequiredRaw: any,
+  actor: string
+) => {
+  const circularMembers = (Array.isArray(circularMembersRaw) ? circularMembersRaw : [])
+    .map((item) => (
+      typeof item === 'string'
+        ? { empcode: '', name: '', email: normalizeValue(item) }
+        : {
+          empcode: normalizeValue(item?.empcode),
+          name: normalizeValue(item?.name),
+          email: normalizeValue(item?.email),
+        }
+    ))
+    .filter((item) => item.email)
+    .slice(0, 6)
+  const actionRequired = parseStoredObject(actionRequiredRaw)
+  const sqlList = [
+    RequestRegisterPageSQL.deleteGprCircularMembers({ SELECTION_ID: selectionId }),
+    RequestRegisterPageSQL.deleteGprActionSetup({ SELECTION_ID: selectionId }),
+  ]
+
+  circularMembers.forEach((member, index) => {
+    sqlList.push(RequestRegisterPageSQL.insertGprCircularMember({
+      SELECTION_ID: selectionId,
+      MEMBER_ORDER: index + 1,
+      EMPCODE: member.empcode,
+      MEMBER_NAME: member.name,
+      EMAIL: member.email,
+      CREATE_BY: actor,
+      UPDATE_BY: actor,
+    }))
+  })
+
+  GPR_ACTION_SETUP_STAGES.forEach((stageCode) => {
+    const stage = parseStoredObject(actionRequired[stageCode])
+    sqlList.push(RequestRegisterPageSQL.insertGprActionSetup({
+      SELECTION_ID: selectionId,
+      STAGE_CODE: stageCode,
+      PIC_NAME: stage.pic_name,
+      PIC_EMAIL: stage.pic_email,
+      RESULT_STATUS: stage.result_status,
+      RESULT_NOTE: stage.result_note,
+      RESULT_UPDATED_AT: stage.result_updated_at,
+      CREATE_BY: actor,
+      UPDATE_BY: actor,
+    }))
+  })
+
+  return Promise.all(sqlList)
+}
+
 export const RequestRegisterGprService = {
   resolveEmployeeProfile: async (dataItem: any) => {
     const empcode = normalizeValue(dataItem?.EMPCODE)
@@ -173,9 +229,19 @@ export const RequestRegisterGprService = {
 
       sqlList.push(await RequestRegisterPageSQL.deleteFinancials({ SELECTION_ID: selection_id }))
       sqlList.push(await RequestRegisterPageSQL.deleteCriteria({ SELECTION_ID: selection_id }))
+      sqlList.push(...await buildNormalizedGprSetupSql(
+        Number(selection_id),
+        circularList,
+        rawFormData.action_required_setup,
+        updateBy
+      ))
 
       if (rawFormData.sales_profit) {
         for (const sp of rawFormData.sales_profit) {
+          const hasFinancialValue = [sp.year, sp.total_revenue, sp.net_profit]
+            .some((value) => normalizeValue(value) !== '')
+          if (!hasFinancialValue) continue
+
           sqlList.push(await RequestRegisterPageSQL.insertFinancial({
             SELECTION_ID: selection_id,
             YEAR: sp.year || '',
@@ -241,6 +307,10 @@ export const RequestRegisterGprService = {
         throw new Error('Only requester can update GPR C notification setup')
       }
 
+      const existingSelectionSql = RequestRegisterPageSQL.getSelection({ REQUEST_ID: reqId })
+      const existingSelectionRows = (await MySQLExecute.search(existingSelectionSql)) as any[]
+      const existingSelection = existingSelectionRows[0] || null
+
       const approverEmpCode = normalizeValue(gprCData.gpr_c_approver_empcode)
       const approverMember = approverEmpCode ? await resolveMemberByEmpCode(approverEmpCode) : null
 
@@ -256,9 +326,17 @@ export const RequestRegisterGprService = {
         if (member) circularMembers.push(member)
       }
 
-      const actionRequiredSetup = parseStoredObject(gprCData.action_required_setup)
+      const existingActionRequiredSetup = parseStoredObject(
+        getValue(existingSelection, 'action_required_json', 'ACTION_REQUIRED_JSON')
+      )
+      const incomingActionRequiredSetup = parseStoredObject(gprCData.action_required_setup)
+      const actionRequiredSetup = {
+        ...existingActionRequiredSetup,
+        ...incomingActionRequiredSetup,
+      }
       const actionRequiredPayload = buildActionRequiredMeta(actionRequiredSetup, {
         gpr_c_approver_empcode: approverMember?.empcode || '',
+        gpr_c_pc_pic_empcode: normalizeValue(gprCData.gpr_c_pc_pic_empcode),
         gpr_c_circular_members: circularMembers,
       })
 
@@ -268,15 +346,15 @@ export const RequestRegisterGprService = {
         UPDATE_BY: updater,
         GPR_C_APPROVER_NAME: approverMember?.name || '',
         GPR_C_APPROVER_EMAIL: approverMember?.email || '',
+        GPR_C_APPROVER_EMPCODE: approverMember?.empcode || '',
         GPR_C_PC_PIC_NAME: String(gprCData.gpr_c_pc_pic_name || '').trim(),
         GPR_C_PC_PIC_EMAIL: String(gprCData.gpr_c_pc_pic_email || '').trim(),
+        GPR_C_PC_PIC_EMPCODE: normalizeValue(gprCData.gpr_c_pc_pic_empcode),
         GPR_C_CIRCULAR_JSON: JSON.stringify(circularMembers),
         ACTION_REQUIRED_JSON: JSON.stringify(actionRequiredPayload),
       }
 
-      const checkSql = await RequestRegisterPageSQL.checkSelectionExists(formData)
-      const checkRes = (await MySQLExecute.search(checkSql)) as any[]
-      const selection_id = getValue(checkRes[0], 'selection_id', 'SELECTION_ID')
+      let selection_id = getValue(existingSelection, 'selection_id', 'SELECTION_ID')
 
       if (selection_id) {
         formData.SELECTION_ID = selection_id
@@ -301,8 +379,19 @@ export const RequestRegisterGprService = {
           COMPLETION_DATE: '',
         }
         const insertSql = await RequestRegisterPageSQL.insertSelection(insertData)
-        await MySQLExecute.execute(insertSql)
+        const insertResult = (await MySQLExecute.execute(insertSql)) as any
+        selection_id = insertResult.insertId
       }
+
+      if (!selection_id) throw new Error('Failed to create/identify GPR selection record')
+
+      const normalizedSetupSql = await buildNormalizedGprSetupSql(
+        Number(selection_id),
+        circularMembers,
+        actionRequiredPayload,
+        updater
+      )
+      await MySQLExecute.executeList(normalizedSetupSql)
 
       const flowResult = await GprCApprovalService.submitSetup({
         REQUEST_ID: reqId,
@@ -347,16 +436,54 @@ export const RequestRegisterGprService = {
     const finSql = await RequestRegisterPageSQL.getFinancials({ SELECTION_ID: selection_id })
     const critSql = await RequestRegisterPageSQL.getCriteria({ SELECTION_ID: selection_id })
 
-    const [finRes, critRes] = await Promise.all([MySQLExecute.search(finSql) as Promise<any[]>, MySQLExecute.search(critSql) as Promise<any[]>])
+    const circularSql = RequestRegisterPageSQL.getGprCircularMembers({ SELECTION_ID: selection_id })
+    const actionSetupSql = RequestRegisterPageSQL.getGprActionSetup({ SELECTION_ID: selection_id })
+    const [finRes, critRes, circularRows, actionSetupRows] = await Promise.all([
+      MySQLExecute.search(finSql) as Promise<any[]>,
+      MySQLExecute.search(critSql) as Promise<any[]>,
+      MySQLExecute.search(circularSql) as Promise<any[]>,
+      MySQLExecute.search(actionSetupSql) as Promise<any[]>,
+    ])
 
-    const actionRequiredSetup = parseStoredObject(getValue(selRes[0], 'action_required_json', 'ACTION_REQUIRED_JSON'))
-    const meta = parseStoredObject(actionRequiredSetup?._meta)
-    const circularMembers = parseCircularMembers(getValue(selRes[0], 'gpr_c_circular_json', 'GPR_C_CIRCULAR_JSON'))
+    const legacyActionRequiredSetup = parseStoredObject(getValue(selRes[0], 'action_required_json', 'ACTION_REQUIRED_JSON'))
+    const legacyMeta = parseStoredObject(legacyActionRequiredSetup?._meta)
+    const relationalActionRequiredSetup = Object.fromEntries(
+      actionSetupRows.map((row) => [
+        normalizeValue(getValue(row, 'stage_code', 'STAGE_CODE')),
+        {
+          pic_name: normalizeValue(getValue(row, 'pic_name', 'PIC_NAME')),
+          pic_email: normalizeValue(getValue(row, 'pic_email', 'PIC_EMAIL')),
+          result_status: normalizeValue(getValue(row, 'result_status', 'RESULT_STATUS')),
+          result_note: normalizeValue(getValue(row, 'result_note', 'RESULT_NOTE')),
+          result_updated_at: getValue(row, 'result_updated_at', 'RESULT_UPDATED_AT') || '',
+        },
+      ])
+    )
+    const meta = {
+      ...legacyMeta,
+      gpr_c_approver_empcode: normalizeValue(
+        getValue(selRes[0], 'gpr_c_approver_empcode', 'GPR_C_APPROVER_EMPCODE')
+      ) || normalizeValue(legacyMeta.gpr_c_approver_empcode),
+      gpr_c_pc_pic_empcode: normalizeValue(
+        getValue(selRes[0], 'gpr_c_pc_pic_empcode', 'GPR_C_PC_PIC_EMPCODE')
+      ) || normalizeValue(legacyMeta.gpr_c_pc_pic_empcode),
+    }
+    const actionRequiredSetup = actionSetupRows.length > 0
+      ? { ...relationalActionRequiredSetup, _meta: meta }
+      : { ...legacyActionRequiredSetup, _meta: meta }
+    const circularMembers = circularRows.length > 0
+      ? circularRows.map((row) => ({
+        empcode: normalizeValue(getValue(row, 'empcode', 'EMPCODE')),
+        name: normalizeValue(getValue(row, 'member_name', 'MEMBER_NAME')),
+        email: normalizeValue(getValue(row, 'email', 'EMAIL')),
+      }))
+      : parseCircularMembers(getValue(selRes[0], 'gpr_c_circular_json', 'GPR_C_CIRCULAR_JSON'))
 
     return {
       ...selRes[0],
       action_required_json: JSON.stringify(actionRequiredSetup),
       gpr_c_approver_empcode: normalizeValue(meta.gpr_c_approver_empcode),
+      gpr_c_pc_pic_empcode: normalizeValue(meta.gpr_c_pc_pic_empcode),
       gpr_c_circular_empcodes: circularMembers.map((item) => item.empcode).filter(Boolean),
       gpr_c_circular_members: circularMembers,
       gpr_43_acceptance_status: normalizeGpr43AcceptanceStatus(getValue(selRes[0], 'gpr_43_acceptance_status', 'GPR_43_ACCEPTANCE_STATUS')),

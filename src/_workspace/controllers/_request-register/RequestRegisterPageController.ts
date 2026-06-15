@@ -269,8 +269,6 @@ export const RequestRegisterPageController = {
         STEP_STATUS: dataItem.STEP_STATUS || 'pending',
         DESCRIPTION: dataItem.DESCRIPTION || '',
         STEP_CODE: dataItem.STEP_CODE || '',
-        ACTOR_TYPE: dataItem.ACTOR_TYPE || '',
-        GROUP_CODE: dataItem.GROUP_CODE || '',
         ASSIGNMENT_MODE: dataItem.ASSIGNMENT_MODE || 'AUTO',
         CREATE_BY: dataItem.CREATE_BY || '',
       })

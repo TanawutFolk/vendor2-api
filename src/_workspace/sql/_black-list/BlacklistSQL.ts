@@ -234,6 +234,8 @@ export const BlacklistSQL = {
                 , bu.CREATE_DATE AS create_date
             FROM
                 blacklist_us bu
+            WHERE
+                bu.INUSE = 1
 
             UNION ALL
 
@@ -261,6 +263,8 @@ export const BlacklistSQL = {
                 , bc.CREATE_DATE AS create_date
             FROM
                 blacklist_cn bc
+            WHERE
+                bc.INUSE = 1
         `
 
     let sqlCount = `
@@ -301,8 +305,30 @@ export const BlacklistSQL = {
     return [sqlCount, sqlData]
   },
 
-  deleteUs: () => 'DELETE FROM blacklist_us',
-  deleteCn: () => 'DELETE FROM blacklist_cn',
+  deactivateUs: (updateBy: string) => `
+    UPDATE blacklist_us
+    SET
+      INUSE = 0,
+      UPDATE_BY = '${esc(updateBy || 'SYSTEM')}',
+      UPDATE_DATE = NOW()
+    WHERE INUSE = 1
+  `,
+  deactivateCnAliases: (updateBy: string) => `
+    UPDATE blacklist_cn_aliases
+    SET
+      INUSE = 0,
+      UPDATE_BY = '${esc(updateBy || 'SYSTEM')}',
+      UPDATE_DATE = NOW()
+    WHERE INUSE = 1
+  `,
+  deactivateCn: (updateBy: string) => `
+    UPDATE blacklist_cn
+    SET
+      INUSE = 0,
+      UPDATE_BY = '${esc(updateBy || 'SYSTEM')}',
+      UPDATE_DATE = NOW()
+    WHERE INUSE = 1
+  `,
 
   insertUs: (dataItem: BlacklistUsInsertDataItem) => {
     let sql = `

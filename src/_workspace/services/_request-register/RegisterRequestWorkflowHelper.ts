@@ -18,10 +18,58 @@ export const WORKFLOW_ACTION = {
   REJECT: 'REJECT',
 } as const
 
+export const WORKFLOW_STEP_CODE = {
+  REQUEST_SUBMITTED: 'REQUEST_SUBMITTED',
+  PIC_REVIEW: 'PIC_REVIEW',
+  PENDING_AGREEMENT: 'PENDING_AGREEMENT',
+  AGREEMENT_REACHED: 'AGREEMENT_REACHED',
+  DOC_CHECK: 'DOC_CHECK',
+  PO_MGR_APPROVAL: 'PO_MGR_APPROVAL',
+  PO_GM_APPROVAL: 'PO_GM_APPROVAL',
+  MD_APPROVAL: 'MD_APPROVAL',
+  ACCOUNT_REGISTERED: 'ACCOUNT_REGISTERED',
+  REJECTED: 'REJECTED',
+  VENDOR_DISAGREED: 'VENDOR_DISAGREED',
+  ISSUE_GPR_B: 'ISSUE_GPR_B',
+  ISSUE_GPR_C: 'ISSUE_GPR_C',
+} as const
+
 export const normalizeText = (value: any) =>
   String(value || '')
     .trim()
     .toLowerCase()
+
+const LEGACY_STEP_CODE_BY_LABEL: Record<string, string> = {
+  'sent to po & scm (pic)': WORKFLOW_STEP_CODE.REQUEST_SUBMITTED,
+  'po & scm approved (pic)': WORKFLOW_STEP_CODE.PIC_REVIEW,
+  'po & scm approve (pic)': WORKFLOW_STEP_CODE.PIC_REVIEW,
+  'pending agreement to vendor': WORKFLOW_STEP_CODE.PENDING_AGREEMENT,
+  'agreement reached': WORKFLOW_STEP_CODE.AGREEMENT_REACHED,
+  'po & scm check all document': WORKFLOW_STEP_CODE.DOC_CHECK,
+  'po mgr approve': WORKFLOW_STEP_CODE.PO_MGR_APPROVAL,
+  'po gm approve': WORKFLOW_STEP_CODE.PO_GM_APPROVAL,
+  'md approval': WORKFLOW_STEP_CODE.MD_APPROVAL,
+  'account registered': WORKFLOW_STEP_CODE.ACCOUNT_REGISTERED,
+  rejected: WORKFLOW_STEP_CODE.REJECTED,
+  'vendor disagreed': WORKFLOW_STEP_CODE.VENDOR_DISAGREED,
+  'issue gpr b': WORKFLOW_STEP_CODE.ISSUE_GPR_B,
+  'issue gpr c': WORKFLOW_STEP_CODE.ISSUE_GPR_C,
+}
+
+const PIC_STEP_CODES = new Set<string>([
+  WORKFLOW_STEP_CODE.PIC_REVIEW,
+  WORKFLOW_STEP_CODE.PENDING_AGREEMENT,
+  WORKFLOW_STEP_CODE.AGREEMENT_REACHED,
+  WORKFLOW_STEP_CODE.VENDOR_DISAGREED,
+  WORKFLOW_STEP_CODE.ISSUE_GPR_B,
+])
+
+const APPROVER_STEP_CODES = new Set<string>([
+  WORKFLOW_STEP_CODE.DOC_CHECK,
+  WORKFLOW_STEP_CODE.MD_APPROVAL,
+  WORKFLOW_STEP_CODE.PO_MGR_APPROVAL,
+  WORKFLOW_STEP_CODE.PO_GM_APPROVAL,
+])
 
 const normalizeActionToken = (value: any) => normalizeText(String(value || '').replace(/[-\s]+/g, '_'))
 
@@ -54,28 +102,22 @@ export const resolveWorkflowAction = (dataItem: any) => {
 }
 
 export const inferStepCode = (step: any) => {
-  if (step?.step_code || step?.STEP_CODE) return String(step.step_code || step.STEP_CODE).trim().toUpperCase()
+  const configuredStepCode = String(step?.step_code || step?.STEP_CODE || '').trim().toUpperCase()
+  const source = normalizeText(step?.DESCRIPTION || step?.description || step?.label || step?.value)
 
-  const source = normalizeText(`${step?.DESCRIPTION || ''} ${step?.description || ''} ${step?.label || ''}`)
+  // Compatibility for records created before the submitted and PIC-review
+  // steps received distinct codes.
+  if (
+    configuredStepCode === WORKFLOW_STEP_CODE.PIC_REVIEW &&
+    source === 'sent to po & scm (pic)'
+  ) {
+    return WORKFLOW_STEP_CODE.REQUEST_SUBMITTED
+  }
 
-  if (source.includes('checker') || source.includes('check document') || source.includes('check all document')) {
-    return 'DOC_CHECK'
-  }
-  if (source.includes('general manager') || source.includes('po gm')) {
-    return 'PO_GM_APPROVAL'
-  }
-  if (source.includes('mgr') || source.includes('manager')) {
-    return 'PO_MGR_APPROVAL'
-  }
-  if (source.includes('director') || source === 'md' || source.includes(' md ')) {
-    return 'MD_APPROVAL'
-  }
-  if (source.includes('account')) {
-    return 'ACCOUNT_REGISTERED'
-  }
-  if (source.includes('pic') || source.includes('sent to po')) {
-    return 'PIC_REVIEW'
-  }
+  if (configuredStepCode) return configuredStepCode
+
+  const legacyStepCode = LEGACY_STEP_CODE_BY_LABEL[source]
+  if (legacyStepCode) return legacyStepCode
 
   return ''
 }
@@ -84,11 +126,11 @@ export const inferActorType = (step: any) => {
   if (step?.actor_type || step?.ACTOR_TYPE) return String(step.actor_type || step.ACTOR_TYPE).trim().toUpperCase()
 
   const stepCode = inferStepCode(step)
-  if (stepCode === 'PIC_REVIEW') return 'PIC'
-  if (stepCode === 'ACCOUNT_REGISTERED') return 'ACCOUNT'
-  if (['DOC_CHECK', 'MD_APPROVAL', 'PO_MGR_APPROVAL', 'PO_GM_APPROVAL'].includes(stepCode)) {
-    return 'APPROVER'
-  }
+  if (PIC_STEP_CODES.has(stepCode)) return 'PIC'
+  if (stepCode === WORKFLOW_STEP_CODE.REQUEST_SUBMITTED) return 'REQUESTER'
+  if (stepCode === WORKFLOW_STEP_CODE.ISSUE_GPR_C) return 'REQUESTER'
+  if (stepCode === WORKFLOW_STEP_CODE.ACCOUNT_REGISTERED) return 'ACCOUNT'
+  if (APPROVER_STEP_CODES.has(stepCode)) return 'APPROVER'
 
   return ''
 }
@@ -97,17 +139,21 @@ export const resolveGroupCodeForStep = (step: any, isOversea: boolean) => {
   if (step?.group_code || step?.GROUP_CODE) return String(step.group_code || step.GROUP_CODE).trim().toUpperCase()
 
   switch (inferStepCode(step)) {
-    case 'PIC_REVIEW':
+    case WORKFLOW_STEP_CODE.PIC_REVIEW:
+    case WORKFLOW_STEP_CODE.PENDING_AGREEMENT:
+    case WORKFLOW_STEP_CODE.AGREEMENT_REACHED:
+    case WORKFLOW_STEP_CODE.VENDOR_DISAGREED:
+    case WORKFLOW_STEP_CODE.ISSUE_GPR_B:
       return isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
-    case 'DOC_CHECK':
+    case WORKFLOW_STEP_CODE.DOC_CHECK:
       return GROUP_CODE.PO_CHECKER_MAIN
-    case 'MD_APPROVAL':
+    case WORKFLOW_STEP_CODE.MD_APPROVAL:
       return GROUP_CODE.MD
-    case 'PO_MGR_APPROVAL':
+    case WORKFLOW_STEP_CODE.PO_MGR_APPROVAL:
       return GROUP_CODE.PO_MGR
-    case 'PO_GM_APPROVAL':
+    case WORKFLOW_STEP_CODE.PO_GM_APPROVAL:
       return GROUP_CODE.PO_GM
-    case 'ACCOUNT_REGISTERED':
+    case WORKFLOW_STEP_CODE.ACCOUNT_REGISTERED:
       return isOversea ? GROUP_CODE.ACC_OVERSEA_MAIN : GROUP_CODE.ACC_LOCAL_MAIN
     default:
       return ''
@@ -124,7 +170,7 @@ export const requiresVendorReply = (step: any) => {
     return Number(requiresVendorReplyValue) === 1
   }
 
-  return inferStepCode(step) === 'PIC_REVIEW' || isPicStep(step)
+  return inferStepCode(step) === WORKFLOW_STEP_CODE.PIC_REVIEW
 }
 
 export const requiresVendorCode = (step: any) => {
@@ -133,7 +179,7 @@ export const requiresVendorCode = (step: any) => {
     return Number(requiresVendorCodeValue) === 1
   }
 
-  return inferStepCode(step) === 'ACCOUNT_REGISTERED'
+  return inferStepCode(step) === WORKFLOW_STEP_CODE.ACCOUNT_REGISTERED
 }
 
 export const isRejectedStatus = (value: any) => normalizeText(value) === 'rejected'

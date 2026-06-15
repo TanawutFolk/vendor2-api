@@ -7,6 +7,7 @@ const path = require('path')
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const INVALID_TOKENS = new Set(['-', 'n/a', 'na', 'null', 'undefined'])
+const MAX_ATTACHMENT_BYTES = 3 * 1024 * 1024
 
 const isValidEmail = (value: string) => EMAIL_REGEX.test(value)
 
@@ -168,10 +169,12 @@ const buildAttachmentEntries = (attachments: MailAttachment[] = []) => {
     const contentType = resolveAttachmentContentType(attachment, filename)
 
     if (attachmentPath && fs.existsSync(attachmentPath)) {
+      const sizeBytes = fs.statSync(attachmentPath).size
       return {
         attachment,
         filename,
         contentType,
+        sizeBytes,
         value: fs.createReadStream(attachmentPath),
         options: {
           filename,
@@ -186,6 +189,7 @@ const buildAttachmentEntries = (attachments: MailAttachment[] = []) => {
         attachment,
         filename,
         contentType,
+        sizeBytes: inlineContent.length,
         value: inlineContent,
         options: {
           filename,
@@ -196,11 +200,13 @@ const buildAttachmentEntries = (attachments: MailAttachment[] = []) => {
     }
 
     if (typeof inlineContent === 'string' && inlineContent.length > 0) {
+      const contentBuffer = Buffer.from(inlineContent)
       return {
         attachment,
         filename,
         contentType,
-        value: Buffer.from(inlineContent),
+        sizeBytes: contentBuffer.length,
+        value: contentBuffer,
         options: {
           filename,
           contentType,
@@ -213,6 +219,7 @@ const buildAttachmentEntries = (attachments: MailAttachment[] = []) => {
       attachment,
       filename,
       contentType,
+      sizeBytes: 0,
       value: null,
       options: null,
       reason: attachmentPath ? 'Attachment file not found' : 'Attachment content is empty',
@@ -285,6 +292,7 @@ const sendEmail = async (
     })
     return { success: false, skipped: true, reason: 'Invalid TO recipient' }
   }
+
   const form = new FormData()
   form.append('To', normalizedTo)
   form.append('CC', normalizedCc.length > 0 ? normalizedCc.join(';') : '')
@@ -294,6 +302,20 @@ const sendEmail = async (
   const attachmentEntries = buildAttachmentEntries(attachments)
   const readableAttachments = attachmentEntries.filter((item) => item.value && item.options)
   const missingAttachments = attachmentEntries.filter((item) => !item.value || !item.options)
+  const oversizedAttachments = readableAttachments.filter((item) => item.sizeBytes > MAX_ATTACHMENT_BYTES)
+
+  if (oversizedAttachments.length > 0) {
+    const details = oversizedAttachments
+      .map((item) => `${item.filename} (${(item.sizeBytes / 1024 / 1024).toFixed(2)} MB)`)
+      .join(', ')
+    const reason = `Attachment exceeds the 3 MB per-file limit: ${details}`
+
+    console.error('[MAIL TEMPLATE][skipped]', {
+      ...logPayload,
+      reason,
+    })
+    return { success: false, skipped: true, reason }
+  }
 
   missingAttachments.forEach((item) => {
     console.error('[MAIL TEMPLATE][attachment skipped]', {

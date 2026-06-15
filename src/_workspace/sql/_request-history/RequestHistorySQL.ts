@@ -92,13 +92,16 @@ export const RequestHistorySQL = {
                                                                          , rr.REQUEST_NUMBER
                                      , rr.VENDOR_ID
                                      , rr.REQUEST_STATUS
+                                     , rr.REQUEST_STATE
+                                     , rr.CURRENT_STATUS_ID
+                                     , rr.CURRENT_STEP_ID
                                      , rr.SUPPORTPRODUCT_PROCESS
                                      , rr.PURCHASE_FREQUENCY
                                      , rr.REQUESTER_REMARK
                                      , rr.APPROVER_REMARK
                                      , rr.APPROVE_BY
                                      , rr.APPROVE_DATE
-                                     , rr.VENDOR_CODE
+                                     , COALESCE(rr.APPROVED_VENDOR_CODE, rr.VENDOR_CODE) AS VENDOR_CODE
                                      , rr.ASSIGN_TO
                                      , rr.PIC_EMAIL
                                      , rr.VENDOR_CONTACT_ID
@@ -197,6 +200,7 @@ export const RequestHistorySQL = {
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
                                                                                'step_id', ras.STEP_ID,
+                                                                               'status_id', ras.STATUS_ID,
                                                                                'step_order', ras.STEP_ORDER,
                                                                                'approver_id', ras.APPROVER_ID,
                                                                                'approver_name', (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM Person.MEMBER_FED pm WHERE pm.EMPCODE = ras.APPROVER_ID LIMIT 1),
@@ -206,6 +210,8 @@ export const RequestHistorySQL = {
                                                                                'actor_type', ras.ACTOR_TYPE,
                                                                                'group_code', ras.GROUP_CODE,
                                                                                'assignment_mode', ras.ASSIGNMENT_MODE,
+                                                                               'master_status_value', mrs.STATUS_VALUE,
+                                                                               'master_status_label', mrs.STATUS_LABEL,
                                                                                'CREATE_DATE', ras.CREATE_DATE,
                                                                                'UPDATE_BY', ras.UPDATE_BY,
                                                                                'UPDATE_DATE', ras.UPDATE_DATE
@@ -213,6 +219,8 @@ export const RequestHistorySQL = {
                                                                       )
                                                            FROM
                                                                       request_approval_step ras
+                                                                           INNER JOIN
+                                                                      m_request_status mrs ON mrs.STATUS_ID = ras.STATUS_ID
                                                            WHERE
                                                                       ras.REQUEST_ID = rr.REQUEST_ID AND ras.INUSE = 1
                                                 ),
@@ -231,13 +239,20 @@ export const RequestHistorySQL = {
                                                                                'action_by_name', COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM Person.MEMBER_FED pm WHERE pm.EMPCODE = ral.ACTION_BY LIMIT 1)),
                                                                                'action_type', ral.ACTION_TYPE,
                                                                                'remark', ral.REMARK,
-                                                                               'action_date', ral.ACTION_DATE
+                                                                               'action_date', ral.ACTION_DATE,
+                                                                               'DESCRIPTION', ral.DESCRIPTION,
+                                                                               'CREATE_BY', ral.CREATE_BY,
+                                                                               'UPDATE_BY', ral.UPDATE_BY,
+                                                                               'CREATE_DATE', ral.CREATE_DATE,
+                                                                               'UPDATE_DATE', ral.UPDATE_DATE,
+                                                                               'INUSE', ral.INUSE
                                                                            )
                                                                       )
                                                            FROM
                                                                       request_approval_log ral
                                                            WHERE
                                                                       ral.REQUEST_ID = rr.REQUEST_ID
+                                                                      AND ral.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS approval_logs
@@ -259,7 +274,9 @@ export const RequestHistorySQL = {
                                                                            JOIN
                                                                       vendor_selection_criteria vsc ON vsc.SELECTION_ID = rvs2.SELECTION_ID
                                                            WHERE
-                                                                      rvs2.REQUEST_ID = rr.REQUEST_ID AND rvs2.INUSE = 1
+                                                                      rvs2.REQUEST_ID = rr.REQUEST_ID
+                                                                      AND rvs2.INUSE = 1
+                                                                      AND vsc.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS gpr_criteria
@@ -291,6 +308,8 @@ export const RequestHistorySQL = {
                             SELECT 
                                        ras.STEP_ID
                                      , ras.REQUEST_ID
+                                     , ras.WORKFLOW_STEP_ID
+                                     , ras.STATUS_ID
                                      , ras.STEP_ORDER
                                      , ras.APPROVER_ID
                                      , ras.STEP_STATUS
@@ -303,9 +322,14 @@ export const RequestHistorySQL = {
                                      , ras.CREATE_DATE
                                      , ras.UPDATE_BY
                                      , ras.UPDATE_DATE
+                                     , ras.INUSE
+                                     , mrs.STATUS_VALUE AS master_status_value
+                                     , mrs.STATUS_LABEL AS master_status_label
                                      , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS approver_name
                             FROM
                                        request_approval_step ras
+                                            INNER JOIN
+                                       m_request_status mrs ON mrs.STATUS_ID = ras.STATUS_ID
                                             LEFT JOIN
                                        Person.MEMBER_FED m ON m.EMPCODE = ras.APPROVER_ID
                             WHERE
@@ -330,6 +354,12 @@ export const RequestHistorySQL = {
                                      , ral.ACTION_TYPE
                                      , ral.REMARK
                                      , ral.ACTION_DATE
+                                     , ral.DESCRIPTION
+                                     , ral.CREATE_BY
+                                     , ral.UPDATE_BY
+                                     , ral.CREATE_DATE
+                                     , ral.UPDATE_DATE
+                                     , ral.INUSE
                                      , COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), CONCAT(m.EMPNAME, ' ', m.EMPSURNAME)) AS action_by_name
                             FROM
                                        request_approval_log ral
@@ -337,6 +367,7 @@ export const RequestHistorySQL = {
                                        Person.MEMBER_FED m ON m.EMPCODE = ral.ACTION_BY
                             WHERE
                                        ral.REQUEST_ID = dataItem.REQUEST_ID
+                                       AND ral.INUSE = 1
                             ORDER BY
                                        ral.ACTION_DATE ASC
         `

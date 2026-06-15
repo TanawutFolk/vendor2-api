@@ -57,8 +57,8 @@ import accRegisterRoutes from './routes/_Acc-register/AccRegisterRoutes'
 import gprCApprovalRoutes from './routes/_approval-GPRC/GprCApprovalRoutes'
 import blacklistRoutes from './routes/_black-list/BlacklistRoute'
 import findVendorRoutes from './routes/_find-vendor/FindVendorRoute'
-import createApprovalQueueRoutes from './routes/_approval-queue/ApprovalQueueRoutes'
-import registerRequestRoutes from './routes/_request-register/RegisterRequestRoute'
+import approvalQueueRoutes from './routes/_approval-queue/ApprovalQueueRoutes'
+import requestRegisterRouter from './routes/_request-register/RequestRegisterRouter'
 import assigneesRoutes from './routes/_Employee-manager/AssigneesRoutes'
 import taskManagerRequestRoutes from './routes/_task-manager/TaskManagerRequestRoutes'
 
@@ -131,16 +131,13 @@ Routers.use('/black-list', blacklistRoutes)
 Routers.use('/find-vendor', findVendorRoutes)
 
 // ? Register Request Routes
-Routers.use('/register-request', registerRequestRoutes)
+Routers.use('/register-request', requestRegisterRouter)
 
-// ? Page-aligned Vendor Workflow Route Aliases
+// ? Vendor Workflow Routes
 Routers.use('/acc-register', accRegisterRoutes)
 Routers.use('/approval-gprc', gprCApprovalRoutes)
-Routers.use('/approval-queue', createApprovalQueueRoutes())
-Routers.use('/check-document', createApprovalQueueRoutes('DOC_CHECK'))
-Routers.use('/md-approval', createApprovalQueueRoutes('MD_APPROVAL'))
-Routers.use('/po-gm-approval', createApprovalQueueRoutes('PO_GM_APPROVAL'))
-Routers.use('/po-mgr-approval', createApprovalQueueRoutes('PO_MGR_APPROVAL'))
+
+Routers.use('/approval-queue', approvalQueueRoutes)
 Routers.use('/task-manager', taskManagerRequestRoutes)
 
 // ? Assignees Configuration Routes
