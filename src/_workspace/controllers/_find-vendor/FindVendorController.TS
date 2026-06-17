@@ -103,7 +103,7 @@ export const FindVendorController = {
                             FROM request_register_vendor rrv_ip
                             WHERE rrv_ip.VENDOR_ID = v.VENDOR_ID
                               AND rrv_ip.INUSE = 1
-                              AND rrv_ip.REQUEST_STATUS NOT IN ('Completed', 'Rejected', 'Vendor Disagreed', 'Cancelled')
+                              AND rrv_ip.REQUEST_STATE = 'in_progress'
                         ) THEN 'In Progress'
                         ELSE IFNULL(vmr.STATUS_CHECK, 'Not Registered')
                     END

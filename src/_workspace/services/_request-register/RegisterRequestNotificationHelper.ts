@@ -38,16 +38,25 @@ import {
 const SYSTEM_ORIGIN = process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'
 
 const DEFAULT_VENDOR_DOCUMENT_LOCAL_PATH =
-  'C:\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier\\00.DocumentSet\\01.New (Full)\\Local\\00.Sending'
+  '\\\\192.168.14.35\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier\\00.DocumentSet\\01.New (Full)\\Local\\00.Sending'
 const DEFAULT_VENDOR_DOCUMENT_OVERSEA_PATH =
-  'C:\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier\\00.DocumentSet\\01.New (Full)\\Oversea\\00.Sending'
+  '\\\\192.168.14.35\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier\\00.DocumentSet\\01.New (Full)\\Oversea\\00.Sending'
 const DEFAULT_VENDOR_DOCUMENT_FORM_B_PATH =
-  'C:\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier\\00.DocumentSet\\00.Purchase Form\\FORM B.xlsx'
+  '\\\\192.168.14.35\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier\\00.DocumentSet\\00.Purchase Form\\FORM B.xlsx'
 const VENDOR_DOCUMENT_ATTACHMENT_EXTENSIONS = new Set(['.pdf', '.xlsx', '.xls', '.doc', '.docx'])
 
 const getVendorDocumentLocalPath = () => process.env.VENDOR_DOCUMENT_LOCAL_PATH || DEFAULT_VENDOR_DOCUMENT_LOCAL_PATH
 const getVendorDocumentOverseaPath = () => process.env.VENDOR_DOCUMENT_OVERSEA_PATH || DEFAULT_VENDOR_DOCUMENT_OVERSEA_PATH
 const getVendorDocumentFormBPath = () => process.env.VENDOR_DOCUMENT_FORM_B_PATH || DEFAULT_VENDOR_DOCUMENT_FORM_B_PATH
+
+const logVendorDocumentFolder = (message: string, detail?: unknown) => {
+  if (detail === undefined) {
+    console.log(`[VendorDocumentFolder] ${message}`)
+    return
+  }
+
+  console.log(`[VendorDocumentFolder] ${message}:`, detail)
+}
 
 const STAGE_KEY = {
   ENGINEER: 'engineer',
@@ -64,6 +73,7 @@ type EmployeeProfile = {
   empCode: string
   fullName: string
   email: string
+  tel: string
 }
 
 const getValue = (row: any, ...keys: string[]) => {
@@ -133,6 +143,7 @@ const resolveEmployeeProfile = async (empCodeRaw: unknown): Promise<EmployeeProf
     empCode,
     fullName: buildFullName(row),
     email: normalizeEmail(row?.empEmail || row?.EMPEMAIL),
+    tel: String(row?.EMP_TEL || row?.emp_tel || '').trim(),
   }
   employeeProfileCache.set(empCode, profile)
   return profile
@@ -168,6 +179,7 @@ const resolveAssigneeProfile = async (empCodeRaw: unknown): Promise<EmployeeProf
     empCode,
     fullName: buildFullName(row) || String(row?.empName || row?.EMPNAME || '').trim(),
     email: normalizeEmail(row?.empEmail || row?.EMPEMAIL),
+    tel: String(row?.EMP_TEL || row?.emp_tel || '').trim(),
   }
   assigneeProfileCache.set(empCode, profile)
   return profile
@@ -363,8 +375,10 @@ const resolveRequesterMailProfile = async (vd: VendorContext) => {
   const profile = requesterEmpCode ? await resolveEmployeeProfile(requesterEmpCode) : null
   return {
     profile,
+    empCode: requesterEmpCode,
     email: directRequesterEmail || normalizeEmail(profile?.email),
     name: resolveDisplayName([profile?.fullName], 'Requester'),
+    tel: profile?.tel || '',
   }
 }
 
@@ -373,6 +387,13 @@ const resolveRequesterMailProfile = async (vd: VendorContext) => {
 const buildVendorDocumentAttachments = (vendorRegion: any, isGprBStage = false): MailAttachment[] => {
   if (isGprBStage) {
     const formBPath = getVendorDocumentFormBPath()
+    const formBFolder = path.dirname(formBPath)
+    logVendorDocumentFolder('Checking GPR B form folder', formBFolder)
+    if (!fs.existsSync(formBFolder)) {
+      logVendorDocumentFolder('GPR B form folder not found', formBFolder)
+    } else {
+      logVendorDocumentFolder('GPR B form folder found', formBFolder)
+    }
     if (!fs.existsSync(formBPath)) {
       throw new Error(`GPR B agreement file not found: ${formBPath}`)
     }
@@ -385,9 +406,12 @@ const buildVendorDocumentAttachments = (vendorRegion: any, isGprBStage = false):
   }
 
   const basePath = isOverseaRegion(vendorRegion) ? getVendorDocumentOverseaPath() : getVendorDocumentLocalPath()
+  logVendorDocumentFolder('Checking agreement document folder', { vendorRegion, basePath })
   if (!fs.existsSync(basePath)) {
+    logVendorDocumentFolder('Agreement document folder not found', basePath)
     throw new Error(`Agreement document folder not found: ${basePath}`)
   }
+  logVendorDocumentFolder('Agreement document folder found', basePath)
 
   const attachments = fs
     .readdirSync(basePath, { withFileTypes: true })
@@ -413,6 +437,20 @@ const resolveDisplayName = (options: Array<unknown>, fallbackLabel: string) => {
     const value = String(option || '').trim()
     if (!value) continue
     if (/^[A-Z]\d{3,}$/i.test(value)) continue
+    return value
+  }
+  return fallbackLabel
+}
+
+const isRoleFallbackName = (value: unknown) => {
+  const normalized = String(value || '').trim().toLowerCase()
+  return ['pic', 'po pic', 'po checker', 'account pic', 'approver', 'requester'].includes(normalized)
+}
+
+const resolveMailRecipientName = (options: Array<unknown>, fallbackLabel = 'Recipient') => {
+  for (const option of options) {
+    const value = String(option || '').trim()
+    if (!value || isRoleFallbackName(value)) continue
     return value
   }
   return fallbackLabel
@@ -601,7 +639,10 @@ export const selectApprovalNotificationByStep = (
   if (stepCode === 'ACCOUNT_REGISTERED') {
     return {
       templateName: 'emailToAccountPICTemplate',
-      emailHtml: emailToAccountPICTemplate({ ...baseEmailData, recipientName: 'Account PIC' }),
+      emailHtml: emailToAccountPICTemplate({
+        ...baseEmailData,
+        recipientName: resolveMailRecipientName([baseEmailData.recipientName], 'Account PIC'),
+      }),
       emailSubject: `[Request Action] Please process register vendor "${requestNumber}" - Account Step`,
     }
   }
@@ -609,7 +650,10 @@ export const selectApprovalNotificationByStep = (
   if (stepCode === 'DOC_CHECK') {
     return {
       templateName: 'emailToCheckerPICTemplate',
-      emailHtml: emailToCheckerPICTemplate({ ...baseEmailData, recipientName: 'PO Checker' }),
+      emailHtml: emailToCheckerPICTemplate({
+        ...baseEmailData,
+        recipientName: resolveMailRecipientName([baseEmailData.recipientName], 'PO Checker'),
+      }),
       emailSubject: `[Request Check] Please check register vendor "${requestNumber}" - Document Step`,
     }
   }
@@ -656,7 +700,7 @@ export const triggerCreationEmail = async (
 
   const emailHtml = emailRequestRegisterVendorTemplate({
     requestNumber,
-    recipientName: resolveDisplayName([nextAssigneeProfile?.fullName], 'PO PIC'),
+    recipientName: resolveMailRecipientName([nextAssigneeProfile?.fullName, nextAssignee.empCode, nextAssigneeEmail], 'Recipient'),
     vendorName: vendorData.company_name || 'Error Connection',
     address: vendorData.address || 'Error Connection',
     contactPic: vendorData.contact_name || 'Error Connection',
@@ -666,7 +710,7 @@ export const triggerCreationEmail = async (
     purchaseFrequency: dataItem.PURCHASE_FREQUENCY || 'Error Connection',
     systemLink: systemLink('request-register'),
     userName: requester.name,
-    userTel: '',
+    userTel: requester.tel,
   })
 
   await sendTemplatedEmail({
@@ -723,7 +767,7 @@ export const sendAgreementEmail = async (dataItem: any) => {
     ])
 
     dataItem.PIC_NAME =
-      dataItem.PIC_NAME || resolveDisplayName([picProfile?.fullName], 'PO PIC')
+      dataItem.PIC_NAME || resolveMailRecipientName([picProfile?.fullName, vd.assign_to, picEmail], 'Vendor Registration System')
   }
 
   const resolvedRequestNumber = String(dataItem.REQUEST_NUMBER || vd.request_number || '').trim()
@@ -746,7 +790,7 @@ export const sendAgreementEmail = async (dataItem: any) => {
     ccEmail: ccEmails.join('; '),
     topicRef: resolvedRequestNumber,
     isNewSupplier: !dataItem.FFT_VENDOR_CODE,
-    picName: dataItem.PIC_NAME || 'PO PIC',
+    picName: resolveMailRecipientName([dataItem.PIC_NAME, vd.assign_to], 'Vendor Registration System'),
     picTel: dataItem.PIC_TEL || '',
   })
 
@@ -781,8 +825,8 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
 
     const picProfile = await resolveAssigneeProfile(vd.assign_to)
     const picEmail = await resolveAssignedEmail(vd.assign_to)
-    const picName = resolveDisplayName([picProfile?.fullName], 'PO PIC')
-    const picTel = ''
+    const picName = resolveMailRecipientName([picProfile?.fullName, vd.assign_to, picEmail], 'Vendor Registration System')
+    const picTel = picProfile?.tel || ''
 
     const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
     const ccEmails = excludeEmails(mergeUniqueEmails(poPicContext.allPoPicEmails), [
@@ -893,8 +937,8 @@ export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynami
 
     const picProfile = await resolveAssigneeProfile(vd.assign_to)
     const picEmail = await resolveAssignedEmail(vd.assign_to)
-    const picName = resolveDisplayName([picProfile?.fullName], 'PIC')
-    const picTel = ''
+    const picName = resolveMailRecipientName([picProfile?.fullName, vd.assign_to, picEmail], 'Vendor Registration System')
+    const picTel = picProfile?.tel || ''
 
     let targetApprover = dynamicApprover || nextStep?.approver_id || ''
     let approverEmail = ''
@@ -955,7 +999,7 @@ export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynami
       toEmail: approverEmail,
       ccEmail: ccEmails.join('; '),
       requestNumber,
-      recipientName: resolveDisplayName([approverName], 'Approver'),
+      recipientName: resolveMailRecipientName([approverName, targetApprover, approverEmail], 'Recipient'),
       vendorName: vd.company_name || 'N/A',
       address: vd.address || 'N/A',
       contactPic: vd.contact_name || 'N/A',
@@ -1006,13 +1050,13 @@ export const triggerActionRequiredEmail = async (dataItem: any, currentStep: any
     const recipientEmail = normalizeEmail(stageConfig?.pic_email)
     if (!recipientEmail) return
 
-    const recipientName = String(stageConfig?.pic_name || 'PIC').trim()
+    const recipientName = resolveMailRecipientName([stageConfig?.pic_name, stageConfig?.pic_empcode], 'Recipient')
     const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
 
     const picProfile = await resolveAssigneeProfile(vd.assign_to)
     const picEmail = await resolveAssignedEmail(vd.assign_to)
-    const picName = resolveDisplayName([picProfile?.fullName], 'PO PIC')
-    const picTel = ''
+    const picName = resolveMailRecipientName([picProfile?.fullName, vd.assign_to, picEmail], 'Vendor Registration System')
+    const picTel = picProfile?.tel || ''
 
     const ccEmails = excludeEmails(
       mergeUniqueEmails(picEmail ? [picEmail] : []).filter((email) => email !== recipientEmail),
@@ -1067,8 +1111,8 @@ export const triggerAfterGprCApprovedEmail = async (dataItem: any) => {
 
     const picProfile = await resolveAssigneeProfile(vd.assign_to)
     const picEmail = await resolveAssignedEmail(vd.assign_to)
-    const picName = resolveDisplayName([picProfile?.fullName], 'PO PIC')
-    const picTel = ''
+    const picName = resolveMailRecipientName([picProfile?.fullName, vd.assign_to, picEmail], 'Vendor Registration System')
+    const picTel = picProfile?.tel || ''
 
     const gprCMeta = getGprCSetupMeta(vd.action_required_json)
     const gprCApproverEmail = await resolveAssignedEmail(
@@ -1126,8 +1170,8 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
 
     const picProfile = await resolveAssigneeProfile(vd.assign_to)
     const picEmail = await resolveAssignedEmail(vd.assign_to)
-    const picName = resolveDisplayName([picProfile?.fullName], 'PIC')
-    const picTel = ''
+    const picName = resolveMailRecipientName([picProfile?.fullName, vd.assign_to, picEmail], 'Vendor Registration System')
+    const picTel = picProfile?.tel || ''
 
     const approverEmail = await resolveAssignedEmail(currentStep?.approver_id)
     const requester = await resolveRequesterMailProfile(vd)
@@ -1148,7 +1192,9 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
         : [poPicContext.peerPicCc, requester.email ? [requester.email] : [], approverEmail ? [approverEmail] : []]
 
     const primaryToEmail = isPicReject ? requester.email : picEmail
-    const recipientName = isPicReject ? requester.name : picName
+    const recipientName = isPicReject
+      ? resolveMailRecipientName([requester.name, requester.empCode, requester.email], 'Requester')
+      : resolveMailRecipientName([picName, vd.assign_to, picEmail], 'PIC')
 
     if (!primaryToEmail) return
 
@@ -1211,8 +1257,8 @@ export const triggerCompletionEmail = async (dataItem: any) => {
 
     const picProfile = await resolveAssigneeProfile(vd.assign_to)
     const picEmail = await resolveAssignedEmail(vd.assign_to)
-    const picName = resolveDisplayName([picProfile?.fullName], 'PIC')
-    const picTel = ''
+    const picName = resolveMailRecipientName([picProfile?.fullName, vd.assign_to, picEmail], 'Vendor Registration System')
+    const picTel = picProfile?.tel || ''
 
     const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
 
@@ -1242,7 +1288,7 @@ export const triggerCompletionEmail = async (dataItem: any) => {
       picName,
       picTel,
       vendorCode: dataItem.VENDOR_CODE || vd.vendor_code || 'Pending',
-      userName: requester.name || 'Requester',
+      userName: resolveMailRecipientName([requester.name, requester.empCode, requester.email], 'Requester'),
     })
 
     await sendTemplatedEmail({
@@ -1271,8 +1317,8 @@ export const triggerVendorDisagreeEmail = async (dataItem: any) => {
 
     const picProfile = await resolveAssigneeProfile(vd.assign_to)
     const picEmail = await resolveAssignedEmail(vd.assign_to)
-    const picName = resolveDisplayName([picProfile?.fullName], 'PO PIC')
-    const picTel = ''
+    const picName = resolveMailRecipientName([picProfile?.fullName, vd.assign_to, picEmail], 'Vendor Registration System')
+    const picTel = picProfile?.tel || ''
 
     const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
 
@@ -1294,7 +1340,7 @@ export const triggerVendorDisagreeEmail = async (dataItem: any) => {
       toEmail: requester.email,
       ccEmail: ccEmails.join('; '),
       requestNumber,
-      userName: requester.name,
+      userName: resolveMailRecipientName([requester.name, requester.empCode, requester.email], 'Requester'),
       vendorName: vd.company_name || 'N/A',
       address: vd.address || 'N/A',
       contactPic: vd.contact_name || 'N/A',

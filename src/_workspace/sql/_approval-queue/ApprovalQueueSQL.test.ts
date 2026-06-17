@@ -47,6 +47,7 @@ describe('ApprovalQueueSQL reassignment statements', () => {
     })
 
     expect(sql).toContain("APPROVED_VENDOR_CODE = 'V00010'")
+    expect(sql).not.toContain('REQUEST_STATUS =')
     expect(sql).toContain("REQUEST_STATE = 'completed'")
     expect(sql).toContain('CURRENT_STATUS_ID')
     expect(sql).toContain('CURRENT_STEP_ID = NULL')

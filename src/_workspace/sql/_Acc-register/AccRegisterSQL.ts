@@ -196,8 +196,6 @@ export const AccRegisterSQL = {
     let sql = `
                             UPDATE request_register_vendor SET
                                        APPROVED_VENDOR_CODE = 'dataItem.VENDOR_CODE'
-                                     , VENDOR_CODE = 'dataItem.VENDOR_CODE'
-                                     , REQUEST_STATUS = 'Completed'
                                      , REQUEST_STATE = 'completed'
                                      , CURRENT_STATUS_ID = (
                                            SELECT STATUS_ID FROM m_request_status
@@ -224,7 +222,6 @@ export const AccRegisterSQL = {
     let sql = `
                             UPDATE request_register_vendor SET
                                        APPROVED_VENDOR_CODE = 'dataItem.VENDOR_CODE'
-                                     , VENDOR_CODE = 'dataItem.VENDOR_CODE'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
@@ -269,8 +266,7 @@ export const AccRegisterSQL = {
   markRequestCompleted: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE request_register_vendor SET
-                                       REQUEST_STATUS = 'Completed'
-                                     , REQUEST_STATE = 'completed'
+                                       REQUEST_STATE = 'completed'
                                      , CURRENT_STATUS_ID = (
                                            SELECT STATUS_ID FROM m_request_status
                                            WHERE STEP_CODE = 'ACCOUNT_REGISTERED'

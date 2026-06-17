@@ -1,4 +1,5 @@
 import { getTaskManagerTerminalStatuses } from '../../services/_task-manager/TaskManagerRules'
+import { requestStatusExpr } from '../_request-register/RequestStatusSqlSnippets'
 
 export interface TaskManagerDataItem {
   [key: string]: any
@@ -103,7 +104,7 @@ export const TaskManagerSQL = {
                     rr.REQUEST_ID,
                     rr.REQUEST_NUMBER,
                     v.COMPANY_NAME,
-                    rr.REQUEST_STATUS,
+                    ${requestStatusExpr('rr')} AS REQUEST_STATUS,
                     rr.REQUEST_STATE,
                     v.VENDOR_REGION,
                     rr.CREATE_DATE,

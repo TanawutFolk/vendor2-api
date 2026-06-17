@@ -1,4 +1,7 @@
 import type { AuditFields } from '../../types/AuditFields'
+import { gprCSelectionFields } from '../_request-register/GprCSelectionSqlSnippets'
+import { primaryVendorContactIdExpr } from '../_request-register/RequestVendorContactSqlSnippets'
+import { requestStatusExpr, requestStatusIdByValueExpr } from '../_request-register/RequestStatusSqlSnippets'
 
 export interface RegisterRequestDataItem extends Partial<AuditFields> {
   [key: string]: any
@@ -116,7 +119,7 @@ export const ApprovalQueueSQL = {
                                        rr.REQUEST_ID
                                                                          , rr.REQUEST_NUMBER
                                      , rr.VENDOR_ID
-                                     , rr.REQUEST_STATUS
+                                     , ${requestStatusExpr('rr')} AS REQUEST_STATUS
                                      , rr.REQUEST_STATE
                                      , rr.CURRENT_STATUS_ID
                                      , rr.CURRENT_STEP_ID
@@ -124,18 +127,13 @@ export const ApprovalQueueSQL = {
                                      , rr.PURCHASE_FREQUENCY
                                      , rr.ASSIGN_TO
                                      , rr.PIC_EMAIL
-                                     , rr.VENDOR_CONTACT_ID
+                                     , ${primaryVendorContactIdExpr('rr')} AS VENDOR_CONTACT_ID
                                      , rr.REQUESTER_REMARK
                                      , rr.APPROVE_BY
                                      , rr.APPROVE_DATE
                                      , rr.APPROVER_REMARK
-                                     , COALESCE(rr.APPROVED_VENDOR_CODE, rr.VENDOR_CODE) AS VENDOR_CODE
-                                     , rvs.GPR_C_APPROVER_NAME
-                                     , rvs.GPR_C_APPROVER_EMAIL
-                                     , rvs.GPR_C_PC_PIC_NAME
-                                     , rvs.GPR_C_PC_PIC_EMAIL
-                                     , rvs.GPR_C_CIRCULAR_JSON
-                                     , rvs.ACTION_REQUIRED_JSON
+                                     , rr.APPROVED_VENDOR_CODE AS VENDOR_CODE
+                                     ${gprCSelectionFields('rvs', 'rr')}
                                      , rvs.GPR_43_ACCEPTANCE_STATUS
                                      , rr.REQUEST_BY_EMPLOYEECODE AS EMPLOYEE_CODE
                                      , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS FULL_NAME
@@ -380,13 +378,13 @@ export const ApprovalQueueSQL = {
   getRequestStatusAndAssign: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             SELECT
-                                       REQUEST_STATUS
+                                       ${requestStatusExpr('rr')} AS REQUEST_STATUS
                                      , ASSIGN_TO
                             FROM
-                                       request_register_vendor
+                                       request_register_vendor rr
                             WHERE
-                                       REQUEST_ID = dataItem.REQUEST_ID
-                                       AND INUSE = 1
+                                       rr.REQUEST_ID = dataItem.REQUEST_ID
+                                       AND rr.INUSE = 1
                             LIMIT
                                        1
         `
@@ -440,11 +438,7 @@ export const ApprovalQueueSQL = {
   updateRequest: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE request_register_vendor SET
-                                       VENDOR_CONTACT_ID = CASE
-                                           WHEN dataItem.VENDOR_CONTACT_ID > 0 THEN dataItem.VENDOR_CONTACT_ID
-                                           ELSE VENDOR_CONTACT_ID
-                                       END
-                                     , SUPPORTPRODUCT_PROCESS = 'dataItem.SUPPORTPRODUCT_PROCESS'
+                                       SUPPORTPRODUCT_PROCESS = 'dataItem.SUPPORTPRODUCT_PROCESS'
                                      , PURCHASE_FREQUENCY = 'dataItem.PURCHASE_FREQUENCY'
                                      , REQUESTER_REMARK = 'dataItem.REQUESTER_REMARK'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
@@ -585,13 +579,8 @@ export const ApprovalQueueSQL = {
                                      , rr.ASSIGN_TO
                                      , rr.REQUEST_NUMBER
                                      , rr.CREATE_DATE
-                                     , COALESCE(rvs.PROPOSED_VENDOR_CODE, rvs.VENDOR_CODE_SELECTOR) AS VENDOR_CODE_SELECTOR
-                                     , rvs.GPR_C_APPROVER_NAME
-                                     , rvs.GPR_C_APPROVER_EMAIL
-                                     , rvs.GPR_C_PC_PIC_NAME
-                                     , rvs.GPR_C_PC_PIC_EMAIL
-                                     , rvs.GPR_C_CIRCULAR_JSON
-                                     , rvs.ACTION_REQUIRED_JSON
+                                     , rvs.PROPOSED_VENDOR_CODE AS VENDOR_CODE_SELECTOR
+                                     ${gprCSelectionFields('rvs', 'rr')}
                                      , rvs.GPR_43_ACCEPTANCE_STATUS
                                      , v.VENDOR_REGION
                             FROM
@@ -719,7 +708,7 @@ export const ApprovalQueueSQL = {
   updateStatus: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE request_register_vendor SET
-                                       REQUEST_STATUS = 'dataItem.REQUEST_STATUS'
+                                       CURRENT_STATUS_ID = COALESCE(${requestStatusIdByValueExpr("'dataItem.REQUEST_STATUS'")}, CURRENT_STATUS_ID)
                                      , REQUEST_STATE = CASE
                                            WHEN LOWER('dataItem.REQUEST_STATUS') = 'completed' THEN 'completed'
                                            WHEN LOWER('dataItem.REQUEST_STATUS') IN ('rejected', 'vendor disagreed') THEN 'rejected'
@@ -749,7 +738,6 @@ export const ApprovalQueueSQL = {
     let sql = `
                             UPDATE request_register_vendor SET
                                        APPROVED_VENDOR_CODE = 'dataItem.VENDOR_CODE'
-                                     , VENDOR_CODE = 'dataItem.VENDOR_CODE'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
@@ -827,11 +815,6 @@ export const ApprovalQueueSQL = {
                                            WHEN active_step.STEP_ID IS NOT NULL THEN active_step.STATUS_ID
                                            ELSE rr.CURRENT_STATUS_ID
                                        END
-                                     , rr.REQUEST_STATUS = CASE
-                                           WHEN LOWER('dataItem.STEP_STATUS') = 'rejected' THEN rejected_status.STATUS_VALUE
-                                           WHEN active_step.STEP_ID IS NOT NULL THEN active_status.STATUS_VALUE
-                                           ELSE rr.REQUEST_STATUS
-                                       END
                                      , rr.UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , rr.UPDATE_DATE = NOW()
                             WHERE
@@ -867,8 +850,7 @@ export const ApprovalQueueSQL = {
   markRequestCompleted: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE request_register_vendor SET
-                                       REQUEST_STATUS = 'Completed'
-                                     , REQUEST_STATE = 'completed'
+                                       REQUEST_STATE = 'completed'
                                      , CURRENT_STATUS_ID = (
                                            SELECT STATUS_ID FROM m_request_status
                                            WHERE STEP_CODE = 'ACCOUNT_REGISTERED'
@@ -894,7 +876,7 @@ export const ApprovalQueueSQL = {
                                        rr.REQUEST_ID
                                                                          , rr.REQUEST_NUMBER
                                      , rr.VENDOR_ID
-                                     , rr.REQUEST_STATUS
+                                     , ${requestStatusExpr('rr')} AS REQUEST_STATUS
                                      , rr.REQUEST_STATE
                                      , rr.CURRENT_STATUS_ID
                                      , rr.CURRENT_STEP_ID
@@ -904,20 +886,15 @@ export const ApprovalQueueSQL = {
                                      , rr.APPROVER_REMARK
                                      , rr.APPROVE_BY
                                      , rr.APPROVE_DATE
-                                     , COALESCE(rr.APPROVED_VENDOR_CODE, rr.VENDOR_CODE) AS VENDOR_CODE
+                                     , rr.APPROVED_VENDOR_CODE AS VENDOR_CODE
                                      , rr.ASSIGN_TO
                                      , rr.PIC_EMAIL
-                                     , rr.VENDOR_CONTACT_ID
+                                     , ${primaryVendorContactIdExpr('rr')} AS VENDOR_CONTACT_ID
                                      , rr.REQUEST_BY_EMPLOYEECODE AS EMPLOYEE_CODE
                                      , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS FULL_NAME
                                      , m.EMPDEPT AS EMPLOYEE_DEPT
                                      , rr.CREATE_DATE
-                                     , rvs.GPR_C_APPROVER_NAME
-                                     , rvs.GPR_C_APPROVER_EMAIL
-                                     , rvs.GPR_C_PC_PIC_NAME
-                                     , rvs.GPR_C_PC_PIC_EMAIL
-                                     , rvs.GPR_C_CIRCULAR_JSON
-                                     , rvs.ACTION_REQUIRED_JSON
+                                     ${gprCSelectionFields('rvs', 'rr')}
                                      , rvs.GPR_43_ACCEPTANCE_STATUS
 
                                      -- Vendor Info
@@ -1193,8 +1170,6 @@ export const ApprovalQueueSQL = {
     let sql = `
                             UPDATE request_register_vendor SET
                                        APPROVED_VENDOR_CODE = 'dataItem.VENDOR_CODE'
-                                     , VENDOR_CODE = 'dataItem.VENDOR_CODE'
-                                     , REQUEST_STATUS = 'Completed'
                                      , REQUEST_STATE = 'completed'
                                      , CURRENT_STATUS_ID = (
                                            SELECT STATUS_ID FROM m_request_status

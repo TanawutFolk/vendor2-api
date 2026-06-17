@@ -164,6 +164,22 @@ export const RequestRegisterPageService = {
         dataItem.REQUEST_STATUS = reRegisterInitialStatus
       }
 
+      const groupAssigneeCache = new Map<string, string>()
+      const resolvePrimaryAssigneeByGroupCode = async (groupCodeRaw: string) => {
+        const groupCode = String(groupCodeRaw || '').trim().toUpperCase()
+        if (!groupCode) return ''
+        if (groupAssigneeCache.has(groupCode)) return groupAssigneeCache.get(groupCode) || ''
+
+        const assigneeSql = await RequestRegisterPageSQL.getActiveAssigneesByGroupCode({
+          GROUP_CODE: groupCode,
+        })
+        const assigneeRows = await queryRows(assigneeSql)
+        const empCode = String(assigneeRows[0]?.empcode || assigneeRows[0]?.EMPCODE || '').trim()
+        groupAssigneeCache.set(groupCode, empCode)
+
+        return empCode
+      }
+
       const sqlCreate = await RequestRegisterPageSQL.createRequest(dataItem)
       const result = await executeSql(sqlCreate)
       const insertedId = result.insertId
@@ -241,6 +257,11 @@ export const RequestRegisterPageService = {
         const isPendingAgreementStep = stepCode === WORKFLOW_STEP_CODE.PENDING_AGREEMENT
         const isAgreementReachedStep = stepCode === WORKFLOW_STEP_CODE.AGREEMENT_REACHED
         const isVendorRequestStep = requiresVendorReply({ ...ws, step_code: stepCode, actor_type: actorType })
+        const approverId = (stepOrder <= 2 || isPicOwnedStep)
+          ? nextAssignee.empCode
+          : groupCode
+            ? await resolvePrimaryAssigneeByGroupCode(groupCode)
+            : ''
 
         if (isReRegisterRequest) {
           if (isRequestSubmittedStep) {
@@ -264,7 +285,7 @@ export const RequestRegisterPageService = {
             WORKFLOW_STEP_ID: ws.workflowStepId,
             STATUS_ID: ws.statusId,
             STEP_ORDER: stepOrder,
-            APPROVER_ID: stepOrder <= 2 || isPicOwnedStep ? nextAssignee.empCode : '',
+            APPROVER_ID: approverId,
             STEP_STATUS: initialStatus,
             DESCRIPTION: ws.label,
             STEP_CODE: stepCode,
@@ -430,11 +451,20 @@ export const RequestRegisterPageService = {
     const groupCode = isOversea
       ? status.DEFAULT_GROUP_CODE_OVERSEA
       : status.DEFAULT_GROUP_CODE_LOCAL
+    let approverId = String(dataItem.APPROVER_ID || '').trim()
+
+    if (!approverId && groupCode) {
+      const assigneeRows = (await MySQLExecute.search(
+        await RequestRegisterPageSQL.getActiveAssigneesByGroupCode({ GROUP_CODE: groupCode })
+      )) as RowDataPacket[]
+      approverId = String(assigneeRows[0]?.empcode || assigneeRows[0]?.EMPCODE || '').trim()
+    }
 
     const sql = await RequestRegisterPageSQL.createApprovalStep({
       ...dataItem,
       WORKFLOW_STEP_ID: status.WORKFLOW_STEP_ID,
       STATUS_ID: status.STATUS_ID,
+      APPROVER_ID: approverId,
       STEP_CODE: status.STEP_CODE,
       ACTOR_TYPE: status.ACTOR_TYPE || '',
       GROUP_CODE: groupCode || '',

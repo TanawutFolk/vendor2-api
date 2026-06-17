@@ -126,13 +126,19 @@ const renderLink = (systemLink?: string) => {
   `
 }
 
-const renderSignature = (name: unknown, tel: unknown, role: string) => `
-  <div style="border-top: 1px solid #c9c9c9; margin-top: 20px; padding-top: 13px; color: #111111; font-size: 12px; line-height: 1.55;">
-    <div style="font-weight: 700;">Thank you &amp; Best regards,</div>
-    <div style="font-weight: 700;">${text(name, 'Vendor Registration System')}${String(tel || '').trim() ? ` <span style="font-weight: 400;">(#Tel. ${text(tel)})</span>` : ''}</div>
-    <div>${escapeHtml(role)}</div>
-  </div>
-`
+const renderSignature = (name: unknown, tel: unknown, role: string) => {
+  const normalizedName = String(name || '').trim()
+  const roleFallbackNames = ['pic', 'po pic', 'po checker', 'account pic', 'approver', 'requester']
+  const safeName = roleFallbackNames.includes(normalizedName.toLowerCase()) ? '' : normalizedName
+
+  return `
+    <div style="border-top: 1px solid #c9c9c9; margin-top: 20px; padding-top: 13px; color: #111111; font-size: 12px; line-height: 1.55;">
+      <div style="font-weight: 700;">Thank you &amp; Best regards,</div>
+      <div style="font-weight: 700;">${text(safeName, 'Vendor Registration System')}${String(tel || '').trim() ? ` <span style="font-weight: 400;">(#Tel. ${text(tel)})</span>` : ''}</div>
+      <div>${escapeHtml(role)}</div>
+    </div>
+  `
+}
 
 const renderCompanyFooter = () => `
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse;">
@@ -160,9 +166,9 @@ const renderMailLayout = ({
       <table role="presentation" width="100%" height="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="width: 100%; min-height: 100%; border-collapse: collapse; background-color: #ffffff; background-image: linear-gradient(to bottom, #F02016 0%, #F02016 40%, #ffffff 40%, #ffffff 100%); background-repeat: no-repeat;">
         <tr>
           <td align="center" valign="top" style="padding: 28px 12px 40px 12px; background-color: transparent;">
-            <table role="presentation" width="680" cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 680px; border-collapse: collapse; font-family: Arial, 'Segoe UI', Tahoma, sans-serif;">
+            <table role="presentation" width="820" cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 820px; border-collapse: collapse; font-family: Arial, 'Segoe UI', Tahoma, sans-serif;">
               <tr>
-                <td style="padding: 0 24px; background-color: transparent;">
+                <td style="padding: 0 16px; background-color: transparent;">
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; background: #ededed;">
                     <tr>
                       <td style="padding: 42px 52px 36px 52px;">
@@ -233,6 +239,12 @@ export const emailRequestRegisterVendorTemplate = (data: MailTemplateData) =>
 export const emailVendorDocumentRequestTemplate = (data: MailTemplateData) => {
   const requestNumber = data.topicRef || data.requestNumber
   const supplierType = data.isNewSupplier ? 'new supplier registration' : 'supplier re-registration'
+  const englishIntro = data.isNewSupplier
+    ? `As <strong>Furukawa <span style="color: #ef1239;">FITEL</span> (Thailand) Co., Ltd.</strong> has never contacted or used the service from your company, it is necessary to <strong>request more information to register a new supplier</strong>. Including informing about company policies such as Environmental Policy, Quality Policy and Export Control Policy. Therefore, we kindly request the following documents:`
+    : `As <strong>Furukawa <span style="color: #ef1239;">FITEL</span> (Thailand) Co., Ltd.</strong> needs to update supplier registration information and confirm company policies such as Environmental Policy, Quality Policy and Export Control Policy, we kindly request the following documents:`
+  const thaiIntro = data.isNewSupplier
+    ? `เนื่องด้วยทาง <strong>บริษัท ฟูรูกาวา <span style="color: #ef1239;">ไฟเทล</span> (ประเทศไทย) จำกัด</strong> ยังไม่เคยติดต่อใช้บริการร่วมกับบริษัทของคุณ จึงจำเป็นต้องมีการ<strong>ร้องขอข้อมูลที่จำเป็นเพื่อใช้ในการลงทะเบียนผู้ผลิต / ผู้จัดจำหน่ายใหม่</strong> รวมถึงการแจ้งข้อมูลเกี่ยวกับนโยบายของบริษัท ได้แก่ นโยบายด้านสิ่งแวดล้อม ด้านคุณภาพ และด้านการควบคุมการส่งออก ดังนั้นทางเราจึงรบกวนขอเอกสารต่าง ๆ ดังนี้`
+    : `เนื่องด้วยทาง <strong>บริษัท ฟูรูกาวา <span style="color: #ef1239;">ไฟเทล</span> (ประเทศไทย) จำกัด</strong> มีความจำเป็นต้องอัปเดตข้อมูลการลงทะเบียนผู้ผลิต / ผู้จัดจำหน่าย และยืนยันข้อมูลเกี่ยวกับนโยบายของบริษัท ได้แก่ นโยบายด้านสิ่งแวดล้อม ด้านคุณภาพ และด้านการควบคุมการส่งออก ดังนั้นทางเราจึงรบกวนขอเอกสารต่าง ๆ ดังนี้`
 
   return renderMailLayout({
     recipient: 'Supplier',
@@ -244,30 +256,44 @@ export const emailVendorDocumentRequestTemplate = (data: MailTemplateData) => {
         'Vendor documents required',
         `Please prepare the documents for <strong>${escapeHtml(supplierType)}</strong>, reference <strong>"${text(requestNumber)}"</strong>, and reply within 7 days.`
       )}
-      <div style="font-size: 12px; line-height: 1.65; color: #222222;">
-        <p style="margin: 0 0 10px 0;">Furukawa FITEL (Thailand) Co., Ltd. requires the following information and documents:</p>
-        <ol style="margin: 0 0 18px 20px; padding: 0;">
-          <li style="margin-bottom: 5px;">Company certificate and VAT license (Por Por 20)</li>
-          <li style="margin-bottom: 5px;">Company profile</li>
-          <li style="margin-bottom: 5px;">Other certifications, such as ISO9001, ISO14000, and product catalog</li>
-          <li style="margin-bottom: 5px;">Copy of bank book</li>
-          <li style="margin-bottom: 5px;">Completed MFG Survey in Excel format</li>
-          <li>Completed Reply Form in PDF format</li>
-        </ol>
-      </div>
-      ${renderThaiStatus(
-        'ขอเอกสารสำหรับลงทะเบียนผู้ขาย',
-        `กรุณาจัดเตรียมเอกสารสำหรับหมายเลขอ้างอิง <strong>"${text(requestNumber)}"</strong> และตอบกลับภายใน 7 วัน`
-      )}
+      <p style="margin: 0 0 18px 0; font-weight: 700; color: #d32f2f; background: #fff5f5; padding: 8px 12px; display: inline-block;">
+        ** สามารถอ่านภาษาไทยด้านล่างได้ค่ะ **
+      </p>
       <div style="font-size: 12px; line-height: 1.7; color: #222222;">
-        <ol style="margin: 0 0 18px 20px; padding: 0;">
-          <li style="margin-bottom: 5px;">หนังสือรับรองนิติบุคคลและ ภ.พ.20</li>
-          <li style="margin-bottom: 5px;">Company profile</li>
-          <li style="margin-bottom: 5px;">เอกสารรับรอง เช่น ISO9001, ISO14000 และแคตตาล็อกสินค้า</li>
-          <li style="margin-bottom: 5px;">สำเนาหน้าสมุดบัญชีธนาคาร</li>
-          <li style="margin-bottom: 5px;">แบบสำรวจ MFG ในรูปแบบ Excel</li>
-          <li>Reply Form ในรูปแบบ PDF</li>
+        <p style="margin: 0 0 16px 0;">${englishIntro}</p>
+        <ol style="margin: 0 0 22px 20px; padding: 0;">
+          <li style="margin-bottom: 8px;"><strong>Company certificate</strong> (Limited Company or Public Company Limited) and <strong>Vat License</strong> (Por Por 20)</li>
+          <li style="margin-bottom: 8px;"><strong>Company profile</strong></li>
+          <li style="margin-bottom: 8px;"><strong>Other certifications</strong>, such as ISO9001, ISO14000, catalog main product, etc.</li>
+          <li style="margin-bottom: 8px;"><strong>Copy of Book banking</strong></li>
+          <li style="margin-bottom: 8px;">Reply to <strong>"MFG survey document"</strong> in Excel file format <strong>within 7 days</strong>.</li>
+          <li style="margin-bottom: 8px;">Reply to <strong>"Reply Form document"</strong> in Pdf file format <strong>within 7 days</strong>.</li>
         </ol>
+        <p style="margin: 0 0 22px 0; background-color: #f7f7f7; padding: 12px 14px; border-left: 3px solid #8c8c8c;">
+          You can see more information in attached file.<br>
+          If you have any comments, please let me know.
+        </p>
+        <p style="margin: 0 0 26px 0; font-size: 11px; color: #666666; line-height: 1.55;">
+          <em>Remark: This message (including any attachments) contains confidential information intended for a specific individual and purpose, and is protected by law. If you are not the intended recipient, you should delete this message.<br>
+          Any disclosure, copying, or distribution of this message, or the taking of any action based on it, is strictly prohibited.</em>
+        </p>
+      </div>
+      <div style="height: 1px; background: #c9c9c9; margin: 24px 0;"></div>
+      <div style="font-size: 12px; line-height: 1.7; color: #222222;">
+        <p style="margin: 0 0 16px 0; font-weight: 700; font-size: 13px; color: #111111;">เรียน ผู้ผลิตและผู้จัดจำหน่าย</p>
+        <p style="margin: 0 0 16px 0;">${thaiIntro}</p>
+        <ol style="margin: 0 0 22px 20px; padding: 0;">
+          <li style="margin-bottom: 8px;"><strong>หนังสือรับรองนิติบุคคล, ภพ.20</strong></li>
+          <li style="margin-bottom: 8px;"><strong>Company profile</strong></li>
+          <li style="margin-bottom: 8px;"><strong>เอกสารรับรองอื่นๆ</strong> เช่น ISO9001, ISO14000, แคตตาล็อค ฯลฯ</li>
+          <li style="margin-bottom: 8px;"><strong>สำเนาหน้า Book banking</strong></li>
+          <li style="margin-bottom: 8px;">ตอบกลับเอกสาร <strong>"MFG survey"</strong> ในรูปแบบไฟล์ Excel <strong>ภายใน 7 วัน</strong></li>
+          <li style="margin-bottom: 8px;">ตอบกลับเอกสาร <strong>"Reply Form"</strong> ในรูปแบบไฟล์ pdf <strong>ภายใน 7 วัน</strong></li>
+        </ol>
+        <p style="margin: 0 0 22px 0; background-color: #f7f7f7; padding: 12px 14px; border-left: 3px solid #8c8c8c;">
+          รบกวนดูรายละเอียดเพิ่มเติมจากไฟล์แนบ<br>
+          หากมีข้อสงสัย โปรดแจ้งกลับมาให้เราทราบค่ะ
+        </p>
       </div>
     `,
   })
@@ -400,7 +426,7 @@ export const emailIncompleteTemplate = (data: MailTemplateData) => {
 
 export const emailActionRequiredTemplate = (data: MailTemplateData) =>
   renderMailLayout({
-    recipient: data.recipientName || 'PIC',
+    recipient: data.recipientName || 'Recipient',
     signerName: data.picName,
     signerTel: data.picTel,
     signerRole: 'PO & SCM PIC',

@@ -3,6 +3,7 @@ import { ResultSetHeader, RowDataPacket } from 'mysql2'
 import sendEmail from '@src/config/sendEmail'
 import { emailActionRequiredTemplate, emailGprCStepApprovalTemplate, emailGprCRequesterSetupTemplate, emailUserCheckerApproverGPRCTemplate } from '@src/config/mailTemplate'
 import { GprCApprovalSQL } from '../../sql/_approval-GPRC/GprCApprovalSQL'
+import { RequestRegisterPageSQL } from '../../sql/_request-register/RequestRegisterPageSQL'
 import {
   GROUP_CODE,
   inferStepCode,
@@ -663,7 +664,6 @@ export const GprCApprovalService = {
           GPR_C_APPROVER_EMAIL: stepApprovers[0].approver.email,
           PC_PIC_NAME: pcPicName,
           PC_PIC_EMAIL: pcPicEmail,
-          CIRCULAR_JSON: JSON.stringify(circularMembers),
           UPDATE_BY: updateBy,
         }),
         GprCApprovalSQL.deactivateStepsByFlow({
@@ -671,6 +671,29 @@ export const GprCApprovalService = {
           UPDATE_BY: updateBy,
         }),
       ]
+
+      if (selectionId) {
+        sqlList.push(
+          RequestRegisterPageSQL.deleteGprCircularMembers({
+            SELECTION_ID: selectionId,
+            UPDATE_BY: updateBy,
+          })
+        )
+
+        circularMembers.forEach((member, index) => {
+          sqlList.push(
+            RequestRegisterPageSQL.insertGprCircularMember({
+              SELECTION_ID: selectionId,
+              MEMBER_ORDER: index + 1,
+              EMPCODE: member.empcode,
+              MEMBER_NAME: member.name,
+              EMAIL: member.email,
+              CREATE_BY: updateBy,
+              UPDATE_BY: updateBy,
+            })
+          )
+        })
+      }
 
       for (const step of stepApprovers) {
         sqlList.push(

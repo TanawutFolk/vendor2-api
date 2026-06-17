@@ -2,6 +2,12 @@ import { ApprovalQueueModel } from '@src/_workspace/models/_approval-queue/Appro
 import { ResponseI } from '@src/types/ResponseI'
 import { Request, Response } from 'express'
 import getSqlWhere_aggrid from '@src/helpers/getSqlWhere_aggrid'
+import { requestStatusExpr } from '@src/_workspace/sql/_request-register/RequestStatusSqlSnippets'
+
+const escapeSqlText = (value: unknown) =>
+  String(value ?? '')
+    .replaceAll('\\', '\\\\')
+    .replaceAll("'", "\\'")
 
 export const ApprovalQueueController = {
   getById: async (req: Request, res: Response) => {
@@ -54,7 +60,6 @@ export const ApprovalQueueController = {
       // Table mapping for AG Grid ColumnFilters and SearchFilters
       const tableIds = [
         { table: 'rr', id: 'request_id', Fns: '=' },
-        { table: 'rr', id: 'request_status', Fns: '=' },
         { table: 'rr', id: 'supportProduct_Process', Fns: 'LIKE' },
         { table: 'rr', id: 'purchase_frequency', Fns: 'LIKE' },
         { table: 'rr', id: 'assign_to', Fns: '=' },
@@ -72,6 +77,22 @@ export const ApprovalQueueController = {
       // Filter out null/empty values from SearchFilters before passing to helper
       if (dataItem.SEARCHFILTERS && Array.isArray(dataItem.SEARCHFILTERS)) {
         dataItem.SEARCHFILTERS = dataItem.SEARCHFILTERS.filter((item: any) => item.value !== null && item.value !== undefined && item.value !== '')
+      }
+
+      const requestStatusFilters: string[] = []
+      if (Array.isArray(dataItem.SEARCHFILTERS)) {
+        dataItem.SEARCHFILTERS = dataItem.SEARCHFILTERS.filter((item: any) => {
+          if (item.id !== 'request_status') return true
+          requestStatusFilters.push(String(item.value ?? ''))
+          return false
+        })
+      }
+      if (Array.isArray(dataItem.COLUMNFILTERS)) {
+        dataItem.COLUMNFILTERS = dataItem.COLUMNFILTERS.filter((item: any) => {
+          if (item.id !== 'request_status') return true
+          requestStatusFilters.push(String(item.value ?? ''))
+          return false
+        })
       }
 
       // Create SQL WHERE, ORDER BY, and Offset using AG Grid-compatible helper
@@ -161,7 +182,10 @@ export const ApprovalQueueController = {
         manualFilters.push(`rr.Request_By_EmployeeCode = '${dataItem.REQUEST_BY_EMPLOYEECODE}'`)
       }
       if (dataItem.REQUEST_STATUS) {
-        manualFilters.push(`rr.request_status = '${dataItem.REQUEST_STATUS}'`)
+        requestStatusFilters.push(String(dataItem.REQUEST_STATUS))
+      }
+      for (const statusFilter of requestStatusFilters.filter(Boolean)) {
+        manualFilters.push(`${requestStatusExpr('rr')} = '${escapeSqlText(statusFilter)}'`)
       }
 
       // Combine AG Grid filters and manual root filters

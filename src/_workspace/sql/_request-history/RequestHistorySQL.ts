@@ -1,3 +1,7 @@
+import { gprCSelectionFields } from '../_request-register/GprCSelectionSqlSnippets'
+import { primaryVendorContactIdExpr } from '../_request-register/RequestVendorContactSqlSnippets'
+import { requestStatusExpr } from '../_request-register/RequestStatusSqlSnippets'
+
 export interface RegisterRequestDataItem {
   [key: string]: any
   request_id?: number | string
@@ -91,7 +95,7 @@ export const RequestHistorySQL = {
                                        rr.REQUEST_ID
                                                                          , rr.REQUEST_NUMBER
                                      , rr.VENDOR_ID
-                                     , rr.REQUEST_STATUS
+                                     , ${requestStatusExpr('rr')} AS REQUEST_STATUS
                                      , rr.REQUEST_STATE
                                      , rr.CURRENT_STATUS_ID
                                      , rr.CURRENT_STEP_ID
@@ -101,20 +105,15 @@ export const RequestHistorySQL = {
                                      , rr.APPROVER_REMARK
                                      , rr.APPROVE_BY
                                      , rr.APPROVE_DATE
-                                     , COALESCE(rr.APPROVED_VENDOR_CODE, rr.VENDOR_CODE) AS VENDOR_CODE
+                                     , rr.APPROVED_VENDOR_CODE AS VENDOR_CODE
                                      , rr.ASSIGN_TO
                                      , rr.PIC_EMAIL
-                                     , rr.VENDOR_CONTACT_ID
+                                     , ${primaryVendorContactIdExpr('rr')} AS VENDOR_CONTACT_ID
                                      , rr.REQUEST_BY_EMPLOYEECODE AS EMPLOYEE_CODE
                                      , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS FULL_NAME
                                      , m.EMPDEPT AS EMPLOYEE_DEPT
                                      , rr.CREATE_DATE
-                                     , rvs.GPR_C_APPROVER_NAME
-                                     , rvs.GPR_C_APPROVER_EMAIL
-                                     , rvs.GPR_C_PC_PIC_NAME
-                                     , rvs.GPR_C_PC_PIC_EMAIL
-                                     , rvs.GPR_C_CIRCULAR_JSON
-                                     , rvs.ACTION_REQUIRED_JSON
+                                     ${gprCSelectionFields('rvs', 'rr')}
                                      , rvs.GPR_43_ACCEPTANCE_STATUS
 
                                      -- Vendor Info

@@ -1,4 +1,7 @@
 import type { AuditFields } from '../../types/AuditFields'
+import { gprCSelectionFields } from '../_request-register/GprCSelectionSqlSnippets'
+import { primaryVendorContactIdExpr } from '../_request-register/RequestVendorContactSqlSnippets'
+import { requestStatusExpr, requestStatusIdByValueExpr } from '../_request-register/RequestStatusSqlSnippets'
 
 interface RegisterRequestDataItem extends Partial<AuditFields> {
   [key: string]: any
@@ -102,7 +105,6 @@ export interface GprCFlowDataItem {
   gpr_c_approver_email?: string
   pc_pic_name?: string
   pc_pic_email?: string
-  circular_json?: string
   completed_at?: string
   rejected_at?: string
   rejected_by?: string
@@ -325,7 +327,6 @@ export const GprCApprovalSQL = {
                 GPR_C_APPROVER_EMAIL = 'dataItem.GPR_C_APPROVER_EMAIL',
                 PC_PIC_NAME = 'dataItem.PC_PIC_NAME',
                 PC_PIC_EMAIL = 'dataItem.PC_PIC_EMAIL',
-                CIRCULAR_JSON = 'dataItem.CIRCULAR_JSON',
                 DESCRIPTION = LEFT(CONCAT('dataItem.FLOW_STATUS', ': ', 'dataItem.CURRENT_STEP_CODE'), 100),
                 UPDATE_BY = 'dataItem.UPDATE_BY',
                 UPDATE_DATE = NOW()
@@ -340,7 +341,6 @@ export const GprCApprovalSQL = {
     sql = sql.replaceAll('dataItem.GPR_C_APPROVER_EMAIL', esc(dataItem.GPR_C_APPROVER_EMAIL))
     sql = sql.replaceAll('dataItem.PC_PIC_NAME', esc(dataItem.PC_PIC_NAME))
     sql = sql.replaceAll('dataItem.PC_PIC_EMAIL', esc(dataItem.PC_PIC_EMAIL))
-    sql = sql.replaceAll('dataItem.CIRCULAR_JSON', esc(dataItem.CIRCULAR_JSON || '[]'))
     sql = sql.replaceAll('dataItem.UPDATE_BY', esc(dataItem.UPDATE_BY || 'SYSTEM'))
     sql = sql.replaceAll('dataItem.GPR_C_FLOW_ID', num(dataItem.GPR_C_FLOW_ID).toString())
     return sql
@@ -596,7 +596,7 @@ export const GprCApprovalSQL = {
                 f.CURRENT_STEP_CODE,
                 s.STEP_NAME,
                 rr.REQUEST_NUMBER,
-                rr.REQUEST_STATUS,
+                ${requestStatusExpr('rr')} AS REQUEST_STATUS,
                 v.COMPANY_NAME
             FROM REQUEST_VENDOR_GPR_C_ACTION_REQUIRED ar
                 JOIN REQUEST_VENDOR_GPR_C_FLOWS f
@@ -667,7 +667,7 @@ export const GprCApprovalSQL = {
                     f.CURRENT_STEP_CODE,
                     s.STEP_NAME,
                     rr.REQUEST_NUMBER,
-                    rr.REQUEST_STATUS,
+                    ${requestStatusExpr('rr')} AS REQUEST_STATUS,
                     v.COMPANY_NAME
                 FROM REQUEST_VENDOR_GPR_C_ACTION_REQUIRED ar
                     JOIN REQUEST_VENDOR_GPR_C_FLOWS f
@@ -722,7 +722,7 @@ export const GprCApprovalSQL = {
                 s.APPROVER_EMAIL,
                 s.STEP_STATUS,
                 rr.REQUEST_NUMBER,
-                rr.REQUEST_STATUS,
+                ${requestStatusExpr('rr')} AS REQUEST_STATUS,
                 rr.SUPPORTPRODUCT_PROCESS,
                 rr.PURCHASE_FREQUENCY,
                 rr.REQUEST_BY_EMPLOYEECODE,
@@ -745,7 +745,7 @@ export const GprCApprovalSQL = {
                 LEFT JOIN vendor_contacts vc
                     ON vc.VENDOR_ID = v.VENDOR_ID
                 LEFT JOIN vendor_contacts vc_sel
-                    ON vc_sel.VENDOR_CONTACT_ID = rr.VENDOR_CONTACT_ID
+                    ON vc_sel.VENDOR_CONTACT_ID = ${primaryVendorContactIdExpr('rr')}
                     AND vc_sel.INUSE = 1
             WHERE f.INUSE = 1
               AND f.FLOW_STATUS = 'in_progress'
@@ -807,7 +807,7 @@ export const GprCApprovalSQL = {
                     s.APPROVER_EMAIL,
                     s.STEP_STATUS,
                     rr.REQUEST_NUMBER,
-                    rr.REQUEST_STATUS,
+                    ${requestStatusExpr('rr')} AS REQUEST_STATUS,
                     rr.SUPPORTPRODUCT_PROCESS,
                     rr.PURCHASE_FREQUENCY,
                     rr.REQUEST_BY_EMPLOYEECODE,
@@ -830,7 +830,7 @@ export const GprCApprovalSQL = {
                     LEFT JOIN vendor_contacts vc
                         ON vc.VENDOR_ID = v.VENDOR_ID
                     LEFT JOIN vendor_contacts vc_sel
-                        ON vc_sel.VENDOR_CONTACT_ID = rr.VENDOR_CONTACT_ID
+                        ON vc_sel.VENDOR_CONTACT_ID = ${primaryVendorContactIdExpr('rr')}
                         AND vc_sel.INUSE = 1
                 WHERE f.INUSE = 1
                   AND f.FLOW_STATUS = 'in_progress'
@@ -879,7 +879,7 @@ export const GprCApprovalSQL = {
                 s.APPROVER_EMAIL,
                 s.STEP_STATUS,
                 rr.REQUEST_NUMBER,
-                rr.REQUEST_STATUS,
+                ${requestStatusExpr('rr')} AS REQUEST_STATUS,
                 rr.SUPPORTPRODUCT_PROCESS,
                 rr.PURCHASE_FREQUENCY,
                 rr.REQUEST_BY_EMPLOYEECODE,
@@ -938,7 +938,7 @@ export const GprCApprovalSQL = {
             SELECT
                 rr.REQUEST_ID,
                 rr.REQUEST_NUMBER,
-                rr.REQUEST_STATUS,
+                ${requestStatusExpr('rr')} AS REQUEST_STATUS,
                 rr.ASSIGN_TO,
                 rr.REQUEST_BY_EMPLOYEECODE,
                 rr.SUPPORTPRODUCT_PROCESS,
@@ -954,7 +954,7 @@ export const GprCApprovalSQL = {
                 vc.TEL_PHONE
             FROM request_register_vendor rr
                 LEFT JOIN vendors v ON v.VENDOR_ID = rr.VENDOR_ID
-                LEFT JOIN vendor_contacts vc ON vc.VENDOR_CONTACT_ID = rr.VENDOR_CONTACT_ID
+                LEFT JOIN vendor_contacts vc ON vc.VENDOR_CONTACT_ID = ${primaryVendorContactIdExpr('rr')}
             WHERE rr.REQUEST_ID = dataItem.REQUEST_ID
             LIMIT 1
         `
@@ -1107,11 +1107,6 @@ export const GprCApprovalSQL = {
                                            WHEN active_step.STEP_ID IS NOT NULL THEN active_step.STATUS_ID
                                            ELSE rr.CURRENT_STATUS_ID
                                        END
-                                     , rr.REQUEST_STATUS = CASE
-                                           WHEN LOWER('dataItem.STEP_STATUS') = 'rejected' THEN rejected_status.STATUS_VALUE
-                                           WHEN active_step.STEP_ID IS NOT NULL THEN active_status.STATUS_VALUE
-                                           ELSE rr.REQUEST_STATUS
-                                       END
                                      , rr.UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , rr.UPDATE_DATE = NOW()
                             WHERE
@@ -1176,7 +1171,7 @@ export const GprCApprovalSQL = {
   updateStatus: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE request_register_vendor SET
-                                       REQUEST_STATUS = 'dataItem.REQUEST_STATUS'
+                                       CURRENT_STATUS_ID = COALESCE(${requestStatusIdByValueExpr("'dataItem.REQUEST_STATUS'")}, CURRENT_STATUS_ID)
                                      , REQUEST_STATE = CASE
                                            WHEN LOWER('dataItem.REQUEST_STATUS') = 'completed' THEN 'completed'
                                            WHEN LOWER('dataItem.REQUEST_STATUS') IN ('rejected', 'vendor disagreed') THEN 'rejected'
@@ -1204,8 +1199,7 @@ export const GprCApprovalSQL = {
   markRequestCompleted: async (dataItem: RegisterRequestDataItem) => {
     let sql = `
                             UPDATE request_register_vendor SET
-                                       REQUEST_STATUS = 'Completed'
-                                     , REQUEST_STATE = 'completed'
+                                       REQUEST_STATE = 'completed'
                                      , CURRENT_STATUS_ID = (
                                            SELECT STATUS_ID FROM m_request_status
                                            WHERE STEP_CODE = 'ACCOUNT_REGISTERED'
@@ -1230,13 +1224,8 @@ export const GprCApprovalSQL = {
                             SELECT
                                        rr.VENDOR_ID
                                      , rr.ASSIGN_TO
-                                     , COALESCE(rvs.PROPOSED_VENDOR_CODE, rvs.VENDOR_CODE_SELECTOR) AS VENDOR_CODE_SELECTOR
-                                     , rvs.GPR_C_APPROVER_NAME
-                                     , rvs.GPR_C_APPROVER_EMAIL
-                                     , rvs.GPR_C_PC_PIC_NAME
-                                      , rvs.GPR_C_PC_PIC_EMAIL
-                                      , rvs.GPR_C_CIRCULAR_JSON
-                                      , rvs.ACTION_REQUIRED_JSON
+                                     , rvs.PROPOSED_VENDOR_CODE AS VENDOR_CODE_SELECTOR
+                                      ${gprCSelectionFields('rvs', 'rr')}
                                       , rvs.GPR_43_ACCEPTANCE_STATUS
                                       , v.VENDOR_REGION
                             FROM
