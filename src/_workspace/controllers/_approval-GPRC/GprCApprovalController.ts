@@ -7,7 +7,7 @@ export const GprCApprovalController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -19,7 +19,7 @@ export const GprCApprovalController = {
       }
 
       const result = await GprCApprovalModel.gprCApproveStep({
-        REQUEST_ID: request_id,
+        REQUEST_REGISTER_VENDOR_ID: request_id,
         ACTION_BY: dataItem.ACTION_BY || dataItem.UPDATE_BY || '',
         REMARK: dataItem.REMARK || dataItem.ACTION_REMARK || '',
         UPDATE_BY: dataItem.UPDATE_BY || dataItem.ACTION_BY || 'SYSTEM',
@@ -41,7 +41,7 @@ export const GprCApprovalController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -53,7 +53,7 @@ export const GprCApprovalController = {
       }
 
       const result = await GprCApprovalModel.gprCRejectStep({
-        REQUEST_ID: request_id,
+        REQUEST_REGISTER_VENDOR_ID: request_id,
         ACTION_BY: dataItem.ACTION_BY || dataItem.UPDATE_BY || '',
         REMARK: dataItem.REMARK || dataItem.ACTION_REMARK || '',
         UPDATE_BY: dataItem.UPDATE_BY || dataItem.ACTION_BY || 'SYSTEM',
@@ -75,7 +75,7 @@ export const GprCApprovalController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -87,7 +87,7 @@ export const GprCApprovalController = {
       }
 
       const result = await GprCApprovalModel.gprCActionRequired({
-        REQUEST_ID: request_id,
+        REQUEST_REGISTER_VENDOR_ID: request_id,
         ACTION_BY: dataItem.ACTION_BY || dataItem.UPDATE_BY || '',
         PIC_NAME: dataItem.PIC_NAME || '',
         PIC_EMAIL: dataItem.PIC_EMAIL || '',
@@ -111,7 +111,7 @@ export const GprCApprovalController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const action_required_id = parseInt(dataItem.ACTION_REQUIRED_ID as string)
+      const action_required_id = parseInt(dataItem.REQUEST_VENDOR_GPR_C_ACTION_REQUIRED_ID as string)
       if (!action_required_id || isNaN(action_required_id)) {
         return res.status(400).json({
           Status: false,
@@ -123,7 +123,7 @@ export const GprCApprovalController = {
       }
 
       const result = await GprCApprovalModel.gprCRecordActionResult({
-        ACTION_REQUIRED_ID: action_required_id,
+        REQUEST_VENDOR_GPR_C_ACTION_REQUIRED_ID: action_required_id,
         RESULT_STATUS: dataItem.RESULT_STATUS || 'COMPLETED',
         RESULT_REMARK: dataItem.RESULT_REMARK || '',
         RESULT_BY: dataItem.RESULT_BY || dataItem.UPDATE_BY || '',
@@ -146,7 +146,7 @@ export const GprCApprovalController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const approver_empcode = String(dataItem.APPROVER_EMPCODE || dataItem.APPROVER_ID || '').trim()
+      const approver_empcode = String(dataItem.APPROVER_EMPCODE || dataItem.APPROVER_EMPCODE || '').trim()
       if (!approver_empcode) {
         return res.status(400).json({
           Status: false,

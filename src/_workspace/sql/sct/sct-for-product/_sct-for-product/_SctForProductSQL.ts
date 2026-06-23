@@ -55,7 +55,7 @@ export const _SctForProductSQL = {
     //                                         AND tb_4.ITEM_M_S_PRICE_VERSION_NO = tb_5.max_revision
     //                                         LEFT JOIN
     //                                 CURRENCY tb_6
-    //                                         ON tb_3.PURCHASE_PRICE_CURRENCY_ID = tb_6.CURRENCY_ID
+    //                                         ON tb_3.PURCHASE_PRICE_CURRENCY_ID = tb_6.INFO_CURRENCY_ID
     //                                         LEFT JOIN
     //                                 UNIT_OF_MEASUREMENT tb_7
     //                                         ON tb_3.PURCHASE_PRICE_UNIT_ID = tb_7.UNIT_OF_MEASUREMENT_ID
@@ -139,7 +139,7 @@ export const _SctForProductSQL = {
                                                 ON tb_4.EXCHANGE_RATE_ID = tb_5.EXCHANGE_RATE_ID
                                                 LEFT JOIN
                                 CURRENCY tb_6
-                                        ON tb_5.CURRENCY_ID = tb_6.CURRENCY_ID
+                                        ON tb_5.INFO_CURRENCY_ID = tb_6.INFO_CURRENCY_ID
                                         LEFT JOIN
                                 UNIT_OF_MEASUREMENT tb_7
                                         ON tb_4.PURCHASE_UNIT_ID  = tb_7.UNIT_OF_MEASUREMENT_ID

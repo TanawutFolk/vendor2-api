@@ -208,7 +208,7 @@ export const ItemService = {
 
       //GET VENDER ID
       if (excelColumnName['VENDOR NAME'] !== null) {
-        venderId_forInsertDb = vender.find((e: any) => e.VENDOR_NAME === excelColumnName['VENDOR NAME'])?.VENDOR_ID
+        venderId_forInsertDb = vender.find((e: any) => e.VENDOR_NAME === excelColumnName['VENDOR NAME'])?.VENDORS_ID
 
         if (typeof venderId_forInsertDb === 'undefined') {
           obj = {
@@ -381,7 +381,7 @@ export const ItemService = {
 
         ITEM_PURPOSE_ID: itemPurposeId_forInsertDb,
         ITEM_GROUP_ID: itemGroupId_forInsertDb,
-        VENDOR_ID: venderId_forInsertDb,
+        VENDORS_ID: venderId_forInsertDb,
         MAKER_ID: makerId_forInsertDb,
 
         WIDTH: excelColumnName['WIDTH [mm] (optional)'],
@@ -477,8 +477,8 @@ export const ItemService = {
   //       sqlWhere += " AND tb_3.ITEM_GROUP_ID = 'dataItem.ITEM_GROUP_ID'"
   //     }
 
-  //     if (dataItem['VENDOR_ID'] != '') {
-  //       sqlWhere += " AND tb_3.VENDOR_ID = 'dataItem.VENDOR_ID'"
+  //     if (dataItem['VENDORS_ID'] != '') {
+  //       sqlWhere += " AND tb_3.VENDORS_ID = 'dataItem.VENDORS_ID'"
   //     }
 
   //     if (dataItem['MAKER_ID'] != '') {
@@ -863,7 +863,7 @@ export type createItemByListItem_Type = {
   ITEM_CODE_FOR_SUPPORT_MES: string // ITEM_CODE
   ITEM_PURPOSE_ID: string
   ITEM_GROUP_ID: string
-  VENDOR_ID: string
+  VENDORS_ID: string
   MAKER_ID: string
 
   WIDTH: string
@@ -914,7 +914,7 @@ export const createItemByListItem = async (data: createItemByListItem_Type[]) =>
         ITEM_CODE_FOR_SUPPORT_MES: dataItem.ITEM_CODE_FOR_SUPPORT_MES,
         ITEM_PURPOSE_ID: dataItem.ITEM_PURPOSE_ID,
         ITEM_GROUP_ID: dataItem.ITEM_GROUP_ID,
-        VENDOR_ID: dataItem.VENDOR_ID,
+        VENDORS_ID: dataItem.VENDORS_ID,
         MAKER_ID: dataItem.MAKER_ID,
         WIDTH: dataItem.WIDTH,
         HEIGHT: dataItem.HEIGHT,

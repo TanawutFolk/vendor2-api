@@ -35,7 +35,7 @@ export const AssigneesService = {
       if (!groupCode) throw new Error('Group code is required')
 
       const duplicateSql = await AssigneesSQL.findDuplicate({
-        ASSIGNEES_ID: dataItem.ASSIGNEES_ID,
+        ASSIGNEES_TO_ID: dataItem.ASSIGNEES_TO_ID,
         EMPCODE: empcode,
         GROUP_CODE: groupCode,
       })
@@ -49,7 +49,7 @@ export const AssigneesService = {
       let sql = ''
       let method = ''
 
-      if (dataItem.ASSIGNEES_ID) {
+      if (dataItem.ASSIGNEES_TO_ID) {
         sql = await AssigneesSQL.update({
           ...dataItem,
           EMPCODE: empcode,

@@ -1,8 +1,8 @@
-import { ApprovalQueueModel } from '@src/_workspace/models/_approval-queue/ApprovalQueueModel'
+﻿import { ApprovalQueueModel } from '@src/_workspace/models/_approval-queue/ApprovalQueueModel'
 import { ResponseI } from '@src/types/ResponseI'
 import { Request, Response } from 'express'
 import getSqlWhere_aggrid from '@src/helpers/getSqlWhere_aggrid'
-import { requestStatusExpr } from '@src/_workspace/sql/_request-register/RequestStatusSqlSnippets'
+import { RequestStatusSqlSnippets } from '@src/_workspace/sql/_request-register/RequestStatusSqlSnippets'
 
 const escapeSqlText = (value: unknown) =>
   String(value ?? '')
@@ -14,7 +14,7 @@ export const ApprovalQueueController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
 
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
@@ -26,7 +26,7 @@ export const ApprovalQueueController = {
         } as ResponseI)
       }
 
-      const result = await ApprovalQueueModel.getById({ REQUEST_ID: request_id })
+      const result = await ApprovalQueueModel.getById({ REQUEST_REGISTER_VENDOR_ID: request_id })
 
       return res.status(200).json({
         Status: true,
@@ -59,7 +59,8 @@ export const ApprovalQueueController = {
     try {
       // Table mapping for AG Grid ColumnFilters and SearchFilters
       const tableIds = [
-        { table: 'rr', id: 'request_id', Fns: '=' },
+        { table: 'rr', id: 'request_id', column: 'REQUEST_REGISTER_VENDOR_ID', Fns: '=' },
+        { table: 'rr', id: 'REQUEST_REGISTER_VENDOR_ID', column: 'REQUEST_REGISTER_VENDOR_ID', Fns: '=' },
         { table: 'rr', id: 'supportProduct_Process', Fns: 'LIKE' },
         { table: 'rr', id: 'purchase_frequency', Fns: 'LIKE' },
         { table: 'rr', id: 'assign_to', Fns: '=' },
@@ -96,7 +97,7 @@ export const ApprovalQueueController = {
       }
 
       // Create SQL WHERE, ORDER BY, and Offset using AG Grid-compatible helper
-      getSqlWhere_aggrid(dataItem, tableIds, 'rr.request_id')
+      getSqlWhere_aggrid(dataItem, tableIds, 'request_id')
 
       // Default Limit if not provided by frontend
       dataItem.LIMIT = dataItem.LIMIT || 50
@@ -111,7 +112,7 @@ export const ApprovalQueueController = {
       // Manually add root-level filters (frontend passes these directly instead of via SearchFilters)
       const manualFilters: string[] = []
       const actorFilters: string[] = []
-      if (dataItem.APPROVER_ID) {
+      if (dataItem.APPROVER_EMPCODE) {
         const queueStepCode = String(dataItem.QUEUE_STEP_CODE || '')
           .trim()
           .toUpperCase()
@@ -121,24 +122,24 @@ export const ApprovalQueueController = {
           if (!queueStepCode) return ''
           if (queueStepCode === 'DOC_CHECK') {
             return [
-              '(UPPER(IFNULL(ras.step_code, \'\')) = \'DOC_CHECK\'',
-              'OR LOWER(IFNULL(ras.description, \'\')) LIKE \'%checker%\'',
-              'OR LOWER(IFNULL(ras.description, \'\')) LIKE \'%check all document%\')',
+              '(UPPER(IFNULL(ras.STEP_CODE, \'\')) = \'DOC_CHECK\'',
+              'OR LOWER(IFNULL(ras.DESCRIPTION, \'\')) LIKE \'%checker%\'',
+              'OR LOWER(IFNULL(ras.DESCRIPTION, \'\')) LIKE \'%check all document%\')',
             ].join(' ')
           }
           if (queueStepCode === 'ACCOUNT_REGISTERED') {
             return [
-              '(UPPER(IFNULL(ras.step_code, \'\')) = \'ACCOUNT_REGISTERED\'',
-              'OR LOWER(IFNULL(ras.description, \'\')) LIKE \'%account%\')',
+              '(UPPER(IFNULL(ras.STEP_CODE, \'\')) = \'ACCOUNT_REGISTERED\'',
+              'OR LOWER(IFNULL(ras.DESCRIPTION, \'\')) LIKE \'%account%\')',
             ].join(' ')
           }
           if (queueStepCode === 'ISSUE_GPR_C') {
             return [
-              '(UPPER(IFNULL(ras.step_code, \'\')) = \'ISSUE_GPR_C\'',
-              'OR LOWER(IFNULL(ras.description, \'\')) LIKE \'%issue gpr c%\')',
+              '(UPPER(IFNULL(ras.STEP_CODE, \'\')) = \'ISSUE_GPR_C\'',
+              'OR LOWER(IFNULL(ras.DESCRIPTION, \'\')) LIKE \'%issue gpr c%\')',
             ].join(' ')
           }
-          return `UPPER(IFNULL(ras.step_code, '')) = '${queueStepCode}'`
+          return `UPPER(IFNULL(ras.STEP_CODE, '')) = '${queueStepCode}'`
         })()
 
         // Approval pages (MD / PO GM / PO Mgr / Check Document):
@@ -150,9 +151,9 @@ export const ApprovalQueueController = {
           actorFilters.push(
             [
               'EXISTS (SELECT 1 FROM request_approval_step ras',
-              'WHERE ras.request_id = rr.request_id',
-              `AND ras.approver_id = '${dataItem.APPROVER_ID}'`,
-              'AND ras.step_status IN (\'in_progress\', \'approved\', \'rejected\')',
+              'WHERE ras.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID',
+              `AND ras.APPROVER_EMPCODE = '${dataItem.APPROVER_EMPCODE}'`,
+              'AND ras.STEP_STATUS IN (\'in_progress\', \'approved\', \'rejected\')',
               `AND ${queueStepCondition}`,
               'AND ras.INUSE = 1)',
             ].join(' ')
@@ -162,9 +163,9 @@ export const ApprovalQueueController = {
           actorFilters.push(
             [
               'EXISTS (SELECT 1 FROM request_approval_step ras',
-              'WHERE ras.request_id = rr.request_id',
-              `AND ras.approver_id = '${dataItem.APPROVER_ID}'`,
-              'AND ras.step_status IN (\'in_progress\', \'approved\', \'rejected\')',
+              'WHERE ras.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID',
+              `AND ras.APPROVER_EMPCODE = '${dataItem.APPROVER_EMPCODE}'`,
+              'AND ras.STEP_STATUS IN (\'in_progress\', \'approved\', \'rejected\')',
               'AND ras.INUSE = 1)',
             ].join(' ')
           )
@@ -185,7 +186,7 @@ export const ApprovalQueueController = {
         requestStatusFilters.push(String(dataItem.REQUEST_STATUS))
       }
       for (const statusFilter of requestStatusFilters.filter(Boolean)) {
-        manualFilters.push(`${requestStatusExpr('rr')} = '${escapeSqlText(statusFilter)}'`)
+        manualFilters.push(`${RequestStatusSqlSnippets.requestStatusExpr('rr')} = '${escapeSqlText(statusFilter)}'`)
       }
 
       // Combine AG Grid filters and manual root filters
@@ -235,7 +236,7 @@ export const ApprovalQueueController = {
     }
 
     try {
-      const request_id = parseInt((dataItem.REQUEST_ID ?? dataItem.request_id) as string)
+      const request_id = parseInt((dataItem.REQUEST_REGISTER_VENDOR_ID ?? dataItem.request_id) as string)
       const requestStatus = dataItem.REQUEST_STATUS ?? dataItem.request_status ?? ''
       const workflowAction = dataItem.WORKFLOW_ACTION ?? dataItem.workflow_action ?? ''
       const actionType = dataItem.ACTION_TYPE ?? dataItem.action_type ?? ''
@@ -258,7 +259,7 @@ export const ApprovalQueueController = {
       // approve_date: set to 'NOW()' (DB CURRENT_TIMESTAMP) when Rejected, or when it's the final step
       const isFinalStepOrRejected = requestStatus === 'Rejected' || isFinalStep
       const result = await ApprovalQueueModel.updateStatus({
-        REQUEST_ID: request_id,
+        REQUEST_REGISTER_VENDOR_ID: request_id,
         REQUEST_STATUS: requestStatus,
         WORKFLOW_ACTION: workflowAction,
         ACTION_TYPE: actionType,
@@ -315,7 +316,7 @@ export const ApprovalQueueController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -327,7 +328,7 @@ export const ApprovalQueueController = {
       }
 
       const result = await ApprovalQueueModel.reassignAssignment({
-        REQUEST_ID: request_id,
+        REQUEST_REGISTER_VENDOR_ID: request_id,
         SCOPE: dataItem.SCOPE || '',
         TO_EMPCODE: dataItem.TO_EMPCODE || '',
         REASON: dataItem.REASON || '',
@@ -347,3 +348,4 @@ export const ApprovalQueueController = {
     }
   },
 }
+

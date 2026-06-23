@@ -178,7 +178,7 @@ export const ItemSQL = {
                 ITEM_MANUFACTURING tb_1
                     INNER JOIN
                 VENDOR tb_2
-                    ON tb_1.VENDOR_ID = tb_2.VENDOR_ID
+                    ON tb_1.VENDORS_ID = tb_2.VENDORS_ID
             WHERE
                     tb_1.ITEM_ID = 'dataItem.ITEM_ID'
           `
@@ -196,7 +196,7 @@ export const ItemSQL = {
                 , tb_4.ITEM_PURPOSE_ID
                 , tb_5.VENDOR_ALPHABET
                 , tb_5.VENDOR_NAME
-                , tb_5.VENDOR_ID
+                , tb_5.VENDORS_ID
                 , tb_6.MAKER_NAME
                 , tb_6.MAKER_ID
                 , tb_7.ITEM_PROPERTY_COLOR_NAME
@@ -239,7 +239,7 @@ export const ItemSQL = {
             JOIN
                 VENDOR tb_5
             ON
-                tb_1.VENDOR_ID = tb_5.VENDOR_ID
+                tb_1.VENDORS_ID = tb_5.VENDORS_ID
             JOIN
                 MAKER tb_6
             ON
@@ -394,7 +394,7 @@ export const ItemSQL = {
     ITEM_CATEGORY_ID: number
     ITEM_PURPOSE_ID: number
     ITEM_GROUP_ID: number
-    VENDOR_ID: number
+    VENDORS_ID: number
     MAKER_ID: number
     ITEM_PROPERTY_COLOR_ID: number | ''
     ITEM_PROPERTY_SHAPE_ID: number | ''
@@ -431,7 +431,7 @@ export const ItemSQL = {
             , ITEM_ID
             , ITEM_PURPOSE_ID
             , ITEM_GROUP_ID
-            , VENDOR_ID
+            , VENDORS_ID
             , MAKER_ID
             , WIDTH
             , HEIGHT
@@ -465,7 +465,7 @@ export const ItemSQL = {
             ,  @itemId
             , 'dataItem.ITEM_PURPOSE_ID'
             , 'dataItem.ITEM_GROUP_ID'
-            , 'dataItem.VENDOR_ID'
+            , 'dataItem.VENDORS_ID'
             , 'dataItem.MAKER_ID'
             , dataItem.WIDTH
             , dataItem.HEIGHT
@@ -499,7 +499,7 @@ export const ItemSQL = {
     sql = sql.replaceAll('dataItem.ITEM_CATEGORY_ID', dataItem['ITEM_CATEGORY_ID'].toString())
     sql = sql.replaceAll('dataItem.ITEM_PURPOSE_ID', dataItem['ITEM_PURPOSE_ID'].toString())
     sql = sql.replaceAll('dataItem.ITEM_GROUP_ID', dataItem['ITEM_GROUP_ID'].toString())
-    sql = sql.replaceAll('dataItem.VENDOR_ID', dataItem['VENDOR_ID'].toString())
+    sql = sql.replaceAll('dataItem.VENDORS_ID', dataItem['VENDORS_ID'].toString())
     sql = sql.replaceAll('dataItem.MAKER_ID', dataItem['MAKER_ID'].toString())
 
     sql = sql.replaceAll('dataItem.WIDTH', dataItem['WIDTH'] ? dataItem['WIDTH'].toString() : 'NULL')
@@ -584,7 +584,7 @@ export const ItemSQL = {
                 , tb_4.ITEM_PURPOSE_NAME
                 , tb_3.ITEM_GROUP_ID
                 , tb_5.ITEM_GROUP_NAME
-                , tb_3.VENDOR_ID
+                , tb_3.VENDORS_ID
                 , tb_6.VENDOR_ALPHABET
                 , tb_6.VENDOR_NAME
                 , tb_3.USAGE_UNIT_RATIO
@@ -683,7 +683,7 @@ export const ItemSQL = {
                 , tb_4.ITEM_PURPOSE_NAME
                 , tb_3.ITEM_GROUP_ID
                 , tb_5.ITEM_GROUP_NAME
-                , tb_3.VENDOR_ID
+                , tb_3.VENDORS_ID
                 , tb_6.VENDOR_ALPHABET
                 , tb_6.VENDOR_NAME
                 , tb_3.USAGE_UNIT_RATIO
@@ -1373,7 +1373,7 @@ FROM
                 ITEM_MANUFACTURING tb_1
                     INNER JOIN
                 VENDOR tb_2
-                    ON tb_1.VENDOR_ID = tb_2.VENDOR_ID
+                    ON tb_1.VENDORS_ID = tb_2.VENDORS_ID
             WHERE
                     tb_1.ITEM_CODE_FOR_SUPPORT_MES = 'dataItem.ITEM_CODE_FOR_SUPPORT_MES'
                 AND tb_1.INUSE = 1

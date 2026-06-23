@@ -1,8 +1,10 @@
-export const primaryVendorContactIdExpr = (requestAlias = 'rr') => `(
-                                           SELECT rrvc.VENDOR_CONTACT_ID
+export const RequestVendorContactSqlSnippets = {
+  primaryVendorContactIdExpr: (requestAlias = 'rr') => `(
+                                           SELECT rrvc.VENDOR_CONTACTS_ID
                                            FROM request_register_vendor_contacts rrvc
-                                           WHERE rrvc.REQUEST_ID = ${requestAlias}.REQUEST_ID
+                                           WHERE rrvc.REQUEST_REGISTER_VENDOR_ID = ${requestAlias}.REQUEST_REGISTER_VENDOR_ID
                                              AND rrvc.INUSE = 1
-                                           ORDER BY rrvc.IS_PRIMARY DESC, rrvc.REQUEST_CONTACT_ID ASC
+                                           ORDER BY rrvc.IS_PRIMARY DESC, rrvc.REQUEST_REGISTER_VENDOR_CONTACTS_ID ASC
                                            LIMIT 1
-                                       )`
+                                       )`,
+}

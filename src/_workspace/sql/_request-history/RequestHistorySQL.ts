@@ -1,119 +1,34 @@
-import { gprCSelectionFields } from '../_request-register/GprCSelectionSqlSnippets'
-import { primaryVendorContactIdExpr } from '../_request-register/RequestVendorContactSqlSnippets'
-import { requestStatusExpr } from '../_request-register/RequestStatusSqlSnippets'
+﻿import { GprCSelectionSqlSnippets } from '../_request-register/GprCSelectionSqlSnippets'
+import { RequestVendorContactSqlSnippets } from '../_request-register/RequestVendorContactSqlSnippets'
+import { RequestApprovalSummarySqlSnippets } from '../_request-register/RequestApprovalSummarySqlSnippets'
+import { RequestStatusSqlSnippets } from '../_request-register/RequestStatusSqlSnippets'
 
-export interface RegisterRequestDataItem {
-  [key: string]: any
-  request_id?: number | string
-  request_number?: string
-  vendor_id?: number | string
-  vendor_contact_id?: number | string
-  Request_By_EmployeeCode?: string
-  supportProduct_Process?: string
-  purchase_frequency?: string
-  request_status?: string
-  requester_remark?: string
-  assign_to?: string
-  PIC_Email?: string
-  CREATE_BY?: string
-  UPDATE_BY?: string
-  file_name?: string
-  file_path?: string
-  file_size?: number | string
-  file_type?: string
-  sqlWhere?: string
-  sqlWhereColumnFilter?: string
-  Order?: string
-  Limit?: number | string
-  Offset?: number | string
-  approve_by?: string
-  approve_date?: string
-  approver_remark?: string
-  step_id?: number | string
-  step_order?: number | string
-  approver_id?: string
-  step_status?: string
-  DESCRIPTION?: string
-  step_code?: string
-  actor_type?: string
-  group_code?: string
-  assignment_mode?: string
-  action_by?: string
-  action_type?: string
-  remark?: string
-  vendor_code?: string
-  selection_id?: number | string
-  business_category?: string
-  start_year?: string
-  authorized_capital?: string
-  establish?: string
-  number_of_employees?: string
-  manufactured_country?: string
-  vendor_original_country?: string
-  sanctions?: string
-  currency?: string
-  suggestion?: string
-  result?: string
-  path?: string
-  vendor_code_selector?: string
-  completion_date?: string
-  gpr_c_approver_name?: string
-  gpr_c_approver_email?: string
-  gpr_c_pc_pic_name?: string
-  gpr_c_pc_pic_email?: string
-  gpr_c_circular_json?: string
-  action_required_json?: string
-  completion_date_null?: string
-  year?: string
-  total_revenue?: number | string
-  net_profit?: number | string
-  no?: string | number
-  criteria?: string
-  uploaded_file?: string
-  uploaded_name?: string
-  path_null?: string
-  name_null?: string
-  vendor_region?: string
-  group_name?: string
-  scope?: string
-  from_empcode?: string
-  to_empcode?: string
-  changed_by?: string
-  reason?: string
-  fft_status?: number | string
-  empcode?: string
-  target_group?: string
-  target_compact?: string
-  group_compact?: string
-  is_oversea?: boolean | number | string
-}
 
 export const RequestHistorySQL = {
-  getById: async (dataItem: RegisterRequestDataItem) => {
+  getById: async (dataItem: any) => {
     let sql = `
                             SELECT
-                                       rr.REQUEST_ID
+                                       rr.REQUEST_REGISTER_VENDOR_ID
                                                                          , rr.REQUEST_NUMBER
-                                     , rr.VENDOR_ID
-                                     , ${requestStatusExpr('rr')} AS REQUEST_STATUS
+                                     , rr.VENDORS_ID
+                                     , ${RequestStatusSqlSnippets.requestStatusExpr('rr')} AS REQUEST_STATUS
                                      , rr.REQUEST_STATE
-                                     , rr.CURRENT_STATUS_ID
-                                     , rr.CURRENT_STEP_ID
+                                     , rr.CURRENT_M_REQUEST_STATUS_ID
+                                     , rr.CURRENT_REQUEST_APPROVAL_STEP_ID
                                      , rr.SUPPORTPRODUCT_PROCESS
                                      , rr.PURCHASE_FREQUENCY
                                      , rr.REQUESTER_REMARK
-                                     , rr.APPROVER_REMARK
-                                     , rr.APPROVE_BY
-                                     , rr.APPROVE_DATE
+                                     , ${RequestApprovalSummarySqlSnippets.latestApprovalRemarkExpr('rr.REQUEST_REGISTER_VENDOR_ID')} AS APPROVER_REMARK
+                                     , ${RequestApprovalSummarySqlSnippets.latestApprovalDateExpr('rr.REQUEST_REGISTER_VENDOR_ID')} AS APPROVE_DATE
                                      , rr.APPROVED_VENDOR_CODE AS VENDOR_CODE
                                      , rr.ASSIGN_TO
                                      , rr.PIC_EMAIL
-                                     , ${primaryVendorContactIdExpr('rr')} AS VENDOR_CONTACT_ID
+                                     , ${RequestVendorContactSqlSnippets.primaryVendorContactIdExpr('rr')} AS VENDOR_CONTACTS_ID
                                      , rr.REQUEST_BY_EMPLOYEECODE AS EMPLOYEE_CODE
                                      , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS FULL_NAME
                                      , m.EMPDEPT AS EMPLOYEE_DEPT
                                      , rr.CREATE_DATE
-                                     ${gprCSelectionFields('rvs', 'rr')}
+                                     ${GprCSelectionSqlSnippets.gprCSelectionFields('rvs', 'rr')}
                                      , rvs.GPR_43_ACCEPTANCE_STATUS
 
                                      -- Vendor Info
@@ -144,7 +59,7 @@ export const RequestHistorySQL = {
                                                            FROM
                                                                       vendor_contacts vc
                                                            WHERE
-                                                                      vc.VENDOR_ID = v.VENDOR_ID AND vc.INUSE = 1
+                                                                      vc.VENDORS_ID = v.VENDORS_ID AND vc.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS contacts
@@ -164,9 +79,9 @@ export const RequestHistorySQL = {
                                                            FROM
                                                                       vendor_products vp
                                                                            LEFT JOIN
-                                                                      master_product_groups mpg ON mpg.PRODUCT_GROUP_ID = vp.PRODUCT_GROUP_ID
+                                                                      master_product_groups mpg ON mpg.MASTER_PRODUCT_GROUPS_ID = vp.MASTER_PRODUCT_GROUPS_ID
                                                            WHERE
-                                                                      vp.VENDOR_ID = v.VENDOR_ID AND vp.INUSE = 1
+                                                                      vp.VENDORS_ID = v.VENDORS_ID AND vp.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS products
@@ -177,7 +92,7 @@ export const RequestHistorySQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                 JSON_OBJECT(
-                                                  'document_id', rrf.REQUEST_FILE_ID,
+                                                  'document_id', rrf.REQUEST_REGISTER_FILE_ID,
                                                   'file_name', rrf.FILE_NAME,
                                                   'file_path', rrf.FILE_PATH,
                                                   'file_size', rrf.FILE_SIZE,
@@ -187,7 +102,7 @@ export const RequestHistorySQL = {
                                                            FROM
                                                                       request_register_file rrf
                                                            WHERE
-                                                                      rrf.REQUEST_ID = rr.REQUEST_ID AND rrf.INUSE = 1
+                                                                      rrf.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND rrf.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS documents
@@ -198,19 +113,19 @@ export const RequestHistorySQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
-                                                                               'step_id', ras.STEP_ID,
-                                                                               'status_id', ras.STATUS_ID,
-                                                                               'step_order', ras.STEP_ORDER,
-                                                                               'approver_id', ras.APPROVER_ID,
-                                                                               'approver_name', (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM Person.MEMBER_FED pm WHERE pm.EMPCODE = ras.APPROVER_ID LIMIT 1),
-                                                                               'step_status', ras.STEP_STATUS,
+                                                                               'REQUEST_APPROVAL_STEP_ID', ras.REQUEST_APPROVAL_STEP_ID,
+                                                                               'M_REQUEST_STATUS_ID', ras.M_REQUEST_STATUS_ID,
+                                                                               'STEP_ORDER', ras.STEP_ORDER,
+                                                                               'APPROVER_EMPCODE', ras.APPROVER_EMPCODE,
+                                                                               'approver_name', (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM person.member_fed pm WHERE pm.EMPCODE = ras.APPROVER_EMPCODE LIMIT 1),
+                                                                               'STEP_STATUS', ras.STEP_STATUS,
                                                                                'DESCRIPTION', ras.DESCRIPTION,
-                                                                               'step_code', ras.STEP_CODE,
-                                                                               'actor_type', ras.ACTOR_TYPE,
-                                                                               'group_code', ras.GROUP_CODE,
-                                                                               'assignment_mode', ras.ASSIGNMENT_MODE,
+                                                                               'STEP_CODE', ras.STEP_CODE,
+                                                                               'ACTOR_TYPE', ras.ACTOR_TYPE,
+                                                                               'GROUP_CODE', ras.GROUP_CODE,
+                                                                               'ASSIGNMENT_MODE', ras.ASSIGNMENT_MODE,
                                                                                'master_status_value', mrs.STATUS_VALUE,
-                                                                               'master_status_label', mrs.STATUS_LABEL,
+                                                                               'master_status_label', mrs.STATUS_VALUE,
                                                                                'CREATE_DATE', ras.CREATE_DATE,
                                                                                'UPDATE_BY', ras.UPDATE_BY,
                                                                                'UPDATE_DATE', ras.UPDATE_DATE
@@ -219,9 +134,9 @@ export const RequestHistorySQL = {
                                                            FROM
                                                                       request_approval_step ras
                                                                            INNER JOIN
-                                                                      m_request_status mrs ON mrs.STATUS_ID = ras.STATUS_ID
+                                                                      m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = ras.M_REQUEST_STATUS_ID
                                                            WHERE
-                                                                      ras.REQUEST_ID = rr.REQUEST_ID AND ras.INUSE = 1
+                                                                      ras.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND ras.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS approval_steps
@@ -232,17 +147,15 @@ export const RequestHistorySQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
-                                                                               'log_id', ral.LOG_ID,
-                                                                               'step_id', ral.STEP_ID,
-                                                                               'action_by', ral.ACTION_BY,
-                                                                               'action_by_name', COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM Person.MEMBER_FED pm WHERE pm.EMPCODE = ral.ACTION_BY LIMIT 1)),
-                                                                               'action_type', ral.ACTION_TYPE,
-                                                                               'remark', ral.REMARK,
-                                                                               'action_date', ral.ACTION_DATE,
+                                                                               'REQUEST_APPROVAL_LOG_ID', ral.REQUEST_APPROVAL_LOG_ID,
+                                                                               'REQUEST_APPROVAL_STEP_ID', ral.REQUEST_APPROVAL_STEP_ID,
+                                                                               'ACTION_BY', ral.ACTION_BY,
+                                                                               'ACTION_BY_NAME', COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM person.member_fed pm WHERE pm.EMPCODE = ral.ACTION_BY LIMIT 1)),
+                                                                               'ACTION_TYPE', ral.ACTION_TYPE,
                                                                                'DESCRIPTION', ral.DESCRIPTION,
+                                                                               'CREATE_DATE', ral.CREATE_DATE,
                                                                                'CREATE_BY', ral.CREATE_BY,
                                                                                'UPDATE_BY', ral.UPDATE_BY,
-                                                                               'CREATE_DATE', ral.CREATE_DATE,
                                                                                'UPDATE_DATE', ral.UPDATE_DATE,
                                                                                'INUSE', ral.INUSE
                                                                            )
@@ -250,7 +163,7 @@ export const RequestHistorySQL = {
                                                            FROM
                                                                       request_approval_log ral
                                                            WHERE
-                                                                      ral.REQUEST_ID = rr.REQUEST_ID
+                                                                      ral.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID
                                                                       AND ral.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
@@ -271,9 +184,9 @@ export const RequestHistorySQL = {
                                                            FROM
                                                                       request_vendor_selections rvs2
                                                                            JOIN
-                                                                      vendor_selection_criteria vsc ON vsc.SELECTION_ID = rvs2.SELECTION_ID
+                                                                      vendor_selection_criteria vsc ON vsc.REQUEST_VENDOR_SELECTIONS_ID = rvs2.REQUEST_VENDOR_SELECTIONS_ID
                                                            WHERE
-                                                                      rvs2.REQUEST_ID = rr.REQUEST_ID
+                                                                      rvs2.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID
                                                                       AND rvs2.INUSE = 1
                                                                       AND vsc.INUSE = 1
                                                 ),
@@ -283,34 +196,34 @@ export const RequestHistorySQL = {
                             FROM
                                        request_register_vendor rr
                                             LEFT JOIN
-                                       request_vendor_selections rvs ON rvs.REQUEST_ID = rr.REQUEST_ID AND rvs.INUSE = 1
+                                       request_vendor_selections rvs ON rvs.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND rvs.INUSE = 1
                                             LEFT JOIN
-                                       vendors v ON v.VENDOR_ID = rr.VENDOR_ID
+                                       vendors v ON v.VENDORS_ID = rr.VENDORS_ID
                                             LEFT JOIN
-                                       master_vendor_types vt ON vt.VENDOR_TYPE_ID = v.VENDOR_TYPE_ID
+                                       master_vendor_types vt ON vt.MASTER_VENDOR_TYPES_ID = v.MASTER_VENDOR_TYPES_ID
                                             LEFT JOIN
-                                       Person.MEMBER_FED m ON m.EMPCODE = rr.REQUEST_BY_EMPLOYEECODE
+                                       person.member_fed m ON m.EMPCODE = rr.REQUEST_BY_EMPLOYEECODE
                             WHERE
-                                       rr.REQUEST_ID = dataItem.REQUEST_ID
+                                       rr.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
                                        AND rr.INUSE = 1
                             LIMIT
                                        1
         `
 
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
 
     return sql
   },
 
-  getApprovalSteps: async (dataItem: RegisterRequestDataItem) => {
+  getApprovalSteps: async (dataItem: any) => {
     let sql = `
                             SELECT 
-                                       ras.STEP_ID
-                                     , ras.REQUEST_ID
-                                     , ras.WORKFLOW_STEP_ID
-                                     , ras.STATUS_ID
+                                       ras.REQUEST_APPROVAL_STEP_ID
+                                     , ras.REQUEST_REGISTER_VENDOR_ID
+                                     , ras.WORKFLOW_STEP_MASTER_ID
+                                     , ras.M_REQUEST_STATUS_ID
                                      , ras.STEP_ORDER
-                                     , ras.APPROVER_ID
+                                     , ras.APPROVER_EMPCODE
                                      , ras.STEP_STATUS
                                      , ras.DESCRIPTION
                                      , ras.STEP_CODE
@@ -323,36 +236,36 @@ export const RequestHistorySQL = {
                                      , ras.UPDATE_DATE
                                      , ras.INUSE
                                      , mrs.STATUS_VALUE AS master_status_value
-                                     , mrs.STATUS_LABEL AS master_status_label
+                                     , mrs.STATUS_VALUE AS master_status_label
                                      , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS approver_name
                             FROM
                                        request_approval_step ras
                                             INNER JOIN
-                                       m_request_status mrs ON mrs.STATUS_ID = ras.STATUS_ID
+                                       m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = ras.M_REQUEST_STATUS_ID
                                             LEFT JOIN
-                                       Person.MEMBER_FED m ON m.EMPCODE = ras.APPROVER_ID
+                                       person.member_fed m ON m.EMPCODE = ras.APPROVER_EMPCODE
                             WHERE
-                                       ras.REQUEST_ID = dataItem.REQUEST_ID
+                                       ras.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
                                        AND ras.INUSE = 1
                             ORDER BY
                                        ras.STEP_ORDER ASC
         `
 
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
 
     return sql
   },
 
-  getApprovalLogs: async (dataItem: RegisterRequestDataItem) => {
+  getApprovalLogs: async (dataItem: any) => {
     let sql = `
                             SELECT 
-                                       ral.LOG_ID
-                                     , ral.REQUEST_ID
-                                     , ral.STEP_ID
+                                       ral.REQUEST_APPROVAL_LOG_ID
+                                     , ral.REQUEST_REGISTER_VENDOR_ID
+                                     , ral.REQUEST_APPROVAL_STEP_ID
                                      , ral.ACTION_BY
                                      , ral.ACTION_TYPE
-                                     , ral.REMARK
-                                     , ral.ACTION_DATE
+                                     , ral.DESCRIPTION
+                                     , ral.CREATE_DATE
                                      , ral.DESCRIPTION
                                      , ral.CREATE_BY
                                      , ral.UPDATE_BY
@@ -363,31 +276,32 @@ export const RequestHistorySQL = {
                             FROM
                                        request_approval_log ral
                                             LEFT JOIN
-                                       Person.MEMBER_FED m ON m.EMPCODE = ral.ACTION_BY
+                                       person.member_fed m ON m.EMPCODE = ral.ACTION_BY
                             WHERE
-                                       ral.REQUEST_ID = dataItem.REQUEST_ID
+                                       ral.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
                                        AND ral.INUSE = 1
                             ORDER BY
-                                       ral.ACTION_DATE ASC
+                                       ral.CREATE_DATE ASC
         `
 
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
 
     return sql
   },
 
-  getSelection: (dataItem: RegisterRequestDataItem) => {
+  getSelection: (dataItem: any) => {
     let sql = `
                             SELECT * FROM
                                        request_vendor_selections
                             WHERE
-                                       REQUEST_ID = 'dataItem.REQUEST_ID' AND INUSE = 1
+                                       REQUEST_REGISTER_VENDOR_ID = 'dataItem.REQUEST_REGISTER_VENDOR_ID' AND INUSE = 1
                             ORDER BY
-                                       SELECTION_ID DESC
+                                       REQUEST_VENDOR_SELECTIONS_ID DESC
                             LIMIT
                                        1
         `
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
     return sql
   },
 }
+

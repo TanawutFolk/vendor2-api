@@ -1,7 +1,7 @@
 export const ExchangeRateSQL = {
   getLatestExchangeRate: async (dataItem: any) => {
     let sql = `     SELECT
-                          tb_1.CURRENCY_ID
+                          tb_1.INFO_CURRENCY_ID
                         , tb_1.CURRENCY_SYMBOL
                         , tb_1.CURRENCY_NAME
                         , tb_2.EXCHANGE_RATE_ID
@@ -13,7 +13,7 @@ export const ExchangeRateSQL = {
                     JOIN
                         EXCHANGE_RATE tb_2
                     ON
-                        tb_1.CURRENCY_ID = tb_2.CURRENCY_ID
+                        tb_1.INFO_CURRENCY_ID = tb_2.INFO_CURRENCY_ID
                     WHERE
                             tb_2.INUSE = 1
                         AND tb_2.FISCAL_YEAR = 'dataItem.FISCAL_YEAR'

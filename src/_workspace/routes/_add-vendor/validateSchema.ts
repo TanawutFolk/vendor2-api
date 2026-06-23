@@ -35,7 +35,7 @@ const ContactSchema = z.object({
 // Product Schema
 const ProductSchema = z.object({
   product_group_id: z.number().min(1, 'Product Group is required').optional(),
-  PRODUCT_GROUP_ID: z.number().min(1, 'Product Group is required').optional(),
+  MASTER_PRODUCT_GROUPS_ID: z.number().min(1, 'Product Group is required').optional(),
   maker_name: nonEmptyString('Maker Name').optional(),
   MAKER_NAME: nonEmptyString('Maker Name').optional(),
   product_name: nonEmptyString('Product Name').optional(),
@@ -53,7 +53,7 @@ export const CreateVendorSchema = z.object({
   postal_code: nonEmptyString('Postal Code').optional(),
   POSTAL_CODE: nonEmptyString('Postal Code').optional(),
   vendor_type_id: z.number().min(1, 'Vendor Type is required').optional(),
-  VENDOR_TYPE_ID: z.number().min(1, 'Vendor Type is required').optional(),
+  MASTER_VENDOR_TYPES_ID: z.number().min(1, 'Vendor Type is required').optional(),
 
   vendor_region: optionalString(),
   VENDOR_REGION: optionalString(),

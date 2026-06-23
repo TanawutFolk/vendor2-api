@@ -13,7 +13,7 @@ export const AccRegisterController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -24,7 +24,7 @@ export const AccRegisterController = {
         } as ResponseI)
       }
       const result = await AccRegisterModel.completeRegistration({
-        REQUEST_ID: request_id,
+        REQUEST_REGISTER_VENDOR_ID: request_id,
         VENDOR_CODE: dataItem.VENDOR_CODE || '',
         UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
       })

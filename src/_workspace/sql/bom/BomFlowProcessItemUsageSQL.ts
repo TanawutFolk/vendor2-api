@@ -176,7 +176,7 @@ export const BomFlowProcessItemUsageSQL = {
                                         ON tb_13.EXCHANGE_RATE_ID  = tb_15.EXCHANGE_RATE_ID
                                         LEFT JOIN
                         CURRENCY tb_16
-                                        ON tb_15.CURRENCY_ID  = tb_16.CURRENCY_ID
+                                        ON tb_15.INFO_CURRENCY_ID  = tb_16.INFO_CURRENCY_ID
                                 LEFT JOIN
                         ITEM_CATEGORY tb_17
                                     ON tb_11.ITEM_CATEGORY_ID = tb_17.ITEM_CATEGORY_ID

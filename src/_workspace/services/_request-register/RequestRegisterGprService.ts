@@ -130,13 +130,13 @@ const buildNormalizedGprSetupSql = async (
     .slice(0, 6)
   const actionRequired = parseStoredObject(actionRequiredRaw)
   const sqlList = [
-    RequestRegisterPageSQL.deleteGprCircularMembers({ SELECTION_ID: selectionId }),
-    RequestRegisterPageSQL.deleteGprActionSetup({ SELECTION_ID: selectionId }),
+    RequestRegisterPageSQL.deleteGprCircularMembers({ REQUEST_VENDOR_SELECTIONS_ID: selectionId }),
+    RequestRegisterPageSQL.deleteGprActionSetup({ REQUEST_VENDOR_SELECTIONS_ID: selectionId }),
   ]
 
   circularMembers.forEach((member, index) => {
     sqlList.push(RequestRegisterPageSQL.insertGprCircularMember({
-      SELECTION_ID: selectionId,
+      REQUEST_VENDOR_SELECTIONS_ID: selectionId,
       MEMBER_ORDER: index + 1,
       EMPCODE: member.empcode,
       MEMBER_NAME: member.name,
@@ -149,7 +149,7 @@ const buildNormalizedGprSetupSql = async (
   GPR_ACTION_SETUP_STAGES.forEach((stageCode) => {
     const stage = parseStoredObject(actionRequired[stageCode])
     sqlList.push(RequestRegisterPageSQL.insertGprActionSetup({
-      SELECTION_ID: selectionId,
+      REQUEST_VENDOR_SELECTIONS_ID: selectionId,
       STAGE_CODE: stageCode,
       PIC_NAME: stage.pic_name,
       PIC_EMAIL: stage.pic_email,
@@ -185,7 +185,7 @@ export const RequestRegisterGprService = {
 
   saveGprForm: async (dataItem: any) => {
     try {
-      const reqId = dataItem.REQUEST_ID
+      const reqId = dataItem.REQUEST_REGISTER_VENDOR_ID
       if (!reqId) throw new Error('Missing request_id')
 
       const rawFormData = typeof dataItem.GPR_DATA === 'string' ? JSON.parse(dataItem.GPR_DATA) : dataItem.GPR_DATA || {}
@@ -197,7 +197,7 @@ export const RequestRegisterGprService = {
       }
 
       const formData: any = {
-        REQUEST_ID: reqId,
+        REQUEST_REGISTER_VENDOR_ID: reqId,
         BUSINESS_CATEGORY: rawFormData.business_category || '',
         START_YEAR: rawFormData.start_year || '',
         AUTHORIZED_CAPITAL: rawFormData.authorized_capital || '',
@@ -220,22 +220,22 @@ export const RequestRegisterGprService = {
       const sqlList = []
       const checkSql = await RequestRegisterPageSQL.checkSelectionExists(formData)
       const checkRes = (await MySQLExecute.search(checkSql)) as any[]
-      let selection_id = getValue(checkRes[0], 'selection_id', 'SELECTION_ID')
+      let selection_id = getValue(checkRes[0], 'selection_id', 'REQUEST_VENDOR_SELECTIONS_ID')
 
       if (selection_id) {
-        formData.SELECTION_ID = selection_id
+        formData.REQUEST_VENDOR_SELECTIONS_ID = selection_id
         sqlList.push(await RequestRegisterPageSQL.updateSelection(formData))
       } else {
         const insertSql = await RequestRegisterPageSQL.insertSelection(formData)
         const res = (await MySQLExecute.execute(insertSql)) as any
         selection_id = res.insertId
-        formData.SELECTION_ID = selection_id
+        formData.REQUEST_VENDOR_SELECTIONS_ID = selection_id
       }
 
       if (!selection_id) throw new Error('Failed to create/identify GPR selection record')
 
-      sqlList.push(await RequestRegisterPageSQL.deleteFinancials({ SELECTION_ID: selection_id }))
-      sqlList.push(await RequestRegisterPageSQL.deleteCriteria({ SELECTION_ID: selection_id }))
+      sqlList.push(await RequestRegisterPageSQL.deleteFinancials({ REQUEST_VENDOR_SELECTIONS_ID: selection_id }))
+      sqlList.push(await RequestRegisterPageSQL.deleteCriteria({ REQUEST_VENDOR_SELECTIONS_ID: selection_id }))
       sqlList.push(...await buildNormalizedGprSetupSql(
         Number(selection_id),
         circularList,
@@ -250,7 +250,7 @@ export const RequestRegisterGprService = {
           if (!hasFinancialValue) continue
 
           sqlList.push(await RequestRegisterPageSQL.insertFinancial({
-            SELECTION_ID: selection_id,
+            REQUEST_VENDOR_SELECTIONS_ID: selection_id,
             YEAR: sp.year || '',
             TOTAL_REVENUE: sp.total_revenue || '',
             NET_PROFIT: sp.net_profit || '',
@@ -262,7 +262,7 @@ export const RequestRegisterGprService = {
       if (rawFormData.criteria) {
         for (const cr of rawFormData.criteria) {
           sqlList.push(await RequestRegisterPageSQL.insertCriteria({
-            SELECTION_ID: selection_id,
+            REQUEST_VENDOR_SELECTIONS_ID: selection_id,
             NO: cr.no || '',
             CRITERIA: cr.criteria || '',
             REMARK: cr.remark || '',
@@ -295,14 +295,14 @@ export const RequestRegisterGprService = {
 
   saveGprCNotification: async (dataItem: any) => {
     try {
-      const reqId = Number(dataItem.REQUEST_ID)
+      const reqId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID)
       if (!reqId || Number.isNaN(reqId)) throw new Error('Missing request_id')
 
       const creator = String(dataItem.CREATE_BY || dataItem.UPDATE_BY || '').trim() || 'SYSTEM'
       const updater = String(dataItem.UPDATE_BY || '').trim() || 'SYSTEM'
       const gprCData = typeof dataItem.GPR_C_DATA === 'string' ? JSON.parse(dataItem.GPR_C_DATA) : dataItem.GPR_C_DATA || {}
 
-      const requesterSql = await RequestRegisterPageSQL.getRequesterByRequestId({ REQUEST_ID: reqId })
+      const requesterSql = await RequestRegisterPageSQL.getRequesterByRequestId({ REQUEST_REGISTER_VENDOR_ID: reqId })
       const requesterRes = (await MySQLExecute.search(requesterSql)) as any[]
       const requesterCode = String(getValue(requesterRes[0], 'Request_By_EmployeeCode', 'REQUEST_BY_EMPLOYEECODE')).trim()
 
@@ -314,7 +314,7 @@ export const RequestRegisterGprService = {
         throw new Error('Only requester can update GPR C notification setup')
       }
 
-      const existingSelectionSql = RequestRegisterPageSQL.getSelection({ REQUEST_ID: reqId })
+      const existingSelectionSql = RequestRegisterPageSQL.getSelection({ REQUEST_REGISTER_VENDOR_ID: reqId })
       const existingSelectionRows = (await MySQLExecute.search(existingSelectionSql)) as any[]
       const existingSelection = existingSelectionRows[0] || null
 
@@ -333,9 +333,9 @@ export const RequestRegisterGprService = {
         if (member) circularMembers.push(member)
       }
 
-      const selectionIdForSetup = getValue(existingSelection, 'selection_id', 'SELECTION_ID')
+      const selectionIdForSetup = getValue(existingSelection, 'selection_id', 'REQUEST_VENDOR_SELECTIONS_ID')
       const existingActionSetupRows = selectionIdForSetup
-        ? await MySQLExecute.search(RequestRegisterPageSQL.getGprActionSetup({ SELECTION_ID: selectionIdForSetup })) as any[]
+        ? await MySQLExecute.search(RequestRegisterPageSQL.getGprActionSetup({ REQUEST_VENDOR_SELECTIONS_ID: selectionIdForSetup })) as any[]
         : []
       const existingActionRequiredSetup = actionSetupRowsToPayload(existingActionSetupRows)
       const incomingActionRequiredSetup = parseStoredObject(gprCData.action_required_setup)
@@ -350,15 +350,15 @@ export const RequestRegisterGprService = {
       })
 
       const formData: any = {
-        REQUEST_ID: reqId,
+        REQUEST_REGISTER_VENDOR_ID: reqId,
         CREATE_BY: creator,
         UPDATE_BY: updater,
       }
 
-      let selection_id = getValue(existingSelection, 'selection_id', 'SELECTION_ID')
+      let selection_id = getValue(existingSelection, 'selection_id', 'REQUEST_VENDOR_SELECTIONS_ID')
 
       if (selection_id) {
-        formData.SELECTION_ID = selection_id
+        formData.REQUEST_VENDOR_SELECTIONS_ID = selection_id
         const updateSql = await RequestRegisterPageSQL.updateSelectionGprCOnly(formData)
         await MySQLExecute.execute(updateSql)
       } else {
@@ -395,7 +395,7 @@ export const RequestRegisterGprService = {
       await MySQLExecute.executeList(normalizedSetupSql)
 
       const flowResult = await GprCApprovalService.submitSetup({
-        REQUEST_ID: reqId,
+        REQUEST_REGISTER_VENDOR_ID: reqId,
         GPR_C_DATA: gprCData,
         UPDATE_BY: updater,
       })
@@ -423,23 +423,23 @@ export const RequestRegisterGprService = {
   },
 
   getGprForm: async (dataItem: any) => {
-    const requestId = Number(typeof dataItem === 'number' ? dataItem : dataItem?.REQUEST_ID)
+    const requestId = Number(typeof dataItem === 'number' ? dataItem : dataItem?.REQUEST_REGISTER_VENDOR_ID)
 
     if (!requestId || Number.isNaN(requestId)) {
       return null
     }
 
-    const selectionSql = await RequestRegisterPageSQL.getSelection({ REQUEST_ID: requestId })
+    const selectionSql = await RequestRegisterPageSQL.getSelection({ REQUEST_REGISTER_VENDOR_ID: requestId })
     const selRes = (await MySQLExecute.search(selectionSql)) as any[]
     if (!selRes[0]) return null
 
-    const selection_id = getValue(selRes[0], 'selection_id', 'SELECTION_ID')
-    const finSql = await RequestRegisterPageSQL.getFinancials({ SELECTION_ID: selection_id })
-    const critSql = await RequestRegisterPageSQL.getCriteria({ SELECTION_ID: selection_id })
+    const selection_id = getValue(selRes[0], 'selection_id', 'REQUEST_VENDOR_SELECTIONS_ID')
+    const finSql = await RequestRegisterPageSQL.getFinancials({ REQUEST_VENDOR_SELECTIONS_ID: selection_id })
+    const critSql = await RequestRegisterPageSQL.getCriteria({ REQUEST_VENDOR_SELECTIONS_ID: selection_id })
 
-    const circularSql = RequestRegisterPageSQL.getGprCircularMembers({ SELECTION_ID: selection_id })
-    const actionSetupSql = RequestRegisterPageSQL.getGprActionSetup({ SELECTION_ID: selection_id })
-    const flowSetupSql = RequestRegisterPageSQL.getGprFlowSetup({ REQUEST_ID: requestId })
+    const circularSql = RequestRegisterPageSQL.getGprCircularMembers({ REQUEST_VENDOR_SELECTIONS_ID: selection_id })
+    const actionSetupSql = RequestRegisterPageSQL.getGprActionSetup({ REQUEST_VENDOR_SELECTIONS_ID: selection_id })
+    const flowSetupSql = RequestRegisterPageSQL.getGprFlowSetup({ REQUEST_REGISTER_VENDOR_ID: requestId })
     const [finRes, critRes, circularRows, actionSetupRows, flowSetupRows] = await Promise.all([
       MySQLExecute.search(finSql) as Promise<any[]>,
       MySQLExecute.search(critSql) as Promise<any[]>,

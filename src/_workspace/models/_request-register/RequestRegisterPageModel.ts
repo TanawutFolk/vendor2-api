@@ -5,6 +5,8 @@ export const RequestRegisterPageModel = {
   getBusinessCategories: async (dataItem: any = {}) => RequestRegisterPageService.getBusinessCategories(dataItem),
   getCurrencies: async (dataItem: any = {}) => RequestRegisterPageService.getCurrencies(dataItem),
   createDocument: async (dataItem: any) => RequestRegisterPageService.createDocument(dataItem),
+  getCriteriaFileForDelete: async (dataItem: any) => RequestRegisterPageService.getCriteriaFileForDelete(dataItem),
+  clearCriteriaUploadedFile: async (dataItem: any) => RequestRegisterPageService.clearCriteriaUploadedFile(dataItem),
   updateRequest: async (dataItem: any) => RequestRegisterPageService.updateRequest(dataItem),
   sendAgreementEmail: async (dataItem: any) => RequestRegisterPageService.sendAgreementEmail(dataItem),
   createApprovalStep: async (dataItem: any) => RequestRegisterPageService.createApprovalStep(dataItem),

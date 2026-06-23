@@ -106,7 +106,7 @@ export const StandardPriceController = {
   //               JOIN
   //                   CURRENCY tb_6
   //               ON
-  //                   tb_2.PURCHASE_PRICE_CURRENCY_ID = tb_6.CURRENCY_ID
+  //                   tb_2.PURCHASE_PRICE_CURRENCY_ID = tb_6.INFO_CURRENCY_ID
   //               LEFT JOIN
   //                   IMPORT_FEE tb_5
   //               ON
@@ -116,7 +116,7 @@ export const StandardPriceController = {
   //                   ON tb_3.ITEM_ID = tb_7.ITEM_ID
   //                                       LEFT JOIN
   //                   vendor tb_8
-  //                   ON tb_3.VENDOR_ID = tb_8.VENDOR_ID
+  //                   ON tb_3.VENDORS_ID = tb_8.VENDORS_ID
   //                   LEFT JOIN item_import_type tb_9
   //                   ON tb_8.ITEM_IMPORT_TYPE_ID = tb_9.ITEM_IMPORT_TYPE_ID
   //              INNER JOIN
@@ -647,7 +647,7 @@ export const StandardPriceController = {
       currencies.map((currency) => ({
         CURRENCY_SYMBOL: currency.CURRENCY_SYMBOL,
         CURRENCY_NAME: currency.CURRENCY_NAME,
-        CURRENCY_ID: currency.CURRENCY_ID,
+        INFO_CURRENCY_ID: currency.INFO_CURRENCY_ID,
       }))
     )
 

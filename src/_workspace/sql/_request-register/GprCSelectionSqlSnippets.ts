@@ -1,42 +1,43 @@
-export const gprCSelectionFields = (selectionAlias = 'rvs', requestAlias = 'rr') => `
+export const GprCSelectionSqlSnippets = {
+  gprCSelectionFields: (selectionAlias = 'rvs', requestAlias = 'rr') => `
                                      , COALESCE((
                                            SELECT f.GPR_C_APPROVER_NAME
                                            FROM request_vendor_gpr_c_flows f
-                                           WHERE f.REQUEST_ID = ${requestAlias}.REQUEST_ID
+                                           WHERE f.REQUEST_REGISTER_VENDOR_ID = ${requestAlias}.REQUEST_REGISTER_VENDOR_ID
                                              AND f.INUSE = 1
-                                           ORDER BY f.GPR_C_FLOW_ID DESC
+                                           ORDER BY f.REQUEST_VENDOR_GPR_C_FLOWS_ID DESC
                                            LIMIT 1
                                        ), '') AS GPR_C_APPROVER_NAME
                                      , COALESCE((
                                            SELECT f.GPR_C_APPROVER_EMAIL
                                            FROM request_vendor_gpr_c_flows f
-                                           WHERE f.REQUEST_ID = ${requestAlias}.REQUEST_ID
+                                           WHERE f.REQUEST_REGISTER_VENDOR_ID = ${requestAlias}.REQUEST_REGISTER_VENDOR_ID
                                              AND f.INUSE = 1
-                                           ORDER BY f.GPR_C_FLOW_ID DESC
+                                           ORDER BY f.REQUEST_VENDOR_GPR_C_FLOWS_ID DESC
                                            LIMIT 1
                                        ), '') AS GPR_C_APPROVER_EMAIL
                                      , COALESCE((
                                            SELECT f.GPR_C_APPROVER_EMPCODE
                                            FROM request_vendor_gpr_c_flows f
-                                           WHERE f.REQUEST_ID = ${requestAlias}.REQUEST_ID
+                                           WHERE f.REQUEST_REGISTER_VENDOR_ID = ${requestAlias}.REQUEST_REGISTER_VENDOR_ID
                                              AND f.INUSE = 1
-                                           ORDER BY f.GPR_C_FLOW_ID DESC
+                                           ORDER BY f.REQUEST_VENDOR_GPR_C_FLOWS_ID DESC
                                            LIMIT 1
                                        ), '') AS GPR_C_APPROVER_EMPCODE
                                      , COALESCE((
                                            SELECT f.PC_PIC_NAME
                                            FROM request_vendor_gpr_c_flows f
-                                           WHERE f.REQUEST_ID = ${requestAlias}.REQUEST_ID
+                                           WHERE f.REQUEST_REGISTER_VENDOR_ID = ${requestAlias}.REQUEST_REGISTER_VENDOR_ID
                                              AND f.INUSE = 1
-                                           ORDER BY f.GPR_C_FLOW_ID DESC
+                                           ORDER BY f.REQUEST_VENDOR_GPR_C_FLOWS_ID DESC
                                            LIMIT 1
                                        ), '') AS GPR_C_PC_PIC_NAME
                                      , COALESCE((
                                            SELECT f.PC_PIC_EMAIL
                                            FROM request_vendor_gpr_c_flows f
-                                           WHERE f.REQUEST_ID = ${requestAlias}.REQUEST_ID
+                                           WHERE f.REQUEST_REGISTER_VENDOR_ID = ${requestAlias}.REQUEST_REGISTER_VENDOR_ID
                                              AND f.INUSE = 1
-                                           ORDER BY f.GPR_C_FLOW_ID DESC
+                                           ORDER BY f.REQUEST_VENDOR_GPR_C_FLOWS_ID DESC
                                            LIMIT 1
                                        ), '') AS GPR_C_PC_PIC_EMAIL
                                      , '' AS GPR_C_PC_PIC_EMPCODE
@@ -51,7 +52,7 @@ export const gprCSelectionFields = (selectionAlias = 'rvs', requestAlias = 'rr')
                                            FROM (
                                                SELECT EMPCODE, MEMBER_NAME, EMAIL
                                                FROM request_vendor_gpr_c_circular_members
-                                               WHERE SELECTION_ID = ${selectionAlias}.SELECTION_ID
+                                               WHERE REQUEST_VENDOR_SELECTIONS_ID = ${selectionAlias}.REQUEST_VENDOR_SELECTIONS_ID
                                                  AND INUSE = 1
                                                ORDER BY MEMBER_ORDER ASC
                                            ) cm
@@ -77,9 +78,9 @@ export const gprCSelectionFields = (selectionAlias = 'rvs', requestAlias = 'rr')
                                                        'gpr_c_approver_empcode', COALESCE((
                                                            SELECT f.GPR_C_APPROVER_EMPCODE
                                                            FROM request_vendor_gpr_c_flows f
-                                                           WHERE f.REQUEST_ID = ${requestAlias}.REQUEST_ID
+                                                           WHERE f.REQUEST_REGISTER_VENDOR_ID = ${requestAlias}.REQUEST_REGISTER_VENDOR_ID
                                                              AND f.INUSE = 1
-                                                           ORDER BY f.GPR_C_FLOW_ID DESC
+                                                           ORDER BY f.REQUEST_VENDOR_GPR_C_FLOWS_ID DESC
                                                            LIMIT 1
                                                        ), ''),
                                                        'gpr_c_pc_pic_empcode', ''
@@ -87,7 +88,8 @@ export const gprCSelectionFields = (selectionAlias = 'rvs', requestAlias = 'rr')
                                                )
                                            )
                                            FROM request_vendor_gpr_c_action_setup aset
-                                           WHERE aset.SELECTION_ID = ${selectionAlias}.SELECTION_ID
+                                           WHERE aset.REQUEST_VENDOR_SELECTIONS_ID = ${selectionAlias}.REQUEST_VENDOR_SELECTIONS_ID
                                              AND aset.INUSE = 1
                                        ), JSON_OBJECT('_meta', JSON_OBJECT('gpr_c_approver_empcode', '', 'gpr_c_pc_pic_empcode', ''))) AS ACTION_REQUIRED_JSON
-`
+`,
+}

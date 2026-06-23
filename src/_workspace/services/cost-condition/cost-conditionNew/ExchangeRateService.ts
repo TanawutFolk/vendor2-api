@@ -26,7 +26,7 @@ export const ExchangeRateService = {
   create: async (dataItem: {
     FISCAL_YEAR: number
     CREATE_BY: string
-    CURRENCY_DATA: { CURRENCY_ID: number; CURRENCY_IMAGE: string; CURRENCY_NAME: string; CURRENCY_SYMBOL: string; CURRENCY_VALUE: string; THB_IMAGE: string }[]
+    CURRENCY_DATA: { INFO_CURRENCY_ID: number; CURRENCY_IMAGE: string; CURRENCY_NAME: string; CURRENCY_SYMBOL: string; CURRENCY_VALUE: string; THB_IMAGE: string }[]
   }) => {
     const sqlList = []
 
@@ -52,7 +52,7 @@ export const ExchangeRateService = {
     sqlList.push(
       await ExchangeRateSQL.create(
         {
-          CURRENCY_ID: 7,
+          INFO_CURRENCY_ID: 7,
           CURRENCY_VALUE: 1,
         },
         {
@@ -96,7 +96,7 @@ export const ExchangeRateService = {
       IS_CURRENT: number
       ITEM_M_S_PRICE_CREATE_FROM_SETTING_ID: number
 
-      CURRENCY_ID: number
+      INFO_CURRENCY_ID: number
       ITEM_CODE_FOR_SUPPORT_MES: string
       PURCHASE_PRICE: number
       ITEM_ID: number
@@ -115,7 +115,7 @@ export const ExchangeRateService = {
         })
       )
 
-      const exchangeRate = dataItem.CURRENCY_DATA.find((item) => item.CURRENCY_ID === itemMSPrice.CURRENCY_ID)
+      const exchangeRate = dataItem.CURRENCY_DATA.find((item) => item.INFO_CURRENCY_ID === itemMSPrice.INFO_CURRENCY_ID)
 
       if (!exchangeRate) {
         throw new Error('Exchange Rate Not Found')
@@ -147,7 +147,7 @@ export const ExchangeRateService = {
           SCT_PATTERN_ID: itemMSPrice.SCT_PATTERN_ID,
           ITEM_M_S_PRICE_CREATE_FROM_SETTING_ID: 3,
 
-          CURRENCY_ID: exchangeRate.CURRENCY_ID,
+          INFO_CURRENCY_ID: exchangeRate.INFO_CURRENCY_ID,
           PURCHASE_UNIT_RATIO: itemMSPrice.PURCHASE_UNIT_RATIO,
           PURCHASE_UNIT_ID: itemMSPrice.PURCHASE_UNIT_ID,
           USAGE_UNIT_RATIO: itemMSPrice.USAGE_UNIT_RATIO,

@@ -181,7 +181,7 @@ export const SctBomFlowProcessItemUsagePriceSQL = {
                              ON tb_3.EXCHANGE_RATE_ID = tb_7.EXCHANGE_RATE_ID
                              INNER JOIN
                         CURRENCY tb_8
-                             ON tb_7.CURRENCY_ID = tb_8.CURRENCY_ID
+                             ON tb_7.INFO_CURRENCY_ID = tb_8.INFO_CURRENCY_ID
                              LEFT JOIN
                         dataItem.STANDARD_COST_DB.SCT_BOM_FLOW_PROCESS_ITEM_USAGE_PRICE_ADJUST tb_2
                               ON tb_1.BOM_FLOW_PROCESS_ITEM_USAGE_ID = tb_2.BOM_FLOW_PROCESS_ITEM_USAGE_ID

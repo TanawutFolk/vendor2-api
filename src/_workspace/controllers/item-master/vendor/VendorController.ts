@@ -52,7 +52,7 @@ export const VendorController = {
     }
 
     const tableIds = [
-      { table: 'tb_1', id: 'VENDOR_ID', Fns: '=' },
+      { table: 'tb_1', id: 'VENDORS_ID', Fns: '=' },
       { table: 'tb_1', id: 'VENDOR_NAME', Fns: 'LIKE' },
       { table: 'tb_1', id: 'VENDOR_ALPHABET', Fns: 'LIKE' },
       { table: 'tb_2', id: 'ITEM_IMPORT_TYPE_NAME', Fns: 'LIKE' },

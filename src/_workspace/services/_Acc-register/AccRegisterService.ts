@@ -5,7 +5,7 @@ import { triggerCompletionEmail } from '../_request-register/RegisterRequestNoti
 
 const normalizeApprovalStep = (step: any) => ({
   ...step,
-  step_id: Number(step?.step_id || step?.STEP_ID || 0),
+  step_id: Number(step?.step_id || step?.REQUEST_APPROVAL_STEP_ID || 0),
   step_status: String(step?.step_status || step?.STEP_STATUS || ''),
 })
 
@@ -20,15 +20,15 @@ export const AccRegisterService = {
       if (currentStep) {
         sqlList.push(
           await AccRegisterSQL.updateApprovalStep({
-            STEP_ID: currentStep.step_id,
+            REQUEST_APPROVAL_STEP_ID: currentStep.step_id,
             STEP_STATUS: 'approved',
             UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
           })
         )
         sqlList.push(
           await AccRegisterSQL.createApprovalLog({
-            REQUEST_ID: dataItem.REQUEST_ID,
-            STEP_ID: currentStep.step_id,
+            REQUEST_REGISTER_VENDOR_ID: dataItem.REQUEST_REGISTER_VENDOR_ID,
+            REQUEST_APPROVAL_STEP_ID: currentStep.step_id,
             ACTION_BY: dataItem.UPDATE_BY || 'SYSTEM',
             ACTION_TYPE: 'approved',
             REMARK: dataItem.VENDOR_CODE ? `Vendor Code: ${dataItem.VENDOR_CODE}` : 'Registration completed',

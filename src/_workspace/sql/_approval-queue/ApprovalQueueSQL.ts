@@ -1,113 +1,22 @@
-import type { AuditFields } from '../../types/AuditFields'
-import { gprCSelectionFields } from '../_request-register/GprCSelectionSqlSnippets'
-import { primaryVendorContactIdExpr } from '../_request-register/RequestVendorContactSqlSnippets'
-import { requestStatusExpr, requestStatusIdByValueExpr } from '../_request-register/RequestStatusSqlSnippets'
+import { GprCSelectionSqlSnippets } from '../_request-register/GprCSelectionSqlSnippets'
+import { RequestVendorContactSqlSnippets } from '../_request-register/RequestVendorContactSqlSnippets'
+import { RequestApprovalSummarySqlSnippets } from '../_request-register/RequestApprovalSummarySqlSnippets'
+import { RequestStatusSqlSnippets } from '../_request-register/RequestStatusSqlSnippets'
 
-export interface RegisterRequestDataItem extends Partial<AuditFields> {
-  [key: string]: any
-  request_id?: number | string
-  request_number?: string
-  vendor_id?: number | string
-  vendor_contact_id?: number | string
-  Request_By_EmployeeCode?: string
-  supportProduct_Process?: string
-  purchase_frequency?: string
-  request_status?: string
-  requester_remark?: string
-  assign_to?: string
-  PIC_Email?: string
-  CREATE_BY?: string
-  UPDATE_BY?: string
-  file_name?: string
-  file_path?: string
-  file_size?: number | string
-  file_type?: string
-  sqlWhere?: string
-  sqlWhereColumnFilter?: string
-  Order?: string
-  Limit?: number | string
-  Offset?: number | string
-  approve_by?: string
-  approve_date?: string
-  approver_remark?: string
-  step_id?: number | string
-  workflow_step_id?: number | string
-  step_order?: number | string
-  approver_id?: string
-  step_status?: string
-  DESCRIPTION?: string
-  step_code?: string
-  actor_type?: string
-  group_code?: string
-  assignment_mode?: string
-  action_by?: string
-  action_type?: string
-  remark?: string
-  vendor_code?: string
-  selection_id?: number | string
-  business_category?: string
-  start_year?: string
-  authorized_capital?: string
-  establish?: string
-  number_of_employees?: string
-  manufactured_country?: string
-  vendor_original_country?: string
-  sanctions?: string
-  currency?: string
-  suggestion?: string
-  result?: string
-  path?: string
-  vendor_code_selector?: string
-  completion_date?: string
-  gpr_c_approver_name?: string
-  gpr_c_approver_email?: string
-  gpr_c_pc_pic_name?: string
-  gpr_c_pc_pic_email?: string
-  gpr_c_circular_json?: string
-  action_required_json?: string
-  completion_date_null?: string
-  year?: string
-  total_revenue?: number | string
-  net_profit?: number | string
-  no?: string | number
-  criteria?: string
-  uploaded_file?: string
-  uploaded_name?: string
-  path_null?: string
-  name_null?: string
-  vendor_region?: string
-  group_name?: string
-  scope?: string
-  from_empcode?: string
-  to_empcode?: string
-  changed_by?: string
-  reason?: string
-  fft_status?: number | string
-  empcode?: string
-  target_group?: string
-  target_compact?: string
-  group_compact?: string
-  is_oversea?: boolean | number | string
-}
-
-const escapeSqlString = (value: unknown) =>
-  String(value ?? '')
-    .replaceAll('\\', '\\\\')
-    .replaceAll("'", "\\'")
 
 export const ApprovalQueueSQL = {
-  getAllRequests: async (dataItem: RegisterRequestDataItem): Promise<string[]> => {
+  getAllRequests: async (dataItem: any) => {
     let countSql = `
                             SELECT
-                                       COUNT(DISTINCT rr.REQUEST_ID) AS TOTAL_COUNT
+                                       COUNT(DISTINCT rr.REQUEST_REGISTER_VENDOR_ID) AS TOTAL_COUNT
                             FROM
                                        request_register_vendor rr
                                             LEFT JOIN
-                                       vendors v ON v.VENDOR_ID = rr.VENDOR_ID
+                                       vendors v ON v.VENDORS_ID = rr.VENDORS_ID
                                             LEFT JOIN
-                                       master_vendor_types vt ON vt.VENDOR_TYPE_ID = v.VENDOR_TYPE_ID
+                                       master_vendor_types vt ON vt.MASTER_VENDOR_TYPES_ID = v.MASTER_VENDOR_TYPES_ID
                                             LEFT JOIN
-                                       Person.MEMBER_FED m ON m.EMPCODE = rr.REQUEST_BY_EMPLOYEECODE
+                                       person.member_fed m ON m.EMPCODE = rr.REQUEST_BY_EMPLOYEECODE
                             WHERE
                                        rr.INUSE = 1
                                        dataItem.SQLWHERE
@@ -116,24 +25,23 @@ export const ApprovalQueueSQL = {
 
     let dataSql = `
                             SELECT
-                                       rr.REQUEST_ID
+                                       rr.REQUEST_REGISTER_VENDOR_ID
                                                                          , rr.REQUEST_NUMBER
-                                     , rr.VENDOR_ID
-                                     , ${requestStatusExpr('rr')} AS REQUEST_STATUS
+                                     , rr.VENDORS_ID
+                                     , ${RequestStatusSqlSnippets.requestStatusExpr('rr')} AS REQUEST_STATUS
                                      , rr.REQUEST_STATE
-                                     , rr.CURRENT_STATUS_ID
-                                     , rr.CURRENT_STEP_ID
+                                     , rr.CURRENT_M_REQUEST_STATUS_ID
+                                     , rr.CURRENT_REQUEST_APPROVAL_STEP_ID
                                      , rr.SUPPORTPRODUCT_PROCESS
                                      , rr.PURCHASE_FREQUENCY
                                      , rr.ASSIGN_TO
                                      , rr.PIC_EMAIL
-                                     , ${primaryVendorContactIdExpr('rr')} AS VENDOR_CONTACT_ID
+                                     , ${RequestVendorContactSqlSnippets.primaryVendorContactIdExpr('rr')} AS VENDOR_CONTACTS_ID
                                      , rr.REQUESTER_REMARK
-                                     , rr.APPROVE_BY
-                                     , rr.APPROVE_DATE
-                                     , rr.APPROVER_REMARK
+                                     , ${RequestApprovalSummarySqlSnippets.latestApprovalDateExpr('rr.REQUEST_REGISTER_VENDOR_ID')} AS APPROVE_DATE
+                                     , ${RequestApprovalSummarySqlSnippets.latestApprovalRemarkExpr('rr.REQUEST_REGISTER_VENDOR_ID')} AS APPROVER_REMARK
                                      , rr.APPROVED_VENDOR_CODE AS VENDOR_CODE
-                                     ${gprCSelectionFields('rvs', 'rr')}
+                                     ${GprCSelectionSqlSnippets.gprCSelectionFields('rvs', 'rr')}
                                      , rvs.GPR_43_ACCEPTANCE_STATUS
                                      , rr.REQUEST_BY_EMPLOYEECODE AS EMPLOYEE_CODE
                                      , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS FULL_NAME
@@ -168,7 +76,7 @@ export const ApprovalQueueSQL = {
                                                            FROM
                                                                       vendor_contacts vc
                                                            WHERE
-                                                                      vc.VENDOR_ID = v.VENDOR_ID AND vc.INUSE = 1
+                                                                      vc.VENDORS_ID = v.VENDORS_ID AND vc.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS contacts
@@ -188,9 +96,9 @@ export const ApprovalQueueSQL = {
                                                            FROM
                                                                       vendor_products vp
                                                                            LEFT JOIN
-                                                                      master_product_groups mpg ON mpg.PRODUCT_GROUP_ID = vp.PRODUCT_GROUP_ID
+                                                                      master_product_groups mpg ON mpg.MASTER_PRODUCT_GROUPS_ID = vp.MASTER_PRODUCT_GROUPS_ID
                                                            WHERE
-                                                                      vp.VENDOR_ID = v.VENDOR_ID AND vp.INUSE = 1
+                                                                      vp.VENDORS_ID = v.VENDORS_ID AND vp.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS products
@@ -201,7 +109,7 @@ export const ApprovalQueueSQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                 JSON_OBJECT(
-                                                  'document_id', rrf.REQUEST_FILE_ID,
+                                                  'document_id', rrf.REQUEST_REGISTER_FILE_ID,
                                                   'file_name', rrf.FILE_NAME,
                                                   'file_path', rrf.FILE_PATH,
                                                   'file_size', rrf.FILE_SIZE,
@@ -211,7 +119,7 @@ export const ApprovalQueueSQL = {
                                                            FROM
                                                                       request_register_file rrf
                                                            WHERE
-                                                                      rrf.REQUEST_ID = rr.REQUEST_ID AND rrf.INUSE = 1
+                                                                      rrf.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND rrf.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS documents
@@ -222,19 +130,19 @@ export const ApprovalQueueSQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
-                                                                               'step_id', ras.STEP_ID,
-                                                                               'status_id', ras.STATUS_ID,
-                                                                               'step_order', ras.STEP_ORDER,
-                                                                               'approver_id', ras.APPROVER_ID,
-                                                                               'approver_name', (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM Person.MEMBER_FED pm WHERE pm.EMPCODE = ras.APPROVER_ID LIMIT 1),
-                                                                               'step_status', ras.STEP_STATUS,
+                                                                               'REQUEST_APPROVAL_STEP_ID', ras.REQUEST_APPROVAL_STEP_ID,
+                                                                               'M_REQUEST_STATUS_ID', ras.M_REQUEST_STATUS_ID,
+                                                                               'STEP_ORDER', ras.STEP_ORDER,
+                                                                               'APPROVER_EMPCODE', ras.APPROVER_EMPCODE,
+                                                                               'approver_name', (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM person.member_fed pm WHERE pm.EMPCODE = ras.APPROVER_EMPCODE LIMIT 1),
+                                                                               'STEP_STATUS', ras.STEP_STATUS,
                                                                                'DESCRIPTION', ras.DESCRIPTION,
-                                                                               'step_code', ras.STEP_CODE,
-                                                                               'actor_type', ras.ACTOR_TYPE,
-                                                                               'group_code', ras.GROUP_CODE,
-                                                                               'assignment_mode', ras.ASSIGNMENT_MODE,
+                                                                               'STEP_CODE', ras.STEP_CODE,
+                                                                               'ACTOR_TYPE', ras.ACTOR_TYPE,
+                                                                               'GROUP_CODE', ras.GROUP_CODE,
+                                                                               'ASSIGNMENT_MODE', ras.ASSIGNMENT_MODE,
                                                                                'master_status_value', mrs.STATUS_VALUE,
-                                                                               'master_status_label', mrs.STATUS_LABEL,
+                                                                               'master_status_label', mrs.STATUS_VALUE,
                                                                                'CREATE_DATE', ras.CREATE_DATE,
                                                                                'UPDATE_BY', ras.UPDATE_BY,
                                                                                'UPDATE_DATE', ras.UPDATE_DATE
@@ -243,9 +151,9 @@ export const ApprovalQueueSQL = {
                                                            FROM
                                                                       request_approval_step ras
                                                                            INNER JOIN
-                                                                      m_request_status mrs ON mrs.STATUS_ID = ras.STATUS_ID
+                                                                      m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = ras.M_REQUEST_STATUS_ID
                                                            WHERE
-                                                                      ras.REQUEST_ID = rr.REQUEST_ID AND ras.INUSE = 1
+                                                                      ras.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND ras.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS approval_steps
@@ -256,17 +164,15 @@ export const ApprovalQueueSQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
-                                                                               'log_id', ral.LOG_ID,
-                                                                               'step_id', ral.STEP_ID,
-                                                                               'action_by', ral.ACTION_BY,
-                                                                               'action_by_name', COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM Person.MEMBER_FED pm WHERE pm.EMPCODE = ral.ACTION_BY LIMIT 1)),
-                                                                               'action_type', ral.ACTION_TYPE,
-                                                                               'remark', ral.REMARK,
-                                                                               'action_date', ral.ACTION_DATE,
+                                                                               'REQUEST_APPROVAL_LOG_ID', ral.REQUEST_APPROVAL_LOG_ID,
+                                                                               'REQUEST_APPROVAL_STEP_ID', ral.REQUEST_APPROVAL_STEP_ID,
+                                                                               'ACTION_BY', ral.ACTION_BY,
+                                                                               'ACTION_BY_NAME', COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM person.member_fed pm WHERE pm.EMPCODE = ral.ACTION_BY LIMIT 1)),
+                                                                               'ACTION_TYPE', ral.ACTION_TYPE,
                                                                                'DESCRIPTION', ral.DESCRIPTION,
+                                                                               'CREATE_DATE', ral.CREATE_DATE,
                                                                                'CREATE_BY', ral.CREATE_BY,
                                                                                'UPDATE_BY', ral.UPDATE_BY,
-                                                                               'CREATE_DATE', ral.CREATE_DATE,
                                                                                'UPDATE_DATE', ral.UPDATE_DATE,
                                                                                'INUSE', ral.INUSE
                                                                            )
@@ -274,7 +180,7 @@ export const ApprovalQueueSQL = {
                                                            FROM
                                                                       request_approval_log ral
                                                            WHERE
-                                                                      ral.REQUEST_ID = rr.REQUEST_ID
+                                                                      ral.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID
                                                                       AND ral.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
@@ -295,9 +201,9 @@ export const ApprovalQueueSQL = {
                                                            FROM
                                                                       request_vendor_selections rvs2
                                                                            JOIN
-                                                                      vendor_selection_criteria vsc ON vsc.SELECTION_ID = rvs2.SELECTION_ID
+                                                                      vendor_selection_criteria vsc ON vsc.REQUEST_VENDOR_SELECTIONS_ID = rvs2.REQUEST_VENDOR_SELECTIONS_ID
                                                            WHERE
-                                                                      rvs2.REQUEST_ID = rr.REQUEST_ID AND rvs2.INUSE = 1
+                                                                      rvs2.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND rvs2.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS gpr_criteria
@@ -305,19 +211,19 @@ export const ApprovalQueueSQL = {
                             FROM
                                        request_register_vendor rr
                                             LEFT JOIN
-                                       request_vendor_selections rvs ON rvs.REQUEST_ID = rr.REQUEST_ID AND rvs.INUSE = 1
+                                       request_vendor_selections rvs ON rvs.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND rvs.INUSE = 1
                                             LEFT JOIN
-                                       vendors v ON v.VENDOR_ID = rr.VENDOR_ID
+                                       vendors v ON v.VENDORS_ID = rr.VENDORS_ID
                                             LEFT JOIN
-                                       master_vendor_types vt ON vt.VENDOR_TYPE_ID = v.VENDOR_TYPE_ID
+                                       master_vendor_types vt ON vt.MASTER_VENDOR_TYPES_ID = v.MASTER_VENDOR_TYPES_ID
                                             LEFT JOIN
-                                       Person.MEMBER_FED m ON m.EMPCODE = rr.REQUEST_BY_EMPLOYEECODE
+                                       person.member_fed m ON m.EMPCODE = rr.REQUEST_BY_EMPLOYEECODE
                             WHERE
                                        rr.INUSE = 1
                                        dataItem.SQLWHERE
                                        dataItem.SQLWHERECOLUMNFILTER
                             GROUP BY
-                                       rr.REQUEST_ID
+                                       rr.REQUEST_REGISTER_VENDOR_ID
                             ORDER BY
                                        dataItem.ORDER
                             LIMIT
@@ -329,8 +235,8 @@ export const ApprovalQueueSQL = {
 
     dataSql = dataSql.replaceAll('dataItem.SQLWHERECOLUMNFILTER', dataItem['SQLWHERECOLUMNFILTER'] || '')
     dataSql = dataSql.replaceAll('dataItem.SQLWHERE', dataItem['SQLWHERE'] || '')
-    dataSql = dataSql.replaceAll('dataItem.ORDER', dataItem['ORDER'] || 'rr.REQUEST_ID DESC')
-    dataSql = dataSql.replaceAll('dataItem.LIMIT', (dataItem['LIMIT'] || 10).toString())
+    dataSql = dataSql.replaceAll('dataItem.ORDER', dataItem['ORDER'] || 'rr.REQUEST_REGISTER_VENDOR_ID DESC')
+    dataSql = dataSql.replaceAll('dataItem.LIMIT', (dataItem['LIMIT'] || 50).toString())
     dataSql = dataSql.replaceAll('dataItem.OFFSET', (dataItem['OFFSET'] || 0).toString())
 
     return [countSql, dataSql]
@@ -339,70 +245,66 @@ export const ApprovalQueueSQL = {
   getStatusOptions: async (_dataItem?: any) => {
     const sql = `
                             SELECT
-                                       wsm.WORKFLOW_STEP_ID AS workflowStepId
-                                     , mrs.STATUS_ID AS statusId
+                                       wsm.WORKFLOW_STEP_MASTER_ID AS workflowStepId
+                                     , mrs.M_REQUEST_STATUS_ID AS statusId
                                      , mrs.STATUS_VALUE AS value
-                                     , mrs.STATUS_LABEL AS label
-                                     , COALESCE(wsm.STEP_CODE, mrs.STEP_CODE) AS stepCode
-                                     , COALESCE(wsm.ACTOR_TYPE, mrs.ACTOR_TYPE) AS actorType
-                                     , COALESCE(wsm.DEFAULT_GROUP_CODE_LOCAL, mrs.DEFAULT_GROUP_CODE_LOCAL) AS defaultGroupCodeLocal
-                                     , COALESCE(wsm.DEFAULT_GROUP_CODE_OVERSEA, mrs.DEFAULT_GROUP_CODE_OVERSEA) AS defaultGroupCodeOversea
-                                     , COALESCE(wsm.REQUIRES_VENDOR_REPLY, mrs.REQUIRES_VENDOR_REPLY) AS requiresVendorReply
-                                     , COALESCE(wsm.REQUIRES_VENDOR_CODE, mrs.REQUIRES_VENDOR_CODE) AS requiresVendorCode
-                                     , mrs.CHIP_COLOR AS chipColor
-                                     , mrs.ACCENT_COLOR AS accent
-                                     , mrs.ICON AS icon
-                                     , COALESCE(wsm.DEFAULT_STEP_ORDER, mrs.SORT_ORDER) AS sortOrder
+                                     , mrs.STATUS_VALUE AS label
+                                     , wsm.STEP_CODE AS stepCode
+                                     , wsm.ACTOR_TYPE AS actorType
+                                     , wsm.DEFAULT_GROUP_CODE_LOCAL AS defaultGroupCodeLocal
+                                     , wsm.DEFAULT_GROUP_CODE_OVERSEA AS defaultGroupCodeOversea
+                                     , wsm.REQUIRES_VENDOR_REPLY AS requiresVendorReply
+                                     , wsm.REQUIRES_VENDOR_CODE AS requiresVendorCode
+                                     , wsm.DEFAULT_STEP_ORDER AS sortOrder
                             FROM
-                                       m_request_status mrs
-                                            LEFT JOIN
                                        workflow_step_master wsm
-                                         ON wsm.STATUS_ID = mrs.STATUS_ID
-                                        AND wsm.WORKFLOW_ID = (
-                                            SELECT WORKFLOW_ID
-                                            FROM workflow_definition
-                                            WHERE WORKFLOW_CODE = 'VENDOR_REGISTRATION'
-                                              AND IS_ACTIVE = 1
-                                            ORDER BY VERSION_NO DESC
-                                            LIMIT 1
-                                        )
+                                            INNER JOIN
+                                       m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID
                             WHERE
-                                       mrs.IS_ACTIVE = 1
-                                       AND (wsm.WORKFLOW_STEP_ID IS NULL OR wsm.IS_ACTIVE = 1)
+                                       wsm.WORKFLOW_DEFINITION_ID = (
+                                           SELECT WORKFLOW_DEFINITION_ID
+                                           FROM workflow_definition
+                                           WHERE WORKFLOW_CODE = 'VENDOR_REGISTRATION'
+                                             AND INUSE = 1
+                                           ORDER BY VERSION_NO DESC
+                                           LIMIT 1
+                                       )
+                                       AND wsm.INUSE = 1
+                                       AND mrs.INUSE = 1
                             ORDER BY
-                                       COALESCE(wsm.DEFAULT_STEP_ORDER, mrs.SORT_ORDER) ASC
+                                       wsm.DEFAULT_STEP_ORDER ASC
         `
     return sql
   },
 
-  getRequestStatusAndAssign: async (dataItem: RegisterRequestDataItem) => {
+  getRequestStatusAndAssign: async (dataItem: any) => {
     let sql = `
                             SELECT
-                                       ${requestStatusExpr('rr')} AS REQUEST_STATUS
+                                       ${RequestStatusSqlSnippets.requestStatusExpr('rr')} AS REQUEST_STATUS
                                      , ASSIGN_TO
                             FROM
                                        request_register_vendor rr
                             WHERE
-                                       rr.REQUEST_ID = dataItem.REQUEST_ID
+                                       rr.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
                                        AND rr.INUSE = 1
                             LIMIT
                                        1
         `
 
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
 
     return sql
   },
 
-  getApprovalSteps: async (dataItem: RegisterRequestDataItem) => {
+  getApprovalSteps: async (dataItem: any) => {
     let sql = `
                             SELECT 
-                                       ras.STEP_ID
-                                     , ras.REQUEST_ID
-                                     , ras.WORKFLOW_STEP_ID
-                                     , ras.STATUS_ID
+                                       ras.REQUEST_APPROVAL_STEP_ID
+                                     , ras.REQUEST_REGISTER_VENDOR_ID
+                                     , ras.WORKFLOW_STEP_MASTER_ID
+                                     , ras.M_REQUEST_STATUS_ID
                                      , ras.STEP_ORDER
-                                     , ras.APPROVER_ID
+                                     , ras.APPROVER_EMPCODE
                                      , ras.STEP_STATUS
                                      , ras.DESCRIPTION
                                      , ras.STEP_CODE
@@ -415,27 +317,27 @@ export const ApprovalQueueSQL = {
                                      , ras.UPDATE_DATE
                                      , ras.INUSE
                                      , mrs.STATUS_VALUE AS master_status_value
-                                     , mrs.STATUS_LABEL AS master_status_label
+                                     , mrs.STATUS_VALUE AS master_status_label
                                      , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS approver_name
                             FROM
                                        request_approval_step ras
                                             INNER JOIN
-                                       m_request_status mrs ON mrs.STATUS_ID = ras.STATUS_ID
+                                       m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = ras.M_REQUEST_STATUS_ID
                                             LEFT JOIN
-                                       Person.MEMBER_FED m ON m.EMPCODE = ras.APPROVER_ID
+                                       person.member_fed m ON m.EMPCODE = ras.APPROVER_EMPCODE
                             WHERE
-                                       ras.REQUEST_ID = dataItem.REQUEST_ID
+                                       ras.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
                                        AND ras.INUSE = 1
                             ORDER BY
                                        ras.STEP_ORDER ASC
         `
 
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
 
     return sql
   },
 
-  updateRequest: async (dataItem: RegisterRequestDataItem) => {
+  updateRequest: async (dataItem: any) => {
     let sql = `
                             UPDATE request_register_vendor SET
                                        SUPPORTPRODUCT_PROCESS = 'dataItem.SUPPORTPRODUCT_PROCESS'
@@ -444,7 +346,7 @@ export const ApprovalQueueSQL = {
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
-                                       REQUEST_ID = dataItem.REQUEST_ID;
+                                       REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID;
 
                             UPDATE request_register_vendor_contacts
                             SET
@@ -452,13 +354,13 @@ export const ApprovalQueueSQL = {
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
-                                       REQUEST_ID = dataItem.REQUEST_ID
-                                       AND dataItem.VENDOR_CONTACT_ID > 0
+                                       REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
+                                       AND dataItem.VENDOR_CONTACTS_ID > 0
                                        AND INUSE = 1;
 
                             INSERT INTO request_register_vendor_contacts (
-                                       REQUEST_ID
-                                     , VENDOR_CONTACT_ID
+                                       REQUEST_REGISTER_VENDOR_ID
+                                     , VENDOR_CONTACTS_ID
                                      , IS_PRIMARY
                                      , DESCRIPTION
                                      , CREATE_BY
@@ -466,14 +368,14 @@ export const ApprovalQueueSQL = {
                                      , INUSE
                             )
                             SELECT
-                                       dataItem.REQUEST_ID
-                                     , dataItem.VENDOR_CONTACT_ID
+                                       dataItem.REQUEST_REGISTER_VENDOR_ID
+                                     , dataItem.VENDOR_CONTACTS_ID
                                      , 1
                                      , 'Primary vendor contact'
                                      , 'dataItem.UPDATE_BY'
                                      , 'dataItem.UPDATE_BY'
                                      , 1
-                            WHERE dataItem.VENDOR_CONTACT_ID > 0
+                            WHERE dataItem.VENDOR_CONTACTS_ID > 0
                             ON DUPLICATE KEY UPDATE
                                        IS_PRIMARY = 1
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
@@ -481,8 +383,8 @@ export const ApprovalQueueSQL = {
                                      , INUSE = 1
         `
 
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
-    sql = sql.replaceAll('dataItem.VENDOR_CONTACT_ID', (dataItem['VENDOR_CONTACT_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.VENDOR_CONTACTS_ID', (dataItem['VENDOR_CONTACTS_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.SUPPORTPRODUCT_PROCESS', dataItem['SUPPORTPRODUCT_PROCESS'] || '')
     sql = sql.replaceAll('dataItem.PURCHASE_FREQUENCY', dataItem['PURCHASE_FREQUENCY'] || '')
     sql = sql.replaceAll('dataItem.REQUESTER_REMARK', dataItem['REQUESTER_REMARK'] || '')
@@ -491,16 +393,14 @@ export const ApprovalQueueSQL = {
     return sql
   },
 
-  createApprovalLog: async (dataItem: RegisterRequestDataItem) => {
+  createApprovalLog: async (dataItem: any) => {
     let sql = `
                             INSERT INTO request_approval_log (
-                                       REQUEST_ID
-                                     , STEP_ID
+                                       REQUEST_REGISTER_VENDOR_ID
+                                     , REQUEST_APPROVAL_STEP_ID
                                      , ACTION_BY
                                      , ACTION_BY_NAME
                                      , ACTION_TYPE
-                                     , REMARK
-                                     , ACTION_DATE
                                      , DESCRIPTION
                                      , CREATE_BY
                                      , UPDATE_BY
@@ -508,19 +408,17 @@ export const ApprovalQueueSQL = {
                                      , UPDATE_DATE
                                      , INUSE
                             ) VALUES (
-                                        dataItem.REQUEST_ID
-                                     ,  dataItem.STEP_ID
+                                        dataItem.REQUEST_REGISTER_VENDOR_ID
+                                     ,  dataItem.REQUEST_APPROVAL_STEP_ID
                                      , 'dataItem.ACTION_BY'
                                      , COALESCE(
                                            (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME)
-                                            FROM Person.MEMBER_FED pm
+                                            FROM person.member_fed pm
                                             WHERE pm.EMPCODE = 'dataItem.ACTION_BY'
                                             LIMIT 1),
                                            'dataItem.ACTION_BY'
                                        )
                                      , 'dataItem.ACTION_TYPE'
-                                     , 'dataItem.REMARK'
-                                     ,  NOW()
                                      , LEFT('dataItem.REMARK', 100)
                                      , 'dataItem.ACTION_BY'
                                      , 'dataItem.ACTION_BY'
@@ -530,25 +428,25 @@ export const ApprovalQueueSQL = {
                             )
         `
 
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
-    sql = sql.replaceAll('dataItem.STEP_ID', dataItem['STEP_ID'] ? dataItem['STEP_ID'].toString() : 'NULL')
-    sql = sql.replaceAll('dataItem.ACTION_BY', escapeSqlString(dataItem['ACTION_BY']))
-    sql = sql.replaceAll('dataItem.ACTION_TYPE', escapeSqlString(dataItem['ACTION_TYPE']))
-    sql = sql.replaceAll('dataItem.REMARK', escapeSqlString(dataItem['REMARK']))
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_APPROVAL_STEP_ID', dataItem['REQUEST_APPROVAL_STEP_ID'] ? dataItem['REQUEST_APPROVAL_STEP_ID'].toString() : 'NULL')
+    sql = sql.replaceAll('dataItem.ACTION_BY', dataItem['ACTION_BY'])
+    sql = sql.replaceAll('dataItem.ACTION_TYPE', dataItem['ACTION_TYPE'])
+    sql = sql.replaceAll('dataItem.REMARK', dataItem['REMARK'])
 
     return sql
   },
 
-  getApprovalLogs: async (dataItem: RegisterRequestDataItem) => {
+  getApprovalLogs: async (dataItem: any) => {
     let sql = `
                             SELECT 
-                                       ral.LOG_ID
-                                     , ral.REQUEST_ID
-                                     , ral.STEP_ID
+                                       ral.REQUEST_APPROVAL_LOG_ID
+                                     , ral.REQUEST_REGISTER_VENDOR_ID
+                                     , ral.REQUEST_APPROVAL_STEP_ID
                                      , ral.ACTION_BY
                                      , ral.ACTION_TYPE
-                                     , ral.REMARK
-                                     , ral.ACTION_DATE
+                                     , ral.DESCRIPTION
+                                     , ral.CREATE_DATE
                                      , ral.DESCRIPTION
                                      , ral.CREATE_BY
                                      , ral.UPDATE_BY
@@ -559,65 +457,65 @@ export const ApprovalQueueSQL = {
                             FROM
                                        request_approval_log ral
                                             LEFT JOIN
-                                       Person.MEMBER_FED m ON m.EMPCODE = ral.ACTION_BY
+                                       person.member_fed m ON m.EMPCODE = ral.ACTION_BY
                             WHERE
-                                       ral.REQUEST_ID = dataItem.REQUEST_ID
+                                       ral.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
                                        AND ral.INUSE = 1
                             ORDER BY
-                                       ral.ACTION_DATE ASC
+                                       ral.CREATE_DATE ASC
         `
 
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
 
     return sql
   },
 
-  getRequestStatusContext: async (dataItem: RegisterRequestDataItem) => {
+  getRequestStatusContext: async (dataItem: any) => {
     let sql = `
                             SELECT
-                                       rr.VENDOR_ID
+                                       rr.VENDORS_ID
                                      , rr.ASSIGN_TO
                                      , rr.REQUEST_NUMBER
                                      , rr.CREATE_DATE
                                      , rvs.PROPOSED_VENDOR_CODE AS VENDOR_CODE_SELECTOR
-                                     ${gprCSelectionFields('rvs', 'rr')}
+                                     ${GprCSelectionSqlSnippets.gprCSelectionFields('rvs', 'rr')}
                                      , rvs.GPR_43_ACCEPTANCE_STATUS
                                      , v.VENDOR_REGION
                             FROM
                                        request_register_vendor rr
                                             LEFT JOIN
-                                       vendors v ON v.VENDOR_ID = rr.VENDOR_ID
+                                       vendors v ON v.VENDORS_ID = rr.VENDORS_ID
                                             LEFT JOIN
-                                       request_vendor_selections rvs ON rvs.REQUEST_ID = rr.REQUEST_ID AND rvs.INUSE = 1
+                                       request_vendor_selections rvs ON rvs.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND rvs.INUSE = 1
                             WHERE
-                                       rr.REQUEST_ID = dataItem.REQUEST_ID
+                                       rr.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
                             ORDER BY
-                                       rvs.SELECTION_ID DESC
+                                       rvs.REQUEST_VENDOR_SELECTIONS_ID DESC
                             LIMIT
                                        1
         `
 
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
 
     return sql
   },
 
-  getRequesterByRequestId: (dataItem: RegisterRequestDataItem) => {
+  getRequesterByRequestId: (dataItem: any) => {
     let sql = `
                             SELECT
                                        REQUEST_BY_EMPLOYEECODE
                             FROM
                                        request_register_vendor
                             WHERE
-                                       REQUEST_ID = dataItem.REQUEST_ID
+                                       REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
                             LIMIT
                                        1
         `
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
     return sql
   },
 
-  getApproverByGroupCode: async (dataItem: RegisterRequestDataItem) => {
+  getApproverByGroupCode: async (dataItem: any) => {
     let sql = `
                             SELECT
                                        EMPCODE
@@ -629,7 +527,7 @@ export const ApprovalQueueSQL = {
                                        GROUP_CODE = 'dataItem.GROUP_CODE'
                                        AND INUSE = 1
                             ORDER BY
-                                       ASSIGNEES_ID ASC
+                                       ASSIGNEES_TO_ID ASC
                             LIMIT
                                        1
         `
@@ -639,10 +537,10 @@ export const ApprovalQueueSQL = {
     return sql
   },
 
-  getActiveAssigneeByEmpCodeAndGroupCode: async (dataItem: RegisterRequestDataItem) => {
+  getActiveAssigneeByEmpCodeAndGroupCode: async (dataItem: any) => {
     let sql = `
                             SELECT
-                                       ASSIGNEES_ID
+                                       ASSIGNEES_TO_ID
                                      , EMPCODE
                                      , EMPNAME
                                      , EMPEMAIL
@@ -664,237 +562,231 @@ export const ApprovalQueueSQL = {
                                        1
         `
 
-    sql = sql.replaceAll('dataItem.EMPCODE', escapeSqlString(dataItem['EMPCODE']))
-    sql = sql.replaceAll('dataItem.GROUP_CODE', escapeSqlString(dataItem['GROUP_CODE']))
-    sql = sql.replaceAll('dataItem.GROUP_COMPACT', escapeSqlString(dataItem['GROUP_COMPACT']))
+    sql = sql.replaceAll('dataItem.EMPCODE', dataItem['EMPCODE'])
+    sql = sql.replaceAll('dataItem.GROUP_CODE', dataItem['GROUP_CODE'])
+    sql = sql.replaceAll('dataItem.GROUP_COMPACT', dataItem['GROUP_COMPACT'])
 
     return sql
   },
 
-  getSelection: (dataItem: RegisterRequestDataItem) => {
+  getSelection: (dataItem: any) => {
     let sql = `
                             SELECT * FROM
                                        request_vendor_selections
                             WHERE
-                                       REQUEST_ID = 'dataItem.REQUEST_ID' AND INUSE = 1
+                                       REQUEST_REGISTER_VENDOR_ID = 'dataItem.REQUEST_REGISTER_VENDOR_ID' AND INUSE = 1
                             ORDER BY
-                                       SELECTION_ID DESC
+                                       REQUEST_VENDOR_SELECTIONS_ID DESC
                             LIMIT
                                        1
         `
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
     return sql
   },
 
-  getCriteria: (dataItem: RegisterRequestDataItem) => {
+  getCriteria: (dataItem: any) => {
     let sql = `
                             SELECT
                                        CRITERIA_NO AS no
                                      , CRITERIA_VALUE AS criteria
-                                     , REMARK
+                                     , DESCRIPTION AS remark
                                      , UPLOADED_FILE_PATH AS uploaded_file
                                      , UPLOADED_FILE_NAME AS uploaded_name
                             FROM
                                        vendor_selection_criteria
                             WHERE
-                                       SELECTION_ID = dataItem.SELECTION_ID
+                                       REQUEST_VENDOR_SELECTIONS_ID = dataItem.REQUEST_VENDOR_SELECTIONS_ID
                             ORDER BY
-                                       CRITERIA_ID ASC
+                                       VENDOR_SELECTION_CRITERIA_ID ASC
         `
-    sql = sql.replaceAll('dataItem.SELECTION_ID', (dataItem['SELECTION_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_VENDOR_SELECTIONS_ID', (dataItem['REQUEST_VENDOR_SELECTIONS_ID'] || 0).toString())
     return sql
   },
 
-  updateStatus: async (dataItem: RegisterRequestDataItem) => {
+  updateStatus: async (dataItem: any) => {
     let sql = `
                             UPDATE request_register_vendor SET
-                                       CURRENT_STATUS_ID = COALESCE(${requestStatusIdByValueExpr("'dataItem.REQUEST_STATUS'")}, CURRENT_STATUS_ID)
+                                       CURRENT_M_REQUEST_STATUS_ID = COALESCE(${RequestStatusSqlSnippets.requestStatusIdByValueExpr("'dataItem.REQUEST_STATUS'")}, CURRENT_M_REQUEST_STATUS_ID)
                                      , REQUEST_STATE = CASE
                                            WHEN LOWER('dataItem.REQUEST_STATUS') = 'completed' THEN 'completed'
                                            WHEN LOWER('dataItem.REQUEST_STATUS') IN ('rejected', 'vendor disagreed') THEN 'rejected'
                                            WHEN LOWER('dataItem.REQUEST_STATUS') IN ('cancelled', 'canceled') THEN 'cancelled'
                                            ELSE REQUEST_STATE
                                        END
-                                     , APPROVE_BY = 'dataItem.APPROVE_BY'
-                                     , APPROVE_DATE = dataItem.APPROVE_DATE
-                                     , APPROVER_REMARK = 'dataItem.APPROVER_REMARK'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
-                                       REQUEST_ID = dataItem.REQUEST_ID
+                                       REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
         `
 
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.REQUEST_STATUS', dataItem['REQUEST_STATUS'] || '')
-    sql = sql.replaceAll('dataItem.APPROVE_BY', dataItem['APPROVE_BY'] || '')
-    sql = sql.replaceAll('dataItem.APPROVE_DATE', dataItem['APPROVE_DATE'] === 'NOW()' ? 'NOW()' : 'APPROVE_DATE')
-    sql = sql.replaceAll('dataItem.APPROVER_REMARK', dataItem['APPROVER_REMARK'] || '')
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
 
     return sql
   },
 
-  updateRequestVendorCode: async (dataItem: RegisterRequestDataItem) => {
+  updateRequestVendorCode: async (dataItem: any) => {
     let sql = `
                             UPDATE request_register_vendor SET
                                        APPROVED_VENDOR_CODE = 'dataItem.VENDOR_CODE'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
-                                       REQUEST_ID = dataItem.REQUEST_ID
+                                       REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
         `
 
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.VENDOR_CODE', dataItem['VENDOR_CODE'] || '')
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
     return sql
   },
 
-  updateVendorFftVendorCode: async (dataItem: RegisterRequestDataItem) => {
+  updateVendorFftVendorCode: async (dataItem: any) => {
     let sql = `
                             UPDATE vendors SET
                                        FFT_VENDOR_CODE = 'dataItem.VENDOR_CODE'
                             WHERE
-                                       VENDOR_ID = dataItem.VENDOR_ID
+                                       VENDORS_ID = dataItem.VENDORS_ID
         `
 
-    sql = sql.replaceAll('dataItem.VENDOR_ID', (dataItem['VENDOR_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.VENDORS_ID', (dataItem['VENDORS_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.VENDOR_CODE', dataItem['VENDOR_CODE'] || '')
 
     return sql
   },
 
-  updateVendorFftStatus: async (dataItem: RegisterRequestDataItem) => {
+  updateVendorFftStatus: async (dataItem: any) => {
     let sql = `
                             UPDATE vendors SET
                                        FFT_STATUS = dataItem.FFT_STATUS
                             WHERE
-                                       VENDOR_ID = dataItem.VENDOR_ID
+                                       VENDORS_ID = dataItem.VENDORS_ID
         `
 
-    sql = sql.replaceAll('dataItem.VENDOR_ID', (dataItem['VENDOR_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.VENDORS_ID', (dataItem['VENDORS_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.FFT_STATUS', (dataItem['FFT_STATUS'] || 0).toString())
 
     return sql
   },
 
-  updateApprovalStep: async (dataItem: RegisterRequestDataItem) => {
+  updateApprovalStep: async (dataItem: any) => {
     let sql = `
                             UPDATE request_approval_step SET
                                        STEP_STATUS = LOWER('dataItem.STEP_STATUS')
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
-                                       STEP_ID = dataItem.STEP_ID;
+                                       REQUEST_APPROVAL_STEP_ID = dataItem.REQUEST_APPROVAL_STEP_ID;
 
                             UPDATE request_register_vendor rr
                             LEFT JOIN request_approval_step changed_step
-                              ON changed_step.STEP_ID = dataItem.STEP_ID
+                              ON changed_step.REQUEST_APPROVAL_STEP_ID = dataItem.REQUEST_APPROVAL_STEP_ID
                             LEFT JOIN request_approval_step active_step
-                              ON active_step.REQUEST_ID = rr.REQUEST_ID
+                              ON active_step.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID
                              AND active_step.STEP_STATUS = 'in_progress'
                              AND active_step.INUSE = 1
                             LEFT JOIN m_request_status active_status
-                              ON active_status.STATUS_ID = active_step.STATUS_ID
+                              ON active_status.M_REQUEST_STATUS_ID = active_step.M_REQUEST_STATUS_ID
                             LEFT JOIN m_request_status rejected_status
-                              ON rejected_status.STEP_CODE = 'REJECTED'
+                              ON rejected_status.STATUS_VALUE = 'Rejected'
+                              OR rejected_status.STATUS_VALUE = 'Rejected'
                             SET
                                        rr.REQUEST_STATE = CASE
                                            WHEN LOWER('dataItem.STEP_STATUS') = 'rejected' THEN 'rejected'
-                                           WHEN active_step.STEP_ID IS NOT NULL THEN 'in_progress'
+                                           WHEN active_step.REQUEST_APPROVAL_STEP_ID IS NOT NULL THEN 'in_progress'
                                            ELSE rr.REQUEST_STATE
                                        END
-                                     , rr.CURRENT_STEP_ID = CASE
-                                           WHEN LOWER('dataItem.STEP_STATUS') = 'rejected' THEN changed_step.STEP_ID
-                                           WHEN active_step.STEP_ID IS NOT NULL THEN active_step.STEP_ID
-                                           ELSE rr.CURRENT_STEP_ID
+                                     , rr.CURRENT_REQUEST_APPROVAL_STEP_ID = CASE
+                                           WHEN LOWER('dataItem.STEP_STATUS') = 'rejected' THEN changed_step.REQUEST_APPROVAL_STEP_ID
+                                           WHEN active_step.REQUEST_APPROVAL_STEP_ID IS NOT NULL THEN active_step.REQUEST_APPROVAL_STEP_ID
+                                           ELSE rr.CURRENT_REQUEST_APPROVAL_STEP_ID
                                        END
-                                     , rr.CURRENT_STATUS_ID = CASE
-                                           WHEN LOWER('dataItem.STEP_STATUS') = 'rejected' THEN rejected_status.STATUS_ID
-                                           WHEN active_step.STEP_ID IS NOT NULL THEN active_step.STATUS_ID
-                                           ELSE rr.CURRENT_STATUS_ID
+                                     , rr.CURRENT_M_REQUEST_STATUS_ID = CASE
+                                           WHEN LOWER('dataItem.STEP_STATUS') = 'rejected' THEN rejected_status.M_REQUEST_STATUS_ID
+                                           WHEN active_step.REQUEST_APPROVAL_STEP_ID IS NOT NULL THEN active_step.M_REQUEST_STATUS_ID
+                                           ELSE rr.CURRENT_M_REQUEST_STATUS_ID
                                        END
                                      , rr.UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , rr.UPDATE_DATE = NOW()
                             WHERE
-                                       rr.REQUEST_ID = changed_step.REQUEST_ID
+                                       rr.REQUEST_REGISTER_VENDOR_ID = changed_step.REQUEST_REGISTER_VENDOR_ID
         `
 
-    sql = sql.replaceAll('dataItem.STEP_ID', (dataItem['STEP_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_APPROVAL_STEP_ID', (dataItem['REQUEST_APPROVAL_STEP_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.STEP_STATUS', dataItem['STEP_STATUS'] || '')
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
 
     return sql
   },
 
-  updateApprovalStepApprover: async (dataItem: RegisterRequestDataItem) => {
+  updateApprovalStepApprover: async (dataItem: any) => {
     let sql = `
                             UPDATE request_approval_step SET
-                                       APPROVER_ID = 'dataItem.APPROVER_ID'
+                                       APPROVER_EMPCODE = 'dataItem.APPROVER_EMPCODE'
                                      , ASSIGNMENT_MODE = 'dataItem.ASSIGNMENT_MODE'
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
-                                       STEP_ID = dataItem.STEP_ID
+                                       REQUEST_APPROVAL_STEP_ID = dataItem.REQUEST_APPROVAL_STEP_ID
         `
 
-    sql = sql.replaceAll('dataItem.STEP_ID', (dataItem['STEP_ID'] || 0).toString())
-    sql = sql.replaceAll('dataItem.APPROVER_ID', dataItem['APPROVER_ID'] || '')
+    sql = sql.replaceAll('dataItem.REQUEST_APPROVAL_STEP_ID', (dataItem['REQUEST_APPROVAL_STEP_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.APPROVER_EMPCODE', dataItem['APPROVER_EMPCODE'] || '')
     sql = sql.replaceAll('dataItem.ASSIGNMENT_MODE', dataItem['ASSIGNMENT_MODE'] || 'MANUAL')
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
     return sql
   },
 
-  markRequestCompleted: async (dataItem: RegisterRequestDataItem) => {
+  markRequestCompleted: async (dataItem: any) => {
     let sql = `
                             UPDATE request_register_vendor SET
                                        REQUEST_STATE = 'completed'
-                                     , CURRENT_STATUS_ID = (
-                                           SELECT STATUS_ID FROM m_request_status
+                                     , CURRENT_M_REQUEST_STATUS_ID = (
+                                           SELECT M_REQUEST_STATUS_ID FROM workflow_step_master
                                            WHERE STEP_CODE = 'ACCOUNT_REGISTERED'
+                                             AND INUSE = 1
                                            LIMIT 1
                                        )
-                                     , CURRENT_STEP_ID = NULL
-                                     , APPROVE_DATE = NOW()
+                                     , CURRENT_REQUEST_APPROVAL_STEP_ID = NULL
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
-                                       REQUEST_ID = dataItem.REQUEST_ID
+                                       REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
         `
 
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
     return sql
   },
 
-  getById: async (dataItem: RegisterRequestDataItem) => {
+  getById: async (dataItem: any) => {
     let sql = `
                             SELECT
-                                       rr.REQUEST_ID
+                                       rr.REQUEST_REGISTER_VENDOR_ID
                                                                          , rr.REQUEST_NUMBER
-                                     , rr.VENDOR_ID
-                                     , ${requestStatusExpr('rr')} AS REQUEST_STATUS
+                                     , rr.VENDORS_ID
+                                     , ${RequestStatusSqlSnippets.requestStatusExpr('rr')} AS REQUEST_STATUS
                                      , rr.REQUEST_STATE
-                                     , rr.CURRENT_STATUS_ID
-                                     , rr.CURRENT_STEP_ID
+                                     , rr.CURRENT_M_REQUEST_STATUS_ID
+                                     , rr.CURRENT_REQUEST_APPROVAL_STEP_ID
                                      , rr.SUPPORTPRODUCT_PROCESS
                                      , rr.PURCHASE_FREQUENCY
                                      , rr.REQUESTER_REMARK
-                                     , rr.APPROVER_REMARK
-                                     , rr.APPROVE_BY
-                                     , rr.APPROVE_DATE
+                                     , ${RequestApprovalSummarySqlSnippets.latestApprovalRemarkExpr('rr.REQUEST_REGISTER_VENDOR_ID')} AS APPROVER_REMARK
+                                     , ${RequestApprovalSummarySqlSnippets.latestApprovalDateExpr('rr.REQUEST_REGISTER_VENDOR_ID')} AS APPROVE_DATE
                                      , rr.APPROVED_VENDOR_CODE AS VENDOR_CODE
                                      , rr.ASSIGN_TO
                                      , rr.PIC_EMAIL
-                                     , ${primaryVendorContactIdExpr('rr')} AS VENDOR_CONTACT_ID
+                                     , ${RequestVendorContactSqlSnippets.primaryVendorContactIdExpr('rr')} AS VENDOR_CONTACTS_ID
                                      , rr.REQUEST_BY_EMPLOYEECODE AS EMPLOYEE_CODE
                                      , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS FULL_NAME
                                      , m.EMPDEPT AS EMPLOYEE_DEPT
                                      , rr.CREATE_DATE
-                                     ${gprCSelectionFields('rvs', 'rr')}
+                                     ${GprCSelectionSqlSnippets.gprCSelectionFields('rvs', 'rr')}
                                      , rvs.GPR_43_ACCEPTANCE_STATUS
 
                                      -- Vendor Info
@@ -925,7 +817,7 @@ export const ApprovalQueueSQL = {
                                                            FROM
                                                                       vendor_contacts vc
                                                            WHERE
-                                                                      vc.VENDOR_ID = v.VENDOR_ID AND vc.INUSE = 1
+                                                                      vc.VENDORS_ID = v.VENDORS_ID AND vc.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS contacts
@@ -945,9 +837,9 @@ export const ApprovalQueueSQL = {
                                                            FROM
                                                                       vendor_products vp
                                                                            LEFT JOIN
-                                                                      master_product_groups mpg ON mpg.PRODUCT_GROUP_ID = vp.PRODUCT_GROUP_ID
+                                                                      master_product_groups mpg ON mpg.MASTER_PRODUCT_GROUPS_ID = vp.MASTER_PRODUCT_GROUPS_ID
                                                            WHERE
-                                                                      vp.VENDOR_ID = v.VENDOR_ID AND vp.INUSE = 1
+                                                                      vp.VENDORS_ID = v.VENDORS_ID AND vp.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS products
@@ -958,7 +850,7 @@ export const ApprovalQueueSQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                 JSON_OBJECT(
-                                                  'document_id', rrf.REQUEST_FILE_ID,
+                                                  'document_id', rrf.REQUEST_REGISTER_FILE_ID,
                                                   'file_name', rrf.FILE_NAME,
                                                   'file_path', rrf.FILE_PATH,
                                                   'file_size', rrf.FILE_SIZE,
@@ -968,7 +860,7 @@ export const ApprovalQueueSQL = {
                                                            FROM
                                                                       request_register_file rrf
                                                            WHERE
-                                                                      rrf.REQUEST_ID = rr.REQUEST_ID AND rrf.INUSE = 1
+                                                                      rrf.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND rrf.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS documents
@@ -979,19 +871,19 @@ export const ApprovalQueueSQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
-                                                                               'step_id', ras.STEP_ID,
-                                                                               'status_id', ras.STATUS_ID,
-                                                                               'step_order', ras.STEP_ORDER,
-                                                                               'approver_id', ras.APPROVER_ID,
-                                                                               'approver_name', (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM Person.MEMBER_FED pm WHERE pm.EMPCODE = ras.APPROVER_ID LIMIT 1),
-                                                                               'step_status', ras.STEP_STATUS,
+                                                                               'REQUEST_APPROVAL_STEP_ID', ras.REQUEST_APPROVAL_STEP_ID,
+                                                                               'M_REQUEST_STATUS_ID', ras.M_REQUEST_STATUS_ID,
+                                                                               'STEP_ORDER', ras.STEP_ORDER,
+                                                                               'APPROVER_EMPCODE', ras.APPROVER_EMPCODE,
+                                                                               'approver_name', (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM person.member_fed pm WHERE pm.EMPCODE = ras.APPROVER_EMPCODE LIMIT 1),
+                                                                               'STEP_STATUS', ras.STEP_STATUS,
                                                                                'DESCRIPTION', ras.DESCRIPTION,
-                                                                               'step_code', ras.STEP_CODE,
-                                                                               'actor_type', ras.ACTOR_TYPE,
-                                                                               'group_code', ras.GROUP_CODE,
-                                                                               'assignment_mode', ras.ASSIGNMENT_MODE,
+                                                                               'STEP_CODE', ras.STEP_CODE,
+                                                                               'ACTOR_TYPE', ras.ACTOR_TYPE,
+                                                                               'GROUP_CODE', ras.GROUP_CODE,
+                                                                               'ASSIGNMENT_MODE', ras.ASSIGNMENT_MODE,
                                                                                'master_status_value', mrs.STATUS_VALUE,
-                                                                               'master_status_label', mrs.STATUS_LABEL,
+                                                                               'master_status_label', mrs.STATUS_VALUE,
                                                                                'CREATE_DATE', ras.CREATE_DATE,
                                                                                'UPDATE_BY', ras.UPDATE_BY,
                                                                                'UPDATE_DATE', ras.UPDATE_DATE
@@ -1000,9 +892,9 @@ export const ApprovalQueueSQL = {
                                                            FROM
                                                                       request_approval_step ras
                                                                            INNER JOIN
-                                                                      m_request_status mrs ON mrs.STATUS_ID = ras.STATUS_ID
+                                                                      m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = ras.M_REQUEST_STATUS_ID
                                                            WHERE
-                                                                      ras.REQUEST_ID = rr.REQUEST_ID AND ras.INUSE = 1
+                                                                      ras.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND ras.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS approval_steps
@@ -1013,19 +905,19 @@ export const ApprovalQueueSQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
-                                                                               'log_id', ral.LOG_ID,
-                                                                               'step_id', ral.STEP_ID,
-                                                                               'action_by', ral.ACTION_BY,
-                                                                               'action_by_name', COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM Person.MEMBER_FED pm WHERE pm.EMPCODE = ral.ACTION_BY LIMIT 1)),
-                                                                               'action_type', ral.ACTION_TYPE,
-                                                                               'remark', ral.REMARK,
-                                                                               'action_date', ral.ACTION_DATE
+                                                                               'REQUEST_APPROVAL_LOG_ID', ral.REQUEST_APPROVAL_LOG_ID,
+                                                                               'REQUEST_APPROVAL_STEP_ID', ral.REQUEST_APPROVAL_STEP_ID,
+                                                                               'ACTION_BY', ral.ACTION_BY,
+                                                                               'ACTION_BY_NAME', COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM person.member_fed pm WHERE pm.EMPCODE = ral.ACTION_BY LIMIT 1)),
+                                                                               'ACTION_TYPE', ral.ACTION_TYPE,
+                                                                               'DESCRIPTION', ral.DESCRIPTION,
+                                                                               'CREATE_DATE', ral.CREATE_DATE
                                                                            )
                                                                       )
                                                            FROM
                                                                       request_approval_log ral
                                                            WHERE
-                                                                      ral.REQUEST_ID = rr.REQUEST_ID
+                                                                      ral.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS approval_logs
@@ -1045,9 +937,9 @@ export const ApprovalQueueSQL = {
                                                            FROM
                                                                       request_vendor_selections rvs2
                                                                            JOIN
-                                                                      vendor_selection_criteria vsc ON vsc.SELECTION_ID = rvs2.SELECTION_ID
+                                                                      vendor_selection_criteria vsc ON vsc.REQUEST_VENDOR_SELECTIONS_ID = rvs2.REQUEST_VENDOR_SELECTIONS_ID
                                                            WHERE
-                                                                      rvs2.REQUEST_ID = rr.REQUEST_ID AND rvs2.INUSE = 1
+                                                                      rvs2.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND rvs2.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS gpr_criteria
@@ -1055,29 +947,29 @@ export const ApprovalQueueSQL = {
                             FROM
                                        request_register_vendor rr
                                             LEFT JOIN
-                                       request_vendor_selections rvs ON rvs.REQUEST_ID = rr.REQUEST_ID AND rvs.INUSE = 1
+                                       request_vendor_selections rvs ON rvs.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND rvs.INUSE = 1
                                             LEFT JOIN
-                                       vendors v ON v.VENDOR_ID = rr.VENDOR_ID
+                                       vendors v ON v.VENDORS_ID = rr.VENDORS_ID
                                             LEFT JOIN
-                                       master_vendor_types vt ON vt.VENDOR_TYPE_ID = v.VENDOR_TYPE_ID
+                                       master_vendor_types vt ON vt.MASTER_VENDOR_TYPES_ID = v.MASTER_VENDOR_TYPES_ID
                                             LEFT JOIN
-                                       Person.MEMBER_FED m ON m.EMPCODE = rr.REQUEST_BY_EMPLOYEECODE
+                                       person.member_fed m ON m.EMPCODE = rr.REQUEST_BY_EMPLOYEECODE
                             WHERE
-                                       rr.REQUEST_ID = dataItem.REQUEST_ID
+                                       rr.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
                                        AND rr.INUSE = 1
                             LIMIT
                                        1
         `
 
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
 
     return sql
   },
 
-  getAssigneeByEmpCode: async (dataItem: RegisterRequestDataItem) => {
+  getAssigneeByEmpCode: async (dataItem: any) => {
     let sql = `
                             SELECT
-                                       ASSIGNEES_ID
+                                       ASSIGNEES_TO_ID
                                      , EMPCODE
                                      , EMPNAME
                                      , EMPEMAIL
@@ -1097,7 +989,7 @@ export const ApprovalQueueSQL = {
     return sql
   },
 
-  updateRequestPicAssignee: async (dataItem: RegisterRequestDataItem) => {
+  updateRequestPicAssignee: async (dataItem: any) => {
     let sql = `
                             UPDATE request_register_vendor SET
                                        ASSIGN_TO = 'dataItem.ASSIGN_TO'
@@ -1105,22 +997,22 @@ export const ApprovalQueueSQL = {
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
-                                       REQUEST_ID = dataItem.REQUEST_ID
+                                       REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
         `
 
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
-    sql = sql.replaceAll('dataItem.ASSIGN_TO', escapeSqlString(dataItem['ASSIGN_TO']))
-    sql = sql.replaceAll('dataItem.PIC_EMAIL', escapeSqlString(dataItem['PIC_EMAIL']))
-    sql = sql.replaceAll('dataItem.UPDATE_BY', escapeSqlString(dataItem['UPDATE_BY'] || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.ASSIGN_TO', dataItem['ASSIGN_TO'])
+    sql = sql.replaceAll('dataItem.PIC_EMAIL', dataItem['PIC_EMAIL'])
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
     return sql
   },
 
-  insertAssignmentHistory: async (dataItem: RegisterRequestDataItem) => {
+  insertAssignmentHistory: async (dataItem: any) => {
     let sql = `
                             INSERT INTO request_assignment_history (
-                                       REQUEST_ID
-                                     , STEP_ID
+                                       REQUEST_REGISTER_VENDOR_ID
+                                     , REQUEST_APPROVAL_STEP_ID
                                      , SCOPE
                                      , STEP_CODE
                                      , GROUP_CODE
@@ -1133,8 +1025,8 @@ export const ApprovalQueueSQL = {
                                      , UPDATE_BY
                                      , INUSE
                             ) VALUES (
-                                        dataItem.REQUEST_ID
-                                     ,  dataItem.STEP_ID
+                                        dataItem.REQUEST_REGISTER_VENDOR_ID
+                                     ,  dataItem.REQUEST_APPROVAL_STEP_ID
                                      , 'dataItem.SCOPE'
                                      , 'dataItem.STEP_CODE'
                                      , 'dataItem.GROUP_CODE'
@@ -1149,46 +1041,46 @@ export const ApprovalQueueSQL = {
                             )
         `
 
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
-    sql = sql.replaceAll('dataItem.STEP_ID', dataItem['STEP_ID'] ? dataItem['STEP_ID'].toString() : 'NULL')
-    sql = sql.replaceAll('dataItem.SCOPE', escapeSqlString(dataItem['SCOPE']))
-    sql = sql.replaceAll('dataItem.STEP_CODE', escapeSqlString(dataItem['STEP_CODE']))
-    sql = sql.replaceAll('dataItem.GROUP_CODE', escapeSqlString(dataItem['GROUP_CODE']))
-    sql = sql.replaceAll('dataItem.FROM_EMPCODE', escapeSqlString(dataItem['FROM_EMPCODE']))
-    sql = sql.replaceAll('dataItem.TO_EMPCODE', escapeSqlString(dataItem['TO_EMPCODE']))
-    sql = sql.replaceAll('dataItem.REASON', escapeSqlString(dataItem['REASON']))
-    sql = sql.replaceAll('dataItem.DESCRIPTION', escapeSqlString(dataItem['DESCRIPTION'] || dataItem['REASON']))
-    sql = sql.replaceAll('dataItem.CHANGED_BY', escapeSqlString(dataItem['CHANGED_BY'] || dataItem['UPDATE_BY'] || 'SYSTEM'))
-    sql = sql.replaceAll('dataItem.CREATE_BY', escapeSqlString(dataItem['CREATE_BY'] || dataItem['CHANGED_BY'] || dataItem['UPDATE_BY'] || 'SYSTEM'))
-    sql = sql.replaceAll('dataItem.UPDATE_BY', escapeSqlString(dataItem['UPDATE_BY'] || dataItem['CHANGED_BY'] || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_APPROVAL_STEP_ID', dataItem['REQUEST_APPROVAL_STEP_ID'] ? dataItem['REQUEST_APPROVAL_STEP_ID'].toString() : 'NULL')
+    sql = sql.replaceAll('dataItem.SCOPE', dataItem['SCOPE'])
+    sql = sql.replaceAll('dataItem.STEP_CODE', dataItem['STEP_CODE'])
+    sql = sql.replaceAll('dataItem.GROUP_CODE', dataItem['GROUP_CODE'])
+    sql = sql.replaceAll('dataItem.FROM_EMPCODE', dataItem['FROM_EMPCODE'])
+    sql = sql.replaceAll('dataItem.TO_EMPCODE', dataItem['TO_EMPCODE'])
+    sql = sql.replaceAll('dataItem.REASON', dataItem['REASON'])
+    sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem['DESCRIPTION'] || dataItem['REASON'])
+    sql = sql.replaceAll('dataItem.CHANGED_BY', dataItem['CHANGED_BY'] || dataItem['UPDATE_BY'] || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || dataItem['CHANGED_BY'] || dataItem['UPDATE_BY'] || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || dataItem['CHANGED_BY'] || 'SYSTEM')
     sql = sql.replaceAll('dataItem.INUSE', '1')
 
     return sql
   },
 
-  completeRegistration: async (dataItem: RegisterRequestDataItem) => {
+  completeRegistration: async (dataItem: any) => {
     let sql = `
                             UPDATE request_register_vendor SET
                                        APPROVED_VENDOR_CODE = 'dataItem.VENDOR_CODE'
                                      , REQUEST_STATE = 'completed'
-                                     , CURRENT_STATUS_ID = (
-                                           SELECT STATUS_ID FROM m_request_status
+                                     , CURRENT_M_REQUEST_STATUS_ID = (
+                                           SELECT M_REQUEST_STATUS_ID FROM workflow_step_master
                                            WHERE STEP_CODE = 'ACCOUNT_REGISTERED'
+                                             AND INUSE = 1
                                            LIMIT 1
                                        )
-                                     , CURRENT_STEP_ID = NULL
-                                     , APPROVE_BY = 'dataItem.UPDATE_BY'
-                                     , APPROVE_DATE = NOW()
+                                     , CURRENT_REQUEST_APPROVAL_STEP_ID = NULL
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
-                                       REQUEST_ID = dataItem.REQUEST_ID
+                                       REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
         `
 
-    sql = sql.replaceAll('dataItem.REQUEST_ID', (dataItem['REQUEST_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.VENDOR_CODE', dataItem['VENDOR_CODE'] || '')
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
     return sql
   },
 }
+

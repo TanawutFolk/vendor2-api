@@ -1,34 +1,10 @@
-export interface AddVendorDataItem {
-  [key: string]: any
-  company_name?: string
-  province?: string
-  postal_code?: string
-  vendor_type_id?: number | string
-  vendor_region?: string
-  website?: string
-  tel_center?: string
-  emailmain?: string
-  address?: string
-  note?: string
-  CREATE_BY?: string
-  contact_name?: string
-  tel_phone?: string
-  email?: string
-  position?: string
-  vendor_id?: number | string
-  product_group_id?: number | string
-  maker_name?: string
-  product_name?: string
-  model_list?: string
-  group_name?: string
-}
-
+﻿
 export const AddVendorSQL = {
   // Check duplicate vendor by company_name, province, and postal_code
-  checkDuplicateVendor: async (dataItem: AddVendorDataItem) => {
+  checkDuplicateVendor: async (dataItem: any) => {
     let sql = `
                             SELECT
-                                       VENDOR_ID
+                                       VENDORS_ID
                                      , COMPANY_NAME
                                      , PROVINCE
                                      , POSTAL_CODE
@@ -49,13 +25,13 @@ export const AddVendorSQL = {
   },
 
   // Create new vendor (main table)
-  createVendor: async (dataItem: AddVendorDataItem) => {
+  createVendor: async (dataItem: any) => {
     let sql = `
                             INSERT INTO vendors (
                                        COMPANY_NAME
                                      , PROVINCE
                                      , POSTAL_CODE
-                                     , VENDOR_TYPE_ID
+                                     , MASTER_VENDOR_TYPES_ID
                                      , VENDOR_REGION
                                      , WEBSITE
                                      , TEL_CENTER
@@ -71,7 +47,7 @@ export const AddVendorSQL = {
                                        'dataItem.COMPANY_NAME'
                                      , 'dataItem.PROVINCE'
                                      , 'dataItem.POSTAL_CODE'
-                                     ,  dataItem.VENDOR_TYPE_ID
+                                     ,  dataItem.MASTER_VENDOR_TYPES_ID
                                      , 'dataItem.VENDOR_REGION'
                                      , 'dataItem.WEBSITE'
                                      , 'dataItem.TEL_CENTER'
@@ -88,7 +64,7 @@ export const AddVendorSQL = {
     sql = sql.replaceAll('dataItem.COMPANY_NAME', dataItem['COMPANY_NAME'] || '')
     sql = sql.replaceAll('dataItem.PROVINCE', dataItem['PROVINCE'] || '')
     sql = sql.replaceAll('dataItem.POSTAL_CODE', dataItem['POSTAL_CODE'] || '')
-    sql = sql.replaceAll('dataItem.VENDOR_TYPE_ID', (dataItem['VENDOR_TYPE_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.MASTER_VENDOR_TYPES_ID', (dataItem['MASTER_VENDOR_TYPES_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.VENDOR_REGION', dataItem['VENDOR_REGION'] || 'Local')
     sql = sql.replaceAll('dataItem.WEBSITE', dataItem['WEBSITE'] || '')
     sql = sql.replaceAll('dataItem.TEL_CENTER', dataItem['TEL_CENTER'] || '')
@@ -101,10 +77,10 @@ export const AddVendorSQL = {
   },
 
   // Create vendor contact
-  createVendorContact: async (dataItem: AddVendorDataItem) => {
+  createVendorContact: async (dataItem: any) => {
     let sql = `
                             INSERT INTO vendor_contacts (
-                                       VENDOR_ID
+                                       VENDORS_ID
                                      , CONTACT_NAME
                                      , TEL_PHONE
                                      , EMAIL
@@ -115,7 +91,7 @@ export const AddVendorSQL = {
                                      , INUSE
                             )
                             VALUES (
-                                        dataItem.VENDOR_ID
+                                        dataItem.VENDORS_ID
                                      , 'dataItem.CONTACT_NAME'
                                      , 'dataItem.TEL_PHONE'
                                      , 'dataItem.EMAIL'
@@ -127,7 +103,7 @@ export const AddVendorSQL = {
                             )
         `
 
-    sql = sql.replaceAll('dataItem.VENDOR_ID', (dataItem['VENDOR_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.VENDORS_ID', (dataItem['VENDORS_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.CONTACT_NAME', dataItem['CONTACT_NAME'] || '')
     sql = sql.replaceAll('dataItem.TEL_PHONE', dataItem['TEL_PHONE'] || '')
     sql = sql.replaceAll('dataItem.EMAIL', dataItem['EMAIL'] || '')
@@ -138,11 +114,11 @@ export const AddVendorSQL = {
   },
 
   // Create vendor product
-  createVendorProduct: async (dataItem: AddVendorDataItem) => {
+  createVendorProduct: async (dataItem: any) => {
     let sql = `
                             INSERT INTO vendor_products (
-                                       VENDOR_ID
-                                     , PRODUCT_GROUP_ID
+                                       VENDORS_ID
+                                     , MASTER_PRODUCT_GROUPS_ID
                                      , MAKER_NAME
                                      , PRODUCT_NAME
                                      , MODEL_LIST
@@ -152,8 +128,8 @@ export const AddVendorSQL = {
                                      , INUSE
                             )
                             VALUES (
-                                        dataItem.VENDOR_ID
-                                     ,  dataItem.PRODUCT_GROUP_ID
+                                        dataItem.VENDORS_ID
+                                     ,  dataItem.MASTER_PRODUCT_GROUPS_ID
                                      , 'dataItem.MAKER_NAME'
                                      , 'dataItem.PRODUCT_NAME'
                                      , 'dataItem.MODEL_LIST'
@@ -164,8 +140,8 @@ export const AddVendorSQL = {
                             )
         `
 
-    sql = sql.replaceAll('dataItem.VENDOR_ID', (dataItem['VENDOR_ID'] || 0).toString())
-    sql = sql.replaceAll('dataItem.PRODUCT_GROUP_ID', (dataItem['PRODUCT_GROUP_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.VENDORS_ID', (dataItem['VENDORS_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.MASTER_PRODUCT_GROUPS_ID', (dataItem['MASTER_PRODUCT_GROUPS_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.MAKER_NAME', dataItem['MAKER_NAME'] || '')
     sql = sql.replaceAll('dataItem.PRODUCT_NAME', dataItem['PRODUCT_NAME'] || '')
     sql = sql.replaceAll('dataItem.MODEL_LIST', dataItem['MODEL_LIST'] || '')
@@ -178,7 +154,7 @@ export const AddVendorSQL = {
   getVendorTypes: async (dataItem?: any) => {
     let sql = `
                             SELECT
-                                       VENDOR_TYPE_ID
+                                       MASTER_VENDOR_TYPES_ID
                                      , NAME
                             FROM
                                        master_vendor_types
@@ -194,7 +170,7 @@ export const AddVendorSQL = {
   getProductGroups: async (dataItem?: any) => {
     let sql = `
                             SELECT
-                                       PRODUCT_GROUP_ID
+                                       MASTER_PRODUCT_GROUPS_ID
                                      , GROUP_NAME
                             FROM
                                        master_product_groups
@@ -213,7 +189,7 @@ export const AddVendorSQL = {
   },
 
   // Create new product group
-  createProductGroup: async (dataItem: AddVendorDataItem) => {
+  createProductGroup: async (dataItem: any) => {
     let sql = `
                             INSERT INTO master_product_groups (
                                        GROUP_NAME
@@ -238,10 +214,10 @@ export const AddVendorSQL = {
   },
 
   // Check duplicate product group
-  checkDuplicateProductGroup: async (dataItem: AddVendorDataItem) => {
+  checkDuplicateProductGroup: async (dataItem: any) => {
     let sql = `
                             SELECT
-                                       PRODUCT_GROUP_ID
+                                       MASTER_PRODUCT_GROUPS_ID
                                      , GROUP_NAME
                             FROM
                                        master_product_groups

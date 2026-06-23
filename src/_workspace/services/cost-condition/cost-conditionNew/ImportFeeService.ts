@@ -61,7 +61,7 @@ export const ImportFeeService = {
     const getLatestExchangeRate = (await ExchangeRateService.getLatestExchangeRate({
       FISCAL_YEAR: dataItem.FISCAL_YEAR,
     })) as {
-      CURRENCY_ID: number
+      INFO_CURRENCY_ID: number
       CURRENCY_SYMBOL: string
       CURRENCY_NAME: string
       EXCHANGE_RATE_ID: number
@@ -96,7 +96,7 @@ export const ImportFeeService = {
       IS_CURRENT: number
       ITEM_M_S_PRICE_CREATE_FROM_SETTING_ID: number
 
-      CURRENCY_ID: number
+      INFO_CURRENCY_ID: number
       ITEM_CODE_FOR_SUPPORT_MES: string
       PURCHASE_PRICE: number
       ITEM_ID: number
@@ -114,7 +114,7 @@ export const ImportFeeService = {
         })
       )
 
-      const exchangeRate = getLatestExchangeRate.find((item) => item.CURRENCY_ID === itemMSPrice.CURRENCY_ID)
+      const exchangeRate = getLatestExchangeRate.find((item) => item.INFO_CURRENCY_ID === itemMSPrice.INFO_CURRENCY_ID)
 
       if (!exchangeRate) {
         throw new Error('Exchange Rate Not Found')

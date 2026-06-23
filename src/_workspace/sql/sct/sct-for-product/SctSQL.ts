@@ -737,7 +737,7 @@ export const SctSQL = {
               JOIN
             CURRENCY tb_4
               ON
-            tb_3.PURCHASE_PRICE_CURRENCY_ID = tb_4.CURRENCY_ID
+            tb_3.PURCHASE_PRICE_CURRENCY_ID = tb_4.INFO_CURRENCY_ID
               JOIN
             UNIT_OF_MEASUREMENT tb_5
               ON
@@ -835,7 +835,7 @@ export const SctSQL = {
               JOIN
             CURRENCY tb_4
               ON
-            tb_3.PURCHASE_PRICE_CURRENCY_ID = tb_4.CURRENCY_ID
+            tb_3.PURCHASE_PRICE_CURRENCY_ID = tb_4.INFO_CURRENCY_ID
               JOIN
             UNIT_OF_MEASUREMENT tb_5
               ON
@@ -890,7 +890,7 @@ export const SctSQL = {
             , tb_9.ITEM_CATEGORY_ID
             , tb_6.IMPORT_FEE_RATE
             , tb_7.CURRENCY_SYMBOL AS PURCHASE_PRICE_CURRENCY
-            , tb_7.CURRENCY_ID AS PURCHASE_PRICE_CURRENCY_ID
+            , tb_7.INFO_CURRENCY_ID AS PURCHASE_PRICE_CURRENCY_ID
             , tb_3.PURCHASE_PRICE_UNIT_ID
             , tb_4.PURCHASE_UNIT_RATIO
             , tb_4.USAGE_UNIT_RATIO
@@ -929,7 +929,7 @@ export const SctSQL = {
               JOIN
             CURRENCY tb_7
               ON
-            tb_3.PURCHASE_PRICE_CURRENCY_ID = tb_7.CURRENCY_ID AND tb_7.INUSE = 1
+            tb_3.PURCHASE_PRICE_CURRENCY_ID = tb_7.INFO_CURRENCY_ID AND tb_7.INUSE = 1
               JOIN
             UNIT_OF_MEASUREMENT tb_8
               ON

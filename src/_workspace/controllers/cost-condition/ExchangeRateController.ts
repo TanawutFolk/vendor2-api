@@ -59,7 +59,7 @@ export const ExchangeRateController = {
     let orderBy = ''
 
     if (dataItem['Order'].length <= 0) {
-      orderBy = 'tb_1.UPDATE_DATE DESC, tb_1.CURRENCY_ID ASC'
+      orderBy = 'tb_1.UPDATE_DATE DESC, tb_1.INFO_CURRENCY_ID ASC'
     } else {
       for (let i = 0; i < dataItem['Order'].length; i++) {
         const word = dataItem['Order'][i]

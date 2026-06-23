@@ -30,7 +30,7 @@ export const ItemManufacturingSQL = {
               , ITEM_ID
               , ITEM_PURPOSE_ID
               , ITEM_GROUP_ID
-              , VENDOR_ID
+              , VENDORS_ID
               , MAKER_ID
               , WIDTH
               , HEIGHT
@@ -60,7 +60,7 @@ export const ItemManufacturingSQL = {
               ,  @itemId
               , 'dataItem.ITEM_PURPOSE_ID'
               ,  @itemGroupId
-              , 'dataItem.VENDOR_ID'
+              , 'dataItem.VENDORS_ID'
               , 'dataItem.MAKER_ID'
               , dataItem.WIDTH
               , dataItem.HEIGHT
@@ -90,7 +90,7 @@ export const ItemManufacturingSQL = {
     sql = sql.replaceAll('dataItem.ITEM_CATEGORY_ID', dataItem['ITEM_CATEGORY_ID'])
     sql = sql.replaceAll('dataItem.ITEM_PURPOSE_ID', dataItem['ITEM_PURPOSE_ID'])
     sql = sql.replaceAll('dataItem.ITEM_GROUP_ID', dataItem['ITEM_GROUP_ID'])
-    sql = sql.replaceAll('dataItem.VENDOR_ID', dataItem['VENDOR_ID'])
+    sql = sql.replaceAll('dataItem.VENDORS_ID', dataItem['VENDORS_ID'])
     sql = sql.replaceAll('dataItem.MAKER_ID', dataItem['MAKER_ID'])
 
     sql = sql.replaceAll('dataItem.WIDTH', dataItem['WIDTH'] != '' ? dataItem['WIDTH'] : 'NULL')
@@ -133,7 +133,7 @@ export const ItemManufacturingSQL = {
               , ITEM_ID
               , ITEM_PURPOSE_ID
               , ITEM_GROUP_ID
-              , VENDOR_ID
+              , VENDORS_ID
               , MAKER_ID
               , WIDTH
               , HEIGHT
@@ -163,7 +163,7 @@ export const ItemManufacturingSQL = {
               ,  @itemId
               , 'dataItem.ITEM_PURPOSE_ID'
               , 'dataItem.ITEM_GROUP_ID'
-              , 'dataItem.VENDOR_ID'
+              , 'dataItem.VENDORS_ID'
               , 'dataItem.MAKER_ID'
               , dataItem.WIDTH
               , dataItem.HEIGHT
@@ -193,7 +193,7 @@ export const ItemManufacturingSQL = {
     sql = sql.replaceAll('dataItem.ITEM_CATEGORY_ID', dataItem['ITEM_CATEGORY_ID'])
     sql = sql.replaceAll('dataItem.ITEM_PURPOSE_ID', dataItem['ITEM_PURPOSE_ID'])
     sql = sql.replaceAll('dataItem.ITEM_GROUP_ID', dataItem['ITEM_GROUP_ID'])
-    sql = sql.replaceAll('dataItem.VENDOR_ID', dataItem['VENDOR_ID'])
+    sql = sql.replaceAll('dataItem.VENDORS_ID', dataItem['VENDORS_ID'])
     sql = sql.replaceAll('dataItem.MAKER_ID', dataItem['MAKER_ID'])
 
     sql = sql.replaceAll('dataItem.WIDTH', dataItem['WIDTH'] != '' ? dataItem['WIDTH'] : 'NULL')
@@ -234,7 +234,7 @@ export const ItemManufacturingSQL = {
 
     ITEM_PURPOSE_ID: string
     ITEM_GROUP_ID: string
-    VENDOR_ID: string
+    VENDORS_ID: string
     MAKER_ID: string
     WIDTH: string
     HEIGHT: string
@@ -263,7 +263,7 @@ export const ItemManufacturingSQL = {
             , ITEM_ID
             , ITEM_PURPOSE_ID
             , ITEM_GROUP_ID
-            , VENDOR_ID
+            , VENDORS_ID
             , MAKER_ID
             , WIDTH
             , HEIGHT
@@ -295,7 +295,7 @@ export const ItemManufacturingSQL = {
             ,  @itemId
             , 'dataItem.ITEM_PURPOSE_ID'
             , 'dataItem.ITEM_GROUP_ID'
-            , 'dataItem.VENDOR_ID'
+            , 'dataItem.VENDORS_ID'
             , 'dataItem.MAKER_ID'
             , dataItem.WIDTH
             , dataItem.HEIGHT
@@ -327,7 +327,7 @@ export const ItemManufacturingSQL = {
     sql = sql.replaceAll('dataItem.ITEM_CATEGORY_ID', dataItem['ITEM_CATEGORY_ID'])
     sql = sql.replaceAll('dataItem.ITEM_PURPOSE_ID', dataItem['ITEM_PURPOSE_ID'])
     sql = sql.replaceAll('dataItem.ITEM_GROUP_ID', dataItem['ITEM_GROUP_ID'])
-    sql = sql.replaceAll('dataItem.VENDOR_ID', dataItem['VENDOR_ID'])
+    sql = sql.replaceAll('dataItem.VENDORS_ID', dataItem['VENDORS_ID'])
     sql = sql.replaceAll('dataItem.MAKER_ID', dataItem['MAKER_ID'])
 
     sql = sql.replaceAll('dataItem.WIDTH', dataItem['WIDTH'] != '' ? dataItem['WIDTH'] : 'NULL')

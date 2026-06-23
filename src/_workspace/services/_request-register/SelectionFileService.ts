@@ -4,7 +4,7 @@ import path from 'path'
 // ── Configuration ────────────────────────────────────────────────────────────
 // Base path for Selection Supplier file storage.
 const DEFAULT_SELECTION_FILE_BASE_PATH =
-  '\\\\192.168.14.35\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier\\01.Selection_File'
+  '\\\\192.168.14.35\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier Test\\01.Selection_File'
 
 // Upload directory where multer stores temporary files
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads', 'documents')
@@ -140,6 +140,38 @@ export const SelectionFileService = {
     }
 
     return ''
+  },
+
+  deleteSelectionFile(filePath: string, fileName?: string, requestNumber?: string) {
+    const resolvedPath = this.resolveDownloadPath(filePath, fileName, requestNumber)
+
+    if (!resolvedPath) {
+      return {
+        deleted: false,
+        filePath: '',
+        reason: 'Selection document not found',
+      }
+    }
+
+    if (!this.isManagedSelectionFilePath(resolvedPath)) {
+      throw new Error('Invalid selection document path')
+    }
+
+    if (!fs.existsSync(resolvedPath)) {
+      return {
+        deleted: false,
+        filePath: resolvedPath,
+        reason: 'Selection document not found',
+      }
+    }
+
+    fs.unlinkSync(resolvedPath)
+
+    return {
+      deleted: true,
+      filePath: resolvedPath,
+      reason: '',
+    }
   },
 
   /**

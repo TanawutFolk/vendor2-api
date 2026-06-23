@@ -64,7 +64,7 @@ export const BlacklistCNService = {
 
         for (const aliasName of row.aliases) {
           const sqlInsertAlias = BlacklistSQL.insertAlias({
-            VENDOR_ID: insertedVendorId,
+            BLACKLIST_CN_ID: insertedVendorId,
             ALIAS_NAME: aliasName,
             NORMALIZED_ALIAS_NAME: normalizeName(aliasName),
             DESCRIPTION: null,

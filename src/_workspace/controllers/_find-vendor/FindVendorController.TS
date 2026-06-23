@@ -54,10 +54,10 @@ export const FindVendorController = {
             { table: 'v', id: 'address', Fns: 'LIKE' },
             { table: 'v', id: 'tel_center', Fns: 'LIKE' },
             { table: 'v', id: 'emailmain', Fns: 'LIKE' },
-            { table: 'v', id: 'vendor_type_id', Fns: '=' },
+            { table: 'v', id: 'vendor_type_id', column: 'MASTER_VENDOR_TYPES_ID', Fns: '=' },
             { table: 'vt', id: 'vendor_type_name', alias: 'name', Fns: 'LIKE' },
             { table: 'mpg', id: 'group_name', Fns: 'LIKE' },
-            { table: 'vp', id: 'product_group_id', Fns: '=' },
+            { table: 'vp', id: 'product_group_id', column: 'MASTER_PRODUCT_GROUPS_ID', Fns: '=' },
             { table: 'vp', id: 'maker_name', Fns: 'LIKE' },
             { table: 'vp', id: 'product_name', Fns: 'LIKE' },
             { table: 'vp', id: 'model_list', Fns: 'LIKE' },
@@ -101,7 +101,7 @@ export const FindVendorController = {
                         WHEN EXISTS (
                             SELECT 1
                             FROM request_register_vendor rrv_ip
-                            WHERE rrv_ip.VENDOR_ID = v.VENDOR_ID
+                            WHERE rrv_ip.VENDORS_ID = v.VENDORS_ID
                               AND rrv_ip.INUSE = 1
                               AND rrv_ip.REQUEST_STATE = 'in_progress'
                         ) THEN 'In Progress'
@@ -193,7 +193,7 @@ export const FindVendorController = {
         }
 
         try {
-            const vendor_id = parseInt(String(dataItem.VENDOR_ID ?? dataItem.vendor_id ?? ''))
+            const vendor_id = parseInt(String(dataItem.VENDORS_ID ?? dataItem.vendor_id ?? ''))
 
             if (!vendor_id || isNaN(vendor_id)) {
                 return res.status(400).json({
@@ -280,7 +280,7 @@ export const FindVendorController = {
         }
 
         try {
-            const vendor_id = parseInt(String(dataItem.VENDOR_ID ?? dataItem.vendor_id ?? ''))
+            const vendor_id = parseInt(String(dataItem.VENDORS_ID ?? dataItem.vendor_id ?? ''))
 
             if (!vendor_id || isNaN(vendor_id)) {
                 return res.status(400).json({
@@ -321,7 +321,7 @@ export const FindVendorController = {
         const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
         try {
-            const vendor_id = parseInt(dataItem.VENDOR_ID as string)
+            const vendor_id = parseInt(String(dataItem.VENDORS_ID ?? dataItem.vendor_id ?? ''))
 
             if (!vendor_id || isNaN(vendor_id)) {
                 return res.status(400).json({
@@ -335,7 +335,7 @@ export const FindVendorController = {
 
             const result = await FindVendorModel.updateVendorComprehensive({
                 ...dataItem,
-                VENDOR_ID: vendor_id,
+                VENDORS_ID: vendor_id,
             })
 
             return res.status(200).json(result as ResponseI)
@@ -355,7 +355,7 @@ export const FindVendorController = {
         const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
         try {
-            const vendor_id = parseInt(dataItem.VENDOR_ID as string)
+            const vendor_id = parseInt(String(dataItem.VENDORS_ID ?? dataItem.vendor_id ?? ''))
 
             if (!vendor_id || isNaN(vendor_id)) {
                 return res.status(400).json({
@@ -368,7 +368,7 @@ export const FindVendorController = {
             }
 
             const result = await FindVendorModel.deleteVendor({
-                VENDOR_ID: vendor_id,
+                VENDORS_ID: vendor_id,
                 UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
             })
 
@@ -562,10 +562,10 @@ export const FindVendorController = {
                 { table: 'v', id: 'address', Fns: 'LIKE' },
                 { table: 'v', id: 'tel_center', Fns: 'LIKE' },
                 { table: 'v', id: 'emailmain', Fns: 'LIKE' },
-                { table: 'v', id: 'vendor_type_id', Fns: '=' },
+                { table: 'v', id: 'vendor_type_id', column: 'MASTER_VENDOR_TYPES_ID', Fns: '=' },
                 { table: 'vt', id: 'vendor_type_name', alias: 'name', Fns: 'LIKE' },
                 { table: 'mpg', id: 'group_name', Fns: 'LIKE' },
-                { table: 'vp', id: 'product_group_id', Fns: '=' },
+                { table: 'vp', id: 'product_group_id', column: 'MASTER_PRODUCT_GROUPS_ID', Fns: '=' },
                 { table: 'vp', id: 'maker_name', Fns: 'LIKE' },
                 { table: 'vp', id: 'product_name', Fns: 'LIKE' },
                 { table: 'vp', id: 'model_list', Fns: 'LIKE' },
@@ -617,7 +617,7 @@ export const FindVendorController = {
                 // We fetch these specific IDs.
                 // We must modify sqlWhere to filter by these IDs.
                 const ids = vendorIds.join(',');
-                const idsSqlWhere = ` AND v.VENDOR_ID IN (${ids})`;
+                const idsSqlWhere = ` AND v.VENDORS_ID IN (${ids})`;
                 // We use searchAllForExport but with specific IDs override
                 // We ignore Order from SQL, because we will sort by ID order in JS
                 searchQuery.SQLWHERE = idsSqlWhere;

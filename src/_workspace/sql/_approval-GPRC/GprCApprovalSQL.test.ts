@@ -4,9 +4,9 @@ import { GprCApprovalSQL } from './GprCApprovalSQL'
 describe('GprCApprovalSQL normalized circular members', () => {
   test('keeps CIRCULAR_JSON out of request_vendor_gpr_c_flows', () => {
     const sql = GprCApprovalSQL.updateFlowSetup({
-      GPR_C_FLOW_ID: 1,
-      REQUEST_ID: 10,
-      SELECTION_ID: 20,
+      REQUEST_VENDOR_GPR_C_FLOWS_ID: 1,
+      REQUEST_REGISTER_VENDOR_ID: 10,
+      REQUEST_VENDOR_SELECTIONS_ID: 20,
       FLOW_STATUS: 'in_progress',
       CURRENT_STEP_CODE: 'REQUESTER_APPROVER',
       REQUESTER_EMPCODE: 'S00001',

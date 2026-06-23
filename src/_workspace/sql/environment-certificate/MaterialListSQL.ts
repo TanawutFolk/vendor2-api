@@ -69,7 +69,7 @@ export const MaterialListSQL = {
             ON tb_20.ITEM_CATEGORY_ID = tb_21.ITEM_CATEGORY_ID
           LEFT JOIN
             VENDOR tb_22
-            ON (tb_12.VENDOR_ID = tb_22.VENDOR_ID)
+            ON (tb_12.VENDORS_ID = tb_22.VENDORS_ID)
           LEFT JOIN
             MAKER tb_23
             ON (tb_12.MAKER_ID = tb_23.MAKER_ID)
@@ -231,7 +231,7 @@ export const MaterialListSQL = {
           ON tb_20.ITEM_CATEGORY_ID = tb_21.ITEM_CATEGORY_ID
         LEFT JOIN
           VENDOR tb_22
-          ON (tb_12.VENDOR_ID = tb_22.VENDOR_ID)
+          ON (tb_12.VENDORS_ID = tb_22.VENDORS_ID)
         LEFT JOIN
           MAKER tb_23
           ON (tb_12.MAKER_ID = tb_23.MAKER_ID)
@@ -406,7 +406,7 @@ export const MaterialListSQL = {
           ON tb_20.ITEM_CATEGORY_ID = tb_21.ITEM_CATEGORY_ID
         LEFT JOIN
           VENDOR tb_22
-          ON (tb_12.VENDOR_ID = tb_22.VENDOR_ID)
+          ON (tb_12.VENDORS_ID = tb_22.VENDORS_ID)
         LEFT JOIN
           MAKER tb_23
           ON (tb_12.MAKER_ID = tb_23.MAKER_ID)
@@ -582,7 +582,7 @@ export const MaterialListSQL = {
           ON tb_20.ITEM_CATEGORY_ID = tb_21.ITEM_CATEGORY_ID
         LEFT JOIN
           VENDOR tb_22
-          ON (tb_12.VENDOR_ID = tb_22.VENDOR_ID)
+          ON (tb_12.VENDORS_ID = tb_22.VENDORS_ID)
         LEFT JOIN
           MAKER tb_23
           ON (tb_12.MAKER_ID = tb_23.MAKER_ID)
@@ -738,7 +738,7 @@ export const MaterialListSQL = {
           ON tb_20.ITEM_CATEGORY_ID = tb_21.ITEM_CATEGORY_ID
         LEFT JOIN
           VENDOR tb_22
-          ON (tb_12.VENDOR_ID = tb_22.VENDOR_ID)
+          ON (tb_12.VENDORS_ID = tb_22.VENDORS_ID)
         LEFT JOIN
           MAKER tb_23
           ON (tb_12.MAKER_ID = tb_23.MAKER_ID)

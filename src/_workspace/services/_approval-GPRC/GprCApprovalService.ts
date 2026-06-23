@@ -24,7 +24,7 @@ const getValue = (row: any, ...keys: string[]) => {
 
 const normalizeMainApprovalStep = (step: any) => ({
   ...step,
-  step_id: Number(getValue(step, 'step_id', 'STEP_ID') || 0),
+  step_id: Number(getValue(step, 'step_id', 'REQUEST_APPROVAL_STEP_ID') || 0),
   step_order: Number(getValue(step, 'step_order', 'STEP_ORDER') || 0),
   step_status: normalizeValue(getValue(step, 'step_status', 'STEP_STATUS')),
   step_code: normalizeValue(getValue(step, 'step_code', 'STEP_CODE')),
@@ -170,30 +170,30 @@ const getPoPicMailContext = async (summary: any) => {
 }
 
 const getSelectionId = async (requestId: number) => {
-  const sql = GprCApprovalSQL.getSelectionIdByRequest({ REQUEST_ID: requestId })
+  const sql = GprCApprovalSQL.getSelectionIdByRequest({ REQUEST_REGISTER_VENDOR_ID: requestId })
   const rows = (await MySQLExecute.search(sql)) as RowDataPacket[]
-  return Number(rows[0]?.selection_id || rows[0]?.SELECTION_ID || 0) || null
+  return Number(rows[0]?.selection_id || rows[0]?.REQUEST_VENDOR_SELECTIONS_ID || 0) || null
 }
 
 const getRequestSummary = async (requestId: number) => {
-  const sql = GprCApprovalSQL.getRequestSummary({ REQUEST_ID: requestId })
+  const sql = GprCApprovalSQL.getRequestSummary({ REQUEST_REGISTER_VENDOR_ID: requestId })
   const rows = (await MySQLExecute.search(sql)) as RowDataPacket[]
   return rows[0] || {}
 }
 
 const getFlowByRequest = async (requestId: number) => {
-  const sql = GprCApprovalSQL.getFlowByRequestId({ REQUEST_ID: requestId })
+  const sql = GprCApprovalSQL.getFlowByRequestId({ REQUEST_REGISTER_VENDOR_ID: requestId })
   const rows = (await MySQLExecute.search(sql)) as RowDataPacket[]
   return rows[0] || null
 }
 
 const getStepsByFlow = async (flowId: number) => {
-  const sql = GprCApprovalSQL.getStepsByFlow({ GPR_C_FLOW_ID: flowId })
+  const sql = GprCApprovalSQL.getStepsByFlow({ REQUEST_VENDOR_GPR_C_FLOWS_ID: flowId })
   return (await MySQLExecute.search(sql)) as RowDataPacket[]
 }
 
 const getCurrentStep = async (flowId: number) => {
-  const sql = GprCApprovalSQL.getCurrentStepByFlow({ GPR_C_FLOW_ID: flowId })
+  const sql = GprCApprovalSQL.getCurrentStepByFlow({ REQUEST_VENDOR_GPR_C_FLOWS_ID: flowId })
   const rows = (await MySQLExecute.search(sql)) as RowDataPacket[]
   return rows[0] || null
 }
@@ -206,8 +206,8 @@ const ensureFlow = async (requestId: number, updateBy: string) => {
   const selectionId = await getSelectionId(requestId)
   const requesterEmpcode = normalizeValue(summary.Request_By_EmployeeCode || summary.REQUEST_BY_EMPLOYEECODE)
   const insertSql = GprCApprovalSQL.insertFlow({
-    REQUEST_ID: requestId,
-    SELECTION_ID: selectionId || '',
+    REQUEST_REGISTER_VENDOR_ID: requestId,
+    REQUEST_VENDOR_SELECTIONS_ID: selectionId || '',
     FLOW_STATUS: 'requester_setup',
     CURRENT_STEP_CODE: 'REQUESTER_SETUP',
     REQUESTER_EMPCODE: requesterEmpcode,
@@ -216,7 +216,7 @@ const ensureFlow = async (requestId: number, updateBy: string) => {
   })
   const result = (await MySQLExecute.execute(insertSql)) as ResultSetHeader
   const flow = await getFlowByRequest(requestId)
-  return flow || { GPR_C_FLOW_ID: result.insertId, REQUEST_ID: requestId }
+  return flow || { REQUEST_VENDOR_GPR_C_FLOWS_ID: result.insertId, REQUEST_REGISTER_VENDOR_ID: requestId }
 }
 
 const buildCircularMembers = async (empcodesRaw: any[]) => {
@@ -381,7 +381,7 @@ const notifyActionRequired = async (requestId: number, step: any, action: any) =
 }
 
 const markMainIssueGprCApproved = async (requestId: number, actionBy: string, remark: string) => {
-  const stepsSql = await GprCApprovalSQL.getApprovalSteps({ REQUEST_ID: requestId })
+  const stepsSql = await GprCApprovalSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId })
   const steps = ((await MySQLExecute.search(stepsSql)) as RowDataPacket[]).map(normalizeMainApprovalStep)
   const currentStep = steps.find((step: any) => String(step.step_status || '').toLowerCase() === 'in_progress')
   if (!currentStep) return
@@ -392,19 +392,19 @@ const markMainIssueGprCApproved = async (requestId: number, actionBy: string, re
     .filter((step: any) => String(step.step_status || '').toLowerCase() === 'pending' && Number(step.step_order) > Number(currentStep.step_order))
     .sort((a: any, b: any) => Number(a.step_order || 0) - Number(b.step_order || 0))
   const nextStep =
-    pendingSteps.find((step: any) => inferStepCode(step) === WORKFLOW_STEP_CODE.AGREEMENT_REACHED) ||
     pendingSteps.find((step: any) => inferStepCode(step) === WORKFLOW_STEP_CODE.DOC_CHECK) ||
+    pendingSteps.find((step: any) => inferStepCode(step) === WORKFLOW_STEP_CODE.AGREEMENT_REACHED) ||
     pendingSteps[0]
 
   const sqlList = [
     await GprCApprovalSQL.updateApprovalStep({
-      STEP_ID: currentStep.step_id,
+      REQUEST_APPROVAL_STEP_ID: currentStep.step_id,
       STEP_STATUS: 'approved',
       UPDATE_BY: actionBy || 'SYSTEM',
     }),
     await GprCApprovalSQL.createApprovalLog({
-      REQUEST_ID: requestId,
-      STEP_ID: currentStep.step_id,
+      REQUEST_REGISTER_VENDOR_ID: requestId,
+      REQUEST_APPROVAL_STEP_ID: currentStep.step_id,
       ACTION_BY: actionBy || 'SYSTEM',
       ACTION_TYPE: 'approved',
       REMARK: remark || 'GPR C sub-workflow approved',
@@ -414,15 +414,15 @@ const markMainIssueGprCApproved = async (requestId: number, actionBy: string, re
   if (nextStep) {
     sqlList.push(
       await GprCApprovalSQL.updateApprovalStep({
-        STEP_ID: nextStep.step_id,
+        REQUEST_APPROVAL_STEP_ID: nextStep.step_id,
         STEP_STATUS: 'in_progress',
         UPDATE_BY: actionBy || 'SYSTEM',
       })
     )
     sqlList.push(
       await GprCApprovalSQL.updateStatus({
-        REQUEST_ID: requestId,
-        REQUEST_STATUS: nextStep.DESCRIPTION || 'Agreement Reached',
+        REQUEST_REGISTER_VENDOR_ID: requestId,
+        REQUEST_STATUS: nextStep.DESCRIPTION || 'PO & SCM Check All Document',
         APPROVE_BY: actionBy || '',
         APPROVE_DATE: '',
         APPROVER_REMARK: remark || '',
@@ -432,7 +432,7 @@ const markMainIssueGprCApproved = async (requestId: number, actionBy: string, re
   } else {
     sqlList.push(
       await GprCApprovalSQL.markRequestCompleted({
-        REQUEST_ID: requestId,
+        REQUEST_REGISTER_VENDOR_ID: requestId,
         UPDATE_BY: actionBy || 'SYSTEM',
       })
     )
@@ -442,16 +442,16 @@ const markMainIssueGprCApproved = async (requestId: number, actionBy: string, re
 }
 
 const markMainIssueGprCRejected = async (requestId: number, actionBy: string, remark: string) => {
-  const stepsSql = await GprCApprovalSQL.getApprovalSteps({ REQUEST_ID: requestId })
+  const stepsSql = await GprCApprovalSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId })
   const steps = ((await MySQLExecute.search(stepsSql)) as RowDataPacket[]).map(normalizeMainApprovalStep)
   const currentStep = steps.find((step: any) => String(step.step_status || '').toLowerCase() === 'in_progress')
-  const contextSql = await GprCApprovalSQL.getRequestStatusContext({ REQUEST_ID: requestId })
+  const contextSql = await GprCApprovalSQL.getRequestStatusContext({ REQUEST_REGISTER_VENDOR_ID: requestId })
   const contextRows = (await MySQLExecute.search(contextSql)) as RowDataPacket[]
-  const vendorId = getValue(contextRows[0], 'vendor_id', 'VENDOR_ID')
+  const vendorId = getValue(contextRows[0], 'vendor_id', 'VENDORS_ID')
 
   const sqlList = [
     await GprCApprovalSQL.updateStatus({
-      REQUEST_ID: requestId,
+      REQUEST_REGISTER_VENDOR_ID: requestId,
       REQUEST_STATUS: 'Rejected',
       APPROVE_BY: actionBy || '',
       APPROVE_DATE: 'NOW()',
@@ -461,21 +461,21 @@ const markMainIssueGprCRejected = async (requestId: number, actionBy: string, re
   ]
 
   if (vendorId) {
-    sqlList.push(await GprCApprovalSQL.updateVendorFftStatus({ VENDOR_ID: vendorId, FFT_STATUS: 2 }))
+    sqlList.push(await GprCApprovalSQL.updateVendorFftStatus({ VENDORS_ID: vendorId, FFT_STATUS: 2 }))
   }
 
   if (currentStep) {
     sqlList.push(
       await GprCApprovalSQL.updateApprovalStep({
-        STEP_ID: currentStep.step_id,
+        REQUEST_APPROVAL_STEP_ID: currentStep.step_id,
         STEP_STATUS: 'rejected',
         UPDATE_BY: actionBy || 'SYSTEM',
       })
     )
     sqlList.push(
       await GprCApprovalSQL.createApprovalLog({
-        REQUEST_ID: requestId,
-        STEP_ID: currentStep.step_id,
+        REQUEST_REGISTER_VENDOR_ID: requestId,
+        REQUEST_APPROVAL_STEP_ID: currentStep.step_id,
         ACTION_BY: actionBy || 'SYSTEM',
         ACTION_TYPE: 'rejected',
         REMARK: remark || 'GPR C sub-workflow rejected',
@@ -486,7 +486,7 @@ const markMainIssueGprCRejected = async (requestId: number, actionBy: string, re
   for (const step of steps.filter((item: any) => String(item.step_status || '').toLowerCase() === 'pending')) {
     sqlList.push(
       await GprCApprovalSQL.updateApprovalStep({
-        STEP_ID: step.step_id,
+        REQUEST_APPROVAL_STEP_ID: step.step_id,
         STEP_STATUS: 'skipped',
         UPDATE_BY: actionBy || 'SYSTEM',
       })
@@ -499,14 +499,14 @@ const markMainIssueGprCRejected = async (requestId: number, actionBy: string, re
 export const GprCApprovalService = {
   createOrGetFlow: async (dataItem: any) => {
     try {
-      const requestId = Number(dataItem.REQUEST_ID)
+      const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID)
       if (!requestId) throw new Error('Missing request_id')
       const existingFlow = await getFlowByRequest(requestId)
       const flow = existingFlow || (await ensureFlow(requestId, normalizeValue(dataItem.UPDATE_BY) || 'SYSTEM'))
       if (!existingFlow) {
         await notifyRequesterSetup(requestId, normalizeValue(dataItem.UPDATE_BY) || 'SYSTEM').catch(console.error)
       }
-      const flowId = Number(getValue(flow, 'GPR_C_FLOW_ID', 'gpr_c_flow_id'))
+      const flowId = Number(getValue(flow, 'REQUEST_VENDOR_GPR_C_FLOWS_ID', 'gpr_c_flow_id'))
       const steps = flowId ? await getStepsByFlow(flowId) : []
       return response(true, 'GPR C flow ready', { flow, steps }, 'GPR C Flow')
     } catch (error: any) {
@@ -516,11 +516,11 @@ export const GprCApprovalService = {
 
   getFlow: async (dataItem: any) => {
     try {
-      const requestId = Number(dataItem.REQUEST_ID)
+      const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID)
       if (!requestId) throw new Error('Missing request_id')
       const flow = await getFlowByRequest(requestId)
       if (!flow) return response(true, 'No GPR C flow found', { flow: null, steps: [], action_required: [] }, 'Get GPR C Flow', 0)
-      const flowId = Number(getValue(flow, 'GPR_C_FLOW_ID', 'gpr_c_flow_id'))
+      const flowId = Number(getValue(flow, 'REQUEST_VENDOR_GPR_C_FLOWS_ID', 'gpr_c_flow_id'))
       const steps = await getStepsByFlow(flowId)
       return response(true, 'GPR C flow loaded', { flow, steps }, 'Get GPR C Flow')
     } catch (error: any) {
@@ -530,7 +530,7 @@ export const GprCApprovalService = {
 
   getQueue: async (dataItem: any) => {
     try {
-      const approverEmpcode = normalizeValue(dataItem.APPROVER_EMPCODE || dataItem.APPROVER_ID)
+      const approverEmpcode = normalizeValue(dataItem.APPROVER_EMPCODE || dataItem.APPROVER_EMPCODE)
       if (!approverEmpcode) throw new Error('Missing approver_empcode')
       const [countSql, dataSql] = GprCApprovalSQL.getQueueByApproverPaginated({
         ...dataItem,
@@ -557,8 +557,8 @@ export const GprCApprovalService = {
 
   reassignStep: async (dataItem: any) => {
     try {
-      const requestId = Number(dataItem.REQUEST_ID)
-      const stepId = Number(dataItem.GPR_C_STEP_ID)
+      const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID)
+      const stepId = Number(dataItem.REQUEST_VENDOR_GPR_C_STEPS_ID)
       const toEmpcode = normalizeValue(dataItem.TO_EMPCODE)
       const updateBy = normalizeValue(dataItem.UPDATE_BY || dataItem.CHANGED_BY) || 'SYSTEM'
 
@@ -566,11 +566,11 @@ export const GprCApprovalService = {
       if (!stepId) throw new Error('Missing gpr_c_step_id')
       if (!toEmpcode) throw new Error('Missing to_empcode')
 
-      const stepSql = GprCApprovalSQL.getStepById({ GPR_C_STEP_ID: stepId })
+      const stepSql = GprCApprovalSQL.getStepById({ REQUEST_VENDOR_GPR_C_STEPS_ID: stepId })
       const stepRows = (await MySQLExecute.search(stepSql)) as RowDataPacket[]
       const step = stepRows[0]
       if (!step) throw new Error('GPR C step not found')
-      if (Number(step.REQUEST_ID || step.request_id) !== requestId) throw new Error('GPR C step does not belong to this request')
+      if (Number(step.REQUEST_REGISTER_VENDOR_ID || step.request_id) !== requestId) throw new Error('GPR C step does not belong to this request')
       if (normalizeValue(step.STEP_STATUS || step.step_status).toUpperCase() !== 'IN_PROGRESS') {
         throw new Error('Only in-progress GPR C step can be reassigned')
       }
@@ -589,7 +589,7 @@ export const GprCApprovalService = {
 
       await MySQLExecute.execute(
         GprCApprovalSQL.updateStepApprover({
-          GPR_C_STEP_ID: stepId,
+          REQUEST_VENDOR_GPR_C_STEPS_ID: stepId,
           APPROVER_EMPCODE: targetAssignee.empcode,
           APPROVER_NAME: targetAssignee.empName,
           APPROVER_EMAIL: targetAssignee.empEmail,
@@ -622,7 +622,7 @@ export const GprCApprovalService = {
 
   submitSetup: async (dataItem: any) => {
     try {
-      const requestId = Number(dataItem.REQUEST_ID)
+      const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID)
       if (!requestId) throw new Error('Missing request_id')
       const updateBy = normalizeValue(dataItem.UPDATE_BY) || 'SYSTEM'
       const gprCData = typeof dataItem.GPR_C_DATA === 'string' ? JSON.parse(dataItem.GPR_C_DATA) : dataItem.GPR_C_DATA || {}
@@ -634,7 +634,7 @@ export const GprCApprovalService = {
       }
 
       const flow = await ensureFlow(requestId, updateBy)
-      const flowId = Number(getValue(flow, 'GPR_C_FLOW_ID', 'gpr_c_flow_id'))
+      const flowId = Number(getValue(flow, 'REQUEST_VENDOR_GPR_C_FLOWS_ID', 'gpr_c_flow_id'))
       const selectionId = await getSelectionId(requestId)
       const approverEmpcode = normalizeValue(gprCData.gpr_c_approver_empcode)
       if (!approverEmpcode) throw new Error('GPR C approver empcode is required')
@@ -652,9 +652,9 @@ export const GprCApprovalService = {
 
       const sqlList = [
         GprCApprovalSQL.updateFlowSetup({
-          GPR_C_FLOW_ID: flowId,
-          REQUEST_ID: requestId,
-          SELECTION_ID: selectionId || '',
+          REQUEST_VENDOR_GPR_C_FLOWS_ID: flowId,
+          REQUEST_REGISTER_VENDOR_ID: requestId,
+          REQUEST_VENDOR_SELECTIONS_ID: selectionId || '',
           FLOW_STATUS: 'in_progress',
           CURRENT_STEP_CODE: 'REQUESTER_APPROVER',
           REQUESTER_EMPCODE: requesterEmpcode,
@@ -667,7 +667,7 @@ export const GprCApprovalService = {
           UPDATE_BY: updateBy,
         }),
         GprCApprovalSQL.deactivateStepsByFlow({
-          GPR_C_FLOW_ID: flowId,
+          REQUEST_VENDOR_GPR_C_FLOWS_ID: flowId,
           UPDATE_BY: updateBy,
         }),
       ]
@@ -675,7 +675,7 @@ export const GprCApprovalService = {
       if (selectionId) {
         sqlList.push(
           RequestRegisterPageSQL.deleteGprCircularMembers({
-            SELECTION_ID: selectionId,
+            REQUEST_VENDOR_SELECTIONS_ID: selectionId,
             UPDATE_BY: updateBy,
           })
         )
@@ -683,7 +683,7 @@ export const GprCApprovalService = {
         circularMembers.forEach((member, index) => {
           sqlList.push(
             RequestRegisterPageSQL.insertGprCircularMember({
-              SELECTION_ID: selectionId,
+              REQUEST_VENDOR_SELECTIONS_ID: selectionId,
               MEMBER_ORDER: index + 1,
               EMPCODE: member.empcode,
               MEMBER_NAME: member.name,
@@ -698,8 +698,8 @@ export const GprCApprovalService = {
       for (const step of stepApprovers) {
         sqlList.push(
           GprCApprovalSQL.insertStep({
-            GPR_C_FLOW_ID: flowId,
-            REQUEST_ID: requestId,
+            REQUEST_VENDOR_GPR_C_FLOWS_ID: flowId,
+            REQUEST_REGISTER_VENDOR_ID: requestId,
             STEP_ORDER: step.order,
             STEP_CODE: step.code,
             STEP_NAME: step.name,
@@ -727,14 +727,14 @@ export const GprCApprovalService = {
 
   approveStep: async (dataItem: any) => {
     try {
-      const requestId = Number(dataItem.REQUEST_ID)
+      const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID)
       if (!requestId) throw new Error('Missing request_id')
       const actionBy = normalizeValue(dataItem.ACTION_BY || dataItem.UPDATE_BY)
       if (!actionBy) throw new Error('Missing action_by')
 
       const flow = await getFlowByRequest(requestId)
       if (!flow) throw new Error('GPR C flow not found')
-      const flowId = Number(getValue(flow, 'GPR_C_FLOW_ID', 'gpr_c_flow_id'))
+      const flowId = Number(getValue(flow, 'REQUEST_VENDOR_GPR_C_FLOWS_ID', 'gpr_c_flow_id'))
       const currentStep = await getCurrentStep(flowId)
       if (!currentStep) throw new Error('No GPR C step in progress')
       if (normalizeValue(currentStep.APPROVER_EMPCODE || currentStep.approver_empcode) !== actionBy) {
@@ -748,7 +748,7 @@ export const GprCApprovalService = {
       const actionType = normalizeValue(dataItem.ACTION_TYPE || 'APPROVED').toUpperCase()
       const sqlList = [
         GprCApprovalSQL.updateStepAction({
-          GPR_C_STEP_ID: currentStep.GPR_C_STEP_ID || currentStep.gpr_c_step_id,
+          REQUEST_VENDOR_GPR_C_STEPS_ID: currentStep.REQUEST_VENDOR_GPR_C_STEPS_ID || currentStep.gpr_c_step_id,
           STEP_STATUS: 'approved',
           ACTION_BY: actionBy,
           ACTION_TYPE: actionType,
@@ -760,13 +760,13 @@ export const GprCApprovalService = {
       if (nextStep) {
         sqlList.push(
           GprCApprovalSQL.activateStep({
-            GPR_C_STEP_ID: nextStep.GPR_C_STEP_ID || nextStep.gpr_c_step_id,
+            REQUEST_VENDOR_GPR_C_STEPS_ID: nextStep.REQUEST_VENDOR_GPR_C_STEPS_ID || nextStep.gpr_c_step_id,
             UPDATE_BY: actionBy,
           })
         )
         sqlList.push(
           GprCApprovalSQL.updateFlowStatus({
-            GPR_C_FLOW_ID: flowId,
+            REQUEST_VENDOR_GPR_C_FLOWS_ID: flowId,
             FLOW_STATUS: 'in_progress',
             CURRENT_STEP_CODE: nextStep.STEP_CODE || nextStep.step_code,
             UPDATE_BY: actionBy,
@@ -777,7 +777,7 @@ export const GprCApprovalService = {
       } else {
         sqlList.push(
           GprCApprovalSQL.updateFlowStatus({
-            GPR_C_FLOW_ID: flowId,
+            REQUEST_VENDOR_GPR_C_FLOWS_ID: flowId,
             FLOW_STATUS: 'approved',
             CURRENT_STEP_CODE: null as any,
             COMPLETED_AT: 'NOW()',
@@ -796,13 +796,13 @@ export const GprCApprovalService = {
 
   rejectStep: async (dataItem: any) => {
     try {
-      const requestId = Number(dataItem.REQUEST_ID)
+      const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID)
       if (!requestId) throw new Error('Missing request_id')
       const actionBy = normalizeValue(dataItem.ACTION_BY || dataItem.UPDATE_BY)
       if (!actionBy) throw new Error('Missing action_by')
       const flow = await getFlowByRequest(requestId)
       if (!flow) throw new Error('GPR C flow not found')
-      const flowId = Number(getValue(flow, 'GPR_C_FLOW_ID', 'gpr_c_flow_id'))
+      const flowId = Number(getValue(flow, 'REQUEST_VENDOR_GPR_C_FLOWS_ID', 'gpr_c_flow_id'))
       const currentStep = await getCurrentStep(flowId)
       if (!currentStep) throw new Error('No GPR C step in progress')
       if (normalizeValue(currentStep.APPROVER_EMPCODE || currentStep.approver_empcode) !== actionBy) {
@@ -811,7 +811,7 @@ export const GprCApprovalService = {
       const remark = normalizeValue(dataItem.REMARK || dataItem.ACTION_REMARK)
       await MySQLExecute.executeList([
         GprCApprovalSQL.updateStepAction({
-          GPR_C_STEP_ID: currentStep.GPR_C_STEP_ID || currentStep.gpr_c_step_id,
+          REQUEST_VENDOR_GPR_C_STEPS_ID: currentStep.REQUEST_VENDOR_GPR_C_STEPS_ID || currentStep.gpr_c_step_id,
           STEP_STATUS: 'rejected',
           ACTION_BY: actionBy,
           ACTION_TYPE: 'REJECTED',
@@ -819,11 +819,11 @@ export const GprCApprovalService = {
           UPDATE_BY: actionBy,
         }),
         GprCApprovalSQL.skipPendingSteps({
-          GPR_C_FLOW_ID: flowId,
+          REQUEST_VENDOR_GPR_C_FLOWS_ID: flowId,
           UPDATE_BY: actionBy,
         }),
         GprCApprovalSQL.updateFlowStatus({
-          GPR_C_FLOW_ID: flowId,
+          REQUEST_VENDOR_GPR_C_FLOWS_ID: flowId,
           FLOW_STATUS: 'rejected',
           CURRENT_STEP_CODE: null as any,
           REJECTED_AT: 'NOW()',
@@ -841,7 +841,7 @@ export const GprCApprovalService = {
 
   actionRequired: async (dataItem: any) => {
     try {
-      const requestId = Number(dataItem.REQUEST_ID)
+      const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID)
       if (!requestId) throw new Error('Missing request_id')
       const actionBy = normalizeValue(dataItem.ACTION_BY || dataItem.UPDATE_BY)
       if (!actionBy) throw new Error('Missing action_by')
@@ -850,7 +850,7 @@ export const GprCApprovalService = {
 
       const flow = await getFlowByRequest(requestId)
       if (!flow) throw new Error('GPR C flow not found')
-      const flowId = Number(getValue(flow, 'GPR_C_FLOW_ID', 'gpr_c_flow_id'))
+      const flowId = Number(getValue(flow, 'REQUEST_VENDOR_GPR_C_FLOWS_ID', 'gpr_c_flow_id'))
       const currentStep = await getCurrentStep(flowId)
       if (!currentStep) throw new Error('No GPR C step in progress')
       const currentStepCode = normalizeValue(currentStep.STEP_CODE || currentStep.step_code)
@@ -862,9 +862,9 @@ export const GprCApprovalService = {
       }
 
       const insertSql = GprCApprovalSQL.insertActionRequired({
-        GPR_C_FLOW_ID: flowId,
-        GPR_C_STEP_ID: currentStep.GPR_C_STEP_ID || currentStep.gpr_c_step_id,
-        REQUEST_ID: requestId,
+        REQUEST_VENDOR_GPR_C_FLOWS_ID: flowId,
+        REQUEST_VENDOR_GPR_C_STEPS_ID: currentStep.REQUEST_VENDOR_GPR_C_STEPS_ID || currentStep.gpr_c_step_id,
+        REQUEST_REGISTER_VENDOR_ID: requestId,
         STAGE_CODE: currentStepCode,
         STAGE_NAME: currentStep.STEP_NAME || currentStep.step_name,
         PIC_NAME: normalizeValue(dataItem.PIC_NAME),
@@ -876,7 +876,7 @@ export const GprCApprovalService = {
       })
       const insertResult = (await MySQLExecute.execute(insertSql)) as ResultSetHeader
       const savedActionRows = (await MySQLExecute.search(
-        GprCApprovalSQL.getActionRequiredById({ ACTION_REQUIRED_ID: insertResult.insertId })
+        GprCApprovalSQL.getActionRequiredById({ REQUEST_VENDOR_GPR_C_ACTION_REQUIRED_ID: insertResult.insertId })
       )) as RowDataPacket[]
       const actionRecord = savedActionRows[0] || {
         action_required_id: insertResult.insertId,
@@ -887,7 +887,7 @@ export const GprCApprovalService = {
       await notifyActionRequired(requestId, currentStep, actionRecord).catch(console.error)
 
       await GprCApprovalService.approveStep({
-        REQUEST_ID: requestId,
+        REQUEST_REGISTER_VENDOR_ID: requestId,
         ACTION_BY: actionBy,
         ACTION_TYPE: 'ACTION_REQUIRED',
         ACTION_REMARK: `Action Required: ${actionRecord.REQUIRED_DETAIL || actionRecord.required_detail || ''}`,
@@ -901,21 +901,21 @@ export const GprCApprovalService = {
 
   recordActionResult: async (dataItem: any) => {
     try {
-      const actionRequiredId = Number(dataItem.ACTION_REQUIRED_ID)
+      const actionRequiredId = Number(dataItem.REQUEST_VENDOR_GPR_C_ACTION_REQUIRED_ID)
       if (!actionRequiredId) throw new Error('Missing action_required_id')
       const updateBy = normalizeValue(dataItem.RESULT_BY || dataItem.UPDATE_BY)
       if (!updateBy) throw new Error('Missing result_by')
       const status = normalizeValue(dataItem.RESULT_STATUS || 'completed').toLowerCase()
       await MySQLExecute.execute(
         GprCApprovalSQL.updateActionRequiredResult({
-          ACTION_REQUIRED_ID: actionRequiredId,
+          REQUEST_VENDOR_GPR_C_ACTION_REQUIRED_ID: actionRequiredId,
           RESULT_STATUS: status,
           RESULT_REMARK: normalizeValue(dataItem.RESULT_REMARK),
           RESULT_BY: updateBy,
           UPDATE_BY: updateBy,
         })
       )
-      const sql = GprCApprovalSQL.getActionRequiredById({ ACTION_REQUIRED_ID: actionRequiredId })
+      const sql = GprCApprovalSQL.getActionRequiredById({ REQUEST_VENDOR_GPR_C_ACTION_REQUIRED_ID: actionRequiredId })
       const rows = (await MySQLExecute.search(sql)) as RowDataPacket[]
       return response(true, 'Action Required result recorded', rows[0] || {}, 'Record GPR C Action Result')
     } catch (error: any) {

@@ -38,11 +38,11 @@ import {
 const SYSTEM_ORIGIN = process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'
 
 const DEFAULT_VENDOR_DOCUMENT_LOCAL_PATH =
-  '\\\\192.168.14.35\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier\\00.DocumentSet\\01.New (Full)\\Local\\00.Sending'
+  '\\\\192.168.14.35\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier Test\\00.DocumentSet\\01.New (Full)\\Local\\00.Sending'
 const DEFAULT_VENDOR_DOCUMENT_OVERSEA_PATH =
-  '\\\\192.168.14.35\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier\\00.DocumentSet\\01.New (Full)\\Oversea\\00.Sending'
+  '\\\\192.168.14.35\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier Test\\00.DocumentSet\\01.New (Full)\\Oversea\\00.Sending'
 const DEFAULT_VENDOR_DOCUMENT_FORM_B_PATH =
-  '\\\\192.168.14.35\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier\\00.DocumentSet\\00.Purchase Form\\FORM B.xlsx'
+  '\\\\192.168.14.35\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier Test\\00.DocumentSet\\00.Purchase Form\\FORM B.xlsx'
 const VENDOR_DOCUMENT_ATTACHMENT_EXTENSIONS = new Set(['.pdf', '.xlsx', '.xls', '.doc', '.docx'])
 
 const getVendorDocumentLocalPath = () => process.env.VENDOR_DOCUMENT_LOCAL_PATH || DEFAULT_VENDOR_DOCUMENT_LOCAL_PATH
@@ -302,7 +302,7 @@ const resolvePrimaryAssigneeByGroupCode = async (groupCode: string) => {
 
 const fetchVendorContext = async (requestId: number): Promise<VendorContext> => {
   const sql = await RequestRegisterPageSQL.getNotificationVendorContextByRequestId({
-    REQUEST_ID: requestId,
+    REQUEST_REGISTER_VENDOR_ID: requestId,
   })
   const rows = (await MySQLExecute.search(sql)) as VendorContext[]
   const row: any = rows[0] ?? {}
@@ -333,7 +333,7 @@ const fetchVendorContext = async (requestId: number): Promise<VendorContext> => 
 }
 
 const fetchVendorContactEmails = async (requestId: number): Promise<string[]> => {
-  const sql = await RequestRegisterPageSQL.getRequestVendorContactsByRequestId({ REQUEST_ID: requestId })
+  const sql = await RequestRegisterPageSQL.getRequestVendorContactsByRequestId({ REQUEST_REGISTER_VENDOR_ID: requestId })
   const rows = (await MySQLExecute.search(sql)) as any[]
   return rows.map((c) => getValue(c, 'email', 'EMAIL'))
 }
@@ -737,9 +737,9 @@ export const sendAgreementEmail = async (dataItem: any) => {
   let vd: VendorContext = {}
   let selectedContactEmails: string[] = []
 
-  if (dataItem.REQUEST_ID) {
-    vd = await fetchVendorContext(Number(dataItem.REQUEST_ID))
-    selectedContactEmails = await fetchVendorContactEmails(Number(dataItem.REQUEST_ID))
+  if (dataItem.REQUEST_REGISTER_VENDOR_ID) {
+    vd = await fetchVendorContext(Number(dataItem.REQUEST_REGISTER_VENDOR_ID))
+    selectedContactEmails = await fetchVendorContactEmails(Number(dataItem.REQUEST_REGISTER_VENDOR_ID))
   }
 
   const recipientEmails = mergeUniqueEmails(selectedContactEmails, [
@@ -754,7 +754,7 @@ export const sendAgreementEmail = async (dataItem: any) => {
   const recipientEmail = recipientEmails.join(';')
   let ccEmails: string[] = []
 
-  if (dataItem.REQUEST_ID) {
+  if (dataItem.REQUEST_REGISTER_VENDOR_ID) {
     const picProfile = await resolveAssigneeProfile(vd.assign_to)
     const picEmail = await resolveAssignedEmail(vd.assign_to)
     const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
@@ -800,7 +800,7 @@ export const sendAgreementEmail = async (dataItem: any) => {
     toEmail: recipientEmail,
     subject: dataItem.EMAIL_SUBJECT || `[Request Submit] Document for ${resolvedRequestNumber}`,
     ccEmails,
-    requestId: dataItem.REQUEST_ID,
+    requestId: dataItem.REQUEST_REGISTER_VENDOR_ID,
     requestNumber: resolvedRequestNumber,
     attachments,
     extra: { flow: 'sendAgreementEmail' },
@@ -932,7 +932,7 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
 
 export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynamicApprover: string) => {
   try {
-    const requestId = dataItem.REQUEST_ID
+    const requestId = dataItem.REQUEST_REGISTER_VENDOR_ID
     const vd = await fetchVendorContext(requestId)
 
     const picProfile = await resolveAssigneeProfile(vd.assign_to)
@@ -1039,7 +1039,7 @@ export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynami
 
 export const triggerActionRequiredEmail = async (dataItem: any, currentStep: any) => {
   try {
-    const requestId = dataItem.REQUEST_ID
+    const requestId = dataItem.REQUEST_REGISTER_VENDOR_ID
     const vd = await fetchVendorContext(requestId)
 
     const stageKey = resolveActionRequiredStage(currentStep)
@@ -1100,7 +1100,7 @@ export const triggerActionRequiredEmail = async (dataItem: any, currentStep: any
 
 export const triggerAfterGprCApprovedEmail = async (dataItem: any) => {
   try {
-    const requestId = Number(dataItem.REQUEST_ID) || 0
+    const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID) || 0
     if (!requestId) return
 
     const vd = await fetchVendorContext(requestId)
@@ -1165,7 +1165,7 @@ export const triggerAfterGprCApprovedEmail = async (dataItem: any) => {
 
 export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => {
   try {
-    const requestId = dataItem.REQUEST_ID
+    const requestId = dataItem.REQUEST_REGISTER_VENDOR_ID
     const vd = await fetchVendorContext(requestId)
 
     const picProfile = await resolveAssigneeProfile(vd.assign_to)
@@ -1249,7 +1249,7 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
 
 export const triggerCompletionEmail = async (dataItem: any) => {
   try {
-    const requestId = dataItem.REQUEST_ID
+    const requestId = dataItem.REQUEST_REGISTER_VENDOR_ID
     const vd = await fetchVendorContext(requestId)
 
     const requester = await resolveRequesterMailProfile(vd)
@@ -1308,7 +1308,7 @@ export const triggerCompletionEmail = async (dataItem: any) => {
 
 export const triggerVendorDisagreeEmail = async (dataItem: any) => {
   try {
-    const requestId = Number(dataItem.REQUEST_ID) || 0
+    const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID) || 0
     if (!requestId) return
 
     const vd = await fetchVendorContext(requestId)

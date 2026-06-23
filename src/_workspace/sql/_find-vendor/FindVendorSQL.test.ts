@@ -15,7 +15,7 @@ describe('FindVendorSQL audit preservation', () => {
 
   test('reactivates existing vendor match results through upsert', () => {
     const sql = FindVendorSQL.insertMatchResultBatch([{
-      VENDOR_ID: 1,
+      VENDORS_ID: 1,
       STATUS_CHECK: 'matched',
       PRONES_CODE: 'P001',
       PRONES_NAME: 'Vendor',

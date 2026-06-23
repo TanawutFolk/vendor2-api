@@ -41,7 +41,7 @@ export const ItemController = {
       { table: 'tb_1', id: 'ITEM_CATEGORY_ID', Fns: '=' },
       { table: 'tb_3', id: 'ITEM_PURPOSE_ID', Fns: '=' },
       { table: 'tb_3', id: 'ITEM_GROUP_ID', Fns: '=' },
-      { table: 'tb_3', id: 'VENDOR_ID', Fns: '=' },
+      { table: 'tb_3', id: 'VENDORS_ID', Fns: '=' },
       { table: 'tb_3', id: 'MAKER_ID', Fns: '=' },
       { table: 'tb_7', id: 'MAKER_NAME', Fns: '=' },
       { table: 'tb_3', id: 'ITEM_PROPERTY_SHAPE_ID', Fns: '=' },
@@ -59,7 +59,7 @@ export const ItemController = {
       { table: 'tb_26', id: 'LEAD_TIME', Fns: 'LIKE' },
       { table: 'tb_26', id: 'SAFETY_STOCK', Fns: 'LIKE' },
       { table: 'tb_2', id: 'ITEM_CATEGORY_NAME', Fns: 'LIKE' },
-      { table: 'tb_1', id: 'STATUS_ID', Fns: '=' },
+      { table: 'tb_1', id: 'M_REQUEST_STATUS_ID', Fns: '=' },
       { table: 'tb_3', id: 'ITEM_INTERNAL_FULL_NAME', Fns: 'LIKE' },
       { table: 'tb_3', id: 'ITEM_INTERNAL_SHORT_NAME', Fns: 'LIKE' },
       { table: 'tb_3', id: 'ITEM_EXTERNAL_CODE', Fns: 'LIKE' },
@@ -108,7 +108,7 @@ export const ItemController = {
                     ON tb_3.ITEM_GROUP_ID  = tb_5.ITEM_GROUP_ID
                     INNER JOIN
                 VENDOR tb_6
-                    ON tb_3.VENDOR_ID  = tb_6.VENDOR_ID
+                    ON tb_3.VENDORS_ID  = tb_6.VENDORS_ID
                     INNER JOIN
                 MAKER tb_7
                     ON tb_3.MAKER_ID  = tb_7.MAKER_ID
@@ -236,9 +236,9 @@ export const ItemController = {
       { table: 'tb_1', id: 'ITEM_CATEGORY_ID', Fns: '=' },
       { table: 'tb_3', id: 'ITEM_PURPOSE_ID', Fns: '=' },
       { table: 'tb_3', id: 'ITEM_GROUP_ID', Fns: '=' },
-      { table: 'tb_3', id: 'VENDOR_ID', Fns: '=' },
+      { table: 'tb_3', id: 'VENDORS_ID', Fns: '=' },
       { table: 'tb_3', id: 'MAKER_ID', Fns: '=' },
-      { table: 'tb_1', id: 'STATUS_ID', Fns: '=' },
+      { table: 'tb_1', id: 'M_REQUEST_STATUS_ID', Fns: '=' },
 
       { table: 'tb_3', id: 'ITEM_INTERNAL_FULL_NAME', Fns: 'LIKE' },
       { table: 'tb_3', id: 'ITEM_INTERNAL_SHORT_NAME', Fns: 'LIKE' },
@@ -270,7 +270,7 @@ export const ItemController = {
                     ON tb_3.ITEM_GROUP_ID  = tb_5.ITEM_GROUP_ID
                     INNER JOIN
                 VENDOR tb_6
-                    ON tb_3.VENDOR_ID  = tb_6.VENDOR_ID
+                    ON tb_3.VENDORS_ID  = tb_6.VENDORS_ID
                     INNER JOIN
                 MAKER tb_7
                     ON tb_3.MAKER_ID  = tb_7.MAKER_ID
@@ -773,9 +773,9 @@ export const ItemController = {
       { table: 'tb_1', id: 'ITEM_CATEGORY_ID', Fns: '=' },
       { table: 'tb_3', id: 'ITEM_PURPOSE_ID', Fns: '=' },
       { table: 'tb_3', id: 'ITEM_GROUP_ID', Fns: '=' },
-      { table: 'tb_3', id: 'VENDOR_ID', Fns: '=' },
+      { table: 'tb_3', id: 'VENDORS_ID', Fns: '=' },
       { table: 'tb_3', id: 'MAKER_ID', Fns: '=' },
-      { table: 'tb_1', id: 'STATUS_ID', Fns: '=' },
+      { table: 'tb_1', id: 'M_REQUEST_STATUS_ID', Fns: '=' },
 
       { table: 'tb_3', id: 'ITEM_INTERNAL_FULL_NAME', Fns: 'LIKE' },
       { table: 'tb_3', id: 'ITEM_INTERNAL_SHORT_NAME', Fns: 'LIKE' },
@@ -808,7 +808,7 @@ export const ItemController = {
                     ON tb_3.ITEM_GROUP_ID  = tb_5.ITEM_GROUP_ID
                     INNER JOIN
                 VENDOR tb_6
-                    ON tb_3.VENDOR_ID  = tb_6.VENDOR_ID
+                    ON tb_3.VENDORS_ID  = tb_6.VENDORS_ID
                     INNER JOIN
                 MAKER tb_7
                     ON tb_3.MAKER_ID  = tb_7.MAKER_ID
@@ -874,7 +874,7 @@ export const ItemController = {
                     ON tb_3.ITEM_GROUP_ID  = tb_5.ITEM_GROUP_ID
                     INNER JOIN
                 VENDOR tb_6
-                    ON tb_3.VENDOR_ID  = tb_6.VENDOR_ID
+                    ON tb_3.VENDORS_ID  = tb_6.VENDORS_ID
                     INNER JOIN
                 MAKER tb_7
                     ON tb_3.MAKER_ID  = tb_7.MAKER_ID

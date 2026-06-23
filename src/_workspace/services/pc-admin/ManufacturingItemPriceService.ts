@@ -65,7 +65,7 @@ export const ManufacturingItemPriceService = {
         // })) as RowDataPacket[]
         // console.log('detail : ', data.ITEM_ID)
         const UUID_V7_2 = uuidv7()
-        const exchangeRate = getLatestExchangeRate.find((item) => item.CURRENCY_ID === data.PURCHASE_PRICE_CURRENCY_ID) as RowDataPacket
+        const exchangeRate = getLatestExchangeRate.find((item) => item.INFO_CURRENCY_ID === data.PURCHASE_PRICE_CURRENCY_ID) as RowDataPacket
         let usagePrice = data.PURCHASE_PRICE * (1 / exchangeRate.EXCHANGE_RATE_VALUE)
         let standardPrice = usagePrice
         if (itemImportTypeId[0]?.ITEM_IMPORT_TYPE_ID === 2) {

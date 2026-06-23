@@ -42,8 +42,8 @@ export const StandardPriceService = {
     if (dataItem.SCT_PATTERN_ID) {
       sqlWhere += " AND tb_1.SCT_PATTERN_ID = 'dataItem.SCT_PATTERN_ID'"
     }
-    if (dataItem.VENDOR_ID) {
-      sqlWhere += " AND tb_8.VENDOR_ID = 'dataItem.VENDOR_ID'"
+    if (dataItem.VENDORS_ID) {
+      sqlWhere += " AND tb_8.VENDORS_ID = 'dataItem.VENDORS_ID'"
     }
     if (dataItem.ITEM_IMPORT_TYPE_ID) {
       sqlWhere += " AND tb_9.ITEM_IMPORT_TYPE_ID = 'dataItem.ITEM_IMPORT_TYPE_ID'"
@@ -79,8 +79,8 @@ export const StandardPriceService = {
     if (query.FISCAL_YEAR) {
       sqlWhere += " AND tb_1.FISCAL_YEAR = 'dataItem.FISCAL_YEAR'"
     }
-    if (query.VENDOR_ID) {
-      sqlWhere += " AND tb_8.VENDOR_ID = 'dataItem.VENDOR_ID'"
+    if (query.VENDORS_ID) {
+      sqlWhere += " AND tb_8.VENDORS_ID = 'dataItem.VENDORS_ID'"
     }
     if (query.ITEM_IMPORT_TYPE_ID) {
       sqlWhere += " AND tb_9.ITEM_IMPORT_TYPE_ID = 'dataItem.ITEM_IMPORT_TYPE_ID'"
@@ -177,7 +177,7 @@ export const StandardPriceService = {
   //       })
 
   //       const UUID_V7_2 = uuidv7()
-  //       const exchangeRate = getLatestExchangeRate.find((item) => item.CURRENCY_ID === data.PURCHASE_PRICE_CURRENCY_ID)
+  //       const exchangeRate = getLatestExchangeRate.find((item) => item.INFO_CURRENCY_ID === data.PURCHASE_PRICE_CURRENCY_ID)
 
   //       if (!exchangeRate) {
   //         throw new Error('Exchange Rate Not Found')
@@ -227,7 +227,7 @@ export const StandardPriceService = {
 
   //       if (!exchangeRate || !importFee) {
   //         const UUID_V7_3 = uuidv7()
-  //         const exchangeRate = getLatestExchangeRate.find((item) => item.CURRENCY_ID === data.PURCHASE_PRICE_CURRENCY_ID)
+  //         const exchangeRate = getLatestExchangeRate.find((item) => item.INFO_CURRENCY_ID === data.PURCHASE_PRICE_CURRENCY_ID)
 
   //         const itemDetail = await ItemService.getItemDetailByItemId({
   //           ITEM_ID: data.ITEM_ID,
@@ -417,7 +417,7 @@ export const StandardPriceService = {
         throw new Error('Item is not current version or not found , Please check or Export file again')
       }
 
-      const exchangeRate = getLatestExchangeRate.find((item) => item.CURRENCY_ID === PURCHASE_PRICE_CURRENCY_ID)
+      const exchangeRate = getLatestExchangeRate.find((item) => item.INFO_CURRENCY_ID === PURCHASE_PRICE_CURRENCY_ID)
       if (!exchangeRate) {
         throw new Error('Exchange Rate Not Found')
       }

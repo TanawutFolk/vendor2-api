@@ -2,7 +2,7 @@ import { FindVendorService } from '@src/_workspace/services/_find-vendor/FindVen
 
 export const FindVendorModel = {
   searchVendors: async (dataItem: any) => FindVendorService.searchVendors(dataItem),
-  getById: async (vendor_id: number) => FindVendorService.getById({ VENDOR_ID: vendor_id }),
+  getById: async (vendor_id: number) => FindVendorService.getById({ VENDORS_ID: vendor_id }),
   updateVendor: async (dataItem: any) => FindVendorService.updateVendor(dataItem),
   updateVendorComprehensive: async (dataItem: any) => FindVendorService.updateVendorComprehensive(dataItem),
   deleteVendor: async (dataItem: any) => FindVendorService.deleteVendor(dataItem),

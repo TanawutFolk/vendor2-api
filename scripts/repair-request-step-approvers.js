@@ -21,24 +21,24 @@ const getSteps = async (conn) => {
   const [rows] = await conn.query(
     `
       SELECT
-        ras.STEP_ID,
+        ras.REQUEST_APPROVAL_STEP_ID,
         ras.STEP_ORDER,
         ras.STEP_CODE,
         ras.DESCRIPTION,
         ras.STEP_STATUS,
-        ras.APPROVER_ID,
+        ras.APPROVER_EMPCODE,
         ras.GROUP_CODE,
         (
           SELECT ato.EMPCODE
           FROM assignees_to ato
           WHERE ato.GROUP_CODE = ras.GROUP_CODE
             AND ato.INUSE = 1
-          ORDER BY ato.ASSIGNEES_ID ASC
+          ORDER BY ato.ASSIGNEES_TO_ID ASC
           LIMIT 1
         ) AS SHOULD_APPROVER_ID
       FROM request_approval_step ras
       INNER JOIN request_register_vendor rr
-        ON rr.REQUEST_ID = ras.REQUEST_ID
+        ON rr.REQUEST_REGISTER_VENDOR_ID = ras.REQUEST_REGISTER_VENDOR_ID
       WHERE rr.REQUEST_NUMBER = ?
         AND ras.INUSE = 1
       ORDER BY ras.STEP_ORDER ASC
@@ -62,23 +62,23 @@ const main = async () => {
       `
         UPDATE request_approval_step ras
         INNER JOIN request_register_vendor rr
-          ON rr.REQUEST_ID = ras.REQUEST_ID
+          ON rr.REQUEST_REGISTER_VENDOR_ID = ras.REQUEST_REGISTER_VENDOR_ID
         INNER JOIN assignees_to ato
           ON ato.GROUP_CODE = ras.GROUP_CODE
          AND ato.INUSE = 1
-         AND ato.ASSIGNEES_ID = (
-              SELECT MIN(ato2.ASSIGNEES_ID)
+         AND ato.ASSIGNEES_TO_ID = (
+              SELECT MIN(ato2.ASSIGNEES_TO_ID)
               FROM assignees_to ato2
               WHERE ato2.GROUP_CODE = ras.GROUP_CODE
                 AND ato2.INUSE = 1
             )
-        SET ras.APPROVER_ID = ato.EMPCODE,
+        SET ras.APPROVER_EMPCODE = ato.EMPCODE,
             ras.ASSIGNMENT_MODE = 'AUTO',
             ras.UPDATE_BY = ?,
             ras.UPDATE_DATE = NOW()
         WHERE rr.REQUEST_NUMBER = ?
           AND ras.INUSE = 1
-          AND COALESCE(TRIM(ras.APPROVER_ID), '') = ''
+          AND COALESCE(TRIM(ras.APPROVER_EMPCODE), '') = ''
           AND COALESCE(TRIM(ras.GROUP_CODE), '') <> ''
       `,
       [updateBy, requestNumber]

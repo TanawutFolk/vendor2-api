@@ -7,7 +7,7 @@ export const VendorSQL = {
                     JOIN
                         VENDOR tb_2
                     ON
-                        tb_1.VENDOR_ID = tb_2.VENDOR_ID
+                        tb_1.VENDORS_ID = tb_2.VENDORS_ID
                     WHERE
                             tb_1.ITEM_ID = 'dataItem.ITEM_ID'
                         AND tb_1.INUSE = '1'
@@ -33,23 +33,23 @@ export const VendorSQL = {
   },
   getVendor: async (dataItem: any) => {
     let sql = `     SELECT
-                            VENDOR_ID
+                            VENDORS_ID
                         , VENDOR_NAME
                         , VENDOR_ALPHABET
                         , INUSE
                         FROM
                         VENDOR
                         WHERE
-                        VENDOR_ID = 'dataItem.VENDOR_ID'
+                        VENDORS_ID = 'dataItem.VENDORS_ID'
                     `
 
-    sql = sql.replaceAll('dataItem.VENDOR_ID', dataItem['VENDOR_ID'])
+    sql = sql.replaceAll('dataItem.VENDORS_ID', dataItem['VENDORS_ID'])
 
     return sql
   },
   getAll: async () => {
     let sql = `     SELECT
-                      VENDOR_ID
+                      VENDORS_ID
                     , VENDOR_NAME
                     , VENDOR_ALPHABET
                     , INUSE
@@ -89,7 +89,7 @@ export const VendorSQL = {
 
     sql = `
             SELECT
-                  tb_1.VENDOR_ID
+                  tb_1.VENDORS_ID
                 , tb_1.VENDOR_NAME
                 , tb_1.VENDOR_ALPHABET
                 , tb_2.ITEM_IMPORT_TYPE_ID
@@ -131,7 +131,7 @@ export const VendorSQL = {
     let sql = `
                     INSERT INTO VENDOR
                     (
-                          VENDOR_ID
+                          VENDORS_ID
                         , VENDOR_NAME
                         , VENDOR_ALPHABET
                         , ITEM_IMPORT_TYPE_ID
@@ -143,7 +143,7 @@ export const VendorSQL = {
                         , UPDATE_BY
                     )
                     SELECT
-                           1 + coalesce((SELECT max(VENDOR_ID) FROM VENDOR), 0)
+                           1 + coalesce((SELECT max(VENDORS_ID) FROM VENDOR), 0)
                         , 'dataItem.VENDOR_NAME'
                         , 'dataItem.VENDOR_ALPHABET'
                         , 'dataItem.ITEM_IMPORT_TYPE_ID'
@@ -197,10 +197,10 @@ export const VendorSQL = {
                         , UPDATE_BY = 'dataItem.UPDATE_BY'
                         , UPDATE_DATE = CURRENT_TIMESTAMP()
                     WHERE
-                        VENDOR_ID = 'dataItem.VENDOR_ID'
+                        VENDORS_ID = 'dataItem.VENDORS_ID'
                       `
 
-    sql = sql.replaceAll('dataItem.VENDOR_ID', dataItem['VENDOR_ID'])
+    sql = sql.replaceAll('dataItem.VENDORS_ID', dataItem['VENDORS_ID'])
 
     sql = sql.replaceAll('dataItem.VENDOR_ALPHABET', dataItem['VENDOR_ALPHABET'])
     sql = sql.replaceAll('dataItem.ITEM_IMPORT_TYPE_ID', dataItem['ITEM_IMPORT_TYPE_ID'])
@@ -220,17 +220,17 @@ export const VendorSQL = {
                         , UPDATE_BY = 'dataItem.UPDATE_BY'
                         , UPDATE_DATE = CURRENT_TIMESTAMP()
                     WHERE
-                        VENDOR_ID = 'dataItem.VENDOR_ID'
+                        VENDORS_ID = 'dataItem.VENDORS_ID'
                       `
 
-    sql = sql.replaceAll('dataItem.VENDOR_ID', dataItem['VENDOR_ID'])
+    sql = sql.replaceAll('dataItem.VENDORS_ID', dataItem['VENDORS_ID'])
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'])
 
     return sql
   },
   getByLikeVendorName: async (dataItem: any) => {
     let sql = `            SELECT
-                                VENDOR_ID
+                                VENDORS_ID
                             , VENDOR_NAME
                             FROM
                             VENDOR
@@ -250,7 +250,7 @@ export const VendorSQL = {
   },
   getByLikeVendorAlphabetAndInuse: async (dataItem: any) => {
     let sql = `     SELECT
-                        VENDOR_ID
+                        VENDORS_ID
                     , VENDOR_ALPHABET
                     FROM
                     VENDOR
@@ -269,7 +269,7 @@ export const VendorSQL = {
   },
   getVendorName: async (dataItem: any) => {
     let sql = `            SELECT
-                                VENDOR_ID
+                                VENDORS_ID
                             , VENDOR_NAME
                             FROM
                             VENDOR
@@ -286,7 +286,7 @@ export const VendorSQL = {
   },
   getVendorAlphabet: async (dataItem: any) => {
     let sql = `     SELECT
-                        VENDOR_ID
+                        VENDORS_ID
                     , VENDOR_ALPHABET
                     FROM
                     VENDOR
@@ -303,7 +303,7 @@ export const VendorSQL = {
 
   getByLikeVendorNameAndImportType: async (dataItem: any) => {
     let sql = `            SELECT
-                              tb_1.VENDOR_ID
+                              tb_1.VENDORS_ID
                             , tb_1.VENDOR_NAME
                             , tb_1.ITEM_IMPORT_TYPE_ID
                             , tb_2.ITEM_IMPORT_TYPE_NAME

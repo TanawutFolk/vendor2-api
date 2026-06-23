@@ -19,7 +19,7 @@ export const StandardPriceSQL = {
                 JOIN
                     VENDOR tb_2
                 ON
-                    tb_1.VENDOR_ID = tb_2.VENDOR_ID
+                    tb_1.VENDORS_ID = tb_2.VENDORS_ID
                 JOIN
                     ITEM_IMPORT_TYPE tb_3
                 ON
@@ -43,7 +43,7 @@ export const StandardPriceSQL = {
                 JOIN
                     CURRENCY tb_8
                 ON
-                    tb_4.PURCHASE_PRICE_CURRENCY_ID = tb_8.CURRENCY_ID
+                    tb_4.PURCHASE_PRICE_CURRENCY_ID = tb_8.INFO_CURRENCY_ID
                 WHERE
                         tb_1.INUSE = '1'
                     AND tb_1.ITEM_ID = dataItem.ITEM_ID
@@ -195,7 +195,7 @@ export const StandardPriceSQL = {
                                             JOIN
                                  CURRENCY tb_6
                                             ON
-                                            tb_2.PURCHASE_PRICE_CURRENCY_ID = tb_6.CURRENCY_ID
+                                            tb_2.PURCHASE_PRICE_CURRENCY_ID = tb_6.INFO_CURRENCY_ID
                                             LEFT JOIN
                                  IMPORT_FEE tb_5
                                             ON
@@ -205,7 +205,7 @@ export const StandardPriceSQL = {
                                             ON tb_3.ITEM_ID = tb_7.ITEM_ID
                                             LEFT JOIN
                                  vendor tb_8
-                                            ON tb_3.VENDOR_ID = tb_8.VENDOR_ID
+                                            ON tb_3.VENDORS_ID = tb_8.VENDORS_ID
                                             LEFT JOIN
                                  item_import_type tb_9
                                             ON tb_8.ITEM_IMPORT_TYPE_ID = tb_9.ITEM_IMPORT_TYPE_ID
@@ -240,7 +240,7 @@ export const StandardPriceSQL = {
     sql = sql.replaceAll('dataItem.ITEM_INTERNAL_SHORT_NAME', dataItem['ITEM_INTERNAL_SHORT_NAME'])
     sql = sql.replaceAll('dataItem.ITEM_IMPORT_TYPE_ID', dataItem['ITEM_IMPORT_TYPE_ID'])
     sql = sql.replaceAll('dataItem.INUSE', dataItem['INUSE'])
-    sql = sql.replaceAll('dataItem.VENDOR_ID', dataItem['VENDOR_ID'])
+    sql = sql.replaceAll('dataItem.VENDORS_ID', dataItem['VENDORS_ID'])
     sql = sql.replaceAll('sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'])
 
     sqlList.push(sql)
@@ -295,7 +295,7 @@ export const StandardPriceSQL = {
                                             JOIN
                                  CURRENCY tb_6
                                             ON
-                                            tb_2.PURCHASE_PRICE_CURRENCY_ID = tb_6.CURRENCY_ID
+                                            tb_2.PURCHASE_PRICE_CURRENCY_ID = tb_6.INFO_CURRENCY_ID
                                             LEFT JOIN
                                  IMPORT_FEE tb_5
                                             ON
@@ -305,7 +305,7 @@ export const StandardPriceSQL = {
                                             ON tb_3.ITEM_ID = tb_7.ITEM_ID
                                             LEFT JOIN
                                  vendor tb_8
-                                            ON tb_3.VENDOR_ID = tb_8.VENDOR_ID
+                                            ON tb_3.VENDORS_ID = tb_8.VENDORS_ID
                                             LEFT JOIN
                                  item_import_type tb_9
                                             ON tb_8.ITEM_IMPORT_TYPE_ID = tb_9.ITEM_IMPORT_TYPE_ID
@@ -347,7 +347,7 @@ export const StandardPriceSQL = {
     sql = sql.replaceAll('dataItem.SCT_PATTERN_ID', dataItem['SCT_PATTERN_ID'])
     sql = sql.replaceAll('dataItem.ITEM_INTERNAL_FULL_NAME', dataItem['ITEM_INTERNAL_FULL_NAME'])
     sql = sql.replaceAll('dataItem.ITEM_INTERNAL_SHORT_NAME', dataItem['ITEM_INTERNAL_SHORT_NAME'])
-    sql = sql.replaceAll('dataItem.VENDOR_ID', dataItem['VENDOR_ID'])
+    sql = sql.replaceAll('dataItem.VENDORS_ID', dataItem['VENDORS_ID'])
     sql = sql.replaceAll('dataItem.ITEM_IMPORT_TYPE_ID', dataItem['ITEM_IMPORT_TYPE_ID'])
     sql = sql.replaceAll('dataItem.Order', dataItem['Order'])
     sql = sql.replaceAll('dataItem.Start', dataItem['Start'])
@@ -384,7 +384,7 @@ export const StandardPriceSQL = {
                                             JOIN
                                  CURRENCY tb_6
                                             ON
-                                            tb_2.PURCHASE_PRICE_CURRENCY_ID = tb_6.CURRENCY_ID
+                                            tb_2.PURCHASE_PRICE_CURRENCY_ID = tb_6.INFO_CURRENCY_ID
                                             LEFT JOIN
                                  IMPORT_FEE tb_5
                                             ON
@@ -394,7 +394,7 @@ export const StandardPriceSQL = {
                                             ON tb_3.ITEM_ID = tb_7.ITEM_ID
                                             LEFT JOIN
                                  vendor tb_8
-                                            ON tb_3.VENDOR_ID = tb_8.VENDOR_ID
+                                            ON tb_3.VENDORS_ID = tb_8.VENDORS_ID
                                             LEFT JOIN
                                  item_import_type tb_9
                                             ON tb_8.ITEM_IMPORT_TYPE_ID = tb_9.ITEM_IMPORT_TYPE_ID
@@ -429,7 +429,7 @@ export const StandardPriceSQL = {
 
     sql = sql.replaceAll('dataItem.ITEM_IMPORT_TYPE_ID', dataItem['ITEM_IMPORT_TYPE_ID'])
     sql = sql.replaceAll('dataItem.INUSE', dataItem['INUSE'])
-    sql = sql.replaceAll('dataItem.VENDOR_ID', dataItem['VENDOR_ID'])
+    sql = sql.replaceAll('dataItem.VENDORS_ID', dataItem['VENDORS_ID'])
 
     sqlList.push(sql)
 
@@ -482,7 +482,7 @@ export const StandardPriceSQL = {
                                             JOIN
                                  CURRENCY tb_6
                                             ON
-                                            tb_2.PURCHASE_PRICE_CURRENCY_ID = tb_6.CURRENCY_ID
+                                            tb_2.PURCHASE_PRICE_CURRENCY_ID = tb_6.INFO_CURRENCY_ID
                                             LEFT JOIN
                                  IMPORT_FEE tb_5
                                             ON
@@ -492,7 +492,7 @@ export const StandardPriceSQL = {
                                             ON tb_3.ITEM_ID = tb_7.ITEM_ID
                                             LEFT JOIN
                                  vendor tb_8
-                                            ON tb_3.VENDOR_ID = tb_8.VENDOR_ID
+                                            ON tb_3.VENDORS_ID = tb_8.VENDORS_ID
                                             LEFT JOIN
                                  item_import_type tb_9
                                             ON tb_8.ITEM_IMPORT_TYPE_ID = tb_9.ITEM_IMPORT_TYPE_ID
@@ -536,7 +536,7 @@ export const StandardPriceSQL = {
     sql = sql.replaceAll('dataItem.SCT_PATTERN_ID', dataItem['SCT_PATTERN_ID'])
     sql = sql.replaceAll('dataItem.INUSE', dataItem['INUSE'])
     sql = sql.replaceAll('dataItem.FISCAL_YEAR', dataItem['FISCAL_YEAR'])
-    sql = sql.replaceAll('dataItem.VENDOR_ID', dataItem['VENDOR_ID'])
+    sql = sql.replaceAll('dataItem.VENDORS_ID', dataItem['VENDORS_ID'])
 
     sqlList.push(sql)
 
@@ -1133,7 +1133,7 @@ export const StandardPriceSQL = {
                 , tb_1.SCT_PATTERN_ID
                 , tb_1.IS_CURRENT
                 , tb_1.ITEM_M_S_PRICE_CREATE_FROM_SETTING_ID
-                , tb_2.CURRENCY_ID
+                , tb_2.INFO_CURRENCY_ID
                 , tb_4.ITEM_CODE_FOR_SUPPORT_MES
                 , tb_3.PURCHASE_PRICE
                 , tb_4.ITEM_ID
@@ -1151,7 +1151,7 @@ export const StandardPriceSQL = {
                     ON tb_3.ITEM_ID = tb_4.ITEM_ID
                     INNER JOIN
                 VENDOR tb_5
-                    ON tb_4.VENDOR_ID = tb_5.VENDOR_ID
+                    ON tb_4.VENDORS_ID = tb_5.VENDORS_ID
             WHERE
                     tb_1.FISCAL_YEAR = 'dataItem.FISCAL_YEAR'
                 AND tb_1.IS_CURRENT = 1
@@ -1171,7 +1171,7 @@ export const StandardPriceSQL = {
     ITEM_ID: number
     SCT_PATTERN_ID: number
     ITEM_M_S_PRICE_CREATE_FROM_SETTING_ID: number
-    CURRENCY_ID: number
+    INFO_CURRENCY_ID: number
     PURCHASE_UNIT_RATIO: number
     PURCHASE_UNIT_ID: number
     USAGE_UNIT_RATIO: number
@@ -1203,7 +1203,7 @@ export const StandardPriceSQL = {
                     (
                       'dataItem.ITEM_M_S_PRICE_ID'
                     , 'dataItem.ITEM_M_O_PRICE_ID'
-                    ,  @new_exchange_rate_id_for_dataItem.CURRENCY_ID
+                    ,  @new_exchange_rate_id_for_dataItem.INFO_CURRENCY_ID
                     , dataItem.IMPORT_FEE_ID
                     , 'dataItem.ITEM_M_S_PRICE_VALUE'
                     , 'dataItem.CREATE_BY'
@@ -1221,7 +1221,7 @@ export const StandardPriceSQL = {
                     , 'dataItem.ITEM_M_S_PRICE_CREATE_FROM_SETTING_ID'
                 )
                     `
-    sql = sql.replaceAll('dataItem.CURRENCY_ID', dataItem['CURRENCY_ID'].toString())
+    sql = sql.replaceAll('dataItem.INFO_CURRENCY_ID', dataItem['INFO_CURRENCY_ID'].toString())
 
     sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'])
     sql = sql.replaceAll('dataItem.ITEM_M_S_PRICE_ID', dataItem['ITEM_M_S_PRICE_ID'])

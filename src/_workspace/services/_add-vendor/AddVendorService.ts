@@ -114,7 +114,7 @@ export const AddVendorService = {
         for (const contact of dataItem.CONTACTS) {
           const contactData = {
             ...contact,
-            VENDOR_ID: vendorId,
+            VENDORS_ID: vendorId,
             CREATE_BY: dataItem.CREATE_BY,
           }
           sqlList.push(await AddVendorSQL.createVendorContact(contactData))
@@ -126,7 +126,7 @@ export const AddVendorService = {
         for (const product of dataItem.PRODUCTS) {
           const productData = {
             ...product,
-            VENDOR_ID: vendorId,
+            VENDORS_ID: vendorId,
             CREATE_BY: dataItem.CREATE_BY,
           }
           sqlList.push(await AddVendorSQL.createVendorProduct(productData))

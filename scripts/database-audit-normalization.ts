@@ -50,6 +50,11 @@ const auditColumns = {
   INUSE: 'TINYINT(1) NOT NULL DEFAULT 1',
 } as const
 
+const auditColumnDefinition = (table: string, column: keyof typeof auditColumns) => {
+  if (table === 'vendor_selection_criteria' && column === 'DESCRIPTION') return 'VARCHAR(500) NULL'
+  return auditColumns[column]
+}
+
 const requiredEnv = ['HOST', 'USER_NAME', 'PASSWORD', 'DB'] as const
 for (const key of requiredEnv) {
   if (!process.env[key]) throw new Error(`Missing ${key} in .env.development`)
@@ -186,12 +191,13 @@ const runPreflight = async () => {
     const names = new Set(columns.map((row) => String(row.COLUMN_NAME)))
 
     if (names.has('DESCRIPTION')) {
+      const maxDescriptionLength = table === 'vendor_selection_criteria' ? 500 : 100
       const rows = await queryRows(
         `SELECT COUNT(*) AS issue_count FROM ${quoteIdentifier(table)}
-         WHERE CHAR_LENGTH(DESCRIPTION) > 100`
+         WHERE CHAR_LENGTH(DESCRIPTION) > ${maxDescriptionLength}`
       )
       const count = Number(rows[0]?.issue_count || 0)
-      if (count > 0) blockers.push({ table_name: table, issue: 'description_over_100', value: count })
+      if (count > 0) blockers.push({ table_name: table, issue: `description_over_${maxDescriptionLength}`, value: count })
     }
 
     if (names.has('INUSE')) {
@@ -231,7 +237,8 @@ const ensureAuditColumns = async (table: string) => {
   )
   const existingNames = new Set(existingColumns.map((row) => String(row.COLUMN_NAME)))
 
-  for (const [column, definition] of Object.entries(auditColumns)) {
+  for (const column of Object.keys(auditColumns) as Array<keyof typeof auditColumns>) {
+    const definition = auditColumnDefinition(table, column)
     if (!existingNames.has(column)) {
       await connection.query(
         `ALTER TABLE ${quoteIdentifier(table)}
@@ -250,8 +257,8 @@ const ensureAuditColumns = async (table: string) => {
       INUSE = CASE WHEN INUSE = 0 THEN 0 ELSE 1 END
   `)
 
-  const modifySql = Object.entries(auditColumns)
-    .map(([column, definition]) => `MODIFY COLUMN ${quoteIdentifier(column)} ${definition}`)
+  const modifySql = (Object.keys(auditColumns) as Array<keyof typeof auditColumns>)
+    .map((column) => `MODIFY COLUMN ${quoteIdentifier(column)} ${auditColumnDefinition(table, column)}`)
     .join(',\n')
   await connection.query(`ALTER TABLE ${quoteIdentifier(table)}\n${modifySql}`)
 }
@@ -260,10 +267,10 @@ const backfillDescriptions = async () => {
   const statements = [
     "UPDATE assignees_to SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(CONCAT(GROUP_NAME, ': ', COALESCE(EMPNAME, EMPCODE)), 100))",
     "UPDATE info_currency SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(CURRENCY_NAME, 100))",
-    "UPDATE m_request_status SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(STATUS_LABEL, 100))",
+    "UPDATE m_request_status SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(STATUS_VALUE, 100))",
     "UPDATE master_product_groups SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(GROUP_NAME, 100))",
     "UPDATE master_vendor_types SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(NAME, 100))",
-    "UPDATE request_approval_log SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(REMARK, 100)), CREATE_BY = ACTION_BY, UPDATE_BY = ACTION_BY, CREATE_DATE = ACTION_DATE, UPDATE_DATE = ACTION_DATE",
+    "UPDATE request_approval_log SET DESCRIPTION = COALESCE(DESCRIPTION, ''), CREATE_BY = ACTION_BY, UPDATE_BY = ACTION_BY, UPDATE_DATE = COALESCE(UPDATE_DATE, CREATE_DATE)",
     "UPDATE request_register_file SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(FILE_NAME, 100))",
     "UPDATE request_register_vendor SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(REQUESTER_REMARK, 100))",
     "UPDATE request_vendor_gpr_c_action_setup SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(CONCAT(STAGE_CODE, ': ', COALESCE(RESULT_NOTE, '')), 100))",
@@ -275,12 +282,12 @@ const backfillDescriptions = async () => {
     "UPDATE vendor_contacts SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(CONTACT_NAME, 100))",
     "UPDATE vendor_match_result SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(MATCH_METHOD, 100)), CREATE_DATE = COALESCE(LAST_UPDATED, CREATE_DATE), UPDATE_DATE = COALESCE(LAST_UPDATED, UPDATE_DATE)",
     "UPDATE vendor_products SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(CONCAT_WS(' / ', PRODUCT_NAME, MAKER_NAME, MODEL_LIST), 100))",
-    "UPDATE vendor_selection_criteria SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(COALESCE(REMARK, CRITERIA_VALUE), 100))",
+    "UPDATE vendor_selection_criteria SET DESCRIPTION = COALESCE(DESCRIPTION, '')",
     "UPDATE vendor_selection_financials SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(CONCAT('Financial year ', YEAR), 100))",
     "UPDATE vendors SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(COALESCE(NOTE, COMPANY_NAME), 100))",
-    "UPDATE workflow_definition SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(WORKFLOW_NAME, 100)), INUSE = IS_ACTIVE",
-    "UPDATE workflow_step_master SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(STEP_CODE, 100)), INUSE = IS_ACTIVE",
-    "UPDATE workflow_transition SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(ACTION_CODE, 100)), INUSE = IS_ACTIVE",
+    "UPDATE workflow_definition SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(WORKFLOW_NAME, 100)), INUSE = CASE WHEN INUSE = 0 THEN 0 ELSE 1 END",
+    "UPDATE workflow_step_master SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(STEP_CODE, 100)), INUSE = CASE WHEN INUSE = 0 THEN 0 ELSE 1 END",
+    "UPDATE workflow_transition SET DESCRIPTION = COALESCE(DESCRIPTION, LEFT(ACTION_CODE, 100)), INUSE = CASE WHEN INUSE = 0 THEN 0 ELSE 1 END",
   ]
   for (const statement of statements) await connection.query(statement)
 }

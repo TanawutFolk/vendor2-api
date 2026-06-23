@@ -70,11 +70,11 @@ export const VendorService = {
     const sqlCheckDuplicate = await VendorSQL.getVendorName(dataItem)
     const resultCheckDuplicate = (await MySQLExecute.search(sqlCheckDuplicate)) as RowDataPacket[]
 
-    if (resultCheckDuplicate.length === 0 || (resultCheckDuplicate.length !== 0 && resultCheckDuplicate[0].VENDOR_ID === dataItem.VENDOR_ID)) {
+    if (resultCheckDuplicate.length === 0 || (resultCheckDuplicate.length !== 0 && resultCheckDuplicate[0].VENDORS_ID === dataItem.VENDORS_ID)) {
       const sqlCheckDuplicateCode = await VendorSQL.getVendorAlphabet(dataItem)
       const resultCheckDuplicateCode = (await MySQLExecute.search(sqlCheckDuplicateCode)) as RowDataPacket[]
 
-      if (resultCheckDuplicateCode.length === 0 || (resultCheckDuplicateCode.length !== 0 && resultCheckDuplicateCode[0].VENDOR_ID === dataItem.VENDOR_ID)) {
+      if (resultCheckDuplicateCode.length === 0 || (resultCheckDuplicateCode.length !== 0 && resultCheckDuplicateCode[0].VENDORS_ID === dataItem.VENDORS_ID)) {
         const sqlUpdate = await VendorSQL.updateVendor(dataItem)
         const resultUpdateData = (await MySQLExecute.execute(sqlUpdate)) as RowDataPacket[]
 

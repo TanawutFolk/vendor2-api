@@ -6,7 +6,7 @@ import fs from 'fs'
 import path from 'path'
 
 const parseVendorContactIds = (dataItem: any): string[] => {
-  const rawValue = dataItem.VENDOR_CONTACT_IDS || dataItem['VENDOR_CONTACT_IDS[]'] || dataItem.VENDOR_CONTACT_ID || []
+  const rawValue = dataItem.VENDOR_CONTACT_IDS || dataItem['VENDOR_CONTACT_IDS[]'] || dataItem.VENDOR_CONTACTS_ID || []
   const rawList = Array.isArray(rawValue) ? rawValue : [rawValue]
 
   return rawList
@@ -75,7 +75,7 @@ export const RequestRegisterPageController = {
     }
 
     try {
-      const vendor_id = parseInt(dataItem.VENDOR_ID as string)
+      const vendor_id = parseInt(dataItem.VENDORS_ID as string)
       const normalizedCreator = dataItem.CREATE_BY || dataItem.REQUEST_BY_EMPLOYEECODE || 'SYSTEM'
 
       if (!vendor_id || isNaN(vendor_id)) {
@@ -93,8 +93,8 @@ export const RequestRegisterPageController = {
       const vendorContactIds = parseVendorContactIds(dataItem)
 
       const createResult = await RequestRegisterPageModel.createRequest({
-        VENDOR_ID: vendor_id,
-        VENDOR_CONTACT_ID: vendorContactIds[0] || dataItem.VENDOR_CONTACT_ID || null,
+        VENDORS_ID: vendor_id,
+        VENDOR_CONTACTS_ID: vendorContactIds[0] || dataItem.VENDOR_CONTACTS_ID || null,
         VENDOR_CONTACT_IDS: vendorContactIds,
         UPLOADED_FILES: files,
         REQUEST_BY_EMPLOYEECODE: dataItem.REQUEST_BY_EMPLOYEECODE || '',
@@ -136,7 +136,7 @@ export const RequestRegisterPageController = {
 
       return res.status(200).json({
         Status: true,
-        ResultOnDb: { request_id: insertedId, request_number: createResultData?.request_number || '' },
+        ResultOnDb: { REQUEST_REGISTER_VENDOR_ID: insertedId, REQUEST_NUMBER: createResultData?.request_number || '' },
         TotalCountOnDb: 1,
         MethodOnDb: 'Create Registration Request',
         Message: createResult?.Message || 'Create Request Register Success',
@@ -166,7 +166,7 @@ export const RequestRegisterPageController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
 
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
@@ -179,8 +179,8 @@ export const RequestRegisterPageController = {
       }
 
       const result = await RequestRegisterPageModel.updateRequest({
-        REQUEST_ID: request_id,
-        VENDOR_CONTACT_ID: dataItem.VENDOR_CONTACT_ID || null,
+        REQUEST_REGISTER_VENDOR_ID: request_id,
+        VENDOR_CONTACTS_ID: dataItem.VENDOR_CONTACTS_ID || null,
         SUPPORTPRODUCT_PROCESS: dataItem.SUPPORTPRODUCT_PROCESS || '',
         PURCHASE_FREQUENCY: dataItem.PURCHASE_FREQUENCY || '',
         REQUESTER_REMARK: dataItem.REQUESTER_REMARK || '',
@@ -210,7 +210,7 @@ export const RequestRegisterPageController = {
     }
 
     try {
-      if (!dataItem.EMAILMAIN && !dataItem.REQUEST_ID) {
+      if (!dataItem.EMAILMAIN && !dataItem.REQUEST_REGISTER_VENDOR_ID) {
         return res.status(400).json({
           Status: false,
           ResultOnDb: {},
@@ -251,7 +251,7 @@ export const RequestRegisterPageController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -263,9 +263,9 @@ export const RequestRegisterPageController = {
       }
 
       const insertedId = await RequestRegisterPageModel.createApprovalStep({
-        REQUEST_ID: request_id,
+        REQUEST_REGISTER_VENDOR_ID: request_id,
         STEP_ORDER: dataItem.STEP_ORDER || 1,
-        APPROVER_ID: dataItem.APPROVER_ID || '',
+        APPROVER_EMPCODE: dataItem.APPROVER_EMPCODE || '',
         STEP_STATUS: dataItem.STEP_STATUS || 'pending',
         DESCRIPTION: dataItem.DESCRIPTION || '',
         STEP_CODE: dataItem.STEP_CODE || '',
@@ -275,7 +275,7 @@ export const RequestRegisterPageController = {
 
       res.status(200).json({
         Status: true,
-        ResultOnDb: { step_id: insertedId },
+        ResultOnDb: { REQUEST_APPROVAL_STEP_ID: insertedId },
         TotalCountOnDb: 1,
         MethodOnDb: 'Create Approval Step',
         Message: 'Create Data Success',
@@ -302,7 +302,7 @@ export const RequestRegisterPageController = {
     }
 
     try {
-      const step_id = parseInt(dataItem.STEP_ID as string)
+      const step_id = parseInt(dataItem.REQUEST_APPROVAL_STEP_ID as string)
       if (!step_id || isNaN(step_id)) {
         return res.status(400).json({
           Status: false,
@@ -314,16 +314,16 @@ export const RequestRegisterPageController = {
       }
 
       await RequestRegisterPageModel.updateApprovalStep({
-        STEP_ID: step_id,
+        REQUEST_APPROVAL_STEP_ID: step_id,
         STEP_STATUS: dataItem.STEP_STATUS || '',
         UPDATE_BY: dataItem.UPDATE_BY || '',
       })
 
       // Create approval log
-      if (dataItem.REQUEST_ID) {
+      if (dataItem.REQUEST_REGISTER_VENDOR_ID) {
         await RequestRegisterPageModel.createApprovalLog({
-          REQUEST_ID: parseInt(dataItem.REQUEST_ID as string),
-          STEP_ID: step_id,
+          REQUEST_REGISTER_VENDOR_ID: parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string),
+          REQUEST_APPROVAL_STEP_ID: step_id,
           ACTION_BY: dataItem.ACTION_BY || dataItem.UPDATE_BY || '',
           ACTION_TYPE: dataItem.ACTION_TYPE || dataItem.STEP_STATUS || '',
           REMARK: dataItem.REMARK || '',
@@ -359,7 +359,7 @@ export const RequestRegisterPageController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -370,7 +370,7 @@ export const RequestRegisterPageController = {
         } as ResponseI)
       }
       await RequestRegisterPageModel.updateCcEmails({
-        REQUEST_ID: request_id,
+        REQUEST_REGISTER_VENDOR_ID: request_id,
         UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
       })
       res.status(200).json({
@@ -402,7 +402,7 @@ export const RequestRegisterPageController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -413,7 +413,7 @@ export const RequestRegisterPageController = {
         } as ResponseI)
       }
       const result = await RequestRegisterPageModel.saveGprForm({
-        REQUEST_ID: request_id,
+        REQUEST_REGISTER_VENDOR_ID: request_id,
         GPR_DATA: dataItem.GPR_DATA || {},
         CREATE_BY: dataItem.CREATE_BY || dataItem.UPDATE_BY || 'SYSTEM',
         UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
@@ -441,7 +441,7 @@ export const RequestRegisterPageController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -453,7 +453,7 @@ export const RequestRegisterPageController = {
       }
 
       const result = await RequestRegisterPageModel.saveGprCNotification({
-        REQUEST_ID: request_id,
+        REQUEST_REGISTER_VENDOR_ID: request_id,
         GPR_C_DATA: dataItem.GPR_C_DATA || {},
         CREATE_BY: dataItem.CREATE_BY || dataItem.UPDATE_BY || 'SYSTEM',
         UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
@@ -476,7 +476,7 @@ export const RequestRegisterPageController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -487,7 +487,7 @@ export const RequestRegisterPageController = {
         } as ResponseI)
       }
 
-      const result = await RequestRegisterPageModel.gprCGetFlow({ REQUEST_ID: request_id })
+      const result = await RequestRegisterPageModel.gprCGetFlow({ REQUEST_REGISTER_VENDOR_ID: request_id })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
       console.error('Get GPR C Flow Error:', error)
@@ -505,7 +505,7 @@ export const RequestRegisterPageController = {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -517,7 +517,7 @@ export const RequestRegisterPageController = {
       }
 
       const result = await RequestRegisterPageModel.gprCSubmitSetup({
-        REQUEST_ID: request_id,
+        REQUEST_REGISTER_VENDOR_ID: request_id,
         GPR_C_DATA: dataItem.GPR_C_DATA || {},
         UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
       })
@@ -544,10 +544,10 @@ export const RequestRegisterPageController = {
       dataItem = req.body
     }
 
-    const { REQUEST_ID, CREATE_BY, DOCUMENT_SCOPE } = dataItem
+    const { REQUEST_REGISTER_VENDOR_ID, CREATE_BY, DOCUMENT_SCOPE } = dataItem
 
     try {
-      const reqId = parseInt(REQUEST_ID as string)
+      const reqId = parseInt(REQUEST_REGISTER_VENDOR_ID as string)
       if (!reqId || isNaN(reqId)) {
         removeTempUpload(file?.path)
         return res.status(400).json({
@@ -603,7 +603,7 @@ export const RequestRegisterPageController = {
 
       if (!isSelectionDocument) {
         const createDocumentResult = await RequestRegisterPageModel.createDocument({
-          REQUEST_ID: reqId,
+          REQUEST_REGISTER_VENDOR_ID: reqId,
           FILE_NAME: persistedFileName,
           FILE_PATH: storedFilePath,
           FILE_SIZE: file.size || 0,
@@ -725,6 +725,91 @@ export const RequestRegisterPageController = {
         TotalCountOnDb: 0,
         MethodOnDb: 'Download Selection Document',
         Message: error?.message || 'Failed to download selection document',
+      } as ResponseI)
+    }
+  },
+
+  deleteSelectionDocument: async (req: Request, res: Response) => {
+    const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
+
+    try {
+      const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID || dataItem.request_id || 0)
+      const criteriaNo = String(dataItem.CRITERIA_NO || dataItem.criteria_no || '').trim()
+      const updateBy = String(dataItem.UPDATE_BY || dataItem.update_by || 'SYSTEM').trim() || 'SYSTEM'
+      const rawRequestNumber = String(dataItem.REQUEST_NUMBER || dataItem.request_number || '').trim()
+
+      if (!requestId || !criteriaNo) {
+        return res.status(200).json({
+          Status: false,
+          ResultOnDb: {},
+          TotalCountOnDb: 0,
+          MethodOnDb: 'Delete Selection Document',
+          Message: 'Missing request_id or criteria_no',
+        } as ResponseI)
+      }
+
+      const criteriaRows = await RequestRegisterPageModel.getCriteriaFileForDelete({
+        REQUEST_REGISTER_VENDOR_ID: requestId,
+        CRITERIA_NO: criteriaNo,
+      })
+      const criteriaRow = criteriaRows[0]
+
+      if (!criteriaRow) {
+        return res.status(200).json({
+          Status: false,
+          ResultOnDb: {},
+          TotalCountOnDb: 0,
+          MethodOnDb: 'Delete Selection Document',
+          Message: 'Criteria document record not found',
+        } as ResponseI)
+      }
+
+      const rawFilePath = String(
+        dataItem.FILE_PATH
+        || dataItem.file_path
+        || criteriaRow.UPLOADED_FILE_PATH
+        || ''
+      ).trim()
+      const rawFileName = String(
+        dataItem.FILE_NAME
+        || dataItem.file_name
+        || criteriaRow.UPLOADED_FILE_NAME
+        || ''
+      ).trim()
+
+      const deleteResult = rawFilePath
+        ? SelectionFileService.deleteSelectionFile(rawFilePath, rawFileName, rawRequestNumber)
+        : { deleted: false, filePath: '', reason: 'No file path in criteria record' }
+
+      await RequestRegisterPageModel.clearCriteriaUploadedFile({
+        REQUEST_VENDOR_SELECTIONS_ID: criteriaRow.REQUEST_VENDOR_SELECTIONS_ID,
+        CRITERIA_NO: criteriaNo,
+        UPDATE_BY: updateBy,
+      })
+
+      return res.status(200).json({
+        Status: true,
+        ResultOnDb: {
+          criteria_no: criteriaNo,
+          physical_deleted: deleteResult.deleted,
+          deleted_file_path: deleteResult.filePath,
+          reason: deleteResult.reason,
+        },
+        TotalCountOnDb: 1,
+        MethodOnDb: 'Delete Selection Document',
+        Message: deleteResult.deleted
+          ? 'Selection document deleted successfully'
+          : 'Selection document record cleared, but physical file was not found',
+      } as ResponseI)
+    } catch (error: any) {
+      console.error('Delete Selection Document Error:', error)
+
+      return res.status(200).json({
+        Status: false,
+        ResultOnDb: {},
+        TotalCountOnDb: 0,
+        MethodOnDb: 'Delete Selection Document',
+        Message: error?.message || 'Failed to delete selection document',
       } as ResponseI)
     }
   },

@@ -13,7 +13,7 @@ export const RequestHistoryController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
 
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
@@ -25,7 +25,7 @@ export const RequestHistoryController = {
         } as ResponseI)
       }
 
-      const result = await RequestHistoryModel.getById({ REQUEST_ID: request_id })
+      const result = await RequestHistoryModel.getById({ REQUEST_REGISTER_VENDOR_ID: request_id })
       res.status(200).json({
         Status: true,
         ResultOnDb: result || {},
@@ -55,7 +55,7 @@ export const RequestHistoryController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -66,7 +66,7 @@ export const RequestHistoryController = {
         } as ResponseI)
       }
 
-      const result = await RequestHistoryModel.getApprovalSteps({ REQUEST_ID: request_id })
+      const result = await RequestHistoryModel.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: request_id })
       res.status(200).json({
         Status: true,
         ResultOnDb: result,
@@ -96,7 +96,7 @@ export const RequestHistoryController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,
@@ -107,7 +107,7 @@ export const RequestHistoryController = {
         } as ResponseI)
       }
 
-      const result = await RequestHistoryModel.getApprovalLogs({ REQUEST_ID: request_id })
+      const result = await RequestHistoryModel.getApprovalLogs({ REQUEST_REGISTER_VENDOR_ID: request_id })
       res.status(200).json({
         Status: true,
         ResultOnDb: result,
@@ -167,7 +167,7 @@ export const RequestHistoryController = {
     }
 
     try {
-      const request_id = parseInt(dataItem.REQUEST_ID as string)
+      const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
         return res.status(400).json({
           Status: false,

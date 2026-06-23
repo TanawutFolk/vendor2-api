@@ -44,16 +44,16 @@ export const FindVendorService = {
       }
 
       // Contact Logic
-      if (dataItem.VENDOR_CONTACT_ID) {
+      if (dataItem.VENDOR_CONTACTS_ID) {
         sqlList.push(await FindVendorSQL.updateVendorContact(dataItem))
-      } else if (dataItem.VENDOR_ID && (dataItem.CONTACT_NAME !== undefined || dataItem.EMAIL !== undefined)) {
+      } else if (dataItem.VENDORS_ID && (dataItem.CONTACT_NAME !== undefined || dataItem.EMAIL !== undefined)) {
         sqlList.push(await FindVendorSQL.createVendorContact(dataItem))
       }
 
       // Product Logic
-      if (dataItem.VENDOR_PRODUCT_ID) {
+      if (dataItem.VENDOR_PRODUCTS_ID) {
         sqlList.push(await FindVendorSQL.updateVendorProduct(dataItem))
-      } else if (dataItem.VENDOR_ID && (dataItem.PRODUCT_NAME !== undefined || dataItem.MAKER_NAME !== undefined)) {
+      } else if (dataItem.VENDORS_ID && (dataItem.PRODUCT_NAME !== undefined || dataItem.MAKER_NAME !== undefined)) {
         sqlList.push(await FindVendorSQL.createVendorProduct(dataItem))
       }
 
@@ -83,7 +83,7 @@ export const FindVendorService = {
 
   updateVendorComprehensive: async (dataItem: any) => {
     try {
-      const vendorId = Number(dataItem.VENDOR_ID) || 0
+      const vendorId = Number(dataItem.VENDORS_ID) || 0
       if (!vendorId) throw new Error('Invalid vendor_id')
 
       const updateBy = dataItem.UPDATE_BY || 'SYSTEM'
@@ -92,9 +92,9 @@ export const FindVendorService = {
 
       if (dataItem.VENDOR_CHANGED !== false) {
         sqlList.push(await FindVendorSQL.updateVendor({
-          VENDOR_ID: vendorId,
+          VENDORS_ID: vendorId,
           COMPANY_NAME: vendor.COMPANY_NAME || '',
-          VENDOR_TYPE_ID: vendor.VENDOR_TYPE_ID ?? null,
+          MASTER_VENDOR_TYPES_ID: vendor.MASTER_VENDOR_TYPES_ID ?? null,
           VENDOR_REGION: vendor.VENDOR_REGION || 'Local',
           PROVINCE: vendor.PROVINCE || '',
           POSTAL_CODE: vendor.POSTAL_CODE || '',
@@ -109,15 +109,15 @@ export const FindVendorService = {
 
       for (const contact of dataItem.CONTACTS || []) {
         const payload = {
-          VENDOR_ID: vendorId,
-          VENDOR_CONTACT_ID: contact.VENDOR_CONTACT_ID,
+          VENDORS_ID: vendorId,
+          VENDOR_CONTACTS_ID: contact.VENDOR_CONTACTS_ID,
           CONTACT_NAME: contact.CONTACT_NAME || '',
           TEL_PHONE: contact.TEL_PHONE || '',
           EMAIL: contact.EMAIL || '',
           POSITION: contact.POSITION || '',
           UPDATE_BY: updateBy,
         }
-        if (contact.VENDOR_CONTACT_ID) {
+        if (contact.VENDOR_CONTACTS_ID) {
           sqlList.push(await FindVendorSQL.updateVendorContact(payload))
         } else if (payload.CONTACT_NAME || payload.EMAIL || payload.TEL_PHONE || payload.POSITION) {
           sqlList.push(await FindVendorSQL.createVendorContact(payload))
@@ -126,31 +126,31 @@ export const FindVendorService = {
 
       for (const product of dataItem.PRODUCTS || []) {
         const payload = {
-          VENDOR_ID: vendorId,
-          VENDOR_PRODUCT_ID: product.VENDOR_PRODUCT_ID,
-          PRODUCT_GROUP_ID: product.PRODUCT_GROUP_ID || 0,
+          VENDORS_ID: vendorId,
+          VENDOR_PRODUCTS_ID: product.VENDOR_PRODUCTS_ID,
+          MASTER_PRODUCT_GROUPS_ID: product.MASTER_PRODUCT_GROUPS_ID || 0,
           MAKER_NAME: product.MAKER_NAME || '',
           PRODUCT_NAME: product.PRODUCT_NAME || '',
           MODEL_LIST: product.MODEL_LIST || '',
           UPDATE_BY: updateBy,
         }
-        if (product.VENDOR_PRODUCT_ID) {
+        if (product.VENDOR_PRODUCTS_ID) {
           sqlList.push(await FindVendorSQL.updateVendorProduct(payload))
-        } else if (payload.PRODUCT_NAME || payload.MAKER_NAME || payload.MODEL_LIST || payload.PRODUCT_GROUP_ID) {
+        } else if (payload.PRODUCT_NAME || payload.MAKER_NAME || payload.MODEL_LIST || payload.MASTER_PRODUCT_GROUPS_ID) {
           sqlList.push(await FindVendorSQL.createVendorProduct(payload))
         }
       }
 
       for (const contactId of dataItem.DELETED_CONTACT_IDS || []) {
         sqlList.push(await FindVendorSQL.deleteVendorContact({
-          VENDOR_CONTACT_ID: contactId,
+          VENDOR_CONTACTS_ID: contactId,
           UPDATE_BY: updateBy,
         }))
       }
 
       for (const productId of dataItem.DELETED_PRODUCT_IDS || []) {
         sqlList.push(await FindVendorSQL.deleteVendorProduct({
-          VENDOR_PRODUCT_ID: productId,
+          VENDOR_PRODUCTS_ID: productId,
           UPDATE_BY: updateBy,
         }))
       }
@@ -435,7 +435,7 @@ export const FindVendorService = {
           if (bestScore === 3) break
         }
         matchResults.push({
-          VENDOR_ID: vendor.VENDOR_ID,
+          VENDORS_ID: vendor.VENDORS_ID,
           STATUS_CHECK: bestScore >= 2 ? 'Registered' : 'Not Registered',
           PRONES_CODE: bestPronesRef ? bestPronesRef.CUSTOMER_CODE : '',
           PRONES_NAME: bestPronesRef ? bestPronesRef.CUSTOMER_NAME : '',

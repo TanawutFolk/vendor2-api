@@ -1,7 +1,7 @@
 export const ExchangeRateSQL = {
   getLatestExchangeRate: async (dataItem: { FISCAL_YEAR: number }) => {
     let sql = `     SELECT
-                          tb_1.CURRENCY_ID
+                          tb_1.INFO_CURRENCY_ID
                         , tb_1.CURRENCY_SYMBOL
                         , tb_1.CURRENCY_NAME
                         , tb_2.EXCHANGE_RATE_ID
@@ -13,7 +13,7 @@ export const ExchangeRateSQL = {
                     JOIN
                         EXCHANGE_RATE tb_2
                     ON
-                        tb_1.CURRENCY_ID = tb_2.CURRENCY_ID
+                        tb_1.INFO_CURRENCY_ID = tb_2.INFO_CURRENCY_ID
                     WHERE
                             tb_2.INUSE = 1
                         AND tb_2.FISCAL_YEAR = 'dataItem.FISCAL_YEAR'
@@ -29,7 +29,7 @@ export const ExchangeRateSQL = {
   },
   getCurrency: async (dataItem: any) => {
     let sql = `     SELECT
-                          tb_1.CURRENCY_ID
+                          tb_1.INFO_CURRENCY_ID
                         , tb_1.CURRENCY_SYMBOL
                         , tb_1.CURRENCY_NAME
                         , tb_2.EXCHANGE_RATE_VALUE
@@ -42,7 +42,7 @@ export const ExchangeRateSQL = {
                     LEFT JOIN
                         EXCHANGE_RATE tb_2
                     ON
-                        (tb_1.CURRENCY_ID = tb_2.CURRENCY_ID)
+                        (tb_1.INFO_CURRENCY_ID = tb_2.INFO_CURRENCY_ID)
                     WHERE
                             tb_1.INUSE = 1
                     GROUP BY
@@ -64,15 +64,15 @@ export const ExchangeRateSQL = {
                     JOIN
                         CURRENCY tb_2
                     ON
-                        tb_1.CURRENCY_ID = tb_2.CURRENCY_ID
+                        tb_1.INFO_CURRENCY_ID = tb_2.INFO_CURRENCY_ID
                     WHERE
                             tb_1.FISCAL_YEAR LIKE '%dataItem.FISCAL_YEAR%'
-                        AND tb_1.CURRENCY_ID LIKE '%dataItem.CURRENCY_ID%'
+                        AND tb_1.INFO_CURRENCY_ID LIKE '%dataItem.INFO_CURRENCY_ID%'
                         AND tb_1.INUSE = '1'
                         sqlWhereColumnFilter `
 
     sql = sql.replaceAll('dataItem.FISCAL_YEAR', dataItem['FISCAL_YEAR'])
-    sql = sql.replaceAll('dataItem.CURRENCY_ID', dataItem['CURRENCY_ID'])
+    sql = sql.replaceAll('dataItem.INFO_CURRENCY_ID', dataItem['INFO_CURRENCY_ID'])
     sql = sql.replaceAll('sqlWhereColumnFilter', dataItem['sqlWhereColumnFilter'])
 
     sqlList.push(sql)
@@ -80,7 +80,7 @@ export const ExchangeRateSQL = {
     sql = `
                 SELECT
                       tb_1.EXCHANGE_RATE_ID
-                    , tb_1.CURRENCY_ID
+                    , tb_1.INFO_CURRENCY_ID
                     , tb_1.EXCHANGE_RATE_VALUE
                     , tb_1.FISCAL_YEAR
                     , tb_1.VERSION
@@ -93,10 +93,10 @@ export const ExchangeRateSQL = {
                 JOIN
                     CURRENCY tb_2
                 ON
-                    tb_1.CURRENCY_ID = tb_2.CURRENCY_ID
+                    tb_1.INFO_CURRENCY_ID = tb_2.INFO_CURRENCY_ID
                 WHERE
                         tb_1.FISCAL_YEAR LIKE '%dataItem.FISCAL_YEAR%'
-                    AND tb_1.CURRENCY_ID LIKE '%dataItem.CURRENCY_ID%'
+                    AND tb_1.INFO_CURRENCY_ID LIKE '%dataItem.INFO_CURRENCY_ID%'
                     AND tb_1.INUSE = '1'
                     sqlWhereColumnFilter
                 ORDER BY
@@ -107,7 +107,7 @@ export const ExchangeRateSQL = {
             `
 
     sql = sql.replaceAll('dataItem.FISCAL_YEAR', dataItem['FISCAL_YEAR'])
-    sql = sql.replaceAll('dataItem.CURRENCY_ID', dataItem['CURRENCY_ID'])
+    sql = sql.replaceAll('dataItem.INFO_CURRENCY_ID', dataItem['INFO_CURRENCY_ID'])
     sql = sql.replaceAll('dataItem.Order', dataItem['Order'])
     sql = sql.replaceAll('dataItem.Start', dataItem['Start'])
     sql = sql.replaceAll('dataItem.Limit', dataItem['Limit'])
@@ -124,7 +124,7 @@ export const ExchangeRateSQL = {
                     (
                           FISCAL_YEAR
                         , VERSION
-                        , CURRENCY_ID
+                        , INFO_CURRENCY_ID
                         , EXCHANGE_RATE_VALUE
                         , DESCRIPTION
                         , CREATE_BY
@@ -138,7 +138,7 @@ export const ExchangeRateSQL = {
                     SELECT
                           dataItem.FISCAL_YEAR
                         , @version
-                        , dataItem.CURRENCY_ID
+                        , dataItem.INFO_CURRENCY_ID
                         , dataItem.CURRENCY_VALUE
                         , ''
                         , 'dataItem.CREATE_BY'
@@ -149,12 +149,12 @@ export const ExchangeRateSQL = {
                         , 1
                       ;
 
-SET @new_exchange_rate_id_for_dataItem.CURRENCY_ID = LAST_INSERT_ID();
+SET @new_exchange_rate_id_for_dataItem.INFO_CURRENCY_ID = LAST_INSERT_ID();
 
                     `
 
     sql = sql.replaceAll('dataItem.FISCAL_YEAR', dataItem['FISCAL_YEAR'])
-    sql = sql.replaceAll('dataItem.CURRENCY_ID', currencyData['CURRENCY_ID'])
+    sql = sql.replaceAll('dataItem.INFO_CURRENCY_ID', currencyData['INFO_CURRENCY_ID'])
     sql = sql.replaceAll('dataItem.CURRENCY_VALUE', currencyData['CURRENCY_VALUE'])
     sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'])
 
@@ -192,7 +192,7 @@ SET @new_exchange_rate_id_for_dataItem.CURRENCY_ID = LAST_INSERT_ID();
   },
   getCurrencyAll: async () => {
     let sql = `     SELECT
-                          tb_1.CURRENCY_ID
+                          tb_1.INFO_CURRENCY_ID
                         , tb_1.CURRENCY_SYMBOL
                         , tb_1.CURRENCY_NAME
                     FROM

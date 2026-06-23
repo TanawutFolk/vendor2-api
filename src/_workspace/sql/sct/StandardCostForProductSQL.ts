@@ -764,7 +764,7 @@ export const StandardCostForProductSQL = {
                                 LEFT JOIN
                             CURRENCY tb_12
                                 ON
-                            tb_11.PURCHASE_PRICE_CURRENCY_ID = tb_12.CURRENCY_ID
+                            tb_11.PURCHASE_PRICE_CURRENCY_ID = tb_12.INFO_CURRENCY_ID
                                 LEFT JOIN
                             UNIT_OF_MEASUREMENT tb_13
                                 ON
@@ -867,7 +867,7 @@ export const StandardCostForProductSQL = {
                                     LEFT JOIN
                                 CURRENCY tb_12
                                     ON
-                                tb_11.PURCHASE_PRICE_CURRENCY_ID = tb_12.CURRENCY_ID
+                                tb_11.PURCHASE_PRICE_CURRENCY_ID = tb_12.INFO_CURRENCY_ID
                                     LEFT JOIN
                                 UNIT_OF_MEASUREMENT tb_13
                                     ON
@@ -1831,7 +1831,7 @@ export const StandardCostForProductSQL = {
                             INNER JOIN
                     CURRENCY tb_4
                             ON
-                    tb_3.PURCHASE_PRICE_CURRENCY_ID = tb_4.CURRENCY_ID
+                    tb_3.PURCHASE_PRICE_CURRENCY_ID = tb_4.INFO_CURRENCY_ID
                             JOIN
                     UNIT_OF_MEASUREMENT tb_5
                             ON
@@ -1905,7 +1905,7 @@ export const StandardCostForProductSQL = {
                                 JOIN
                         CURRENCY tb_4
                                 ON
-                        tb_3.PURCHASE_PRICE_CURRENCY_ID = tb_4.CURRENCY_ID AND tb_4.INUSE = 1
+                        tb_3.PURCHASE_PRICE_CURRENCY_ID = tb_4.INFO_CURRENCY_ID AND tb_4.INUSE = 1
                                 JOIN
                         UNIT_OF_MEASUREMENT tb_5
                                 ON
@@ -5346,7 +5346,7 @@ FROM final_set;
                                 JOIN
                         CURRENCY tb_4
                                 ON
-                        tb_3.PURCHASE_PRICE_CURRENCY_ID = tb_4.CURRENCY_ID
+                        tb_3.PURCHASE_PRICE_CURRENCY_ID = tb_4.INFO_CURRENCY_ID
                                 JOIN
                         UNIT_OF_MEASUREMENT tb_5
                                 ON

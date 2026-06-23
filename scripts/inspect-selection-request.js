@@ -36,14 +36,14 @@ const main = async () => {
     return
   }
 
-  const requestId = request.REQUEST_ID
-  const vendorId = request.VENDOR_ID
+  const requestId = request.REQUEST_REGISTER_VENDOR_ID
+  const vendorId = request.VENDORS_ID
 
   const [selectionRows] = await conn.query(
-    'SELECT * FROM request_vendor_selections WHERE REQUEST_ID = ? ORDER BY SELECTION_ID',
+    'SELECT * FROM request_vendor_selections WHERE REQUEST_REGISTER_VENDOR_ID = ? ORDER BY REQUEST_VENDOR_SELECTIONS_ID',
     [requestId]
   )
-  const selectionIds = selectionRows.map((row) => row.SELECTION_ID).filter(Boolean)
+  const selectionIds = selectionRows.map((row) => row.REQUEST_VENDOR_SELECTIONS_ID).filter(Boolean)
 
   console.log('\n=== key summary ===')
   console.log(JSON.stringify({
@@ -51,13 +51,13 @@ const main = async () => {
     requestId,
     vendorId,
     selectionIds,
-    currentStatusId: request.CURRENT_STATUS_ID,
-    currentStepId: request.CURRENT_STEP_ID,
+    currentStatusId: request.CURRENT_M_REQUEST_STATUS_ID,
+    currentStepId: request.CURRENT_REQUEST_APPROVAL_STEP_ID,
     requestState: request.REQUEST_STATE,
   }, null, 2))
 
   const [columnRows] = await conn.query(
-    "SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME IN ('REQUEST_ID','request_id','SELECTION_ID','selection_id','VENDOR_ID','vendor_id') ORDER BY TABLE_NAME, COLUMN_NAME"
+    "SELECT TABLE_NAME, COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND COLUMN_NAME IN ('REQUEST_REGISTER_VENDOR_ID','REQUEST_VENDOR_SELECTIONS_ID','VENDORS_ID') ORDER BY TABLE_NAME, COLUMN_NAME"
   )
   console.log('\n=== related tables by key column ===')
   console.log(JSON.stringify(columnRows, null, 2))
@@ -70,28 +70,16 @@ const main = async () => {
     const where = []
     const params = []
 
-    if (columns.includes('REQUEST_ID')) {
-      where.push('REQUEST_ID = ?')
+    if (columns.includes('REQUEST_REGISTER_VENDOR_ID')) {
+      where.push('REQUEST_REGISTER_VENDOR_ID = ?')
       params.push(requestId)
     }
-    if (columns.includes('request_id')) {
-      where.push('request_id = ?')
-      params.push(requestId)
-    }
-    if (columns.includes('SELECTION_ID') && selectionIds.length) {
-      where.push(`SELECTION_ID IN (${selectionIds.map(() => '?').join(',')})`)
+    if (columns.includes('REQUEST_VENDOR_SELECTIONS_ID') && selectionIds.length) {
+      where.push(`REQUEST_VENDOR_SELECTIONS_ID IN (${selectionIds.map(() => '?').join(',')})`)
       params.push(...selectionIds)
     }
-    if (columns.includes('selection_id') && selectionIds.length) {
-      where.push(`selection_id IN (${selectionIds.map(() => '?').join(',')})`)
-      params.push(...selectionIds)
-    }
-    if (columns.includes('VENDOR_ID')) {
-      where.push('VENDOR_ID = ?')
-      params.push(vendorId)
-    }
-    if (columns.includes('vendor_id')) {
-      where.push('vendor_id = ?')
+    if (columns.includes('VENDORS_ID')) {
+      where.push('VENDORS_ID = ?')
       params.push(vendorId)
     }
     if (!where.length) continue
@@ -104,9 +92,9 @@ const main = async () => {
   }
 
   const extraQueries = [
-    ['current_status', 'SELECT * FROM m_request_status WHERE STATUS_ID = ?', [request.CURRENT_STATUS_ID]],
-    ['current_step', 'SELECT * FROM request_approval_step WHERE STEP_ID = ?', [request.CURRENT_STEP_ID]],
-    ['all_request_status', 'SELECT * FROM m_request_status ORDER BY STATUS_ID', []],
+    ['current_status', 'SELECT * FROM m_request_status WHERE M_REQUEST_STATUS_ID = ?', [request.CURRENT_M_REQUEST_STATUS_ID]],
+    ['current_step', 'SELECT * FROM request_approval_step WHERE REQUEST_APPROVAL_STEP_ID = ?', [request.CURRENT_REQUEST_APPROVAL_STEP_ID]],
+    ['all_request_status', 'SELECT * FROM m_request_status ORDER BY M_REQUEST_STATUS_ID', []],
   ]
 
   for (const [name, sql, params] of extraQueries) {

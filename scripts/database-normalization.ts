@@ -53,34 +53,34 @@ try {
       {
         name: 'backfill_workflow_step_id',
         sql: `UPDATE request_approval_step ras
-          JOIN workflow_step_master wsm ON wsm.STATUS_ID = ras.STATUS_ID
-          SET ras.WORKFLOW_STEP_ID = wsm.WORKFLOW_STEP_ID`,
+          JOIN workflow_step_master wsm ON wsm.M_REQUEST_STATUS_ID = ras.M_REQUEST_STATUS_ID
+          SET ras.WORKFLOW_STEP_MASTER_ID = wsm.WORKFLOW_STEP_MASTER_ID`,
       },
       {
         name: 'workflow_step_id_not_null',
         sql: `ALTER TABLE request_approval_step
-          MODIFY COLUMN WORKFLOW_STEP_ID SMALLINT UNSIGNED NOT NULL`,
+          MODIFY COLUMN WORKFLOW_STEP_MASTER_ID SMALLINT UNSIGNED NOT NULL`,
       },
       {
         name: 'uq_request_workflow_step',
         sql: `ALTER TABLE request_approval_step
-          ADD CONSTRAINT uq_request_workflow_step UNIQUE (REQUEST_ID, WORKFLOW_STEP_ID)`,
+          ADD CONSTRAINT uq_request_workflow_step UNIQUE (REQUEST_REGISTER_VENDOR_ID, WORKFLOW_STEP_MASTER_ID)`,
       },
       {
         name: 'uq_request_step_pair',
         sql: `ALTER TABLE request_approval_step
-          ADD CONSTRAINT uq_request_step_pair UNIQUE (REQUEST_ID, STEP_ID)`,
+          ADD CONSTRAINT uq_request_step_pair UNIQUE (REQUEST_REGISTER_VENDOR_ID, REQUEST_APPROVAL_STEP_ID)`,
       },
       {
         name: 'idx_request_active_step',
         sql: `ALTER TABLE request_approval_step
-          ADD KEY idx_request_active_step (REQUEST_ID, STEP_STATUS, INUSE)`,
+          ADD KEY idx_request_active_step (REQUEST_REGISTER_VENDOR_ID, STEP_STATUS, INUSE)`,
       },
       {
         name: 'fk_request_approval_workflow_step',
         sql: `ALTER TABLE request_approval_step
           ADD CONSTRAINT fk_request_approval_workflow_step
-          FOREIGN KEY (WORKFLOW_STEP_ID) REFERENCES workflow_step_master (WORKFLOW_STEP_ID)`,
+          FOREIGN KEY (WORKFLOW_STEP_MASTER_ID) REFERENCES workflow_step_master (WORKFLOW_STEP_MASTER_ID)`,
       },
     ]
 
@@ -94,43 +94,43 @@ try {
         name: 'fk_gpr_c_flow_request',
         sql: `ALTER TABLE request_vendor_gpr_c_flows
           ADD CONSTRAINT fk_gpr_c_flow_request
-          FOREIGN KEY (REQUEST_ID) REFERENCES request_register_vendor (REQUEST_ID)`,
+          FOREIGN KEY (REQUEST_REGISTER_VENDOR_ID) REFERENCES request_register_vendor (REQUEST_REGISTER_VENDOR_ID)`,
       },
       {
         name: 'fk_gpr_c_flow_selection',
         sql: `ALTER TABLE request_vendor_gpr_c_flows
           ADD CONSTRAINT fk_gpr_c_flow_selection
-          FOREIGN KEY (SELECTION_ID) REFERENCES request_vendor_selections (SELECTION_ID)`,
+          FOREIGN KEY (REQUEST_VENDOR_SELECTIONS_ID) REFERENCES request_vendor_selections (REQUEST_VENDOR_SELECTIONS_ID)`,
       },
       {
         name: 'fk_gpr_c_step_flow',
         sql: `ALTER TABLE request_vendor_gpr_c_steps
           ADD CONSTRAINT fk_gpr_c_step_flow
-          FOREIGN KEY (GPR_C_FLOW_ID) REFERENCES request_vendor_gpr_c_flows (GPR_C_FLOW_ID)`,
+          FOREIGN KEY (REQUEST_VENDOR_GPR_C_FLOWS_ID) REFERENCES request_vendor_gpr_c_flows (REQUEST_VENDOR_GPR_C_FLOWS_ID)`,
       },
       {
         name: 'fk_gpr_c_step_request',
         sql: `ALTER TABLE request_vendor_gpr_c_steps
           ADD CONSTRAINT fk_gpr_c_step_request
-          FOREIGN KEY (REQUEST_ID) REFERENCES request_register_vendor (REQUEST_ID)`,
+          FOREIGN KEY (REQUEST_REGISTER_VENDOR_ID) REFERENCES request_register_vendor (REQUEST_REGISTER_VENDOR_ID)`,
       },
       {
         name: 'fk_gpr_c_action_flow',
         sql: `ALTER TABLE request_vendor_gpr_c_action_required
           ADD CONSTRAINT fk_gpr_c_action_flow
-          FOREIGN KEY (GPR_C_FLOW_ID) REFERENCES request_vendor_gpr_c_flows (GPR_C_FLOW_ID)`,
+          FOREIGN KEY (REQUEST_VENDOR_GPR_C_FLOWS_ID) REFERENCES request_vendor_gpr_c_flows (REQUEST_VENDOR_GPR_C_FLOWS_ID)`,
       },
       {
         name: 'fk_gpr_c_action_step',
         sql: `ALTER TABLE request_vendor_gpr_c_action_required
           ADD CONSTRAINT fk_gpr_c_action_step
-          FOREIGN KEY (GPR_C_STEP_ID) REFERENCES request_vendor_gpr_c_steps (GPR_C_STEP_ID)`,
+          FOREIGN KEY (REQUEST_VENDOR_GPR_C_STEPS_ID) REFERENCES request_vendor_gpr_c_steps (REQUEST_VENDOR_GPR_C_STEPS_ID)`,
       },
       {
         name: 'fk_gpr_c_action_request',
         sql: `ALTER TABLE request_vendor_gpr_c_action_required
           ADD CONSTRAINT fk_gpr_c_action_request
-          FOREIGN KEY (REQUEST_ID) REFERENCES request_register_vendor (REQUEST_ID)`,
+          FOREIGN KEY (REQUEST_REGISTER_VENDOR_ID) REFERENCES request_register_vendor (REQUEST_REGISTER_VENDOR_ID)`,
       },
     ]
 
@@ -184,13 +184,13 @@ try {
     const contactIntegrity = await queryRows(`
       SELECT 'contact_bridge_missing_request' AS check_name, COUNT(*) AS issue_count
       FROM request_register_vendor_contacts rc
-      LEFT JOIN request_register_vendor rr ON rr.REQUEST_ID = rc.REQUEST_ID
-      WHERE rr.REQUEST_ID IS NULL
+      LEFT JOIN request_register_vendor rr ON rr.REQUEST_REGISTER_VENDOR_ID = rc.REQUEST_REGISTER_VENDOR_ID
+      WHERE rr.REQUEST_REGISTER_VENDOR_ID IS NULL
       UNION ALL
       SELECT 'contact_bridge_missing_contact', COUNT(*)
       FROM request_register_vendor_contacts rc
-      LEFT JOIN vendor_contacts vc ON vc.VENDOR_CONTACT_ID = rc.VENDOR_CONTACT_ID
-      WHERE vc.VENDOR_CONTACT_ID IS NULL
+      LEFT JOIN vendor_contacts vc ON vc.VENDOR_CONTACTS_ID = rc.VENDOR_CONTACTS_ID
+      WHERE vc.VENDOR_CONTACTS_ID IS NULL
     `)
     printRows('Contact integrity state', contactIntegrity)
 
@@ -254,19 +254,19 @@ try {
   const preflight = await queryRows(`
     SELECT 'duplicate_primary_contacts' AS check_name, COUNT(*) AS issue_count
     FROM (
-      SELECT REQUEST_ID
+      SELECT REQUEST_REGISTER_VENDOR_ID
       FROM request_register_vendor_contacts
       WHERE INUSE = 1 AND IS_PRIMARY = 1
-      GROUP BY REQUEST_ID
+      GROUP BY REQUEST_REGISTER_VENDOR_ID
       HAVING COUNT(*) > 1
     ) duplicate_rows
     UNION ALL
     SELECT 'multiple_active_steps', COUNT(*)
     FROM (
-      SELECT REQUEST_ID
+      SELECT REQUEST_REGISTER_VENDOR_ID
       FROM request_approval_step
       WHERE INUSE = 1 AND LOWER(STEP_STATUS) = 'in_progress'
-      GROUP BY REQUEST_ID
+      GROUP BY REQUEST_REGISTER_VENDOR_ID
       HAVING COUNT(*) > 1
     ) duplicate_rows
     UNION ALL
@@ -280,35 +280,35 @@ try {
     UNION ALL
     SELECT 'duplicate_selection_requests', COUNT(*)
     FROM (
-      SELECT s.REQUEST_ID
+      SELECT s.REQUEST_REGISTER_VENDOR_ID
       FROM request_vendor_selections s
-      JOIN request_register_vendor rr ON rr.REQUEST_ID = s.REQUEST_ID
-      GROUP BY s.REQUEST_ID
+      JOIN request_register_vendor rr ON rr.REQUEST_REGISTER_VENDOR_ID = s.REQUEST_REGISTER_VENDOR_ID
+      GROUP BY s.REQUEST_REGISTER_VENDOR_ID
       HAVING COUNT(*) > 1
     ) duplicate_rows
     UNION ALL
     SELECT 'duplicate_financial_years', COUNT(*)
     FROM (
-      SELECT f.SELECTION_ID, f.YEAR
+      SELECT f.REQUEST_VENDOR_SELECTIONS_ID, f.YEAR
       FROM vendor_selection_financials f
-      JOIN request_vendor_selections s ON s.SELECTION_ID = f.SELECTION_ID
-      JOIN request_register_vendor rr ON rr.REQUEST_ID = s.REQUEST_ID
+      JOIN request_vendor_selections s ON s.REQUEST_VENDOR_SELECTIONS_ID = f.REQUEST_VENDOR_SELECTIONS_ID
+      JOIN request_register_vendor rr ON rr.REQUEST_REGISTER_VENDOR_ID = s.REQUEST_REGISTER_VENDOR_ID
       WHERE NOT (
         NULLIF(TRIM(f.YEAR), '') IS NULL
         AND f.TOTAL_REVENUE IS NULL
         AND f.NET_PROFIT IS NULL
       )
-      GROUP BY f.SELECTION_ID, f.YEAR
+      GROUP BY f.REQUEST_VENDOR_SELECTIONS_ID, f.YEAR
       HAVING COUNT(*) > 1
     ) duplicate_rows
     UNION ALL
     SELECT 'duplicate_criteria_numbers', COUNT(*)
     FROM (
-      SELECT c.SELECTION_ID, c.CRITERIA_NO
+      SELECT c.REQUEST_VENDOR_SELECTIONS_ID, c.CRITERIA_NO
       FROM vendor_selection_criteria c
-      JOIN request_vendor_selections s ON s.SELECTION_ID = c.SELECTION_ID
-      JOIN request_register_vendor rr ON rr.REQUEST_ID = s.REQUEST_ID
-      GROUP BY c.SELECTION_ID, c.CRITERIA_NO
+      JOIN request_vendor_selections s ON s.REQUEST_VENDOR_SELECTIONS_ID = c.REQUEST_VENDOR_SELECTIONS_ID
+      JOIN request_register_vendor rr ON rr.REQUEST_REGISTER_VENDOR_ID = s.REQUEST_REGISTER_VENDOR_ID
+      GROUP BY c.REQUEST_VENDOR_SELECTIONS_ID, c.CRITERIA_NO
       HAVING COUNT(*) > 1
     ) duplicate_rows
   `)
@@ -322,9 +322,9 @@ try {
 
   if (!applyMigration && !resumeMigration) {
     const approvalSteps = await queryRows(`
-      SELECT REQUEST_ID, STEP_ID, STATUS_ID, STEP_ORDER, STEP_STATUS, STEP_CODE
+      SELECT REQUEST_REGISTER_VENDOR_ID, REQUEST_APPROVAL_STEP_ID, M_REQUEST_STATUS_ID, STEP_ORDER, STEP_STATUS, STEP_CODE
       FROM request_approval_step
-      ORDER BY REQUEST_ID, STEP_ORDER
+      ORDER BY REQUEST_REGISTER_VENDOR_ID, STEP_ORDER
     `)
     printRows('Approval steps', approvalSteps)
     console.log('\nPreflight passed. Run with --apply to execute database_normalization_phase1.sql.')
@@ -355,16 +355,16 @@ try {
 
     const postflight = await queryRows(`
       SELECT
-        rr.REQUEST_ID,
+        rr.REQUEST_REGISTER_VENDOR_ID,
         rr.REQUEST_STATE,
-        rr.CURRENT_STATUS_ID,
-        rr.CURRENT_STEP_ID,
+        rr.CURRENT_M_REQUEST_STATUS_ID,
+        rr.CURRENT_REQUEST_APPROVAL_STEP_ID,
         ras.STEP_CODE AS current_step_code
       FROM request_register_vendor rr
       LEFT JOIN request_approval_step ras
-        ON ras.REQUEST_ID = rr.REQUEST_ID
-       AND ras.STEP_ID = rr.CURRENT_STEP_ID
-      ORDER BY rr.REQUEST_ID
+        ON ras.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID
+       AND ras.REQUEST_APPROVAL_STEP_ID = rr.CURRENT_REQUEST_APPROVAL_STEP_ID
+      ORDER BY rr.REQUEST_REGISTER_VENDOR_ID
     `)
     printRows('Request workflow state after migration', postflight)
   }

@@ -18,5 +18,6 @@ requestRegisterPageRoutes.post('/gpr-c/get-flow', RequestRegisterPageController.
 requestRegisterPageRoutes.post('/gpr-c/submit-setup', RequestRegisterPageController.gprCSubmitSetup)
 requestRegisterPageRoutes.post('/addDocument', uploadSingleRequestDocument, RequestRegisterPageController.addDocument)
 requestRegisterPageRoutes.post('/downloadSelectionDocument', RequestRegisterPageController.downloadSelectionDocument)
+requestRegisterPageRoutes.post('/deleteSelectionDocument', RequestRegisterPageController.deleteSelectionDocument)
 
 export default requestRegisterPageRoutes
