@@ -272,7 +272,8 @@ export const FindVendorSQL = {
     return sql
   },
 
-  // Helper to escape single quotes for SQL  toNullableNumberSql: (value: any) => {
+  // Helper to escape single quotes for SQL
+  toNullableNumberSql: (value: any) => {
     if (value === null || value === undefined || value === '') return 'NULL'
     return String(value)
   },
@@ -724,7 +725,6 @@ export const FindVendorSQL = {
         `
     return sql
   },
-
   // Staging Prones - Truncate
   truncateStagingPrones: (dataItem?: any) => {
     let sql = `
@@ -736,7 +736,8 @@ export const FindVendorSQL = {
   },
 
   // Staging Prones - Batch Insert
-  insertStagingPronesBatch: (rows: any[]) => {    const values = rows
+  insertStagingPronesBatch: (rows: any[]) => {
+    const values = rows
       .map((row: any, index: any) => {
         let valueSql = `('dataItem.CUSTOMER_CODE_${index}', 'dataItem.CUSTOMER_NAME_${index}', 'dataItem.CUSTOMER_ADDRESS1_${index}', 'dataItem.CUSTOMER_ADDRESS2_${index}', 'dataItem.CUSTOMER_ADDRESS3_${index}', 'dataItem.CUSTOMER_TEL_${index}', LEFT('dataItem.CUSTOMER_NAME_${index}', 100), 'SYSTEM', 'SYSTEM', NOW(), NOW(), 1)`
         valueSql = valueSql.replaceAll(`dataItem.CUSTOMER_CODE_${index}`, row.CUSTOMER_CODE)
@@ -792,7 +793,8 @@ export const FindVendorSQL = {
   },
 
   // Vendor Matching - Batch insert match results
-  insertMatchResultBatch: (rows: any[]) => {    const values = rows
+  insertMatchResultBatch: (rows: any[]) => {
+    const values = rows
       .map((row: any, index: any) => {
         let valueSql = `(dataItem.VENDOR_ID_${index}, 'dataItem.STATUS_CHECK_${index}', 'dataItem.PRONES_CODE_${index}', 'dataItem.PRONES_NAME_${index}', 'dataItem.MATCH_METHOD_${index}', NOW(), LEFT('dataItem.MATCH_METHOD_${index}', 100), 'SYSTEM', 'SYSTEM', NOW(), NOW(), 1)`
         valueSql = valueSql.replaceAll(`dataItem.VENDOR_ID_${index}`, (Number(row.VENDORS_ID) || 0).toString())

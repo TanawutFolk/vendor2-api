@@ -14,6 +14,7 @@ export const RequestRegisterPageModel = {
   createApprovalLog: async (dataItem: any) => RequestRegisterPageService.createApprovalLog(dataItem),
   updateCcEmails: async (dataItem: any) => RequestRegisterPageService.updateCcEmails(dataItem),
   saveGprForm: async (dataItem: any) => RequestRegisterPageService.saveGprForm(dataItem),
+  assertSelectionSheetEditable: async (requestId: number) => RequestRegisterPageService.assertSelectionSheetEditable(requestId),
   saveGprCNotification: async (dataItem: any) => RequestRegisterPageService.saveGprCNotification(dataItem),
   gprCGetFlow: async (dataItem: any) => RequestRegisterPageService.gprCGetFlow(dataItem),
   gprCSubmitSetup: async (dataItem: any) => RequestRegisterPageService.gprCSubmitSetup(dataItem),

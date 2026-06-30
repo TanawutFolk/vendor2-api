@@ -1,4 +1,4 @@
-﻿
+
 
 export const AccRegisterSQL = {
   getApprovalSteps: async (dataItem: any) => {
@@ -41,6 +41,25 @@ export const AccRegisterSQL = {
     return sql
   },
 
+  getSelectionVendorCode: async (dataItem: any) => {
+    let sql = `
+                            SELECT
+                                       PROPOSED_VENDOR_CODE AS VENDOR_CODE
+                            FROM
+                                       request_vendor_selections
+                            WHERE
+                                       REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
+                                       AND INUSE = 1
+                            ORDER BY
+                                       REQUEST_VENDOR_SELECTIONS_ID DESC
+                            LIMIT
+                                       1
+        `
+
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
+
+    return sql
+  },
   updateApprovalStep: async (dataItem: any) => {
     let sql = `
                             UPDATE request_approval_step SET

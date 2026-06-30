@@ -580,6 +580,10 @@ export const RequestRegisterPageController = {
 
       const isSelectionDocument = documentScope === 'GPR_CRITERIA' || documentScope === 'GPR_PDF'
 
+      if (isSelectionDocument) {
+        await RequestRegisterPageModel.assertSelectionSheetEditable(reqId)
+      }
+
       const selectionFileResult = documentScope === 'GPR_CRITERIA'
         ? SelectionFileService.saveToReceiving(
           String(REQUEST_NUMBER),
@@ -747,6 +751,8 @@ export const RequestRegisterPageController = {
           Message: 'Missing request_id or criteria_no',
         } as ResponseI)
       }
+
+      await RequestRegisterPageModel.assertSelectionSheetEditable(requestId)
 
       const criteriaRows = await RequestRegisterPageModel.getCriteriaFileForDelete({
         REQUEST_REGISTER_VENDOR_ID: requestId,

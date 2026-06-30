@@ -221,6 +221,7 @@ enum StepType {
   ISSUE_GPR_C = 'ISSUE_GPR_C',
   VENDOR_DISAGREED = 'VENDOR_DISAGREED',
   DOCUMENT_CHECK = 'DOCUMENT_CHECK',
+  ACCOUNT_REGISTERED = 'ACCOUNT_REGISTERED',
   OTHER = 'OTHER',
 }
 
@@ -247,6 +248,8 @@ const getStepType = (step?: Partial<ApprovalStep>): StepType => {
       return StepType.VENDOR_DISAGREED
     case WORKFLOW_STEP_CODE.DOC_CHECK:
       return StepType.DOCUMENT_CHECK
+    case WORKFLOW_STEP_CODE.ACCOUNT_REGISTERED:
+      return StepType.ACCOUNT_REGISTERED
     default:
       return StepType.OTHER
   }
@@ -1299,29 +1302,36 @@ export const ApprovalQueueService = {
 
   completeRegistration: async (dataItem: CompleteRegistrationPayload) => {
     try {
+      const vendorCode = String(dataItem.VENDOR_CODE || '').trim()
+      if (!vendorCode) {
+        throw new Error('Vendor Code is required before completing registration.')
+      }
+      dataItem.VENDOR_CODE = vendorCode
+
       const stepsSql = await ApprovalQueueSQL.getApprovalSteps(dataItem)
       const steps = ((await MySQLExecute.search(stepsSql)) as ApprovalStep[]).map(normalizeApprovalStep)
       const currentStep = steps.find((step) => String(step.step_status || '').toLowerCase() === 'in_progress')
+      if (!currentStep || getStepType(currentStep) !== StepType.ACCOUNT_REGISTERED) {
+        throw new Error('Registration can only be completed at Account Registered step.')
+      }
 
       const sqlList = []
-      if (currentStep) {
-        sqlList.push(
-          await ApprovalQueueSQL.updateApprovalStep({
-            REQUEST_APPROVAL_STEP_ID: currentStep.step_id,
-            STEP_STATUS: 'approved',
-            UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
-          })
-        )
-        sqlList.push(
-          await ApprovalQueueSQL.createApprovalLog({
-            REQUEST_REGISTER_VENDOR_ID: dataItem.REQUEST_REGISTER_VENDOR_ID,
-            REQUEST_APPROVAL_STEP_ID: currentStep.step_id,
-            ACTION_BY: dataItem.UPDATE_BY || 'SYSTEM',
-            ACTION_TYPE: 'approved',
-            REMARK: dataItem.VENDOR_CODE ? `Vendor Code: ${dataItem.VENDOR_CODE}` : 'Registration completed',
-          })
-        )
-      }
+      sqlList.push(
+        await ApprovalQueueSQL.updateApprovalStep({
+          REQUEST_APPROVAL_STEP_ID: currentStep.step_id,
+          STEP_STATUS: 'approved',
+          UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
+        })
+      )
+      sqlList.push(
+        await ApprovalQueueSQL.createApprovalLog({
+          REQUEST_REGISTER_VENDOR_ID: dataItem.REQUEST_REGISTER_VENDOR_ID,
+          REQUEST_APPROVAL_STEP_ID: currentStep.step_id,
+          ACTION_BY: dataItem.UPDATE_BY || 'SYSTEM',
+          ACTION_TYPE: 'approved',
+          REMARK: `Vendor Code: ${dataItem.VENDOR_CODE}`,
+        })
+      )
 
       sqlList.push(await ApprovalQueueSQL.completeRegistration(dataItem))
       const resultData = await MySQLExecute.executeList(sqlList)

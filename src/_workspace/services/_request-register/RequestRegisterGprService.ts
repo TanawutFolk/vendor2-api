@@ -27,6 +27,60 @@ const resolveGpr43AcceptanceStatus = (formData: any) => {
   return normalizeGpr43AcceptanceStatus(gpr43Row?.remark)
 }
 
+const SELECTION_SHEET_LOCKED_MESSAGE = 'Selection Sheet is read-only after Document Checker approval.'
+
+const isDocCheckStep = (step: any) => {
+  const stepCode = normalizeValue(getValue(step, 'STEP_CODE', 'step_code')).toUpperCase()
+  const description = normalizeValue(getValue(step, 'DESCRIPTION', 'description')).toLowerCase()
+  return stepCode === 'DOC_CHECK' || description.includes('check all document')
+}
+
+const isAccountRegisteredStep = (step: any) => {
+  const stepCode = normalizeValue(getValue(step, 'STEP_CODE', 'step_code')).toUpperCase()
+  const description = normalizeValue(getValue(step, 'DESCRIPTION', 'description')).toLowerCase()
+  return stepCode === 'ACCOUNT_REGISTERED' || description.includes('account registered')
+}
+
+const isApprovedStepStatus = (status: any) => {
+  const normalized = normalizeValue(status).toLowerCase()
+  return normalized === 'approved' || normalized === 'completed'
+}
+
+const getSelectionSheetLockState = async (requestId: number) => {
+  if (!requestId) {
+    return {
+      isLocked: false,
+      isAccountRegisteredInProgress: false,
+    }
+  }
+
+  const stepsSql = await RequestRegisterPageSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId })
+  const steps = (await MySQLExecute.search(stepsSql)) as any[]
+  const isLocked = steps.some((step: any) =>
+    isDocCheckStep(step) && isApprovedStepStatus(getValue(step, 'STEP_STATUS', 'step_status'))
+  )
+  const isAccountRegisteredInProgress = steps.some((step: any) =>
+    isAccountRegisteredStep(step) && normalizeValue(getValue(step, 'STEP_STATUS', 'step_status')).toLowerCase() === 'in_progress'
+  )
+
+  return {
+    isLocked,
+    isAccountRegisteredInProgress,
+  }
+}
+
+const isSelectionSheetLocked = async (requestId: number) => {
+  const state = await getSelectionSheetLockState(requestId)
+  return state.isLocked
+}
+
+const assertSelectionSheetEditable = async (requestId: number) => {
+  const state = await getSelectionSheetLockState(requestId)
+  if (state.isLocked) {
+    throw new Error(SELECTION_SHEET_LOCKED_MESSAGE)
+  }
+}
+
 const parseStoredObject = (raw: any): Record<string, any> => {
   if (!raw) return {}
 
@@ -164,7 +218,37 @@ const buildNormalizedGprSetupSql = async (
   return Promise.all(sqlList)
 }
 
+const saveAccountSelectorFields = async (requestId: number, rawFormData: any, dataItem: any) => {
+  const selectionSql = RequestRegisterPageSQL.getSelection({ REQUEST_REGISTER_VENDOR_ID: requestId })
+  const selectionRows = (await MySQLExecute.search(selectionSql)) as any[]
+  const selectionId = getValue(selectionRows[0], 'REQUEST_VENDOR_SELECTIONS_ID', 'request_vendor_selections_id')
+
+  if (!selectionId) {
+    throw new Error('Selection Sheet record not found. Please complete Selection Sheet before Account Registered step.')
+  }
+
+  const resultData = await MySQLExecute.executeList([
+    await RequestRegisterPageSQL.updateSelectionAccountSelector({
+      REQUEST_VENDOR_SELECTIONS_ID: selectionId,
+      VENDOR_CODE_SELECTOR: rawFormData.vendor_code_selector || '',
+      COMPLETION_DATE: rawFormData.completion_date || '',
+      UPDATE_BY: dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM',
+    }),
+  ])
+
+  return {
+    Status: true,
+    Message: 'Account selector fields saved successfully',
+    ResultOnDb: resultData,
+    MethodOnDb: 'Save Account Selector Fields',
+    TotalCountOnDb: 1,
+  }
+}
+
 export const RequestRegisterGprService = {
+  isSelectionSheetLocked,
+  assertSelectionSheetEditable,
+
   resolveEmployeeProfile: async (dataItem: any) => {
     const empcode = normalizeValue(dataItem?.EMPCODE)
 
@@ -187,9 +271,18 @@ export const RequestRegisterGprService = {
     try {
       const reqId = dataItem.REQUEST_REGISTER_VENDOR_ID
       if (!reqId) throw new Error('Missing request_id')
-
       const rawFormData = typeof dataItem.GPR_DATA === 'string' ? JSON.parse(dataItem.GPR_DATA) : dataItem.GPR_DATA || {}
       const updateBy = dataItem.UPDATE_BY || 'SYSTEM'
+      const lockState = await getSelectionSheetLockState(Number(reqId))
+
+      if (lockState.isLocked) {
+        if (!lockState.isAccountRegisteredInProgress) {
+          throw new Error(SELECTION_SHEET_LOCKED_MESSAGE)
+        }
+
+        return saveAccountSelectorFields(Number(reqId), rawFormData, dataItem)
+      }
+
       const circularList = Array.isArray(rawFormData.gpr_c_circular_list) ? rawFormData.gpr_c_circular_list.map((email: any) => String(email || '').trim()).filter(Boolean) : []
 
       if (circularList.length > 6) {
@@ -297,6 +390,7 @@ export const RequestRegisterGprService = {
     try {
       const reqId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID)
       if (!reqId || Number.isNaN(reqId)) throw new Error('Missing request_id')
+      await assertSelectionSheetEditable(reqId)
 
       const creator = String(dataItem.CREATE_BY || dataItem.UPDATE_BY || '').trim() || 'SYSTEM'
       const updater = String(dataItem.UPDATE_BY || '').trim() || 'SYSTEM'

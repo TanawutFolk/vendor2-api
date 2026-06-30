@@ -1142,6 +1142,34 @@ export const RequestRegisterPageSQL = {
     return sql
   },
 
+  updateSelectionAccountSelector: (dataItem: any) => {
+    let sql = `
+                            UPDATE request_vendor_selections SET
+                                       PROPOSED_VENDOR_CODE = NULLIF('dataItem.VENDOR_CODE_SELECTOR', '')
+                                     , COMPLETION_DATE = dataItem.COMPLETION_DATE_NULL
+                                     , UPDATE_BY = 'dataItem.UPDATE_BY'
+                                     , UPDATE_DATE = NOW()
+                            WHERE
+                                       REQUEST_VENDOR_SELECTIONS_ID = dataItem.REQUEST_VENDOR_SELECTIONS_ID
+                                       AND INUSE = 1
+        `
+
+    const d = dataItem
+
+    sql = sql.replaceAll('dataItem.REQUEST_VENDOR_SELECTIONS_ID', (d['REQUEST_VENDOR_SELECTIONS_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.VENDOR_CODE_SELECTOR', d['VENDOR_CODE_SELECTOR'] || '')
+
+    if (d['COMPLETION_DATE']) {
+      sql = sql.replaceAll('dataItem.COMPLETION_DATE_NULL', `'${d['COMPLETION_DATE']}'`)
+    } else {
+      sql = sql.replaceAll('dataItem.COMPLETION_DATE_NULL', 'NULL')
+    }
+
+    sql = sql.replaceAll('dataItem.UPDATE_BY', d['UPDATE_BY'] || 'SYSTEM')
+
+    return sql
+  },
+
   getGprCircularMembers: (dataItem: any) => {
     let sql = `
                             SELECT

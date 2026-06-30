@@ -558,6 +558,10 @@ export const RequestRegisterPageService = {
     return RequestRegisterGprService.saveGprForm(dataItem)
   },
 
+  assertSelectionSheetEditable: async (requestId: number) => {
+    return RequestRegisterGprService.assertSelectionSheetEditable(requestId)
+  },
+
   saveGprCNotification: async (dataItem: any) => {
     return RequestRegisterGprService.saveGprCNotification(dataItem)
   },
