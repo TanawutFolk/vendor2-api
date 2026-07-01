@@ -16,6 +16,8 @@
     "db:normalize:gpr-setup": "bun scripts/database-normalization.ts --apply-gpr-setup",
     "db:audit:inspect": "bun scripts/database-audit-normalization.ts",
     "db:audit:apply": "bun scripts/database-audit-normalization.ts --apply",
+    "db:reject-reason:inspect": "bun scripts/database-reject-reason.ts",
+    "db:reject-reason:apply": "bun scripts/database-reject-reason.ts --apply",
     "test:vendor:unit": "bun test src/config/mailTemplate.test.ts src/_workspace/sql/_approval-queue/ApprovalQueueSQL.test.ts src/_workspace/sql/_request-register/RequestRegisterPageSQL.test.ts src/_workspace/sql/_black-list/BlacklistSQL.test.ts src/_workspace/sql/_find-vendor/FindVendorSQL.test.ts src/_workspace/services/_request-register/RegisterRequestWorkflowHelper.test.ts src/_workspace/services/_task-manager/TaskManagerRules.test.ts",
     "sql:vendor:pattern": "bun scripts/vendor-sql-pattern-smoke.ts",
     "test:vendor:db": "bun run db:audit:inspect && bun run db:normalize:smoke",

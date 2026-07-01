@@ -1,4 +1,4 @@
-﻿import { RequestApprovalSummarySqlSnippets } from '../_request-register/RequestApprovalSummarySqlSnippets'
+import { RequestApprovalSummarySqlSnippets } from '../_request-register/RequestApprovalSummarySqlSnippets'
 
 
 export const FindVendorSQL = {
@@ -79,7 +79,7 @@ export const FindVendorSQL = {
 
                                      -- Reject Reason
                                      , (
-                                          SELECT ${RequestApprovalSummarySqlSnippets.latestApprovalRemarkExpr('rrv.REQUEST_REGISTER_VENDOR_ID')}
+                                          SELECT (${RequestApprovalSummarySqlSnippets.latestRejectReasonExpr('rrv.REQUEST_REGISTER_VENDOR_ID')})
                                           FROM request_register_vendor rrv
                                           WHERE rrv.VENDORS_ID = v.VENDORS_ID AND rrv.REQUEST_STATE = 'rejected'
                                           ORDER BY rrv.REQUEST_REGISTER_VENDOR_ID DESC LIMIT 1
@@ -588,7 +588,7 @@ export const FindVendorSQL = {
 
                                      -- Reject Reason
                                      , (
-                                          SELECT ${RequestApprovalSummarySqlSnippets.latestApprovalRemarkExpr('rrv.REQUEST_REGISTER_VENDOR_ID')}
+                                          SELECT (${RequestApprovalSummarySqlSnippets.latestRejectReasonExpr('rrv.REQUEST_REGISTER_VENDOR_ID')})
                                           FROM request_register_vendor rrv
                                           WHERE rrv.VENDORS_ID = v.VENDORS_ID AND rrv.REQUEST_STATE = 'rejected'
                                           ORDER BY rrv.REQUEST_REGISTER_VENDOR_ID DESC LIMIT 1

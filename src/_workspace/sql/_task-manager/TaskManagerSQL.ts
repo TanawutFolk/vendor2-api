@@ -15,9 +15,9 @@ export const TaskManagerSQL = {
                     v.VENDOR_REGION,
                     rr.CREATE_DATE,
                     'Request PO PIC' AS workflow_type,
-                    ras.M_REQUEST_STATUS_ID AS current_status_id,
-                    IFNULL(ras.DESCRIPTION, IFNULL(ras.STEP_CODE, '-')) AS current_step_name,
-                    UPPER(IFNULL(ras.STEP_CODE, '')) AS current_step_code,
+                    wsm.M_REQUEST_STATUS_ID AS current_status_id,
+                    IFNULL(mrs.STATUS_VALUE, IFNULL(wsm.STEP_CODE, '-')) AS current_step_name,
+                    UPPER(IFNULL(wsm.STEP_CODE, '')) AS current_step_code,
                     CASE
                         WHEN LOWER(IFNULL(v.VENDOR_REGION, '')) = 'oversea' THEN 'OVERSEA_PO_PIC'
                         ELSE 'LOCAL_PO_PIC'
@@ -55,6 +55,10 @@ export const TaskManagerSQL = {
                             ORDER BY ras_current.STEP_ORDER ASC, ras_current.REQUEST_APPROVAL_STEP_ID ASC
                             LIMIT 1
                         )
+                    LEFT JOIN workflow_step_master wsm
+                        ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID
+                    LEFT JOIN m_request_status mrs
+                        ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID
                     LEFT JOIN vendors v
                         ON v.VENDORS_ID = rr.VENDORS_ID
                     LEFT JOIN assignees_to a_pic

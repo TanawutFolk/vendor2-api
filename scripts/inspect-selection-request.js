@@ -93,7 +93,20 @@ const main = async () => {
 
   const extraQueries = [
     ['current_status', 'SELECT * FROM m_request_status WHERE M_REQUEST_STATUS_ID = ?', [request.CURRENT_M_REQUEST_STATUS_ID]],
-    ['current_step', 'SELECT * FROM request_approval_step WHERE REQUEST_APPROVAL_STEP_ID = ?', [request.CURRENT_REQUEST_APPROVAL_STEP_ID]],
+    ['current_step', `
+      SELECT
+        ras.*,
+        wsm.M_REQUEST_STATUS_ID,
+        wsm.STEP_CODE,
+        wsm.ACTOR_TYPE,
+        mrs.STATUS_VALUE AS DESCRIPTION
+      FROM request_approval_step ras
+      INNER JOIN workflow_step_master wsm
+        ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID
+      INNER JOIN m_request_status mrs
+        ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID
+      WHERE ras.REQUEST_APPROVAL_STEP_ID = ?
+    `, [request.CURRENT_REQUEST_APPROVAL_STEP_ID]],
     ['all_request_status', 'SELECT * FROM m_request_status ORDER BY M_REQUEST_STATUS_ID', []],
   ]
 

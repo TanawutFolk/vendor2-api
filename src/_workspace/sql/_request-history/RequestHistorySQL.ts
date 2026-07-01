@@ -1,4 +1,4 @@
-﻿import { GprCSelectionSqlSnippets } from '../_request-register/GprCSelectionSqlSnippets'
+import { GprCSelectionSqlSnippets } from '../_request-register/GprCSelectionSqlSnippets'
 import { RequestVendorContactSqlSnippets } from '../_request-register/RequestVendorContactSqlSnippets'
 import { RequestApprovalSummarySqlSnippets } from '../_request-register/RequestApprovalSummarySqlSnippets'
 import { RequestStatusSqlSnippets } from '../_request-register/RequestStatusSqlSnippets'
@@ -19,6 +19,7 @@ export const RequestHistorySQL = {
                                      , rr.PURCHASE_FREQUENCY
                                      , rr.REQUESTER_REMARK
                                      , ${RequestApprovalSummarySqlSnippets.latestApprovalRemarkExpr('rr.REQUEST_REGISTER_VENDOR_ID')} AS APPROVER_REMARK
+                                     , (${RequestApprovalSummarySqlSnippets.latestRejectReasonExpr('rr.REQUEST_REGISTER_VENDOR_ID')}) AS REJECT_REASON
                                      , ${RequestApprovalSummarySqlSnippets.latestApprovalDateExpr('rr.REQUEST_REGISTER_VENDOR_ID')} AS APPROVE_DATE
                                      , rr.APPROVED_VENDOR_CODE AS VENDOR_CODE
                                      , rr.ASSIGN_TO
@@ -114,14 +115,14 @@ export const RequestHistorySQL = {
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
                                                                                'REQUEST_APPROVAL_STEP_ID', ras.REQUEST_APPROVAL_STEP_ID,
-                                                                               'M_REQUEST_STATUS_ID', ras.M_REQUEST_STATUS_ID,
+                                                                               'M_REQUEST_STATUS_ID', wsm.M_REQUEST_STATUS_ID,
                                                                                'STEP_ORDER', ras.STEP_ORDER,
                                                                                'APPROVER_EMPCODE', ras.APPROVER_EMPCODE,
                                                                                'approver_name', (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM person.member_fed pm WHERE pm.EMPCODE = ras.APPROVER_EMPCODE LIMIT 1),
                                                                                'STEP_STATUS', ras.STEP_STATUS,
-                                                                               'DESCRIPTION', ras.DESCRIPTION,
-                                                                               'STEP_CODE', ras.STEP_CODE,
-                                                                               'ACTOR_TYPE', ras.ACTOR_TYPE,
+                                                                               'DESCRIPTION', mrs.STATUS_VALUE,
+                                                                               'STEP_CODE', wsm.STEP_CODE,
+                                                                               'ACTOR_TYPE', wsm.ACTOR_TYPE,
                                                                                'GROUP_CODE', ras.GROUP_CODE,
                                                                                'ASSIGNMENT_MODE', ras.ASSIGNMENT_MODE,
                                                                                'master_status_value', mrs.STATUS_VALUE,
@@ -134,7 +135,9 @@ export const RequestHistorySQL = {
                                                            FROM
                                                                       request_approval_step ras
                                                                            INNER JOIN
-                                                                      m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = ras.M_REQUEST_STATUS_ID
+                                                                      workflow_step_master wsm ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID
+                                                                           INNER JOIN
+                                                                      m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID
                                                            WHERE
                                                                       ras.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND ras.INUSE = 1
                                                 ),
@@ -153,6 +156,7 @@ export const RequestHistorySQL = {
                                                                                'ACTION_BY_NAME', COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM person.member_fed pm WHERE pm.EMPCODE = ral.ACTION_BY LIMIT 1)),
                                                                                'ACTION_TYPE', ral.ACTION_TYPE,
                                                                                'DESCRIPTION', ral.DESCRIPTION,
+                                                                               'REJECT_REASON', ral.REJECT_REASON,
                                                                                'CREATE_DATE', ral.CREATE_DATE,
                                                                                'CREATE_BY', ral.CREATE_BY,
                                                                                'UPDATE_BY', ral.UPDATE_BY,
@@ -221,13 +225,13 @@ export const RequestHistorySQL = {
                                        ras.REQUEST_APPROVAL_STEP_ID
                                      , ras.REQUEST_REGISTER_VENDOR_ID
                                      , ras.WORKFLOW_STEP_MASTER_ID
-                                     , ras.M_REQUEST_STATUS_ID
+                                     , wsm.M_REQUEST_STATUS_ID AS M_REQUEST_STATUS_ID
                                      , ras.STEP_ORDER
                                      , ras.APPROVER_EMPCODE
                                      , ras.STEP_STATUS
-                                     , ras.DESCRIPTION
-                                     , ras.STEP_CODE
-                                     , ras.ACTOR_TYPE
+                                     , mrs.STATUS_VALUE AS DESCRIPTION
+                                     , wsm.STEP_CODE
+                                     , wsm.ACTOR_TYPE
                                      , ras.GROUP_CODE
                                      , ras.ASSIGNMENT_MODE
                                      , ras.CREATE_BY
@@ -241,7 +245,9 @@ export const RequestHistorySQL = {
                             FROM
                                        request_approval_step ras
                                             INNER JOIN
-                                       m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = ras.M_REQUEST_STATUS_ID
+                                       workflow_step_master wsm ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID
+                                                                           INNER JOIN
+                                                                      m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID
                                             LEFT JOIN
                                        person.member_fed m ON m.EMPCODE = ras.APPROVER_EMPCODE
                             WHERE
@@ -265,6 +271,7 @@ export const RequestHistorySQL = {
                                      , ral.ACTION_BY
                                      , ral.ACTION_TYPE
                                      , ral.DESCRIPTION
+                                     , ral.REJECT_REASON
                                      , ral.CREATE_DATE
                                      , ral.DESCRIPTION
                                      , ral.CREATE_BY

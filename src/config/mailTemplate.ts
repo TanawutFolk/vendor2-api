@@ -52,6 +52,17 @@ const text = (value: unknown, fallback = '-') => {
   return escapeHtml(normalized || fallback)
 }
 
+const isEmployeeCodeLike = (value: unknown) => /^[A-Z]\d{3,}$/i.test(String(value || '').trim())
+
+const isEmailLike = (value: unknown) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
+
+const isRoleFallbackName = (value: unknown) => {
+  const normalized = String(value || '').trim().toLowerCase()
+  return ['pic', 'po pic', 'po checker', 'account pic', 'approver', 'requester'].includes(normalized)
+}
+
+const isSignatureFallbackName = (value: unknown) => isRoleFallbackName(value) || isEmployeeCodeLike(value) || isEmailLike(value)
+
 const renderStatus = (status: string, message: string, detail = '') => `
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; margin: 0 0 22px 0;">
     <tr>
@@ -128,8 +139,7 @@ const renderLink = (systemLink?: string) => {
 
 const renderSignature = (name: unknown, tel: unknown, role: string) => {
   const normalizedName = String(name || '').trim()
-  const roleFallbackNames = ['pic', 'po pic', 'po checker', 'account pic', 'approver', 'requester']
-  const safeName = roleFallbackNames.includes(normalizedName.toLowerCase()) ? '' : normalizedName
+  const safeName = isSignatureFallbackName(normalizedName) ? '' : normalizedName
 
   return `
     <div style="border-top: 1px solid #c9c9c9; margin-top: 20px; padding-top: 13px; color: #111111; font-size: 12px; line-height: 1.55;">
@@ -158,7 +168,7 @@ const renderMailLayout = ({
   content,
   signerName,
   signerTel,
-  signerRole = 'PO & SCM',
+  signerRole = 'PO & SCM PIC',
 }: MailLayoutOptions) => `
   <!doctype html>
   <html>

@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { RequestRegisterPageSQL } from './RequestRegisterPageSQL'
 
 describe('RequestRegisterPageSQL approval step identity', () => {
-  test('inserts M_REQUEST_STATUS_ID together with the canonical STEP_CODE', async () => {
+  test('stores workflow step id instead of duplicating master step fields', async () => {
     const sql = await RequestRegisterPageSQL.createApprovalStep({
       REQUEST_REGISTER_VENDOR_ID: 10,
       WORKFLOW_STEP_MASTER_ID: 15,
@@ -18,11 +18,13 @@ describe('RequestRegisterPageSQL approval step identity', () => {
       CREATE_BY: 'S00001',
     })
 
-    expect(sql).toContain('M_REQUEST_STATUS_ID')
     expect(sql).toContain('WORKFLOW_STEP_MASTER_ID')
     expect(sql).toContain('15')
-    expect(sql).toContain('DOC_CHECK')
     expect(sql).toContain('PO_CHECKER_MAIN')
+    expect(sql).not.toContain('M_REQUEST_STATUS_ID')
+    expect(sql).not.toContain('STEP_CODE')
+    expect(sql).not.toContain('ACTOR_TYPE')
+    expect(sql).not.toContain('DESCRIPTION')
   })
 
   test('loads master identity by STEP_CODE', async () => {
@@ -43,6 +45,20 @@ describe('RequestRegisterPageSQL approval step identity', () => {
     expect(sql).toContain("WORKFLOW_CODE = 'VENDOR_REGISTRATION'")
     expect(sql).toContain('ORDER BY VERSION_NO DESC')
     expect(sql).toContain('LIMIT 1')
+  })
+
+  test('loads approval step identity from workflow master joins', async () => {
+    const sql = await RequestRegisterPageSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: 10 })
+
+    expect(sql).toContain('wsm.M_REQUEST_STATUS_ID AS M_REQUEST_STATUS_ID')
+    expect(sql).toContain('mrs.STATUS_VALUE AS DESCRIPTION')
+    expect(sql).toContain('wsm.STEP_CODE')
+    expect(sql).toContain('wsm.ACTOR_TYPE')
+    expect(sql).toContain('workflow_step_master wsm')
+    expect(sql).toContain('m_request_status mrs')
+    expect(sql).not.toContain('ras.M_REQUEST_STATUS_ID')
+    expect(sql).not.toContain('ras.STEP_CODE')
+    expect(sql).not.toContain('ras.ACTOR_TYPE')
   })
 
   test('loads assignee display fields for notification recipients', async () => {
@@ -158,5 +174,6 @@ describe('RequestRegisterPageSQL approval step identity', () => {
     expect(deactivateSql).not.toContain('DELETE FROM')
     expect(upsertSql).toContain('ON DUPLICATE KEY UPDATE')
     expect(upsertSql).toContain('INUSE = 1')
+    expect(upsertSql).not.toContain('undefined')
   })
 })

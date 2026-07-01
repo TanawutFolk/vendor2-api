@@ -49,12 +49,12 @@ const resolveManagedGroupForGprCStep = (stepCodeRaw: any) => {
   return ''
 }
 
-const buildDisplayName = (row: any) => [normalizeValue(row?.empName), normalizeValue(row?.empSurname)].filter(Boolean).join(' ')
+const buildDisplayName = (row: any) => [normalizeValue(getValue(row, 'empName', 'EMPNAME')), normalizeValue(getValue(row, 'empSurname', 'EMPSURNAME'))].filter(Boolean).join(' ')
 
 const mapMember = (empcode: string, row: any) => ({
   empcode: normalizeValue(empcode),
-  name: buildDisplayName(row) || normalizeValue(row?.empName) || normalizeValue(empcode),
-  email: normalizeEmail(row?.empEmail),
+  name: buildDisplayName(row) || normalizeValue(getValue(row, 'empName', 'EMPNAME')),
+  email: normalizeEmail(getValue(row, 'empEmail', 'EMPEMAIL')),
 })
 
 const getRequesterProfile = async (empcodeRaw: any) => {
@@ -122,7 +122,7 @@ const getAssigneeByGroup = async (groupCode: string) => {
 
   return {
     empcode: normalizeValue(row.empcode),
-    name: normalizeValue(row.empName) || normalizeValue(row.empcode),
+    name: buildDisplayName(row) || normalizeValue(row.empName),
     email: normalizeEmail(row.empEmail),
     group_code: normalizeValue(row.group_code),
     group_name: normalizeValue(row.group_name),
@@ -313,7 +313,7 @@ const notifyRequesterSetup = async (requestId: number, updateBy: string) => {
       userName: requester.name,
       recipientName: requester.name,
       systemLink: `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-history`,
-      picName: poPicContext.picName || updateBy,
+      picName: poPicContext.picName || 'Vendor Registration System',
     }),
   })
 }

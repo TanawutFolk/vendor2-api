@@ -122,24 +122,24 @@ export const ApprovalQueueController = {
           if (!queueStepCode) return ''
           if (queueStepCode === 'DOC_CHECK') {
             return [
-              '(UPPER(IFNULL(ras.STEP_CODE, \'\')) = \'DOC_CHECK\'',
-              'OR LOWER(IFNULL(ras.DESCRIPTION, \'\')) LIKE \'%checker%\'',
-              'OR LOWER(IFNULL(ras.DESCRIPTION, \'\')) LIKE \'%check all document%\')',
+              '(UPPER(IFNULL(wsm.STEP_CODE, \'\')) = \'DOC_CHECK\'',
+              'OR LOWER(IFNULL(mrs.STATUS_VALUE, \'\')) LIKE \'%checker%\'',
+              'OR LOWER(IFNULL(mrs.STATUS_VALUE, \'\')) LIKE \'%check all document%\')',
             ].join(' ')
           }
           if (queueStepCode === 'ACCOUNT_REGISTERED') {
             return [
-              '(UPPER(IFNULL(ras.STEP_CODE, \'\')) = \'ACCOUNT_REGISTERED\'',
-              'OR LOWER(IFNULL(ras.DESCRIPTION, \'\')) LIKE \'%account%\')',
+              '(UPPER(IFNULL(wsm.STEP_CODE, \'\')) = \'ACCOUNT_REGISTERED\'',
+              'OR LOWER(IFNULL(mrs.STATUS_VALUE, \'\')) LIKE \'%account%\')',
             ].join(' ')
           }
           if (queueStepCode === 'ISSUE_GPR_C') {
             return [
-              '(UPPER(IFNULL(ras.STEP_CODE, \'\')) = \'ISSUE_GPR_C\'',
-              'OR LOWER(IFNULL(ras.DESCRIPTION, \'\')) LIKE \'%issue gpr c%\')',
+              '(UPPER(IFNULL(wsm.STEP_CODE, \'\')) = \'ISSUE_GPR_C\'',
+              'OR LOWER(IFNULL(mrs.STATUS_VALUE, \'\')) LIKE \'%issue gpr c%\')',
             ].join(' ')
           }
-          return `UPPER(IFNULL(ras.STEP_CODE, '')) = '${queueStepCode}'`
+          return `UPPER(IFNULL(wsm.STEP_CODE, '')) = '${queueStepCode}'`
         })()
 
         // Approval pages (MD / PO GM / PO Mgr / Check Document):
@@ -150,7 +150,7 @@ export const ApprovalQueueController = {
           // Queue view: keep actionable + action history for this queue step.
           actorFilters.push(
             [
-              'EXISTS (SELECT 1 FROM request_approval_step ras',
+              'EXISTS (SELECT 1 FROM request_approval_step ras INNER JOIN workflow_step_master wsm ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID INNER JOIN m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID',
               'WHERE ras.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID',
               `AND ras.APPROVER_EMPCODE = '${dataItem.APPROVER_EMPCODE}'`,
               'AND ras.STEP_STATUS IN (\'in_progress\', \'approved\', \'rejected\')',
@@ -162,7 +162,7 @@ export const ApprovalQueueController = {
           // Fallback (legacy): include in-progress and action history for this approver.
           actorFilters.push(
             [
-              'EXISTS (SELECT 1 FROM request_approval_step ras',
+              'EXISTS (SELECT 1 FROM request_approval_step ras INNER JOIN workflow_step_master wsm ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID INNER JOIN m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID',
               'WHERE ras.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID',
               `AND ras.APPROVER_EMPCODE = '${dataItem.APPROVER_EMPCODE}'`,
               'AND ras.STEP_STATUS IN (\'in_progress\', \'approved\', \'rejected\')',

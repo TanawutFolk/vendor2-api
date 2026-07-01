@@ -78,4 +78,21 @@ describe('mail templates', () => {
     expect(html).not.toContain('undefined')
     expect(html).not.toContain('à¸')
   })
+  test('renders PO PIC signature with a real name and role', () => {
+    const html = emailToCheckerPICTemplate({ ...sample, picName: 'TANAWUT PATRAWAN', picTel: '' })
+
+    expect(html).toContain('<div style="font-weight: 700;">Thank you &amp; Best regards,</div>')
+    expect(html).toContain('<div style="font-weight: 700;">TANAWUT PATRAWAN</div>')
+    expect(html).toContain('<div>PO &amp; SCM PIC</div>')
+  })
+
+  test('does not render empcode or email values as signature names', () => {
+    const empcodeHtml = emailToCheckerPICTemplate({ ...sample, picName: 'S00823', picTel: '' })
+    const emailHtml = emailToCheckerPICTemplate({ ...sample, picName: 'Tanawut.pf@gmail.com', picTel: '' })
+
+    expect(empcodeHtml).not.toContain('<div style="font-weight: 700;">S00823</div>')
+    expect(emailHtml).not.toContain('<div style="font-weight: 700;">Tanawut.pf@gmail.com</div>')
+    expect(empcodeHtml).toContain('<div style="font-weight: 700;">Vendor Registration System</div>')
+    expect(emailHtml).toContain('<div style="font-weight: 700;">Vendor Registration System</div>')
+  })
 })

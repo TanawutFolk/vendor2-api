@@ -53,7 +53,7 @@ try {
       {
         name: 'backfill_workflow_step_id',
         sql: `UPDATE request_approval_step ras
-          JOIN workflow_step_master wsm ON wsm.M_REQUEST_STATUS_ID = ras.M_REQUEST_STATUS_ID
+          JOIN workflow_step_master wsm ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID
           SET ras.WORKFLOW_STEP_MASTER_ID = wsm.WORKFLOW_STEP_MASTER_ID`,
       },
       {
@@ -108,12 +108,7 @@ try {
           ADD CONSTRAINT fk_gpr_c_step_flow
           FOREIGN KEY (REQUEST_VENDOR_GPR_C_FLOWS_ID) REFERENCES request_vendor_gpr_c_flows (REQUEST_VENDOR_GPR_C_FLOWS_ID)`,
       },
-      {
-        name: 'fk_gpr_c_step_request',
-        sql: `ALTER TABLE request_vendor_gpr_c_steps
-          ADD CONSTRAINT fk_gpr_c_step_request
-          FOREIGN KEY (REQUEST_REGISTER_VENDOR_ID) REFERENCES request_register_vendor (REQUEST_REGISTER_VENDOR_ID)`,
-      },
+
       {
         name: 'fk_gpr_c_action_flow',
         sql: `ALTER TABLE request_vendor_gpr_c_action_required
@@ -126,12 +121,7 @@ try {
           ADD CONSTRAINT fk_gpr_c_action_step
           FOREIGN KEY (REQUEST_VENDOR_GPR_C_STEPS_ID) REFERENCES request_vendor_gpr_c_steps (REQUEST_VENDOR_GPR_C_STEPS_ID)`,
       },
-      {
-        name: 'fk_gpr_c_action_request',
-        sql: `ALTER TABLE request_vendor_gpr_c_action_required
-          ADD CONSTRAINT fk_gpr_c_action_request
-          FOREIGN KEY (REQUEST_REGISTER_VENDOR_ID) REFERENCES request_register_vendor (REQUEST_REGISTER_VENDOR_ID)`,
-      },
+
     ]
 
     for (const statement of statements) {
@@ -322,9 +312,17 @@ try {
 
   if (!applyMigration && !resumeMigration) {
     const approvalSteps = await queryRows(`
-      SELECT REQUEST_REGISTER_VENDOR_ID, REQUEST_APPROVAL_STEP_ID, M_REQUEST_STATUS_ID, STEP_ORDER, STEP_STATUS, STEP_CODE
-      FROM request_approval_step
-      ORDER BY REQUEST_REGISTER_VENDOR_ID, STEP_ORDER
+      SELECT
+        ras.REQUEST_REGISTER_VENDOR_ID,
+        ras.REQUEST_APPROVAL_STEP_ID,
+        wsm.M_REQUEST_STATUS_ID,
+        ras.STEP_ORDER,
+        ras.STEP_STATUS,
+        wsm.STEP_CODE
+      FROM request_approval_step ras
+      INNER JOIN workflow_step_master wsm
+        ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID
+      ORDER BY ras.REQUEST_REGISTER_VENDOR_ID, ras.STEP_ORDER
     `)
     printRows('Approval steps', approvalSteps)
     console.log('\nPreflight passed. Run with --apply to execute database_normalization_phase1.sql.')
@@ -359,11 +357,13 @@ try {
         rr.REQUEST_STATE,
         rr.CURRENT_M_REQUEST_STATUS_ID,
         rr.CURRENT_REQUEST_APPROVAL_STEP_ID,
-        ras.STEP_CODE AS current_step_code
+        wsm.STEP_CODE AS current_step_code
       FROM request_register_vendor rr
       LEFT JOIN request_approval_step ras
         ON ras.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID
        AND ras.REQUEST_APPROVAL_STEP_ID = rr.CURRENT_REQUEST_APPROVAL_STEP_ID
+      LEFT JOIN workflow_step_master wsm
+        ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID
       ORDER BY rr.REQUEST_REGISTER_VENDOR_ID
     `)
     printRows('Request workflow state after migration', postflight)

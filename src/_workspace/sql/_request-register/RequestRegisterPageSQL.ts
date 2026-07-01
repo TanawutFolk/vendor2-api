@@ -1,4 +1,4 @@
-﻿import { GprCSelectionSqlSnippets } from './GprCSelectionSqlSnippets'
+import { GprCSelectionSqlSnippets } from './GprCSelectionSqlSnippets'
 import { RequestVendorContactSqlSnippets } from './RequestVendorContactSqlSnippets'
 import { RequestStatusSqlSnippets } from './RequestStatusSqlSnippets'
 
@@ -476,7 +476,8 @@ export const RequestRegisterPageSQL = {
                                      , 'dataItem.CREATE_BY'
                                      ,  1
                             )
-        `
+        `
+
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', requestId.toString())
     sql = sql.replaceAll('dataItem.FILE_NAME', dataItem['FILE_NAME'])
     sql = sql.replaceAll('dataItem.FILE_PATH', dataItem['FILE_PATH'])
@@ -607,6 +608,8 @@ export const RequestRegisterPageSQL = {
                             LIMIT 1
         `
 
+
+
     sql = sql.replaceAll('dataItem.STEP_CODE', dataItem['STEP_CODE'] || '')
 
     return sql
@@ -646,13 +649,9 @@ export const RequestRegisterPageSQL = {
                             INSERT INTO request_approval_step (
                                        REQUEST_REGISTER_VENDOR_ID
                                      , WORKFLOW_STEP_MASTER_ID
-                                     , M_REQUEST_STATUS_ID
                                      , STEP_ORDER
                                      , APPROVER_EMPCODE
                                      , STEP_STATUS
-                                     , DESCRIPTION
-                                     , STEP_CODE
-                                     , ACTOR_TYPE
                                      , GROUP_CODE
                                      , ASSIGNMENT_MODE
                                      , CREATE_BY
@@ -661,13 +660,9 @@ export const RequestRegisterPageSQL = {
                             ) VALUES (
                                         dataItem.REQUEST_REGISTER_VENDOR_ID
                                      ,  dataItem.WORKFLOW_STEP_MASTER_ID
-                                     ,  dataItem.M_REQUEST_STATUS_ID
                                      ,  dataItem.STEP_ORDER
                                      , 'dataItem.APPROVER_EMPCODE'
                                      , 'dataItem.STEP_STATUS'
-                                     , 'dataItem.DESCRIPTION'
-                                     , 'dataItem.STEP_CODE'
-                                     , 'dataItem.ACTOR_TYPE'
                                      , 'dataItem.GROUP_CODE'
                                      , 'dataItem.ASSIGNMENT_MODE'
                                      , 'dataItem.CREATE_BY'
@@ -678,13 +673,9 @@ export const RequestRegisterPageSQL = {
 
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.WORKFLOW_STEP_MASTER_ID', (dataItem['WORKFLOW_STEP_MASTER_ID'] || 0).toString())
-    sql = sql.replaceAll('dataItem.M_REQUEST_STATUS_ID', (dataItem['M_REQUEST_STATUS_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.STEP_ORDER', (dataItem['STEP_ORDER'] || 0).toString())
     sql = sql.replaceAll('dataItem.APPROVER_EMPCODE', dataItem['APPROVER_EMPCODE'] || '')
     sql = sql.replaceAll('dataItem.STEP_STATUS', dataItem['STEP_STATUS'] || '')
-    sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem['DESCRIPTION'] || '')
-    sql = sql.replaceAll('dataItem.STEP_CODE', dataItem['STEP_CODE'] || '')
-    sql = sql.replaceAll('dataItem.ACTOR_TYPE', dataItem['ACTOR_TYPE'] || '')
     sql = sql.replaceAll('dataItem.GROUP_CODE', dataItem['GROUP_CODE'] || '')
     sql = sql.replaceAll('dataItem.ASSIGNMENT_MODE', dataItem['ASSIGNMENT_MODE'] || 'AUTO')
     sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'] || '')
@@ -698,13 +689,13 @@ export const RequestRegisterPageSQL = {
                                        ras.REQUEST_APPROVAL_STEP_ID
                                      , ras.REQUEST_REGISTER_VENDOR_ID
                                      , ras.WORKFLOW_STEP_MASTER_ID
-                                     , ras.M_REQUEST_STATUS_ID
+                                     , wsm.M_REQUEST_STATUS_ID AS M_REQUEST_STATUS_ID
                                      , ras.STEP_ORDER
                                      , ras.APPROVER_EMPCODE
                                      , ras.STEP_STATUS
-                                     , ras.DESCRIPTION
-                                     , ras.STEP_CODE
-                                     , ras.ACTOR_TYPE
+                                     , mrs.STATUS_VALUE AS DESCRIPTION
+                                     , wsm.STEP_CODE
+                                     , wsm.ACTOR_TYPE
                                      , ras.GROUP_CODE
                                      , ras.ASSIGNMENT_MODE
                                      , ras.CREATE_BY
@@ -718,7 +709,9 @@ export const RequestRegisterPageSQL = {
                             FROM
                                        request_approval_step ras
                                             INNER JOIN
-                                       m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = ras.M_REQUEST_STATUS_ID
+                                       workflow_step_master wsm ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID
+                                                                           INNER JOIN
+                                                                      m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID
                                             LEFT JOIN
                                        person.member_fed m ON m.EMPCODE = ras.APPROVER_EMPCODE
                             WHERE
@@ -740,11 +733,13 @@ export const RequestRegisterPageSQL = {
                               ON active_step.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID
                              AND active_step.STEP_STATUS = 'in_progress'
                              AND active_step.INUSE = 1
+                            LEFT JOIN workflow_step_master active_wsm
+                              ON active_wsm.WORKFLOW_STEP_MASTER_ID = active_step.WORKFLOW_STEP_MASTER_ID
                             LEFT JOIN m_request_status active_status
-                              ON active_status.M_REQUEST_STATUS_ID = active_step.M_REQUEST_STATUS_ID
+                              ON active_status.M_REQUEST_STATUS_ID = active_wsm.M_REQUEST_STATUS_ID
                             SET
                                        rr.CURRENT_REQUEST_APPROVAL_STEP_ID = active_step.REQUEST_APPROVAL_STEP_ID
-                                     , rr.CURRENT_M_REQUEST_STATUS_ID = active_step.M_REQUEST_STATUS_ID
+                                     , rr.CURRENT_M_REQUEST_STATUS_ID = active_wsm.M_REQUEST_STATUS_ID
                                      , rr.REQUEST_STATE = CASE
                                            WHEN active_step.REQUEST_APPROVAL_STEP_ID IS NULL THEN rr.REQUEST_STATE
                                            ELSE 'in_progress'
@@ -775,11 +770,13 @@ export const RequestRegisterPageSQL = {
                               ON active_step.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID
                              AND active_step.STEP_STATUS = 'in_progress'
                              AND active_step.INUSE = 1
+                            LEFT JOIN workflow_step_master active_wsm
+                              ON active_wsm.WORKFLOW_STEP_MASTER_ID = active_step.WORKFLOW_STEP_MASTER_ID
                             LEFT JOIN m_request_status active_status
-                              ON active_status.M_REQUEST_STATUS_ID = active_step.M_REQUEST_STATUS_ID
+                              ON active_status.M_REQUEST_STATUS_ID = active_wsm.M_REQUEST_STATUS_ID
                             SET
                                        rr.CURRENT_REQUEST_APPROVAL_STEP_ID = COALESCE(active_step.REQUEST_APPROVAL_STEP_ID, rr.CURRENT_REQUEST_APPROVAL_STEP_ID)
-                                     , rr.CURRENT_M_REQUEST_STATUS_ID = COALESCE(active_step.M_REQUEST_STATUS_ID, rr.CURRENT_M_REQUEST_STATUS_ID)
+                                     , rr.CURRENT_M_REQUEST_STATUS_ID = COALESCE(active_wsm.M_REQUEST_STATUS_ID, rr.CURRENT_M_REQUEST_STATUS_ID)
                                      , rr.REQUEST_STATE = CASE
                                            WHEN active_step.REQUEST_APPROVAL_STEP_ID IS NULL THEN rr.REQUEST_STATE
                                            ELSE 'in_progress'
@@ -807,6 +804,7 @@ export const RequestRegisterPageSQL = {
                                      , ACTION_BY_NAME
                                      , ACTION_TYPE
                                      , DESCRIPTION
+                                     , REJECT_REASON
                                      , CREATE_BY
                                      , UPDATE_BY
                                      , CREATE_DATE
@@ -825,6 +823,10 @@ export const RequestRegisterPageSQL = {
                                        )
                                      , 'dataItem.ACTION_TYPE'
                                      , LEFT('dataItem.REMARK', 100)
+                                     , CASE
+                                           WHEN LOWER('dataItem.ACTION_TYPE') IN ('rejected', 'vendor_disagreed') THEN LEFT('dataItem.REJECT_REASON', 500)
+                                           ELSE NULL
+                                       END
                                      , 'dataItem.ACTION_BY'
                                      , 'dataItem.ACTION_BY'
                                      , NOW()
@@ -838,6 +840,7 @@ export const RequestRegisterPageSQL = {
     sql = sql.replaceAll('dataItem.ACTION_BY', dataItem['ACTION_BY'] || '')
     sql = sql.replaceAll('dataItem.ACTION_TYPE', dataItem['ACTION_TYPE'] || '')
     sql = sql.replaceAll('dataItem.REMARK', dataItem['REMARK'] || '')
+    sql = sql.replaceAll('dataItem.REJECT_REASON', dataItem['REJECT_REASON'] ?? dataItem['REMARK'] ?? '')
 
     return sql
   },
@@ -894,6 +897,7 @@ export const RequestRegisterPageSQL = {
                                        CRITERIA_NO AS no
                                      , CRITERIA_VALUE AS criteria
                                      , DESCRIPTION AS remark
+                                     , REJECT_REASON AS reject_reason
                                      , UPLOADED_FILE_PATH AS uploaded_file
                                      , UPLOADED_FILE_NAME AS uploaded_name
                             FROM
@@ -1034,7 +1038,8 @@ export const RequestRegisterPageSQL = {
                             )
         `
     const d = dataItem
-    // Escape quotes helper
+    // Escape quotes helper
+
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', d['REQUEST_REGISTER_VENDOR_ID'])
     sql = sql.replaceAll('dataItem.BUSINESS_CATEGORY', d['BUSINESS_CATEGORY'])
     sql = sql.replaceAll('dataItem.START_YEAR', d['START_YEAR'])
@@ -1098,7 +1103,8 @@ export const RequestRegisterPageSQL = {
                                        REQUEST_VENDOR_SELECTIONS_ID = dataItem.REQUEST_VENDOR_SELECTIONS_ID
                                        AND INUSE = 1
         `
-    const d = dataItem
+    const d = dataItem
+
     sql = sql.replaceAll('dataItem.REQUEST_VENDOR_SELECTIONS_ID', (d['REQUEST_VENDOR_SELECTIONS_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.BUSINESS_CATEGORY', d['BUSINESS_CATEGORY'])
     sql = sql.replaceAll('dataItem.START_YEAR', d['START_YEAR'])
@@ -1135,7 +1141,8 @@ export const RequestRegisterPageSQL = {
                                        AND INUSE = 1
         `
 
-    const d = dataItem
+    const d = dataItem
+
     sql = sql.replaceAll('dataItem.REQUEST_VENDOR_SELECTIONS_ID', (d['REQUEST_VENDOR_SELECTIONS_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.UPDATE_BY', d['UPDATE_BY'] || 'SYSTEM')
 
@@ -1303,7 +1310,7 @@ export const RequestRegisterPageSQL = {
   },
 
   insertGprActionSetup: (dataItem: any) => {
-    const resultUpdatedAt = dataItem.RESULT_UPDATED_AT
+    const resultUpdatedAt = dataItem.RESULT_UPDATED_AT || ''
     let sql = `
                             INSERT INTO request_vendor_gpr_c_action_setup (
                                        REQUEST_VENDOR_SELECTIONS_ID
@@ -1348,11 +1355,11 @@ export const RequestRegisterPageSQL = {
                                      , INUSE = 1
         `
     sql = sql.replaceAll('dataItem.REQUEST_VENDOR_SELECTIONS_ID', (dataItem.REQUEST_VENDOR_SELECTIONS_ID || 0).toString())
-    sql = sql.replaceAll('dataItem.STAGE_CODE', dataItem.STAGE_CODE)
-    sql = sql.replaceAll('dataItem.PIC_NAME', dataItem.PIC_NAME)
-    sql = sql.replaceAll('dataItem.PIC_EMAIL', dataItem.PIC_EMAIL)
-    sql = sql.replaceAll('dataItem.RESULT_STATUS', dataItem.RESULT_STATUS)
-    sql = sql.replaceAll('dataItem.RESULT_NOTE', dataItem.RESULT_NOTE)
+    sql = sql.replaceAll('dataItem.STAGE_CODE', dataItem.STAGE_CODE || '')
+    sql = sql.replaceAll('dataItem.PIC_NAME', dataItem.PIC_NAME || '')
+    sql = sql.replaceAll('dataItem.PIC_EMAIL', dataItem.PIC_EMAIL || '')
+    sql = sql.replaceAll('dataItem.RESULT_STATUS', dataItem.RESULT_STATUS || '')
+    sql = sql.replaceAll('dataItem.RESULT_NOTE', dataItem.RESULT_NOTE || '')
     sql = sql.replaceAll('dataItem.RESULT_UPDATED_AT', resultUpdatedAt)
     sql = sql.replaceAll('dataItem.CREATE_BY', dataItem.CREATE_BY || dataItem.UPDATE_BY || 'SYSTEM')
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM')
@@ -1412,7 +1419,8 @@ export const RequestRegisterPageSQL = {
                                      , UPDATE_BY = VALUES(UPDATE_BY)
                                      , UPDATE_DATE = NOW()
                                      , INUSE = 1
-        `    sql = sql.replaceAll('dataItem.REQUEST_VENDOR_SELECTIONS_ID', (dataItem.REQUEST_VENDOR_SELECTIONS_ID || 0).toString())
+        `
+    sql = sql.replaceAll('dataItem.REQUEST_VENDOR_SELECTIONS_ID', (dataItem.REQUEST_VENDOR_SELECTIONS_ID || 0).toString())
     sql = sql.replaceAll('dataItem.YEAR', dataItem.YEAR)
 
     // Ensure numeric or NULL
@@ -1458,7 +1466,8 @@ export const RequestRegisterPageSQL = {
                                      , UPDATE_BY = VALUES(UPDATE_BY)
                                      , UPDATE_DATE = NOW()
                                      , INUSE = 1
-        `    sql = sql.replaceAll('dataItem.REQUEST_VENDOR_SELECTIONS_ID', (dataItem.REQUEST_VENDOR_SELECTIONS_ID || 0).toString())
+        `
+    sql = sql.replaceAll('dataItem.REQUEST_VENDOR_SELECTIONS_ID', (dataItem.REQUEST_VENDOR_SELECTIONS_ID || 0).toString())
     sql = sql.replaceAll('dataItem.NO', dataItem.NO)
     sql = sql.replaceAll('dataItem.CRITERIA', dataItem.CRITERIA)
     sql = sql.replaceAll('dataItem.REMARK', dataItem.REMARK)

@@ -34,6 +34,7 @@ describe('ApprovalQueueSQL reassignment statements', () => {
     expect(sql).toContain("USER'01")
     expect(sql).toContain("PIC's responsibility changed")
     expect(sql).toContain('DESCRIPTION')
+    expect(sql).toContain('REJECT_REASON')
     expect(sql).toContain('CREATE_BY')
     expect(sql).toContain('UPDATE_BY')
     expect(sql).toContain('INUSE')

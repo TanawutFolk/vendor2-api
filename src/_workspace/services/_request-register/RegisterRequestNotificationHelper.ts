@@ -156,7 +156,8 @@ const resolveAssignedEmail = async (empCodeRaw: unknown): Promise<string> => {
 
   const sql = await RequestRegisterPageSQL.getAssigneeEmailByEmpCode({ EMPCODE: empCode })
   const rows = (await MySQLExecute.search(sql)) as any[]
-  const email = normalizeEmail(rows[0]?.empEmail || rows[0]?.EMPEMAIL)
+  const memberProfile = await resolveEmployeeProfile(empCode).catch(() => null)
+  const email = normalizeEmail(rows[0]?.empEmail || rows[0]?.EMPEMAIL) || memberProfile?.email || ''
   assigneeEmailCache.set(empCode, email)
   return email
 }
@@ -169,17 +170,18 @@ const resolveAssigneeProfile = async (empCodeRaw: unknown): Promise<EmployeeProf
   const sql = await RequestRegisterPageSQL.getAssigneeByEmpCodeContact({ EMPCODE: empCode })
   const rows = (await MySQLExecute.search(sql)) as any[]
   const row = rows[0]
+  const memberProfile = await resolveEmployeeProfile(empCode).catch(() => null)
 
   if (!row) {
-    assigneeProfileCache.set(empCode, null)
-    return null
+    assigneeProfileCache.set(empCode, memberProfile)
+    return memberProfile
   }
 
   const profile: EmployeeProfile = {
     empCode,
-    fullName: buildFullName(row) || String(row?.empName || row?.EMPNAME || '').trim(),
-    email: normalizeEmail(row?.empEmail || row?.EMPEMAIL),
-    tel: String(row?.EMP_TEL || row?.emp_tel || '').trim(),
+    fullName: buildFullName(row) || String(row?.empName || row?.EMPNAME || '').trim() || memberProfile?.fullName || '',
+    email: normalizeEmail(row?.empEmail || row?.EMPEMAIL) || memberProfile?.email || '',
+    tel: String(row?.EMP_TEL || row?.emp_tel || '').trim() || memberProfile?.tel || '',
   }
   assigneeProfileCache.set(empCode, profile)
   return profile
@@ -432,25 +434,30 @@ const buildVendorDocumentAttachments = (vendorRegion: any, isGprBStage = false):
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 
-const resolveDisplayName = (options: Array<unknown>, fallbackLabel: string) => {
-  for (const option of options) {
-    const value = String(option || '').trim()
-    if (!value) continue
-    if (/^[A-Z]\d{3,}$/i.test(value)) continue
-    return value
-  }
-  return fallbackLabel
-}
+const isEmployeeCodeLike = (value: unknown) => /^[A-Z]\d{3,}$/i.test(String(value || '').trim())
+
+const isEmailLike = (value: unknown) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
 
 const isRoleFallbackName = (value: unknown) => {
   const normalized = String(value || '').trim().toLowerCase()
   return ['pic', 'po pic', 'po checker', 'account pic', 'approver', 'requester'].includes(normalized)
 }
 
+const isNonPersonDisplayName = (value: unknown) => isRoleFallbackName(value) || isEmployeeCodeLike(value) || isEmailLike(value)
+
+const resolveDisplayName = (options: Array<unknown>, fallbackLabel: string) => {
+  for (const option of options) {
+    const value = String(option || '').trim()
+    if (!value || isNonPersonDisplayName(value)) continue
+    return value
+  }
+  return fallbackLabel
+}
+
 const resolveMailRecipientName = (options: Array<unknown>, fallbackLabel = 'Recipient') => {
   for (const option of options) {
     const value = String(option || '').trim()
-    if (!value || isRoleFallbackName(value)) continue
+    if (!value || isNonPersonDisplayName(value)) continue
     return value
   }
   return fallbackLabel

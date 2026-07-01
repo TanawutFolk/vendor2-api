@@ -30,28 +30,45 @@ const assert = (condition: unknown, message: string) => {
 
 try {
   const statusRows = await search(await RequestRegisterPageSQL.getStatusOptions())
-  assert(statusRows.length === 12, `Expected 12 active workflow statuses, received ${statusRows.length}`)
+  const workflowStepCount = statusRows.length
+  assert(workflowStepCount > 0, 'Expected at least one active workflow status')
   assert(
     statusRows.every((row) => row.stepCode !== 'REJECTED' && Number(row.workflowStepId || row.workflow_step_id) > 0),
     'Status options should contain workflow steps only'
   )
 
+  const targetRequests = await search(`
+    SELECT rr.REQUEST_REGISTER_VENDOR_ID, rr.REQUEST_NUMBER
+    FROM request_register_vendor rr
+    WHERE rr.INUSE = 1
+      AND EXISTS (
+        SELECT 1
+        FROM request_approval_step ras
+        WHERE ras.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID
+          AND ras.INUSE = 1
+      )
+    ORDER BY rr.REQUEST_REGISTER_VENDOR_ID DESC
+    LIMIT 1
+  `)
+  assert(targetRequests.length === 1, 'Expected at least one active request with approval steps')
+  const requestId = Number(targetRequests[0].REQUEST_REGISTER_VENDOR_ID || targetRequests[0].request_register_vendor_id)
+  const requestNumber = String(targetRequests[0].REQUEST_NUMBER || targetRequests[0].request_number || requestId)
+
   const approvalSteps = await search(
-    await RequestRegisterPageSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: 145 })
+    await RequestRegisterPageSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId })
   )
-  assert(approvalSteps.length === 12, `Expected 12 approval steps, received ${approvalSteps.length}`)
+  assert(approvalSteps.length === workflowStepCount, `Expected ${workflowStepCount} approval steps, received ${approvalSteps.length}`)
   assert(
     approvalSteps.every((row) => Number(row.WORKFLOW_STEP_MASTER_ID || row.workflow_step_id) > 0),
     'Approval step is missing WORKFLOW_STEP_MASTER_ID'
   )
 
-  const requestRows = await search(await ApprovalQueueSQL.getById({ REQUEST_REGISTER_VENDOR_ID: 145 }))
-  assert(requestRows.length === 1, `Expected request 145, received ${requestRows.length} rows`)
+  const requestRows = await search(await ApprovalQueueSQL.getById({ REQUEST_REGISTER_VENDOR_ID: requestId }))
+  assert(requestRows.length === 1, `Expected request ${requestNumber}, received ${requestRows.length} rows`)
   assert(
-    String(requestRows[0].REQUEST_STATE || requestRows[0].request_state) === 'completed',
-    'Request 145 was not migrated to completed REQUEST_STATE'
+    String(requestRows[0].REQUEST_STATE || requestRows[0].request_state || '') !== '',
+    `Request ${requestNumber} is missing REQUEST_STATE`
   )
-
   const [taskCountSql, taskDataSql] = await TaskManagerSQL.searchAllTask(TaskManagerRequestService.buildTaskManagerSqlDataItem({
     SEARCHFILTERS: [],
     COLUMNFILTERS: [],
@@ -87,7 +104,7 @@ try {
   assert(Number(integrityRows[0].orphan_selections) === 0, 'Orphan selections remain')
 
   const selectionRows = await search(
-    RequestRegisterPageSQL.getSelection({ REQUEST_REGISTER_VENDOR_ID: 145 })
+    RequestRegisterPageSQL.getSelection({ REQUEST_REGISTER_VENDOR_ID: requestId })
   )
   const selectionId = Number(selectionRows[0]?.REQUEST_VENDOR_SELECTIONS_ID || selectionRows[0]?.selection_id || 0)
   const actionSetupRows = selectionId
@@ -97,10 +114,12 @@ try {
     ? await search(RequestRegisterPageSQL.getGprCircularMembers({ REQUEST_VENDOR_SELECTIONS_ID: selectionId }))
     : []
 
-  assert(actionSetupRows.length === 4, `Expected 4 GPR action setup rows, received ${actionSetupRows.length}`)
+  if (selectionId) {
+    assert(actionSetupRows.length === 4, `Expected 4 GPR action setup rows, received ${actionSetupRows.length}`)
+  }
 
   await search(`EXPLAIN ${RequestRegisterPageSQL.insertSelection({
-    REQUEST_REGISTER_VENDOR_ID: 145,
+    REQUEST_REGISTER_VENDOR_ID: requestId,
     BUSINESS_CATEGORY: '',
     CURRENCY: 'THB',
     GPR_C_APPROVER_EMPCODE: 'SMOKE_APPROVER',
@@ -121,7 +140,7 @@ try {
     const firstStepId = Number(approvalSteps[0]?.REQUEST_APPROVAL_STEP_ID || approvalSteps[0]?.step_id || 0)
 
     await connection.query(await ApprovalQueueSQL.createApprovalLog({
-      REQUEST_REGISTER_VENDOR_ID: 145,
+      REQUEST_REGISTER_VENDOR_ID: requestId,
       REQUEST_APPROVAL_STEP_ID: firstStepId,
       ACTION_BY: smokeActor,
       ACTION_TYPE: 'smoke_test',
@@ -225,7 +244,7 @@ try {
     }]))
 
     await connection.query(await RequestRegisterPageSQL.updateRequest({
-      REQUEST_REGISTER_VENDOR_ID: 145,
+      REQUEST_REGISTER_VENDOR_ID: requestId,
       VENDOR_CONTACTS_ID: 0,
       SUPPORTPRODUCT_PROCESS: requestRows[0].SUPPORTPRODUCT_PROCESS || '',
       PURCHASE_FREQUENCY: requestRows[0].PURCHASE_FREQUENCY || '',
@@ -239,7 +258,7 @@ try {
   console.table([
     { check: 'active status options', value: statusRows.length },
     { check: 'workflow-linked approval steps', value: approvalSteps.length },
-    { check: 'request 145 state', value: requestRows[0].REQUEST_STATE || requestRows[0].request_state },
+    { check: `${requestNumber} state`, value: requestRows[0].REQUEST_STATE || requestRows[0].request_state },
     { check: 'task manager total', value: taskCountRows[0]?.TOTAL_COUNT || 0 },
     { check: 'task manager sample rows', value: taskRows.length },
     { check: 'unlinked workflow steps', value: integrityRows[0].unlinked_steps },

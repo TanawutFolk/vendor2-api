@@ -7,13 +7,13 @@ export const AccRegisterSQL = {
                                        ras.REQUEST_APPROVAL_STEP_ID
                                      , ras.REQUEST_REGISTER_VENDOR_ID
                                      , ras.WORKFLOW_STEP_MASTER_ID
-                                     , ras.M_REQUEST_STATUS_ID
+                                     , wsm.M_REQUEST_STATUS_ID AS M_REQUEST_STATUS_ID
                                      , ras.STEP_ORDER
                                      , ras.APPROVER_EMPCODE
                                      , ras.STEP_STATUS
-                                     , ras.DESCRIPTION
-                                     , ras.STEP_CODE
-                                     , ras.ACTOR_TYPE
+                                     , mrs.STATUS_VALUE AS DESCRIPTION
+                                     , wsm.STEP_CODE
+                                     , wsm.ACTOR_TYPE
                                      , ras.GROUP_CODE
                                      , ras.ASSIGNMENT_MODE
                                      , ras.CREATE_BY
@@ -26,7 +26,9 @@ export const AccRegisterSQL = {
                             FROM
                                        request_approval_step ras
                                             INNER JOIN
-                                       m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = ras.M_REQUEST_STATUS_ID
+                                       workflow_step_master wsm ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID
+                                                                           INNER JOIN
+                                                                      m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID
                                             LEFT JOIN
                                        person.member_fed m ON m.EMPCODE = ras.APPROVER_EMPCODE
                             WHERE
@@ -86,6 +88,7 @@ export const AccRegisterSQL = {
                                      , ACTION_BY_NAME
                                      , ACTION_TYPE
                                      , DESCRIPTION
+                                     , REJECT_REASON
                                      , CREATE_BY
                                      , UPDATE_BY
                                      , CREATE_DATE
@@ -104,6 +107,10 @@ export const AccRegisterSQL = {
                                        )
                                      , 'dataItem.ACTION_TYPE'
                                      , LEFT('dataItem.REMARK', 100)
+                                     , CASE
+                                           WHEN LOWER('dataItem.ACTION_TYPE') IN ('rejected', 'vendor_disagreed') THEN LEFT('dataItem.REJECT_REASON', 500)
+                                           ELSE NULL
+                                       END
                                      , 'dataItem.ACTION_BY'
                                      , 'dataItem.ACTION_BY'
                                      , NOW()
@@ -117,6 +124,7 @@ export const AccRegisterSQL = {
     sql = sql.replaceAll('dataItem.ACTION_BY', dataItem['ACTION_BY'] || '')
     sql = sql.replaceAll('dataItem.ACTION_TYPE', dataItem['ACTION_TYPE'] || '')
     sql = sql.replaceAll('dataItem.REMARK', dataItem['REMARK'] || '')
+    sql = sql.replaceAll('dataItem.REJECT_REASON', dataItem['REJECT_REASON'] ?? dataItem['REMARK'] ?? '')
 
     return sql
   },

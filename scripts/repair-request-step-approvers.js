@@ -23,8 +23,8 @@ const getSteps = async (conn) => {
       SELECT
         ras.REQUEST_APPROVAL_STEP_ID,
         ras.STEP_ORDER,
-        ras.STEP_CODE,
-        ras.DESCRIPTION,
+        wsm.STEP_CODE,
+        mrs.STATUS_VALUE AS DESCRIPTION,
         ras.STEP_STATUS,
         ras.APPROVER_EMPCODE,
         ras.GROUP_CODE,
@@ -37,6 +37,10 @@ const getSteps = async (conn) => {
           LIMIT 1
         ) AS SHOULD_APPROVER_ID
       FROM request_approval_step ras
+      INNER JOIN workflow_step_master wsm
+        ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID
+      INNER JOIN m_request_status mrs
+        ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID
       INNER JOIN request_register_vendor rr
         ON rr.REQUEST_REGISTER_VENDOR_ID = ras.REQUEST_REGISTER_VENDOR_ID
       WHERE rr.REQUEST_NUMBER = ?
