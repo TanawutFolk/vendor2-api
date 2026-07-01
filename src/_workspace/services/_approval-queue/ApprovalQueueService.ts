@@ -1147,7 +1147,8 @@ export const ApprovalQueueService = {
       const explicitAction = resolveWorkflowAction(dataItem)
       const isExplicitReject = explicitAction === WORKFLOW_ACTION.REJECT
       const actionRequiredRequested = explicitAction === WORKFLOW_ACTION.ACTION_REQUIRED
-      const disagreementRequested = explicitAction === WORKFLOW_ACTION.DISAGREE || isVendorDisagreeStatus(newStatus) || isIssueGprBStatus(newStatus) || isIssueGprCStatus(newStatus)
+      const disagreementRequested =
+        explicitAction === WORKFLOW_ACTION.DISAGREE || isVendorDisagreeStatus(newStatus) || isIssueGprBStatus(newStatus)
       const context = await loadWorkflowContext(dataItem)
       const resolver = createWorkflowResolver(context)
       const vendorRequestLogExists = await hasVendorRequestLog(context)
