@@ -200,7 +200,7 @@ export const RequestRegisterPageController = {
     }
   },
 
-  sendAgreementEmail: async (req: Request, res: Response) => {
+  sendMail_ToSupplier_RequestFormA: async (req: Request, res: Response) => {
     let dataItem
 
     if (!req.body || Object.entries(req.body).length === 0) {
@@ -220,7 +220,7 @@ export const RequestRegisterPageController = {
         } as ResponseI)
       }
 
-      const result = await RequestRegisterPageModel.sendAgreementEmail(dataItem)
+      const result = await RequestRegisterPageModel.sendMail_ToSupplier_RequestFormA(dataItem)
 
       return res.status(200).json({
         Status: true,

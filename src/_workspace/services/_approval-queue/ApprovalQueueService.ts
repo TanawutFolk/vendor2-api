@@ -17,13 +17,13 @@ import {
   WORKFLOW_STEP_CODE,
 } from '../_request-register/RegisterRequestWorkflowHelper'
 import {
-  triggerApprovalEmails,
-  triggerActionRequiredEmail,
-  triggerAfterGprCApprovedEmail,
-  triggerCompletionEmail,
-  triggerRejectionEmail,
-  triggerVendorDisagreeEmail,
-  triggerVendorDocumentEmail,
+  sendMail_ToApprover_NextStep,
+  sendMail_ToUser_ActionRequired,
+  sendMail_ToRequester_GprCApproved,
+  sendMail_ToRequester_RegistrationCompleted,
+  sendMail_ToPic_RequestRejected,
+  sendMail_ToRequester_RegistrationIncomplete,
+  sendMail_NegotiationStageDispatch,
 } from '../_request-register/RegisterRequestNotificationHelper'
 import { SelectionFileService } from '../_request-register/SelectionFileService'
 import { GprCApprovalService } from '../_approval-GPRC/GprCApprovalService'
@@ -216,7 +216,6 @@ interface NegotiationBranchOptions {
 
 enum StepType {
   PENDING_AGREEMENT = 'PENDING_AGREEMENT',
-  AGREEMENT_REACHED = 'AGREEMENT_REACHED',
   ISSUE_GPR_B = 'ISSUE_GPR_B',
   ISSUE_GPR_C = 'ISSUE_GPR_C',
   VENDOR_DISAGREED = 'VENDOR_DISAGREED',
@@ -227,7 +226,6 @@ enum StepType {
 
 const DISAGREE_NEXT: Partial<Record<StepType, StepType[]>> = {
   [StepType.PENDING_AGREEMENT]: [StepType.ISSUE_GPR_B, StepType.ISSUE_GPR_C, StepType.VENDOR_DISAGREED],
-  [StepType.AGREEMENT_REACHED]: [StepType.ISSUE_GPR_B, StepType.ISSUE_GPR_C, StepType.VENDOR_DISAGREED],
   [StepType.ISSUE_GPR_B]: [StepType.VENDOR_DISAGREED],
   [StepType.ISSUE_GPR_C]: [StepType.VENDOR_DISAGREED],
 }
@@ -238,8 +236,6 @@ const getStepType = (step?: Partial<ApprovalStep>): StepType => {
   switch (inferStepCode(step)) {
     case WORKFLOW_STEP_CODE.PENDING_AGREEMENT:
       return StepType.PENDING_AGREEMENT
-    case WORKFLOW_STEP_CODE.AGREEMENT_REACHED:
-      return StepType.AGREEMENT_REACHED
     case WORKFLOW_STEP_CODE.ISSUE_GPR_B:
       return StepType.ISSUE_GPR_B
     case WORKFLOW_STEP_CODE.ISSUE_GPR_C:
@@ -523,7 +519,7 @@ const validateCurrentStep = async (context: WorkflowContext, resolver: WorkflowR
     dataItem.VENDOR_CODE_EXTRACTED = extractedVendorCode
   }
 
-  const requiresGprDecision = isStepType(currentStep, StepType.PENDING_AGREEMENT, StepType.AGREEMENT_REACHED)
+  const requiresGprDecision = isStepType(currentStep, StepType.PENDING_AGREEMENT)
   if (requiresGprDecision && !isExplicitReject && explicitAction !== WORKFLOW_ACTION.ACTION_REQUIRED) {
     const attemptingDisagree = explicitAction === WORKFLOW_ACTION.DISAGREE || isVendorDisagreeStatus(newStatus) || isIssueGprBStatus(newStatus) || isIssueGprCStatus(newStatus)
     const attemptingApprove = !attemptingDisagree
@@ -629,14 +625,14 @@ const handleRejection = async (context: WorkflowContext, sqlList: SqlList, postC
       })
     )
   }
-  postCommitTasks.push(async () => triggerRejectionEmail(dataItem, currentStep))
+  postCommitTasks.push(async () => sendMail_ToPic_RequestRejected(dataItem, currentStep))
 }
 
 const handleVendorReplyRequest = async (context: WorkflowContext, resolver: WorkflowResolver, sqlList: SqlList, hasRequestLog: boolean): Promise<UpdateStatusResponse | null> => {
   const { dataItem, currentStep, steps } = context
   if (!currentStep) return null
 
-  const isNegotiationBranchCurrentStep = isStepType(currentStep, StepType.PENDING_AGREEMENT, StepType.AGREEMENT_REACHED, StepType.ISSUE_GPR_B, StepType.ISSUE_GPR_C)
+  const isNegotiationBranchCurrentStep = isStepType(currentStep, StepType.PENDING_AGREEMENT, StepType.ISSUE_GPR_B, StepType.ISSUE_GPR_C)
   if (!requiresVendorReply(currentStep) || hasRequestLog || isNegotiationBranchCurrentStep) return null
 
   sqlList.push(
@@ -658,7 +654,7 @@ const handleVendorReplyRequest = async (context: WorkflowContext, resolver: Work
 
   const pendingAfterCurrent = getPendingAfterCurrent(steps, currentStep)
   const pendingAgreementStep = findFirstByTypes(pendingAfterCurrent, [StepType.PENDING_AGREEMENT])
-  const nextMainStep = pendingAfterCurrent.find((step) => isStepType(step, StepType.DOCUMENT_CHECK)) || findFirstByTypes(pendingAfterCurrent, [StepType.AGREEMENT_REACHED])
+  const nextMainStep = pendingAfterCurrent.find((step) => isStepType(step, StepType.DOCUMENT_CHECK))
 
   if (pendingAgreementStep) {
     const pendingAgreementApprover = await resolver.resolveStepApprover(pendingAgreementStep)
@@ -703,7 +699,7 @@ const handleVendorReplyRequest = async (context: WorkflowContext, resolver: Work
   createSelectionFolderForVendorRequest(context)
 
   const resultData = await MySQLExecute.executeList(sqlList)
-  const mailResult = await triggerVendorDocumentEmail(dataItem.REQUEST_REGISTER_VENDOR_ID)
+  const mailResult = await sendMail_NegotiationStageDispatch(dataItem.REQUEST_REGISTER_VENDOR_ID)
   const mailMessage = mailResult?.sent
     ? 'Vendor notification sent. Waiting vendor response before next approval step.'
     : `Request updated but vendor email failed: ${mailResult?.reason || 'unknown error'}`
@@ -772,7 +768,7 @@ const handleGprCRequesterPhase = async (
 
   const resultData = await MySQLExecute.executeList(sqlList)
   postCommitTasks.push(async () => {
-    await triggerVendorDocumentEmail(dataItem.REQUEST_REGISTER_VENDOR_ID, currentStep?.DESCRIPTION || 'Issue GPR C')
+    await sendMail_NegotiationStageDispatch(dataItem.REQUEST_REGISTER_VENDOR_ID, currentStep?.DESCRIPTION || 'Issue GPR C')
   })
   queuePostCommitTasks(postCommitTasks, dataItem.REQUEST_REGISTER_VENDOR_ID)
 
@@ -805,9 +801,6 @@ const handleNegotiationBranch = async ({
   const documentCheckStepAny = steps
     .filter((step) => step.step_id !== currentStep.step_id && getStepType(step) === StepType.DOCUMENT_CHECK)
     .sort((a, b) => Number(a.step_order || 0) - Number(b.step_order || 0))[0]
-  const agreementReachedStepAny = steps
-    .filter((step) => step.step_id !== currentStep.step_id && getStepType(step) === StepType.AGREEMENT_REACHED)
-    .sort((a, b) => Number(a.step_order || 0) - Number(b.step_order || 0))[0]
 
   if (currentStepType === StepType.ISSUE_GPR_B && !disagreementRequested && !actionRequiredRequested) {
     resolvedNextStep =
@@ -817,7 +810,7 @@ const handleNegotiationBranch = async ({
     return { nextStep: resolvedNextStep, closeAsVendorDisagreed }
   }
 
-  if (isStepType(currentStep, StepType.PENDING_AGREEMENT, StepType.AGREEMENT_REACHED) && !disagreementRequested) {
+  if (isStepType(currentStep, StepType.PENDING_AGREEMENT) && !disagreementRequested) {
     const branchSteps = pendingAfterCurrent.filter((step) => isDisagreedBranchStep(step))
     for (const branchStep of branchSteps) {
       sqlList.push(
@@ -831,14 +824,12 @@ const handleNegotiationBranch = async ({
     resolvedNextStep =
       pendingAfterCurrent.find((step) => isStepType(step, StepType.DOCUMENT_CHECK)) ||
       pendingNonBranchAnywhere.find((step) => isStepType(step, StepType.DOCUMENT_CHECK)) ||
-      findFirstByTypes(pendingAfterCurrent, [StepType.AGREEMENT_REACHED]) ||
-      findFirstByTypes(pendingNonBranchAnywhere, [StepType.AGREEMENT_REACHED]) ||
       pendingAfterCurrent.find((step) => !isDisagreedBranchStep(step)) ||
       pendingNonBranchAnywhere[0]
-  } else if (DISAGREE_NEXT[currentStepType] || currentStepType === StepType.AGREEMENT_REACHED) {
+  } else if (DISAGREE_NEXT[currentStepType]) {
     if (!disagreementRequested || actionRequiredRequested) {
       if (currentStepType === StepType.ISSUE_GPR_C && !actionRequiredRequested) {
-        resolvedNextStep = documentCheckStepAny || agreementReachedStepAny
+        resolvedNextStep = documentCheckStepAny
       }
       const branchSteps = pendingAfterCurrent.filter((step) => isDisagreedBranchStep(step))
       for (const branchStep of branchSteps) {
@@ -854,8 +845,6 @@ const handleNegotiationBranch = async ({
         resolvedNextStep ||
         pendingAfterCurrent.find((step) => isStepType(step, StepType.DOCUMENT_CHECK)) ||
         pendingNonBranchAnywhere.find((step) => isStepType(step, StepType.DOCUMENT_CHECK)) ||
-        findFirstByTypes(pendingAfterCurrent, [StepType.AGREEMENT_REACHED]) ||
-        findFirstByTypes(pendingNonBranchAnywhere, [StepType.AGREEMENT_REACHED]) ||
         pendingAfterCurrent.find((step) => !isDisagreedBranchStep(step)) ||
         pendingNonBranchAnywhere[0]
     } else {
@@ -898,7 +887,7 @@ const handleNegotiationBranch = async ({
         )
       }
 
-      postCommitTasks.push(async () => triggerVendorDisagreeEmail(dataItem))
+      postCommitTasks.push(async () => sendMail_ToRequester_RegistrationIncomplete(dataItem))
       resolvedNextStep = undefined
     }
   }
@@ -920,12 +909,7 @@ const handleNormalApproval = async (
 
   const approvalActionType = explicitAction === WORKFLOW_ACTION.ACTION_REQUIRED ? 'action_required' : explicitAction === WORKFLOW_ACTION.DISAGREE ? 'vendor_disagreed' : 'approved'
   const approvalRemark = explicitAction === WORKFLOW_ACTION.ACTION_REQUIRED ? buildActionRequiredRemark(dataItem) : dataItem.APPROVER_REMARK || ''
-  const currentStepStatus =
-    getStepType(currentStep) === StepType.PENDING_AGREEMENT && !disagreementRequested
-      ? 'approved'
-      : getStepType(currentStep) === StepType.AGREEMENT_REACHED && disagreementRequested
-        ? 'pending'
-        : 'approved'
+  const currentStepStatus = 'approved'
 
   sqlList.push(
     await ApprovalQueueSQL.updateApprovalStep({
@@ -979,15 +963,6 @@ const handleNormalApproval = async (
   }
 
   if (nextStep) {
-    if (getStepType(currentStep) === StepType.ISSUE_GPR_C && !disagreementRequested && !actionRequiredRequested && getStepType(nextStep) === StepType.AGREEMENT_REACHED) {
-      sqlList.push(
-        await ApprovalQueueSQL.updateApprovalStep({
-          REQUEST_APPROVAL_STEP_ID: nextStep.step_id,
-          STEP_STATUS: 'pending',
-          UPDATE_BY: dataItem.UPDATE_BY || dataItem.APPROVE_BY || 'SYSTEM',
-        })
-      )
-    }
     const nextStepApprover = await resolver.resolveStepApprover(nextStep)
     if (getStepType(nextStep) === StepType.ISSUE_GPR_C && !nextStepApprover) {
       throw new Error('GPR C approver is not configured. Please set GPR C Approver before sending GPR C.')
@@ -1011,7 +986,7 @@ const handleNormalApproval = async (
     )
     if (getStepType(nextStep) === StepType.ISSUE_GPR_B) {
       postCommitTasks.push(async () => {
-        await triggerVendorDocumentEmail(dataItem.REQUEST_REGISTER_VENDOR_ID, nextStep?.DESCRIPTION)
+        await sendMail_NegotiationStageDispatch(dataItem.REQUEST_REGISTER_VENDOR_ID, nextStep?.DESCRIPTION)
       })
     } else if (getStepType(nextStep) === StepType.ISSUE_GPR_C) {
       postCommitTasks.push(async () => {
@@ -1021,13 +996,13 @@ const handleNormalApproval = async (
         })
       })
     } else {
-      postCommitTasks.push(async () => triggerApprovalEmails(dataItem, nextStep, nextStepApprover))
+      postCommitTasks.push(async () => sendMail_ToApprover_NextStep(dataItem, nextStep, nextStepApprover))
     }
     if (getStepType(currentStep) === StepType.ISSUE_GPR_C && !disagreementRequested && !actionRequiredRequested) {
-      postCommitTasks.push(async () => triggerAfterGprCApprovedEmail(dataItem))
+      postCommitTasks.push(async () => sendMail_ToRequester_GprCApproved(dataItem))
     }
     if (actionRequiredRequested) {
-      postCommitTasks.push(async () => triggerActionRequiredEmail(dataItem, currentStep))
+      postCommitTasks.push(async () => sendMail_ToUser_ActionRequired(dataItem, currentStep))
     }
   } else if (!closeAsVendorDisagreed) {
     sqlList.push(
@@ -1037,9 +1012,9 @@ const handleNormalApproval = async (
       })
     )
     if (actionRequiredRequested) {
-      postCommitTasks.push(async () => triggerActionRequiredEmail(dataItem, currentStep))
+      postCommitTasks.push(async () => sendMail_ToUser_ActionRequired(dataItem, currentStep))
     }
-    postCommitTasks.push(async () => triggerCompletionEmail(dataItem))
+    postCommitTasks.push(async () => sendMail_ToRequester_RegistrationCompleted(dataItem))
   }
 }
 
@@ -1338,7 +1313,7 @@ export const ApprovalQueueService = {
       const resultData = await MySQLExecute.executeList(sqlList)
 
       try {
-        await triggerCompletionEmail(dataItem)
+        await sendMail_ToRequester_RegistrationCompleted(dataItem)
       } catch (mailErr: unknown) {
         console.error('[completeRegistration] Completion email failed:', mailErr instanceof Error ? mailErr.message : mailErr)
       }

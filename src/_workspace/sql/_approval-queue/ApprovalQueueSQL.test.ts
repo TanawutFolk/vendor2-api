@@ -61,4 +61,22 @@ describe('ApprovalQueueSQL reassignment statements', () => {
     expect(sql).toContain('ORDER BY VERSION_NO DESC')
     expect(sql).toContain('LIMIT 1')
   })
+  test('keeps approval queue list query lightweight', async () => {
+    const [, dataSql] = await ApprovalQueueSQL.getAllRequests({
+      APPROVER_EMPCODE: 'S00001',
+      QUEUE_STEP_CODE: 'DOC_CHECK',
+      LIMIT: 25,
+      OFFSET: 0,
+    })
+
+    expect(dataSql).toContain('DOCUMENTS_COUNT')
+    expect(dataSql).toContain('MY_APPROVAL_STATUS')
+    expect(dataSql).toContain('GPR_C_SETUP_COMPLETED')
+    expect(dataSql).not.toContain('AS contacts')
+    expect(dataSql).not.toContain('AS products')
+    expect(dataSql).not.toContain('AS documents')
+    expect(dataSql).not.toContain('AS approval_steps')
+    expect(dataSql).not.toContain('AS approval_logs')
+    expect(dataSql).not.toContain('AS gpr_criteria')
+  })
 })

@@ -176,4 +176,11 @@ describe('RequestRegisterPageSQL approval step identity', () => {
     expect(upsertSql).toContain('INUSE = 1')
     expect(upsertSql).not.toContain('undefined')
   })
+  test('loads GPR criteria remarks from DESCRIPTION without reject reason column', () => {
+    const sql = RequestRegisterPageSQL.getCriteria({ REQUEST_VENDOR_SELECTIONS_ID: 10 })
+
+    expect(sql).toContain('DESCRIPTION AS remark')
+    expect(sql).not.toContain('REJECT_REASON')
+    expect(sql).not.toContain('reject_reason')
+  })
 })

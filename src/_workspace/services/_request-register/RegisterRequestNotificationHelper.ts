@@ -4,21 +4,21 @@ import sendEmail, { type MailAttachment } from '@src/config/sendEmail'
 import fs from 'fs'
 import path from 'path'
 import {
-  emailActionRequiredTemplate,
-  emailGprCStepApprovalTemplate,
-  emailExternalSubmitGPRBTemplate,
-  emailGprCRequesterSetupTemplate,
-  emailCompleteTemplate,
-  emailIncompleteTemplate,
-  emailReject1Template,
-  emailReject2Template,
-  emailRequestRegisterVendorTemplate,
-  emailToAccountPICTemplate,
-  emailToCheckerPICTemplate,
-  emailToMDTemplate,
-  emailToPMGMTemplate,
-  emailToPMMgrTemplate,
-  emailVendorDocumentRequestTemplate,
+  email_ToUser_ActionRequired,
+  email_ToGprCApprover_NextStep,
+  email_ToSupplier_RequestFormB,
+  email_ToRequester_GprCSetup,
+  email_ToRequester_RegistrationCompleted,
+  email_ToRequester_RegistrationIncomplete,
+  email_ToPic_RejectedByApprover,
+  email_ToPic_RejectedByChecker,
+  email_ToPic_NewRequest,
+  email_ToAccount_RegisterRequired,
+  email_ToChecker_CheckRequired,
+  email_ToMd_ApproveRequired,
+  email_ToPoGm_ApproveRequired,
+  email_ToPoManager_ApproveRequired,
+  email_ToSupplier_RequestFormA,
   type MailTemplateData,
 } from '@src/config/mailTemplate'
 import { SelectionFileService } from './SelectionFileService'
@@ -367,6 +367,11 @@ const getAccountCcByRegion = (vendorRegion: any) =>
   getPeerCcEmailsByGroupCode(
     isOverseaRegion(vendorRegion) ? GROUP_CODE.ACC_OVERSEA_CC : GROUP_CODE.ACC_LOCAL_CC
   )
+// The actual ACCPIC group (who processes account registration), distinct from the ACC_*_CC notify-only group above.
+const getAccountPicByRegion = (vendorRegion: any) =>
+  getPeerCcEmailsByGroupCode(
+    isOverseaRegion(vendorRegion) ? GROUP_CODE.ACC_OVERSEA_MAIN : GROUP_CODE.ACC_LOCAL_MAIN
+  )
 
 // ─── Requester profile helper ─────────────────────────────────────────────────
 
@@ -621,32 +626,32 @@ export const selectApprovalNotificationByStep = (
 
   if (stepCode === 'PO_GM_APPROVAL') {
     return {
-      templateName: 'emailToPMGMTemplate',
-      emailHtml: emailToPMGMTemplate({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'PO GM' }),
+      templateName: 'email_ToPoGm_ApproveRequired',
+      emailHtml: email_ToPoGm_ApproveRequired({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'PO GM' }),
       emailSubject: `[Request Approval] Please approve register vendor "${requestNumber}" - PO GM Step`,
     }
   }
 
   if (stepCode === 'PO_MGR_APPROVAL') {
     return {
-      templateName: 'emailToPMMgrTemplate',
-      emailHtml: emailToPMMgrTemplate({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'PO Mgr' }),
+      templateName: 'email_ToPoManager_ApproveRequired',
+      emailHtml: email_ToPoManager_ApproveRequired({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'PO Mgr' }),
       emailSubject: `[Request Approval] Please approve register vendor "${requestNumber}" - PO Mgr Step`,
     }
   }
 
   if (stepCode === 'MD_APPROVAL') {
     return {
-      templateName: 'emailToMDTemplate',
-      emailHtml: emailToMDTemplate({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'MD' }),
+      templateName: 'email_ToMd_ApproveRequired',
+      emailHtml: email_ToMd_ApproveRequired({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'MD' }),
       emailSubject: `[Request Approval] Please approve register vendor "${requestNumber}" - MD Approval`,
     }
   }
 
   if (stepCode === 'ACCOUNT_REGISTERED') {
     return {
-      templateName: 'emailToAccountPICTemplate',
-      emailHtml: emailToAccountPICTemplate({
+      templateName: 'email_ToAccount_RegisterRequired',
+      emailHtml: email_ToAccount_RegisterRequired({
         ...baseEmailData,
         recipientName: resolveMailRecipientName([baseEmailData.recipientName], 'Account PIC'),
       }),
@@ -656,8 +661,8 @@ export const selectApprovalNotificationByStep = (
 
   if (stepCode === 'DOC_CHECK') {
     return {
-      templateName: 'emailToCheckerPICTemplate',
-      emailHtml: emailToCheckerPICTemplate({
+      templateName: 'email_ToChecker_CheckRequired',
+      emailHtml: email_ToChecker_CheckRequired({
         ...baseEmailData,
         recipientName: resolveMailRecipientName([baseEmailData.recipientName], 'PO Checker'),
       }),
@@ -667,15 +672,15 @@ export const selectApprovalNotificationByStep = (
 
   // Fallback
   return {
-    templateName: 'emailToPMMgrTemplate',
-    emailHtml: emailToPMMgrTemplate({ ...baseEmailData, recipientName: 'Approver' }),
+    templateName: 'email_ToPoManager_ApproveRequired',
+    emailHtml: email_ToPoManager_ApproveRequired({ ...baseEmailData, recipientName: 'Approver' }),
     emailSubject: `[Request Approval] Please process register vendor "${requestNumber}"`,
   }
 }
 
 // ─── Exported trigger functions ───────────────────────────────────────────────
 
-export const triggerCreationEmail = async (
+export const sendMail_ToPic_NewRequest = async (
   dataItem: any,
   vendorData: any,
   nextAssignee: any,
@@ -705,7 +710,7 @@ export const triggerCreationEmail = async (
     (email) => email !== nextAssigneeEmail
   )
 
-  const emailHtml = emailRequestRegisterVendorTemplate({
+  const emailHtml = email_ToPic_NewRequest({
     requestNumber,
     recipientName: resolveMailRecipientName([nextAssigneeProfile?.fullName, nextAssignee.empCode, nextAssigneeEmail], 'Recipient'),
     vendorName: vendorData.company_name || 'Error Connection',
@@ -721,7 +726,7 @@ export const triggerCreationEmail = async (
   })
 
   await sendTemplatedEmail({
-    templateName: 'emailRequestRegisterVendorTemplate',
+    templateName: 'email_ToPic_NewRequest',
     emailHtml,
     toEmail: nextAssigneeEmail,
     subject: `[Request Check] Please request check register vendor follow as "${requestNumber}"`,
@@ -740,7 +745,7 @@ export const triggerCreationEmail = async (
   })
 }
 
-export const sendAgreementEmail = async (dataItem: any) => {
+export const sendMail_ToSupplier_RequestFormA = async (dataItem: any) => {
   let vd: VendorContext = {}
   let selectedContactEmails: string[] = []
 
@@ -792,7 +797,7 @@ export const sendAgreementEmail = async (dataItem: any) => {
     SelectionFileService.copyAttachmentsToSending(resolvedRequestNumber, attachments)
   }
 
-  const emailHtml = emailVendorDocumentRequestTemplate({
+  const emailHtml = email_ToSupplier_RequestFormA({
     vendorEmail: recipientEmail,
     ccEmail: ccEmails.join('; '),
     topicRef: resolvedRequestNumber,
@@ -802,7 +807,7 @@ export const sendAgreementEmail = async (dataItem: any) => {
   })
 
   await sendTemplatedEmail({
-    templateName: 'emailVendorDocumentRequestTemplate',
+    templateName: 'email_ToSupplier_RequestFormA',
     emailHtml,
     toEmail: recipientEmail,
     subject: dataItem.EMAIL_SUBJECT || `[Request Submit] Document for ${resolvedRequestNumber}`,
@@ -816,7 +821,7 @@ export const sendAgreementEmail = async (dataItem: any) => {
   return { sent_to: recipientEmail }
 }
 
-export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: string) => {
+export const sendMail_NegotiationStageDispatch = async (requestId: number, stageHint?: string) => {
   try {
     const vd = await fetchVendorContext(requestId)
     const selectedContactEmails = await fetchVendorContactEmails(requestId)
@@ -855,7 +860,7 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
         [...vendorEmails, vd.emailmain]
       )
 
-      const emailHtml = emailGprCRequesterSetupTemplate({
+      const emailHtml = email_ToRequester_GprCSetup({
         toEmail: requester.email,
         ccEmail: gprCCcEmails.join('; '),
         requestNumber,
@@ -873,7 +878,7 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
       })
 
       await sendTemplatedEmail({
-        templateName: 'emailGprCRequesterSetupTemplate',
+        templateName: 'email_ToRequester_GprCSetup',
         emailHtml,
         toEmail: requester.email,
         subject: `[GPR C Setup] Please setup GPR C approver for ${requestNumber}`,
@@ -900,14 +905,14 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
     }
 
     const emailHtml = isGprBStage
-      ? emailExternalSubmitGPRBTemplate({
+      ? email_ToSupplier_RequestFormB({
           vendorEmail,
           ccEmail: ccEmails.join('; '),
           requestNumber,
           picName,
           picTel,
         })
-      : emailVendorDocumentRequestTemplate({
+      : email_ToSupplier_RequestFormA({
           vendorEmail,
           ccEmail: ccEmails.join('; '),
           topicRef: requestNumber,
@@ -917,7 +922,7 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
         })
 
     await sendTemplatedEmail({
-      templateName: isGprBStage ? 'emailExternalSubmitGPRBTemplate' : 'emailVendorDocumentRequestTemplate',
+      templateName: isGprBStage ? 'email_ToSupplier_RequestFormB' : 'email_ToSupplier_RequestFormA',
       emailHtml,
       toEmail: vendorEmail,
       subject: isGprBStage
@@ -937,7 +942,7 @@ export const triggerVendorDocumentEmail = async (requestId: number, stageHint?: 
   }
 }
 
-export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynamicApprover: string) => {
+export const sendMail_ToApprover_NextStep = async (dataItem: any, nextStep: any, dynamicApprover: string) => {
   try {
     const requestId = dataItem.REQUEST_REGISTER_VENDOR_ID
     const vd = await fetchVendorContext(requestId)
@@ -1044,7 +1049,7 @@ export const triggerApprovalEmails = async (dataItem: any, nextStep: any, dynami
   }
 }
 
-export const triggerActionRequiredEmail = async (dataItem: any, currentStep: any) => {
+export const sendMail_ToUser_ActionRequired = async (dataItem: any, currentStep: any) => {
   try {
     const requestId = dataItem.REQUEST_REGISTER_VENDOR_ID
     const vd = await fetchVendorContext(requestId)
@@ -1078,7 +1083,7 @@ export const triggerActionRequiredEmail = async (dataItem: any, currentStep: any
     }
     const stageLabel = String(stageConfig?.stage_label || stageLabelMap[stageKey]).trim()
 
-    const emailHtml = emailActionRequiredTemplate({
+    const emailHtml = email_ToUser_ActionRequired({
       stageLabel,
       recipientName,
       requestNumber,
@@ -1091,7 +1096,7 @@ export const triggerActionRequiredEmail = async (dataItem: any, currentStep: any
     })
 
     await sendTemplatedEmail({
-      templateName: 'emailActionRequiredTemplate',
+      templateName: 'email_ToUser_ActionRequired',
       emailHtml,
       toEmail: recipientEmail,
       subject: `[Action Required] ${stageLabel} for ${requestNumber}`,
@@ -1105,7 +1110,7 @@ export const triggerActionRequiredEmail = async (dataItem: any, currentStep: any
   }
 }
 
-export const triggerAfterGprCApprovedEmail = async (dataItem: any) => {
+export const sendMail_ToRequester_GprCApproved = async (dataItem: any) => {
   try {
     const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID) || 0
     if (!requestId) return
@@ -1138,7 +1143,7 @@ export const triggerAfterGprCApprovedEmail = async (dataItem: any) => {
       [vd.vendor_email, vd.vendor_main_email]
     )
 
-    const emailHtml = emailGprCStepApprovalTemplate({
+    const emailHtml = email_ToGprCApprover_NextStep({
       toEmail: requester.email,
       ccEmail: ccEmails.join('; '),
       requestNumber,
@@ -1156,7 +1161,7 @@ export const triggerAfterGprCApprovedEmail = async (dataItem: any) => {
     })
 
     await sendTemplatedEmail({
-      templateName: 'emailGprCStepApprovalTemplate',
+      templateName: 'email_ToGprCApprover_NextStep',
       emailHtml,
       toEmail: requester.email,
       subject: `[Request Update] ${requestNumber} - General Purchase Specification Form C approved`,
@@ -1170,7 +1175,7 @@ export const triggerAfterGprCApprovedEmail = async (dataItem: any) => {
   }
 }
 
-export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => {
+export const sendMail_ToPic_RequestRejected = async (dataItem: any, currentStep: any) => {
   try {
     const requestId = dataItem.REQUEST_REGISTER_VENDOR_ID
     const vd = await fetchVendorContext(requestId)
@@ -1210,7 +1215,7 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
       [vd.vendor_email, vd.vendor_main_email]
     )
 
-    const rejectTemplate = isCheckerReject ? emailReject2Template : emailReject1Template
+    const rejectTemplate = isCheckerReject ? email_ToPic_RejectedByChecker : email_ToPic_RejectedByApprover
     const rejectRemark = dataItem.APPROVER_REMARK || ''
 
     const emailHtml = rejectTemplate({
@@ -1234,7 +1239,7 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
     })
 
     await sendTemplatedEmail({
-      templateName: isCheckerReject ? 'emailReject2Template' : 'emailReject1Template',
+      templateName: isCheckerReject ? 'email_ToPic_RejectedByChecker' : 'email_ToPic_RejectedByApprover',
       emailHtml,
       toEmail: primaryToEmail,
       subject: isCheckerReject
@@ -1254,7 +1259,7 @@ export const triggerRejectionEmail = async (dataItem: any, currentStep: any) => 
   }
 }
 
-export const triggerCompletionEmail = async (dataItem: any) => {
+export const sendMail_ToRequester_RegistrationCompleted = async (dataItem: any) => {
   try {
     const requestId = dataItem.REQUEST_REGISTER_VENDOR_ID
     const vd = await fetchVendorContext(requestId)
@@ -1271,16 +1276,17 @@ export const triggerCompletionEmail = async (dataItem: any) => {
 
     const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
     const checkerPicCc = await getPoCheckerMainEmails()
+    const accPicMain = await getAccountPicByRegion(vd.vendor_region)
     const accPicCc = await getAccountCcByRegion(vd.vendor_region)
 
     const ccEmails = excludeEmails(
-      mergeUniqueEmails(accPicCc, checkerPicCc, poPicContext.allPoPicEmails).filter(
+      mergeUniqueEmails(accPicMain, accPicCc, checkerPicCc, poPicContext.allPoPicEmails).filter(
         (email) => email !== requester.email
       ),
       [vd.vendor_email, vd.vendor_main_email]
     )
 
-    const emailHtml = emailCompleteTemplate({
+    const emailHtml = email_ToRequester_RegistrationCompleted({
       toEmail: requester.email,
       ccEmail: ccEmails.join('; '),
       requestNumber,
@@ -1299,7 +1305,7 @@ export const triggerCompletionEmail = async (dataItem: any) => {
     })
 
     await sendTemplatedEmail({
-      templateName: 'emailCompleteTemplate',
+      templateName: 'email_ToRequester_RegistrationCompleted',
       emailHtml,
       toEmail: requester.email,
       subject: `[Complete] Register vendor "${requestNumber}" is now completed`,
@@ -1313,7 +1319,7 @@ export const triggerCompletionEmail = async (dataItem: any) => {
   }
 }
 
-export const triggerVendorDisagreeEmail = async (dataItem: any) => {
+export const sendMail_ToRequester_RegistrationIncomplete = async (dataItem: any) => {
   try {
     const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID) || 0
     if (!requestId) return
@@ -1331,10 +1337,11 @@ export const triggerVendorDisagreeEmail = async (dataItem: any) => {
 
     const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
     const checkerPicCc = await getPoCheckerMainEmails()
+    const accPicMain = await getAccountPicByRegion(vd.vendor_region)
     const accPicCc = await getAccountCcByRegion(vd.vendor_region)
 
     const ccEmails = excludeEmails(
-      mergeUniqueEmails(accPicCc, checkerPicCc, poPicContext.allPoPicEmails).filter(
+      mergeUniqueEmails(accPicMain, accPicCc, checkerPicCc, poPicContext.allPoPicEmails).filter(
         (email) => email !== requester.email
       ),
       [vd.vendor_email, vd.vendor_main_email]
@@ -1343,7 +1350,7 @@ export const triggerVendorDisagreeEmail = async (dataItem: any) => {
     const safeRemark = String(dataItem.APPROVER_REMARK || '').trim()
     const reasons = ['Vendor disagreed after GPR negotiation rounds', ...(safeRemark ? [safeRemark] : [])]
 
-    const emailHtml = emailIncompleteTemplate({
+    const emailHtml = email_ToRequester_RegistrationIncomplete({
       toEmail: requester.email,
       ccEmail: ccEmails.join('; '),
       requestNumber,
@@ -1362,7 +1369,7 @@ export const triggerVendorDisagreeEmail = async (dataItem: any) => {
     })
 
     await sendTemplatedEmail({
-      templateName: 'emailIncompleteTemplate',
+      templateName: 'email_ToRequester_RegistrationIncomplete',
       emailHtml,
       toEmail: requester.email,
       subject: `[Incomplete] Register vendor "${requestNumber}" ended as Vendor Disagreed`,

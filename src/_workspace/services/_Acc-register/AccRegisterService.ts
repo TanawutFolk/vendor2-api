@@ -1,7 +1,7 @@
 import { MySQLExecute } from '@businessData/dbExecute'
 import { AccRegisterSQL } from '../../sql/_Acc-register/AccRegisterSQL'
 import { RowDataPacket } from 'mysql2'
-import { triggerCompletionEmail } from '../_request-register/RegisterRequestNotificationHelper'
+import { sendMail_ToRequester_RegistrationCompleted } from '../_request-register/RegisterRequestNotificationHelper'
 
 const normalizeApprovalStep = (step: any) => ({
   ...step,
@@ -57,7 +57,7 @@ export const AccRegisterService = {
       const resultData = await MySQLExecute.executeList(sqlList)
 
       try {
-        await triggerCompletionEmail(dataItem)
+        await sendMail_ToRequester_RegistrationCompleted(dataItem)
       } catch (mailErr: any) {
         console.error('[completeRegistration] Completion email failed:', mailErr?.message)
       }

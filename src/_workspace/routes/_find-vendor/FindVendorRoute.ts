@@ -10,7 +10,7 @@ findVendorRoutes.post('/getById', validateData(GetVendorByIdSchema), FindVendorC
 findVendorRoutes.post('/update', validateData(UpdateVendorSchema), FindVendorController.update)
 findVendorRoutes.post('/update-comprehensive', validateData(UpdateVendorComprehensiveSchema), FindVendorController.updateComprehensive)
 findVendorRoutes.post('/deleteVendor', validateData(DeleteVendorSchema), FindVendorController.deleteVendor)
-findVendorRoutes.post('/dropdown/vendor-types', FindVendorController.getVendorTypes)
+findVendorRoutes.post('/dropdown/vendor-business-category-name', FindVendorController.getVendorBusinessCategoryName)
 findVendorRoutes.post('/dropdown/provinces', FindVendorController.getProvinces)
 findVendorRoutes.post('/dropdown/product-groups', FindVendorController.getProductGroups)
 findVendorRoutes.post('/dropdown/prones-Check', FindVendorController.getPronesData)

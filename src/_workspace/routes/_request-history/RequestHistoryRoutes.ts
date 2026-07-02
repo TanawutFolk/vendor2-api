@@ -7,6 +7,6 @@ requestHistoryRoutes.post('/getById', RequestHistoryController.getById)
 requestHistoryRoutes.post('/getApprovalSteps', RequestHistoryController.getApprovalSteps)
 requestHistoryRoutes.post('/getApprovalLogs', RequestHistoryController.getApprovalLogs)
 requestHistoryRoutes.post('/resolveEmployeeProfile', RequestHistoryController.resolveEmployeeProfile)
-requestHistoryRoutes.post('/getGprForm', RequestHistoryController.getGprForm)
+requestHistoryRoutes.post('/getSelectionSheet', RequestHistoryController.getGprForm)
 
 export default requestHistoryRoutes

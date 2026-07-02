@@ -234,7 +234,7 @@ const renderStandardWorkflowMail = (
     `,
   })
 
-export const emailRequestRegisterVendorTemplate = (data: MailTemplateData) =>
+export const email_ToPic_NewRequest = (data: MailTemplateData) =>
   renderStandardWorkflowMail(data, {
     recipient: data.recipientName,
     status: 'Under request register vendor',
@@ -246,7 +246,7 @@ export const emailRequestRegisterVendorTemplate = (data: MailTemplateData) =>
     signerRole: 'Requester',
   })
 
-export const emailVendorDocumentRequestTemplate = (data: MailTemplateData) => {
+export const email_ToSupplier_RequestFormA = (data: MailTemplateData) => {
   const requestNumber = data.topicRef || data.requestNumber
   const supplierType = data.isNewSupplier ? 'new supplier registration' : 'supplier re-registration'
   const englishIntro = data.isNewSupplier
@@ -309,7 +309,7 @@ export const emailVendorDocumentRequestTemplate = (data: MailTemplateData) => {
   })
 }
 
-export const emailExternalSubmitGPRBTemplate = (data: MailTemplateData) =>
+export const email_ToSupplier_RequestFormB = (data: MailTemplateData) =>
   renderMailLayout({
     recipient: 'Supplier',
     signerName: data.picName,
@@ -327,7 +327,7 @@ export const emailExternalSubmitGPRBTemplate = (data: MailTemplateData) =>
     `,
   })
 
-export const emailGprCRequesterSetupTemplate = (data: MailTemplateData) =>
+export const email_ToRequester_GprCSetup = (data: MailTemplateData) =>
   renderStandardWorkflowMail(data, {
     recipient: data.userName || data.recipientName || 'Requester',
     status: 'GPR C setup required',
@@ -336,7 +336,7 @@ export const emailGprCRequesterSetupTemplate = (data: MailTemplateData) =>
     thaiMessage: `กรุณากำหนด GPR C Approver, PC PIC และ Circular List สำหรับคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong>`,
   })
 
-export const emailUserCheckerApproverGPRCTemplate = (data: MailTemplateData) =>
+export const email_ToGprCApprover_FirstStep = (data: MailTemplateData) =>
   renderStandardWorkflowMail(data, {
     recipient: data.userName || data.recipientName,
     status: 'GPR C approval required',
@@ -347,10 +347,10 @@ export const emailUserCheckerApproverGPRCTemplate = (data: MailTemplateData) =>
     thaiDetail: 'กรุณาตรวจสอบ Vendor Form B ที่แนบมาก่อนอนุมัติขั้นตอนนี้',
   })
 
-export const emailGprCStepApprovalTemplate = (data: MailTemplateData) =>
-  emailUserCheckerApproverGPRCTemplate({ ...data, userName: data.picNextStepName })
+export const email_ToGprCApprover_NextStep = (data: MailTemplateData) =>
+  email_ToGprCApprover_FirstStep({ ...data, userName: data.picNextStepName })
 
-export const emailReject1Template = (data: MailTemplateData) =>
+export const email_ToPic_RejectedByApprover = (data: MailTemplateData) =>
   renderStandardWorkflowMail(data, {
     recipient: data.recipientName || 'PO PIC',
     status: 'Rejected - General Purchase Specification Form B',
@@ -361,7 +361,7 @@ export const emailReject1Template = (data: MailTemplateData) =>
     thaiDetail: `สาเหตุ: ${text(data.remarkTH || data.remarkEN)}`,
   })
 
-export const emailToCheckerPICTemplate = (data: MailTemplateData) =>
+export const email_ToChecker_CheckRequired = (data: MailTemplateData) =>
   renderStandardWorkflowMail(data, {
     recipient: data.recipientName || 'PO CHECKER',
     status: 'Under checking register vendor',
@@ -370,7 +370,7 @@ export const emailToCheckerPICTemplate = (data: MailTemplateData) =>
     thaiMessage: `กรุณาตรวจสอบคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong>`,
   })
 
-export const emailReject2Template = (data: MailTemplateData) =>
+export const email_ToPic_RejectedByChecker = (data: MailTemplateData) =>
   renderStandardWorkflowMail(data, {
     recipient: data.recipientName || 'PO PIC',
     status: 'Vendor registration requires recheck',
@@ -381,7 +381,7 @@ export const emailReject2Template = (data: MailTemplateData) =>
     thaiDetail: `สาเหตุ: ${text(data.remarkTH || data.remarkEN)}`,
   })
 
-export const emailToPMMgrTemplate = (data: MailTemplateData) =>
+export const email_ToPoManager_ApproveRequired = (data: MailTemplateData) =>
   renderStandardWorkflowMail(data, {
     recipient: data.recipientName || 'PO Mgr',
     status: 'Under approval register vendor',
@@ -390,16 +390,16 @@ export const emailToPMMgrTemplate = (data: MailTemplateData) =>
     thaiMessage: `กรุณาอนุมัติคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong>`,
   })
 
-export const emailToPMGMTemplate = (data: MailTemplateData) =>
-  emailToPMMgrTemplate({ ...data, recipientName: data.recipientName || 'PO GM' })
+export const email_ToPoGm_ApproveRequired = (data: MailTemplateData) =>
+  email_ToPoManager_ApproveRequired({ ...data, recipientName: data.recipientName || 'PO GM' })
 
-export const emailToMDTemplate = (data: MailTemplateData) =>
-  emailToPMMgrTemplate({ ...data, recipientName: data.recipientName || 'MD' })
+export const email_ToMd_ApproveRequired = (data: MailTemplateData) =>
+  email_ToPoManager_ApproveRequired({ ...data, recipientName: data.recipientName || 'MD' })
 
-export const emailToAccountPICTemplate = (data: MailTemplateData) =>
-  emailToPMMgrTemplate({ ...data, recipientName: data.recipientName || 'Account PIC' })
+export const email_ToAccount_RegisterRequired = (data: MailTemplateData) =>
+  email_ToPoManager_ApproveRequired({ ...data, recipientName: data.recipientName || 'Account PIC' })
 
-export const emailCompleteTemplate = (data: MailTemplateData) =>
+export const email_ToRequester_RegistrationCompleted = (data: MailTemplateData) =>
   renderStandardWorkflowMail(data, {
     recipient: data.userName || data.recipientName,
     status: 'Vendor registration completed',
@@ -418,7 +418,7 @@ export const emailCompleteTemplate = (data: MailTemplateData) =>
     `,
   })
 
-export const emailIncompleteTemplate = (data: MailTemplateData) => {
+export const email_ToRequester_RegistrationIncomplete = (data: MailTemplateData) => {
   const reasons = (data.reasons || []).map((reason) => `<li style="margin-bottom: 4px;">${text(reason)}</li>`).join('')
   const reasonHtml = reasons
     ? `<div style="font-size: 12px; line-height: 1.55; color: #991b1b;"><strong>Reason(s):</strong><ul style="margin: 6px 0 0 18px; padding: 0;">${reasons}</ul></div>`
@@ -434,7 +434,7 @@ export const emailIncompleteTemplate = (data: MailTemplateData) => {
   })
 }
 
-export const emailActionRequiredTemplate = (data: MailTemplateData) =>
+export const email_ToUser_ActionRequired = (data: MailTemplateData) =>
   renderMailLayout({
     recipient: data.recipientName || 'Recipient',
     signerName: data.picName,

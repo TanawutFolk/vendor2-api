@@ -13,7 +13,7 @@ import {
   resolveGroupCodeForStep,
   WORKFLOW_STEP_CODE,
 } from './RegisterRequestWorkflowHelper'
-import { sendAgreementEmail as sendAgreementEmailHelper, triggerCreationEmail as triggerCreationEmailHelper, triggerVendorDocumentEmail } from './RegisterRequestNotificationHelper'
+import { sendMail_ToSupplier_RequestFormA, sendMail_ToPic_NewRequest, sendMail_NegotiationStageDispatch } from './RegisterRequestNotificationHelper'
 import { RequestRegisterGprService } from './RequestRegisterGprService'
 import { GprCApprovalService } from '../_approval-GPRC/GprCApprovalService'
 
@@ -122,9 +122,6 @@ export const RequestRegisterPageService = {
         })
       const pendingAgreementStatus = workflowStatuses.find(
         (status: any) => getConfiguredStepCode(status) === WORKFLOW_STEP_CODE.PENDING_AGREEMENT
-      )
-      const hasAgreementReachedStatus = workflowStatuses.some(
-        (status: any) => getConfiguredStepCode(status) === WORKFLOW_STEP_CODE.AGREEMENT_REACHED
       )
       const reRegisterInitialStatus = pendingAgreementStatus?.value || pendingAgreementStatus?.label || 'Pending Agreement'
 
@@ -255,7 +252,6 @@ export const RequestRegisterPageService = {
         const isRequestSubmittedStep = stepCode === WORKFLOW_STEP_CODE.REQUEST_SUBMITTED
         const isPicReviewStep = stepCode === WORKFLOW_STEP_CODE.PIC_REVIEW
         const isPendingAgreementStep = stepCode === WORKFLOW_STEP_CODE.PENDING_AGREEMENT
-        const isAgreementReachedStep = stepCode === WORKFLOW_STEP_CODE.AGREEMENT_REACHED
         const isVendorRequestStep = requiresVendorReply({ ...ws, step_code: stepCode, actor_type: actorType })
         const approverId = (stepOrder <= 2 || isPicOwnedStep)
           ? nextAssignee.empCode
@@ -270,7 +266,7 @@ export const RequestRegisterPageService = {
             initialStatus = 'approved'
           } else if (isPendingAgreementStep) {
             initialStatus = 'approved'
-          } else if (!reRegisterInProgressAssigned && (isAgreementReachedStep || (!hasAgreementReachedStatus && stepOrder > 2))) {
+          } else if (!reRegisterInProgressAssigned && stepOrder > 2) {
             initialStatus = 'in_progress'
             reRegisterInProgressAssigned = true
           }
@@ -349,13 +345,13 @@ export const RequestRegisterPageService = {
       let message = isReRegisterRequest ? 'Re-register request created and sent to vendor successfully' : 'Request created successfully'
 
       if (isReRegisterRequest) {
-        const mailResult = await triggerVendorDocumentEmail(insertedId, 'Re-register')
+        const mailResult = await sendMail_NegotiationStageDispatch(insertedId, 'Re-register')
         if (!mailResult?.sent) {
           message = `Re-register request created successfully, but vendor email failed: ${mailResult?.reason || 'unknown error'}`
         }
       } else {
         RequestRegisterPageService
-          .triggerCreationEmail(dataItem, vendorData, nextAssignee, insertedId, requestNumber, assignmentGroupCode)
+          .sendMail_ToPic_NewRequest(dataItem, vendorData, nextAssignee, insertedId, requestNumber, assignmentGroupCode)
           .catch(console.error)
       }
 
@@ -389,8 +385,8 @@ export const RequestRegisterPageService = {
     }
   },
 
-  triggerCreationEmail: async (dataItem: any, vendorData: any, nextAssignee: any, insertedId: number, persistedRequestNumber?: string, assigneeGroupCode?: string) => {
-    return triggerCreationEmailHelper(dataItem, vendorData, nextAssignee, insertedId, persistedRequestNumber, assigneeGroupCode)
+  sendMail_ToPic_NewRequest: async (dataItem: any, vendorData: any, nextAssignee: any, insertedId: number, persistedRequestNumber?: string, assigneeGroupCode?: string) => {
+    return sendMail_ToPic_NewRequest(dataItem, vendorData, nextAssignee, insertedId, persistedRequestNumber, assigneeGroupCode)
   },
 
   getBusinessCategories: async (dataItem: any = {}) => {
@@ -438,8 +434,8 @@ export const RequestRegisterPageService = {
     return await MySQLExecute.execute(sql)
   },
 
-  sendAgreementEmail: async (dataItem: any) => {
-    return sendAgreementEmailHelper(dataItem)
+  sendMail_ToSupplier_RequestFormA: async (dataItem: any) => {
+    return sendMail_ToSupplier_RequestFormA(dataItem)
   },
 
   createApprovalStep: async (dataItem: any) => {

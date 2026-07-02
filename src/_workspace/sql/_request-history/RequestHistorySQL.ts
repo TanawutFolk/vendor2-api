@@ -39,6 +39,7 @@ export const RequestHistorySQL = {
                                      , v.VENDOR_REGION
                                      , v.PROVINCE
                                      , v.POSTAL_CODE
+                                     , v.COUNTRY
                                      , v.ADDRESS
                                      , v.TEL_CENTER
                                      , v.WEBSITE

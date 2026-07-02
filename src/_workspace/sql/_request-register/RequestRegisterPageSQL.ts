@@ -623,7 +623,7 @@ export const RequestRegisterPageSQL = {
                                      , BUSINESS_CATEGORY_ID
                                      , DESCRIPTION
                             FROM
-                                       business_category
+                                       info_business_category
                             WHERE
                                        INUSE = 1
                             ORDER BY
@@ -859,7 +859,7 @@ export const RequestRegisterPageSQL = {
                             FROM
                                        request_vendor_selections rvs
                                             LEFT JOIN
-                                       business_category bc ON bc.BUSINESS_CATEGORY_ID = rvs.BUSINESS_CATEGORY_ID AND bc.INUSE = 1
+                                       info_business_category bc ON bc.BUSINESS_CATEGORY_ID = rvs.BUSINESS_CATEGORY_ID AND bc.INUSE = 1
                                             LEFT JOIN
                                        info_currency ic ON ic.INFO_CURRENCY_ID = rvs.INFO_CURRENCY_ID
                             WHERE
@@ -897,7 +897,6 @@ export const RequestRegisterPageSQL = {
                                        CRITERIA_NO AS no
                                      , CRITERIA_VALUE AS criteria
                                      , DESCRIPTION AS remark
-                                     , REJECT_REASON AS reject_reason
                                      , UPLOADED_FILE_PATH AS uploaded_file
                                      , UPLOADED_FILE_NAME AS uploaded_name
                             FROM
@@ -1014,7 +1013,7 @@ export const RequestRegisterPageSQL = {
                                      , INUSE
                             ) VALUES (
                                        'dataItem.REQUEST_REGISTER_VENDOR_ID'
-                                     , (SELECT BUSINESS_CATEGORY_ID FROM business_category
+                                     , (SELECT BUSINESS_CATEGORY_ID FROM info_business_category
                                         WHERE BUSINESS_CATEGORY_NAME = 'dataItem.BUSINESS_CATEGORY' AND INUSE = 1 LIMIT 1)
                                      , 'dataItem.START_YEAR'
                                      , 'dataItem.AUTHORIZED_CAPITAL'
@@ -1073,7 +1072,7 @@ export const RequestRegisterPageSQL = {
     let sql = `
                             UPDATE request_vendor_selections SET
                                        BUSINESS_CATEGORY_ID = (
-                                           SELECT BUSINESS_CATEGORY_ID FROM business_category
+                                           SELECT BUSINESS_CATEGORY_ID FROM info_business_category
                                            WHERE BUSINESS_CATEGORY_NAME = 'dataItem.BUSINESS_CATEGORY'
                                              AND INUSE = 1
                                            LIMIT 1

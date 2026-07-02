@@ -1,0 +1,9 @@
+import { ClearTimeForSctProcessController } from '@src/_workspace/controllers/_ClearTimeSystem/ClearTimeForSctProcessController'
+import { Router } from 'express'
+
+const ClearTimeProcessForSctRoutes = Router()
+
+ClearTimeProcessForSctRoutes.post('/getByProductTypeIdAndFiscalYear_MasterDataLatest', ClearTimeForSctProcessController.getByProductTypeIdAndFiscalYear_MasterDataLatest)
+ClearTimeProcessForSctRoutes.post('/getByProductTypeIdAndFiscalYearAndRevisionNo', ClearTimeForSctProcessController.getByProductTypeIdAndFiscalYearAndRevisionNo)
+
+export default ClearTimeProcessForSctRoutes

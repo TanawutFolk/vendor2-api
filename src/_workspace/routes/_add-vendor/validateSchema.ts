@@ -4,16 +4,45 @@ import { z } from 'zod'
 
 const nonEmptyString = (fieldName: string) => z.string().min(1, `${fieldName} is required`)
 const optionalString = () => z.string().optional().or(z.literal(''))
+const getPayloadString = (data: Record<string, unknown>, lowerKey: string, upperKey: string) => String(data[upperKey] ?? data[lowerKey] ?? '').trim()
 
-// Check Duplicate Schema (company_name + province + postal_code)
+const validateVendorLocation = (data: Record<string, unknown>, ctx: z.RefinementCtx) => {
+  const companyName = getPayloadString(data, 'company_name', 'COMPANY_NAME')
+  const vendorRegion = getPayloadString(data, 'vendor_region', 'VENDOR_REGION') || 'Local'
+  const isOversea = vendorRegion.toLowerCase() === 'oversea'
+
+  if (!companyName) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['COMPANY_NAME'], message: 'Company Name is required' })
+  }
+
+  if (isOversea) {
+    if (!getPayloadString(data, 'country', 'COUNTRY')) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['COUNTRY'], message: 'Country is required' })
+    }
+    return
+  }
+
+  if (!getPayloadString(data, 'province', 'PROVINCE')) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['PROVINCE'], message: 'Province is required' })
+  }
+  if (!getPayloadString(data, 'postal_code', 'POSTAL_CODE')) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['POSTAL_CODE'], message: 'Postal Code is required' })
+  }
+}
+
+// Check Duplicate Schema (Local: company + province + postal code, Oversea: company + country)
 export const CheckDuplicateSchema = z.object({
-  company_name: nonEmptyString('Company Name').optional(),
-  COMPANY_NAME: nonEmptyString('Company Name').optional(),
-  province: nonEmptyString('Province').optional(),
-  PROVINCE: nonEmptyString('Province').optional(),
-  postal_code: nonEmptyString('Postal Code').optional(),
-  POSTAL_CODE: nonEmptyString('Postal Code').optional(),
-})
+  company_name: optionalString(),
+  COMPANY_NAME: optionalString(),
+  vendor_region: optionalString(),
+  VENDOR_REGION: optionalString(),
+  province: optionalString(),
+  PROVINCE: optionalString(),
+  postal_code: optionalString(),
+  POSTAL_CODE: optionalString(),
+  country: optionalString(),
+  COUNTRY: optionalString(),
+}).superRefine(validateVendorLocation)
 
 export const CheckBlacklistSchema = z.object({
   company_name: nonEmptyString('Company Name').optional(),
@@ -33,9 +62,11 @@ const ContactSchema = z.object({
 })
 
 // Product Schema
+const optionalProductGroupId = z.number().int().nonnegative().optional().nullable()
+
 const ProductSchema = z.object({
-  product_group_id: z.number().min(1, 'Product Group is required').optional(),
-  MASTER_PRODUCT_GROUPS_ID: z.number().min(1, 'Product Group is required').optional(),
+  product_group_id: optionalProductGroupId,
+  MASTER_PRODUCT_GROUPS_ID: optionalProductGroupId,
   maker_name: nonEmptyString('Maker Name').optional(),
   MAKER_NAME: nonEmptyString('Maker Name').optional(),
   product_name: nonEmptyString('Product Name').optional(),
@@ -48,10 +79,12 @@ const ProductSchema = z.object({
 export const CreateVendorSchema = z.object({
   company_name: z.string().min(3, 'Company Name is required (min 3 chars)').optional(),
   COMPANY_NAME: z.string().min(3, 'Company Name is required (min 3 chars)').optional(),
-  province: nonEmptyString('Province').optional(),
-  PROVINCE: nonEmptyString('Province').optional(),
-  postal_code: nonEmptyString('Postal Code').optional(),
-  POSTAL_CODE: nonEmptyString('Postal Code').optional(),
+  province: optionalString(),
+  PROVINCE: optionalString(),
+  postal_code: optionalString(),
+  POSTAL_CODE: optionalString(),
+  country: optionalString(),
+  COUNTRY: optionalString(),
   vendor_type_id: z.number().min(1, 'Vendor Type is required').optional(),
   MASTER_VENDOR_TYPES_ID: z.number().min(1, 'Vendor Type is required').optional(),
 
@@ -75,4 +108,4 @@ export const CreateVendorSchema = z.object({
   CONTACTS: z.array(ContactSchema).optional(),
   products: z.array(ProductSchema).optional(),
   PRODUCTS: z.array(ProductSchema).optional(),
-})
+}).superRefine(validateVendorLocation)

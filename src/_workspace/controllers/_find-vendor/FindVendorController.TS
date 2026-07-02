@@ -49,6 +49,7 @@ export const FindVendorController = {
             { table: 'v', id: 'fft_status', Fns: '=' },
             { table: 'v', id: 'inuse', Fns: '=' },
             { table: 'v', id: 'province', Fns: 'LIKE' },
+            { table: 'v', id: 'country', Fns: 'LIKE' },
             { table: 'v', id: 'vendor_region', Fns: '=' },
             { table: 'v', id: 'website', Fns: 'LIKE' },
             { table: 'v', id: 'address', Fns: 'LIKE' },
@@ -79,7 +80,7 @@ export const FindVendorController = {
         }
 
         // Create SQL WHERE, ORDER BY, and Offset using AG Grid-compatible helper
-        // (uses Start directly as row offset — no Start * Limit multiplication)
+        // (uses Start directly as row offset â€” no Start * Limit multiplication)
         getSqlWhere_aggrid(dataItem, tableIds, 'company_name')
 
         // Extract sqlWhere from dataItem (it now contains both SearchFilters and ColumnFilters)
@@ -134,7 +135,7 @@ export const FindVendorController = {
                         contacts = typeof row.contacts_json === 'string' ? JSON.parse(row.contacts_json) : row.contacts_json
                     }
                 } catch (e) {
-                    console.warn('Failed to parse contacts_json for vendor_id ' + row.vendor_id)
+                    console.warn('Failed to parse contacts_json for vendor_id ' + row.VENDORS_ID)
                 }
 
                 try {
@@ -142,7 +143,7 @@ export const FindVendorController = {
                         products = typeof row.products_json === 'string' ? JSON.parse(row.products_json) : row.products_json
                     }
                 } catch (e) {
-                    console.warn('Failed to parse products_json for vendor_id ' + row.vendor_id)
+                    console.warn('Failed to parse products_json for vendor_id ' + row.VENDORS_ID)
                 }
 
                 // MySQL JSON_ARRAYAGG on empty joins defaults to [null], filter that out
@@ -217,7 +218,7 @@ export const FindVendorController = {
                         contacts = typeof row.contacts_json === 'string' ? JSON.parse(row.contacts_json) : row.contacts_json
                     }
                 } catch (e) {
-                    console.warn('Failed to parse contacts_json for getById vendor_id ' + vendor_id)
+                    console.warn('Failed to parse contacts_json for getById VENDORS_ID ' + vendor_id)
                 }
 
                 try {
@@ -225,7 +226,7 @@ export const FindVendorController = {
                         products = typeof row.products_json === 'string' ? JSON.parse(row.products_json) : row.products_json
                     }
                 } catch (e) {
-                    console.warn('Failed to parse products_json for getById vendor_id ' + vendor_id)
+                    console.warn('Failed to parse products_json for getById VENDORS_ID ' + vendor_id)
                 }
 
                 // Filter out [null] from empty JSON_ARRAYAGG
@@ -445,8 +446,8 @@ export const FindVendorController = {
         }
     },
 
-    // Get vendor types for dropdown
-    getVendorTypes: async (req: Request, res: Response) => {
+    // Get vendor business category names for dropdown
+    getVendorBusinessCategoryName: async (req: Request, res: Response) => {
         let dataItem
 
         if (!req.body || Object.entries(req.body).length === 0) {
@@ -456,22 +457,22 @@ export const FindVendorController = {
         }
 
         try {
-            const result = await FindVendorModel.getVendorTypes()
+            const result = await FindVendorModel.getVendorBusinessCategoryName()
             res.status(200).json({
                 Status: true,
                 ResultOnDb: result,
                 TotalCountOnDb: result.length,
-                MethodOnDb: 'Get Vendor Types',
+                MethodOnDb: 'Get Vendor Business Category Name',
                 Message: 'Get Data Success'
             } as ResponseI)
         } catch (error: any) {
-            console.error('Get Vendor Types Error:', error);
+            console.error('Get Vendor Business Category Name Error:', error);
             res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Get Vendor Types',
-                Message: error?.message || 'Failed to get vendor types'
+                MethodOnDb: 'Get Vendor Business Category Name',
+                Message: error?.message || 'Failed to get vendor business category names'
             } as ResponseI)
         }
     },
@@ -557,6 +558,7 @@ export const FindVendorController = {
                 { table: 'v', id: 'fft_status', Fns: '=' },
                 { table: 'v', id: 'inuse', Fns: '=' },
                 { table: 'v', id: 'province', Fns: 'LIKE' },
+                { table: 'v', id: 'country', Fns: 'LIKE' },
                 { table: 'v', id: 'vendor_region', Fns: '=' },
                 { table: 'v', id: 'website', Fns: 'LIKE' },
                 { table: 'v', id: 'address', Fns: 'LIKE' },
@@ -590,9 +592,9 @@ export const FindVendorController = {
             // Intercept Order for SQL fallback
             let statusSort: any = null;
             if (query.ORDER && Array.isArray(query.ORDER)) {
-                statusSort = query.ORDER.find((o: any) => o.id === 'status_check')
+                statusSort = query.ORDER.find((o: any) => o.id === 'status_check' || o.id === 'STATUS_CHECK')
                 if (statusSort) {
-                    query.ORDER = [{ id: 'company_name', desc: false }]
+                    query.ORDER = [{ id: 'COMPANY_NAME', desc: false }]
                 }
             }
 
@@ -630,8 +632,8 @@ export const FindVendorController = {
                 }
 
                 vendorRows.sort((a: any, b: any) => {
-                    const idxA = idMap.has(a?.vendor_id) ? idMap.get(a.vendor_id) : 999999;
-                    const idxB = idMap.has(b?.vendor_id) ? idMap.get(b.vendor_id) : 999999;
+                    const idxA = idMap.has(a?.VENDORS_ID) ? idMap.get(a.VENDORS_ID) : 999999;
+                    const idxB = idMap.has(b?.VENDORS_ID) ? idMap.get(b.VENDORS_ID) : 999999;
                     return (Number(idxA) || 0) - (Number(idxB) || 0);
                 });
 
@@ -650,12 +652,12 @@ export const FindVendorController = {
             // 2. Fetch Prones Data & Match
             let resultData = await matchVendorsWithPrones(vendorRows, requiredStatus);
 
-            // 2.1 Post-Fetch Sorting for 'status_check'
+            // 2.1 Post-Fetch Sorting for 'STATUS_CHECK'
             if (statusSort) {
                 const desc = statusSort.desc;
                 resultData.sort((a: any, b: any) => {
-                    const valA = a.status_check || '';
-                    const valB = b.status_check || '';
+                    const valA = a.STATUS_CHECK || '';
+                    const valB = b.STATUS_CHECK || '';
                     if (valA < valB) return desc ? 1 : -1;
                     if (valA > valB) return desc ? -1 : 1;
                     return 0;
@@ -669,23 +671,23 @@ export const FindVendorController = {
 
             // 4. Setup Headers
             const headerMap: Record<string, string> = {
-                fft_vendor_code: 'Vendor Code',
-                status_check: 'Prones Status',
-                company_name: 'Company Name',
-                vendor_type_name: 'Vendor Type',
-                vendor_region: 'Region',
-                province: 'Province',
-                website: 'Website',
-                address: 'Address',
-                tel_center: 'Tel Company',
-                emailmain: 'Email (Main)',
-                group_name: 'Group Name',
-                maker_name: 'Maker Name',
-                product_name: 'Product Name',
-                model_list: 'Model List',
-                contact_name: 'Contact Name',
-                tel_phone: 'Tel Contact',
-                email: 'Email Contact',
+                FFT_VENDOR_CODE: 'Vendor Code',
+                STATUS_CHECK: 'Prones Status',
+                COMPANY_NAME: 'Company Name',
+                VENDOR_TYPE_NAME: 'Vendor Type',
+                VENDOR_REGION: 'Region',
+                PROVINCE: 'Province',
+                WEBSITE: 'Website',
+                ADDRESS: 'Address',
+                TEL_CENTER: 'Tel Company',
+                EMAILMAIN: 'Email (Main)',
+                GROUP_NAME: 'Group Name',
+                MAKER_NAME: 'Maker Name',
+                PRODUCT_NAME: 'Product Name',
+                MODEL_LIST: 'Model List',
+                CONTACT_NAME: 'Contact Name',
+                TEL_PHONE: 'Tel Contact',
+                EMAIL: 'Email Contact',
                 CREATE_BY: 'Created By',
                 UPDATE_BY: 'Updated By',
                 CREATE_DATE: 'Created Date',
@@ -720,7 +722,7 @@ export const FindVendorController = {
                         const date = new Date(cellValue);
                         cellValue = date.toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit' });
                     }
-                    if (col === 'model_list' && cellValue) cellValue = cellValue.replace(/\n/g, ', ');
+                    if (col === 'MODEL_LIST' && cellValue) cellValue = cellValue.replace(/\n/g, ', ');
 
                     const finalValue = cellValue !== undefined && cellValue !== null ? cellValue.toString() : '';
 
@@ -775,6 +777,7 @@ export const FindVendorController = {
     //             { table: 'v', id: 'fft_status', Fns: '=' },
     //             { table: 'v', id: 'inuse', Fns: '=' },
     //             { table: 'v', id: 'province', Fns: 'LIKE' },
+    //             { table: 'v', id: 'country', Fns: 'LIKE' },
     //             { table: 'v', id: 'website', Fns: 'LIKE' },
     //             { table: 'v', id: 'address', Fns: 'LIKE' },
     //             { table: 'v', id: 'tel_center', Fns: 'LIKE' },
@@ -981,13 +984,13 @@ export const FindVendorController = {
                 dataItem = req.body
             }
 
-            // 1. ดึงข้อมูล vendor ฝั่งเรา
+            // 1. à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ vendor à¸à¸±à¹ˆà¸‡à¹€à¸£à¸²
             const myVendors = await FindVendorModel.getAllVendorNames();
 
-            // 2. ใช้ Helper เพื่อ Match กับ Prones Data
+            // 2. à¹ƒà¸Šà¹‰ Helper à¹€à¸žà¸·à¹ˆà¸­ Match à¸à¸±à¸š Prones Data
             const resultRows = await matchVendorsWithPrones(myVendors);
 
-            // 3. ส่ง JSON กลับ
+            // 3. à¸ªà¹ˆà¸‡ JSON à¸à¸¥à¸±à¸š
             res.status(200).json({
                 Status: true,
                 ResultOnDb: {
@@ -1096,41 +1099,41 @@ export const FindVendorController = {
 // ------- Helper Functions  -------
 const matchVendorsWithPrones = async (vendors: any[], filterStatus: string | null = null) => {
     // Read pre-computed match results from vendor_match_result table
-    const vendorIds = [...new Set(vendors.map((v: any) => v.vendor_id).filter(Boolean))] as number[]
+    const vendorIds = [...new Set(vendors.map((v: any) => v.VENDORS_ID).filter(Boolean))] as number[]
 
     let matchMap = new Map<number, any>()
 
     if (vendorIds.length > 0) {
         const matchResults = await FindVendorModel.getMatchResultsByVendorIds(vendorIds) as any[]
         matchResults.forEach((r: any) => {
-            matchMap.set(r.vendor_id, r)
+            matchMap.set(r.VENDORS_ID, r)
         })
     }
 
     // Enrich vendors with match results
     let enrichedData = vendors.map((vendor: any) => {
-        const match = matchMap.get(vendor.vendor_id)
-        
-        let finalStatus = match ? match.status_check : 'Not Registered'
-        if (vendor.fft_status == 2 || vendor.fft_status === 'Cannot Register') {
+        const match = matchMap.get(vendor.VENDORS_ID)
+
+        let finalStatus = match ? match.STATUS_CHECK : 'Not Registered'
+        if (vendor.FFT_STATUS == 2 || vendor.FFT_STATUS === 'Cannot Register') {
             finalStatus = 'Cannot Register'
         }
 
         return {
             ...vendor,
-            status_check: finalStatus,
-            prones_code: match ? match.prones_code : (vendor.fft_vendor_code || null),
-            prones_name_en: match ? match.prones_name : null,
-            match_method: match ? match.match_method : null,
+            STATUS_CHECK: finalStatus,
+            PRONES_CODE: match ? match.PRONES_CODE : (vendor.FFT_VENDOR_CODE || null),
+            PRONES_NAME_EN: match ? match.PRONES_NAME : null,
+            MATCH_METHOD: match ? match.MATCH_METHOD : null,
         }
     })
 
     // Filter by Prones Status if requested
     if (filterStatus) {
         if (filterStatus === '1') {
-            enrichedData = enrichedData.filter((item: any) => item.status_check === 'Registered')
+            enrichedData = enrichedData.filter((item: any) => item.STATUS_CHECK === 'Registered')
         } else if (filterStatus === '0') {
-            enrichedData = enrichedData.filter((item: any) => item.status_check === 'Not Registered')
+            enrichedData = enrichedData.filter((item: any) => item.STATUS_CHECK === 'Not Registered')
         }
     }
 

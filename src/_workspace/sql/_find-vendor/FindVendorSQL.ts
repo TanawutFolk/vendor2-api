@@ -49,10 +49,11 @@ export const FindVendorSQL = {
                                      , vp.MASTER_PRODUCT_GROUPS_ID
                                      , vc.VENDOR_CONTACTS_ID
                                      , v.COMPANY_NAME
-                                     , vt.NAME AS vendor_type_name
+                                     , vt.NAME AS VENDOR_TYPE_NAME
                                      , v.VENDOR_REGION
                                      , v.PROVINCE
                                      , v.POSTAL_CODE
+                                     , v.COUNTRY
                                      , v.WEBSITE
                                      , v.ADDRESS
                                      , v.TEL_CENTER
@@ -70,11 +71,11 @@ export const FindVendorSQL = {
                                      , v.CREATE_DATE
                                      , v.UPDATE_DATE
                                      , v.INUSE
-                                     
+
                                      -- Prones Matching Data
-                                     , dataItem.STATUSCHECKEXPRESSION AS status_check
-                                     , IFNULL(vmr.PRONES_CODE, v.FFT_VENDOR_CODE) AS prones_code
-                                     , vmr.PRONES_NAME AS prones_name_en
+                                     , dataItem.STATUSCHECKEXPRESSION AS STATUS_CHECK
+                                     , IFNULL(vmr.PRONES_CODE, v.FFT_VENDOR_CODE) AS PRONES_CODE
+                                     , vmr.PRONES_NAME AS PRONES_NAME_EN
                                      , vmr.MATCH_METHOD
 
                                      -- Reject Reason
@@ -83,8 +84,8 @@ export const FindVendorSQL = {
                                           FROM request_register_vendor rrv
                                           WHERE rrv.VENDORS_ID = v.VENDORS_ID AND rrv.REQUEST_STATE = 'rejected'
                                           ORDER BY rrv.REQUEST_REGISTER_VENDOR_ID DESC LIMIT 1
-                                     ) AS reject_reason
-                                     
+                                     ) AS REJECT_REASON
+
                                      -- Contacts JSON (aggregated)
                                      , (
                                                 SELECT
@@ -192,10 +193,11 @@ export const FindVendorSQL = {
                                      , v.FFT_STATUS
                                      , v.COMPANY_NAME
                                      , v.MASTER_VENDOR_TYPES_ID
-                                     , vt.NAME AS vendor_type_name
+                                     , vt.NAME AS VENDOR_TYPE_NAME
                                      , v.VENDOR_REGION
                                      , v.PROVINCE
                                      , v.POSTAL_CODE
+                                     , v.COUNTRY
                                      , v.WEBSITE
                                      , v.ADDRESS
                                      , v.TEL_CENTER
@@ -205,11 +207,11 @@ export const FindVendorSQL = {
                                      , v.CREATE_DATE
                                      , v.UPDATE_DATE
                                      , v.INUSE
-                                     
+
                                      -- Prones Matching Data
-                                     , dataItem.STATUSCHECKEXPRESSION AS status_check
-                                     , IFNULL(vmr.PRONES_CODE, v.FFT_VENDOR_CODE) AS prones_code
-                                     , vmr.PRONES_NAME AS prones_name_en
+                                     , dataItem.STATUSCHECKEXPRESSION AS STATUS_CHECK
+                                     , IFNULL(vmr.PRONES_CODE, v.FFT_VENDOR_CODE) AS PRONES_CODE
+                                     , vmr.PRONES_NAME AS PRONES_NAME_EN
                                      , vmr.MATCH_METHOD
                                      
                                      -- Contacts JSON (aggregated)
@@ -278,6 +280,11 @@ export const FindVendorSQL = {
     return String(value)
   },
 
+  toNullableStringSql: (value: any) => {
+    if (value === null || value === undefined || String(value).trim() === '') return 'NULL'
+    return `'${String(value).replaceAll("'", "''")}'`
+  },
+
   // Update vendor
   updateVendor: (dataItem: any) => {
     let sql = `
@@ -285,8 +292,9 @@ export const FindVendorSQL = {
                                        COMPANY_NAME = 'dataItem.COMPANY_NAME'
                                      , MASTER_VENDOR_TYPES_ID = dataItem.MASTER_VENDOR_TYPES_ID
                                      , VENDOR_REGION = 'dataItem.VENDOR_REGION'
-                                     , PROVINCE = 'dataItem.PROVINCE'
-                                     , POSTAL_CODE = 'dataItem.POSTAL_CODE'
+                                     , PROVINCE = dataItem.PROVINCE_SQL
+                                     , POSTAL_CODE = dataItem.POSTAL_CODE_SQL
+                                     , COUNTRY = dataItem.COUNTRY_SQL
                                      , WEBSITE = 'dataItem.WEBSITE'
                                      , ADDRESS = 'dataItem.ADDRESS'
                                      , TEL_CENTER = 'dataItem.TEL_CENTER'
@@ -301,8 +309,9 @@ export const FindVendorSQL = {
     sql = sql.replaceAll('dataItem.COMPANY_NAME', dataItem['COMPANY_NAME'] || '')
     sql = sql.replaceAll('dataItem.MASTER_VENDOR_TYPES_ID', FindVendorSQL.toNullableNumberSql(dataItem['MASTER_VENDOR_TYPES_ID']))
     sql = sql.replaceAll('dataItem.VENDOR_REGION', dataItem['VENDOR_REGION'] || 'Local')
-    sql = sql.replaceAll('dataItem.PROVINCE', dataItem['PROVINCE'] || '')
-    sql = sql.replaceAll('dataItem.POSTAL_CODE', dataItem['POSTAL_CODE'] || '')
+    sql = sql.replaceAll('dataItem.PROVINCE_SQL', FindVendorSQL.toNullableStringSql(dataItem['PROVINCE']))
+    sql = sql.replaceAll('dataItem.POSTAL_CODE_SQL', FindVendorSQL.toNullableStringSql(dataItem['POSTAL_CODE']))
+    sql = sql.replaceAll('dataItem.COUNTRY_SQL', FindVendorSQL.toNullableStringSql(dataItem['COUNTRY']))
     sql = sql.replaceAll('dataItem.WEBSITE', dataItem['WEBSITE'] || '')
     sql = sql.replaceAll('dataItem.ADDRESS', dataItem['ADDRESS'] || '')
     sql = sql.replaceAll('dataItem.TEL_CENTER', dataItem['TEL_CENTER'] || '')
@@ -485,34 +494,36 @@ export const FindVendorSQL = {
     return sql
   },
 
-  // Get vendor types for dropdown
-  getVendorTypes: (dataItem?: any) => {
+  // Get vendor business category names for dropdown
+  getVendorBusinessCategoryName: (dataItem?: any) => {
     let sql = `
                             SELECT
-                                       MASTER_VENDOR_TYPES_ID AS value
-                                     , NAME AS label
+                                       BUSINESS_CATEGORY_ID AS value
+                                     , BUSINESS_CATEGORY_NAME AS label
                             FROM
-                                       master_vendor_types
+                                       info_business_category
                             WHERE
                                        INUSE = 1
                             ORDER BY
-                                       NAME ASC
+                                       BUSINESS_CATEGORY_NAME ASC
         `
     return sql
   },
 
+  getVendorTypes: (dataItem?: any) => FindVendorSQL.getVendorBusinessCategoryName(dataItem),
+
   // Get provinces for dropdown
   getProvinces: (dataItem?: any) => {
     let sql = `
-                            SELECT DISTINCT
+                            SELECT
                                        PROVINCE AS value
                                      , PROVINCE AS label
                             FROM
-                                       vendors
+                                       info_province
                             WHERE
-                                       INUSE = 1
+                                       IFNULL(INUSE, 1) = 1
                                        AND PROVINCE IS NOT NULL
-                                       AND PROVINCE != ''
+                                       AND TRIM(PROVINCE) != ''
                             ORDER BY
                                        PROVINCE ASC
         `
@@ -558,10 +569,11 @@ export const FindVendorSQL = {
                                      , vp.VENDOR_PRODUCTS_ID
                                      , vc.VENDOR_CONTACTS_ID
                                      , v.COMPANY_NAME
-                                     , vt.NAME AS vendor_type_name
+                                     , vt.NAME AS VENDOR_TYPE_NAME
                                      , v.VENDOR_REGION
                                      , v.PROVINCE
                                      , v.POSTAL_CODE
+                                     , v.COUNTRY
                                      , v.WEBSITE
                                      , v.ADDRESS
                                      , v.TEL_CENTER
@@ -581,9 +593,9 @@ export const FindVendorSQL = {
                                      , v.INUSE
 
                                      -- Prones Matching Data
-                                     , dataItem.STATUSCHECKEXPRESSION AS status_check
-                                     , IFNULL(vmr.PRONES_CODE, v.FFT_VENDOR_CODE) AS prones_code
-                                     , vmr.PRONES_NAME AS prones_name_en
+                                     , dataItem.STATUSCHECKEXPRESSION AS STATUS_CHECK
+                                     , IFNULL(vmr.PRONES_CODE, v.FFT_VENDOR_CODE) AS PRONES_CODE
+                                     , vmr.PRONES_NAME AS PRONES_NAME_EN
                                      , vmr.MATCH_METHOD
 
                                      -- Reject Reason
@@ -592,14 +604,14 @@ export const FindVendorSQL = {
                                           FROM request_register_vendor rrv
                                           WHERE rrv.VENDORS_ID = v.VENDORS_ID AND rrv.REQUEST_STATE = 'rejected'
                                           ORDER BY rrv.REQUEST_REGISTER_VENDOR_ID DESC LIMIT 1
-                                     ) AS reject_reason
-                                     
+                                     ) AS REJECT_REASON
+
                                      -- Contact Audit
                                      , vc.CREATE_BY AS contact_create_by
                                      , vc.UPDATE_BY AS contact_update_by
                                      , vc.CREATE_DATE AS contact_create_date
                                      , vc.UPDATE_DATE AS contact_update_date
-                                     
+
                                      -- Product Audit
                                      , vp.CREATE_BY AS product_create_by
                                      , vp.CREATE_DATE AS product_create_date
@@ -643,6 +655,7 @@ export const FindVendorSQL = {
                             AND (
                                        v.COMPANY_NAME LIKE 'searchVal'
                                      OR v.PROVINCE LIKE 'searchVal'
+                                     OR v.COUNTRY LIKE 'searchVal'
                                      OR v.WEBSITE LIKE 'searchVal'
                                      OR v.FFT_VENDOR_CODE LIKE 'searchVal'
                                      OR v.EMAILMAIN LIKE 'searchVal'

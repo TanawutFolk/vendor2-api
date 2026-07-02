@@ -1,7 +1,7 @@
 import { MySQLExecute } from '@businessData/dbExecute'
 import { ResultSetHeader, RowDataPacket } from 'mysql2'
 import sendEmail from '@src/config/sendEmail'
-import { emailActionRequiredTemplate, emailGprCStepApprovalTemplate, emailGprCRequesterSetupTemplate, emailUserCheckerApproverGPRCTemplate } from '@src/config/mailTemplate'
+import { email_ToUser_ActionRequired, email_ToGprCApprover_NextStep, email_ToRequester_GprCSetup, email_ToGprCApprover_FirstStep } from '@src/config/mailTemplate'
 import { GprCApprovalSQL } from '../../sql/_approval-GPRC/GprCApprovalSQL'
 import { RequestRegisterPageSQL } from '../../sql/_request-register/RequestRegisterPageSQL'
 import {
@@ -302,13 +302,13 @@ const notifyRequesterSetup = async (requestId: number, updateBy: string) => {
   const ccEmails = mergeUniqueEmails(poPicContext.allPoPicEmails).filter((email) => email !== requester.email)
 
   await sendGprCEmail({
-    templateName: 'emailGprCRequesterSetupTemplate',
+    templateName: 'email_ToRequester_GprCSetup',
     toEmail: requester.email,
     ccEmails,
     subject: `[GPR C Setup] Please setup GPR C approver for ${mailData.requestNumber}`,
     requestId,
     requestNumber: mailData.requestNumber,
-    html: emailGprCRequesterSetupTemplate({
+    html: email_ToRequester_GprCSetup({
       ...mailData,
       userName: requester.name,
       recipientName: requester.name,
@@ -331,16 +331,16 @@ const notifyStepApprover = async (requestId: number, step: any, ccEmails: string
   const finalCcEmails = mergeUniqueEmails(poPicContext.allPoPicEmails, ...(stepCode === 'REQUESTER_APPROVER' ? [requester?.email ? [requester.email] : [], ccEmails] : [])).filter(
     (email) => email !== approverEmail
   )
-  const templateName = stepCode === 'REQUESTER_APPROVER' ? 'emailUserCheckerApproverGPRCTemplate' : 'emailGprCStepApprovalTemplate'
+  const templateName = stepCode === 'REQUESTER_APPROVER' ? 'email_ToGprCApprover_FirstStep' : 'email_ToGprCApprover_NextStep'
   const emailHtml =
     stepCode === 'REQUESTER_APPROVER'
-      ? emailUserCheckerApproverGPRCTemplate({
+      ? email_ToGprCApprover_FirstStep({
           ...mailData,
           userName: approverName,
           recipientName: approverName,
           picName: poPicContext.picName,
         })
-      : emailGprCStepApprovalTemplate({
+      : email_ToGprCApprover_NextStep({
           ...mailData,
           picNextStepName: approverName,
           recipientName: approverName,
@@ -365,13 +365,13 @@ const notifyActionRequired = async (requestId: number, step: any, action: any) =
   const mailData = buildBaseMailData(summary, requestId, normalizeValue(action.pic_name || action.PIC_NAME) || 'PIC')
 
   await sendGprCEmail({
-    templateName: 'emailActionRequiredTemplate',
+    templateName: 'email_ToUser_ActionRequired',
     toEmail: picEmail,
     ccEmails: [],
     subject: `[GPR C Action Required] ${mailData.requestNumber} - ${step.STEP_NAME || step.step_name}`,
     requestId,
     requestNumber: mailData.requestNumber,
-    html: emailActionRequiredTemplate({
+    html: email_ToUser_ActionRequired({
       ...mailData,
       stageLabel: step.STEP_NAME || step.step_name,
       note: action.required_detail || action.REQUIRED_DETAIL || '',
@@ -393,7 +393,6 @@ const markMainIssueGprCApproved = async (requestId: number, actionBy: string, re
     .sort((a: any, b: any) => Number(a.step_order || 0) - Number(b.step_order || 0))
   const nextStep =
     pendingSteps.find((step: any) => inferStepCode(step) === WORKFLOW_STEP_CODE.DOC_CHECK) ||
-    pendingSteps.find((step: any) => inferStepCode(step) === WORKFLOW_STEP_CODE.AGREEMENT_REACHED) ||
     pendingSteps[0]
 
   const sqlList = [

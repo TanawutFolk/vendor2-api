@@ -8,7 +8,7 @@ requestRegisterPageRoutes.post('/dropdown/business-categories', RequestRegisterP
 requestRegisterPageRoutes.post('/dropdown/currencies', RequestRegisterPageController.getCurrencies)
 requestRegisterPageRoutes.post('/createRequestVendor', uploadRequestDocuments, RequestRegisterPageController.create)
 requestRegisterPageRoutes.post('/updateRequest', RequestRegisterPageController.updateRequest)
-requestRegisterPageRoutes.post('/sendAgreementEmail', RequestRegisterPageController.sendAgreementEmail)
+requestRegisterPageRoutes.post('/sendAgreementEmail', RequestRegisterPageController.sendMail_ToSupplier_RequestFormA)
 requestRegisterPageRoutes.post('/createApprovalStep', RequestRegisterPageController.createApprovalStep)
 requestRegisterPageRoutes.post('/updateApprovalStep', RequestRegisterPageController.updateApprovalStep)
 requestRegisterPageRoutes.post('/updateCcEmails', RequestRegisterPageController.updateCcEmails)

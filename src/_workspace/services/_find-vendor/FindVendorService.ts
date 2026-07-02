@@ -98,6 +98,7 @@ export const FindVendorService = {
           VENDOR_REGION: vendor.VENDOR_REGION || 'Local',
           PROVINCE: vendor.PROVINCE || '',
           POSTAL_CODE: vendor.POSTAL_CODE || '',
+          COUNTRY: vendor.COUNTRY || '',
           WEBSITE: vendor.WEBSITE || '',
           ADDRESS: vendor.ADDRESS || '',
           TEL_CENTER: vendor.TEL_CENTER || '',
@@ -244,12 +245,14 @@ export const FindVendorService = {
     }
   },
 
-  // Get vendor types
-  getVendorTypes: async (dataItem: any) => {
-    const sql = await FindVendorSQL.getVendorTypes(dataItem)
+  // Get vendor business category names
+  getVendorBusinessCategoryName: async (dataItem: any) => {
+    const sql = await FindVendorSQL.getVendorBusinessCategoryName(dataItem)
     const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
     return resultData
   },
+
+  getVendorTypes: async (dataItem: any) => FindVendorService.getVendorBusinessCategoryName(dataItem),
 
   // Get provinces
   getProvinces: async (dataItem: any) => {
@@ -376,11 +379,11 @@ export const FindVendorService = {
           .replace(/ltd\.?/g, '')
           .replace(/company/g, '')
           .replace(/part\.,?ltd\.?/g, '')
-          .replace(/หจก\./g, '')
-          .replace(/บจก\./g, '')
-          .replace(/บริษัท/g, '')
+          .replace(/Ã Â¸Â«Ã Â¸Ë†Ã Â¸Â\./g, '')
+          .replace(/Ã Â¸Å¡Ã Â¸Ë†Ã Â¸Â\./g, '')
+          .replace(/Ã Â¸Å¡Ã Â¸Â£Ã Â¸Â´Ã Â¸Â©Ã Â¸Â±Ã Â¸â€”/g, '')
           .replace(/\s/g, '')
-          .replace(/[^a-z0-9ก-๙]/g, '')
+          .replace(/[^a-z0-9Ã Â¸Â-Ã Â¹â„¢]/g, '')
       }
       const calculateSimilarity = (str1: string, str2: string): number => {
         if (!str1 || !str2) return 0
@@ -388,7 +391,7 @@ export const FindVendorService = {
           text
             .toString()
             .toLowerCase()
-            .replace(/[^a-z0-9ก-๙\s]/g, ' ')
+            .replace(/[^a-z0-9Ã Â¸Â-Ã Â¹â„¢\s]/g, ' ')
             .split(/\s+/)
             .filter((w) => w.length > 2)
         const tokens1 = tokenize(str1),

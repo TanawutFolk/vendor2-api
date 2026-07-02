@@ -1,21 +1,21 @@
 import { describe, expect, test } from 'bun:test'
 import {
-  emailActionRequiredTemplate,
-  emailCompleteTemplate,
-  emailExternalSubmitGPRBTemplate,
-  emailGprCRequesterSetupTemplate,
-  emailGprCStepApprovalTemplate,
-  emailIncompleteTemplate,
-  emailReject1Template,
-  emailReject2Template,
-  emailRequestRegisterVendorTemplate,
-  emailToAccountPICTemplate,
-  emailToCheckerPICTemplate,
-  emailToMDTemplate,
-  emailToPMGMTemplate,
-  emailToPMMgrTemplate,
-  emailUserCheckerApproverGPRCTemplate,
-  emailVendorDocumentRequestTemplate,
+  email_ToUser_ActionRequired,
+  email_ToRequester_RegistrationCompleted,
+  email_ToSupplier_RequestFormB,
+  email_ToRequester_GprCSetup,
+  email_ToGprCApprover_NextStep,
+  email_ToRequester_RegistrationIncomplete,
+  email_ToPic_RejectedByApprover,
+  email_ToPic_RejectedByChecker,
+  email_ToPic_NewRequest,
+  email_ToAccount_RegisterRequired,
+  email_ToChecker_CheckRequired,
+  email_ToMd_ApproveRequired,
+  email_ToPoGm_ApproveRequired,
+  email_ToPoManager_ApproveRequired,
+  email_ToGprCApprover_FirstStep,
+  email_ToSupplier_RequestFormA,
   type MailTemplateData,
 } from './mailTemplate'
 
@@ -46,22 +46,22 @@ const sample: MailTemplateData = {
 }
 
 const templates = [
-  emailRequestRegisterVendorTemplate,
-  emailVendorDocumentRequestTemplate,
-  emailExternalSubmitGPRBTemplate,
-  emailGprCRequesterSetupTemplate,
-  emailUserCheckerApproverGPRCTemplate,
-  emailGprCStepApprovalTemplate,
-  emailReject1Template,
-  emailToCheckerPICTemplate,
-  emailReject2Template,
-  emailToPMMgrTemplate,
-  emailToPMGMTemplate,
-  emailToMDTemplate,
-  emailToAccountPICTemplate,
-  emailCompleteTemplate,
-  emailIncompleteTemplate,
-  emailActionRequiredTemplate,
+  email_ToPic_NewRequest,
+  email_ToSupplier_RequestFormA,
+  email_ToSupplier_RequestFormB,
+  email_ToRequester_GprCSetup,
+  email_ToGprCApprover_FirstStep,
+  email_ToGprCApprover_NextStep,
+  email_ToPic_RejectedByApprover,
+  email_ToChecker_CheckRequired,
+  email_ToPic_RejectedByChecker,
+  email_ToPoManager_ApproveRequired,
+  email_ToPoGm_ApproveRequired,
+  email_ToMd_ApproveRequired,
+  email_ToAccount_RegisterRequired,
+  email_ToRequester_RegistrationCompleted,
+  email_ToRequester_RegistrationIncomplete,
+  email_ToUser_ActionRequired,
 ]
 
 describe('mail templates', () => {
@@ -79,7 +79,7 @@ describe('mail templates', () => {
     expect(html).not.toContain('à¸')
   })
   test('renders PO PIC signature with a real name and role', () => {
-    const html = emailToCheckerPICTemplate({ ...sample, picName: 'TANAWUT PATRAWAN', picTel: '' })
+    const html = email_ToChecker_CheckRequired({ ...sample, picName: 'TANAWUT PATRAWAN', picTel: '' })
 
     expect(html).toContain('<div style="font-weight: 700;">Thank you &amp; Best regards,</div>')
     expect(html).toContain('<div style="font-weight: 700;">TANAWUT PATRAWAN</div>')
@@ -87,8 +87,8 @@ describe('mail templates', () => {
   })
 
   test('does not render empcode or email values as signature names', () => {
-    const empcodeHtml = emailToCheckerPICTemplate({ ...sample, picName: 'S00823', picTel: '' })
-    const emailHtml = emailToCheckerPICTemplate({ ...sample, picName: 'Tanawut.pf@gmail.com', picTel: '' })
+    const empcodeHtml = email_ToChecker_CheckRequired({ ...sample, picName: 'S00823', picTel: '' })
+    const emailHtml = email_ToChecker_CheckRequired({ ...sample, picName: 'Tanawut.pf@gmail.com', picTel: '' })
 
     expect(empcodeHtml).not.toContain('<div style="font-weight: 700;">S00823</div>')
     expect(emailHtml).not.toContain('<div style="font-weight: 700;">Tanawut.pf@gmail.com</div>')
