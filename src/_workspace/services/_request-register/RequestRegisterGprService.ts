@@ -23,8 +23,8 @@ const resolveGpr43AcceptanceStatus = (formData: any) => {
   if (explicitStatus) return explicitStatus
 
   const criteriaRows = Array.isArray(formData?.criteria) ? formData.criteria : []
-  const gpr43Row = criteriaRows.find((item: any) => normalizeValue(item?.no) === '4.3')
-  return normalizeGpr43AcceptanceStatus(gpr43Row?.remark)
+  const gpr43Row = criteriaRows.find((item: any) => normalizeValue(getValue(item, 'NO', 'no')) === '4.3')
+  return normalizeGpr43AcceptanceStatus(getValue(gpr43Row, 'REMARK', 'remark'))
 }
 
 const SELECTION_SHEET_LOCKED_MESSAGE = 'Selection Sheet is read-only after Document Checker approval.'
@@ -338,15 +338,15 @@ export const RequestRegisterGprService = {
 
       if (rawFormData.sales_profit) {
         for (const sp of rawFormData.sales_profit) {
-          const hasFinancialValue = [sp.year, sp.total_revenue, sp.net_profit]
+          const hasFinancialValue = [getValue(sp, 'YEAR', 'year'), getValue(sp, 'TOTAL_REVENUE', 'total_revenue'), getValue(sp, 'NET_PROFIT', 'net_profit')]
             .some((value) => normalizeValue(value) !== '')
           if (!hasFinancialValue) continue
 
           sqlList.push(await RequestRegisterPageSQL.insertFinancial({
             REQUEST_VENDOR_SELECTIONS_ID: selection_id,
-            YEAR: sp.year || '',
-            TOTAL_REVENUE: sp.total_revenue || '',
-            NET_PROFIT: sp.net_profit || '',
+            YEAR: getValue(sp, 'YEAR', 'year') || '',
+            TOTAL_REVENUE: getValue(sp, 'TOTAL_REVENUE', 'total_revenue') || '',
+            NET_PROFIT: getValue(sp, 'NET_PROFIT', 'net_profit') || '',
             CREATE_BY: formData.CREATE_BY || formData.UPDATE_BY || 'SYSTEM',
             UPDATE_BY: formData.UPDATE_BY || formData.CREATE_BY || 'SYSTEM',
           }))
@@ -356,11 +356,11 @@ export const RequestRegisterGprService = {
         for (const cr of rawFormData.criteria) {
           sqlList.push(await RequestRegisterPageSQL.insertCriteria({
             REQUEST_VENDOR_SELECTIONS_ID: selection_id,
-            NO: cr.no || '',
-            CRITERIA: cr.criteria || '',
-            REMARK: cr.remark || '',
-            UPLOADED_FILE: cr.uploaded_file || '',
-            UPLOADED_NAME: cr.uploaded_name || '',
+            NO: getValue(cr, 'NO', 'no') || '',
+            CRITERIA: getValue(cr, 'CRITERIA', 'criteria') || '',
+            REMARK: getValue(cr, 'REMARK', 'remark') || '',
+            UPLOADED_FILE: getValue(cr, 'UPLOADED_FILE', 'uploaded_file') || '',
+            UPLOADED_NAME: getValue(cr, 'UPLOADED_NAME', 'uploaded_name') || '',
             CREATE_BY: formData.CREATE_BY || formData.UPDATE_BY || 'SYSTEM',
             UPDATE_BY: formData.UPDATE_BY || formData.CREATE_BY || 'SYSTEM',
           }))
@@ -557,18 +557,18 @@ export const RequestRegisterGprService = {
 
     return {
       ...selRes[0],
-      gpr_c_approver_name: normalizeValue(getValue(flowSetup, 'gpr_c_approver_name', 'GPR_C_APPROVER_NAME')),
-      gpr_c_approver_email: normalizeValue(getValue(flowSetup, 'gpr_c_approver_email', 'GPR_C_APPROVER_EMAIL')),
-      gpr_c_pc_pic_name: normalizeValue(getValue(flowSetup, 'gpr_c_pc_pic_name', 'GPR_C_PC_PIC_NAME')),
-      gpr_c_pc_pic_email: normalizeValue(getValue(flowSetup, 'gpr_c_pc_pic_email', 'GPR_C_PC_PIC_EMAIL')),
-      action_required_json: JSON.stringify(actionRequiredSetup),
-      gpr_c_approver_empcode: normalizeValue(meta.gpr_c_approver_empcode),
-      gpr_c_pc_pic_empcode: normalizeValue(meta.gpr_c_pc_pic_empcode),
-      gpr_c_circular_empcodes: circularMembers.map((item) => item.empcode).filter(Boolean),
-      gpr_c_circular_members: circularMembers,
-      gpr_43_acceptance_status: normalizeGpr43AcceptanceStatus(getValue(selRes[0], 'gpr_43_acceptance_status', 'GPR_43_ACCEPTANCE_STATUS')),
-      sales_profit: finRes,
-      criteria: critRes,
+      GPR_C_APPROVER_NAME: normalizeValue(getValue(flowSetup, 'gpr_c_approver_name', 'GPR_C_APPROVER_NAME')),
+      GPR_C_APPROVER_EMAIL: normalizeValue(getValue(flowSetup, 'gpr_c_approver_email', 'GPR_C_APPROVER_EMAIL')),
+      GPR_C_PC_PIC_NAME: normalizeValue(getValue(flowSetup, 'gpr_c_pc_pic_name', 'GPR_C_PC_PIC_NAME')),
+      GPR_C_PC_PIC_EMAIL: normalizeValue(getValue(flowSetup, 'gpr_c_pc_pic_email', 'GPR_C_PC_PIC_EMAIL')),
+      ACTION_REQUIRED_JSON: JSON.stringify(actionRequiredSetup),
+      GPR_C_APPROVER_EMPCODE: normalizeValue(meta.gpr_c_approver_empcode),
+      GPR_C_PC_PIC_EMPCODE: normalizeValue(meta.gpr_c_pc_pic_empcode),
+      GPR_C_CIRCULAR_EMPCODES: circularMembers.map((item) => item.empcode).filter(Boolean),
+      GPR_C_CIRCULAR_MEMBERS: circularMembers,
+      GPR_43_ACCEPTANCE_STATUS: normalizeGpr43AcceptanceStatus(getValue(selRes[0], 'gpr_43_acceptance_status', 'GPR_43_ACCEPTANCE_STATUS')),
+      SALES_PROFIT: finRes,
+      CRITERIA: critRes,
     }
   },
 }

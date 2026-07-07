@@ -91,5 +91,7 @@ export const GprCSelectionSqlSnippets = {
                                            WHERE aset.REQUEST_VENDOR_SELECTIONS_ID = ${selectionAlias}.REQUEST_VENDOR_SELECTIONS_ID
                                              AND aset.INUSE = 1
                                        ), JSON_OBJECT('_meta', JSON_OBJECT('gpr_c_approver_empcode', '', 'gpr_c_pc_pic_empcode', ''))) AS ACTION_REQUIRED_JSON
+                                     , ${selectionAlias}.GPR_B_FILE_PATH AS GPR_B_FILE_PATH
+                                     , ${selectionAlias}.GPR_B_FILE_NAME AS GPR_B_FILE_NAME
 `,
 }

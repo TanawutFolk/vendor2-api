@@ -14,33 +14,33 @@ export const TaskManagerSQL = {
                     rr.REQUEST_STATE,
                     v.VENDOR_REGION,
                     rr.CREATE_DATE,
-                    'Request PO PIC' AS workflow_type,
-                    wsm.M_REQUEST_STATUS_ID AS current_status_id,
-                    IFNULL(mrs.STATUS_VALUE, IFNULL(wsm.STEP_CODE, '-')) AS current_step_name,
-                    UPPER(IFNULL(wsm.STEP_CODE, '')) AS current_step_code,
+                    'Request PO PIC' AS WORKFLOW_TYPE,
+                    wsm.M_REQUEST_STATUS_ID AS CURRENT_STATUS_ID,
+                    IFNULL(mrs.STATUS_VALUE, IFNULL(wsm.STEP_CODE, '-')) AS CURRENT_STEP_NAME,
+                    UPPER(IFNULL(wsm.STEP_CODE, '')) AS CURRENT_STEP_CODE,
                     CASE
                         WHEN LOWER(IFNULL(v.VENDOR_REGION, '')) = 'oversea' THEN 'OVERSEA_PO_PIC'
                         ELSE 'LOCAL_PO_PIC'
-                    END AS current_group_code,
+                    END AS CURRENT_GROUP_CODE,
                     CASE
                         WHEN LOWER(IFNULL(v.VENDOR_REGION, '')) = 'oversea' THEN 'OVERSEA_PO_PIC'
                         ELSE 'LOCAL_PO_PIC'
-                    END AS current_group_name,
-                    IFNULL(rr.ASSIGN_TO, '-') AS current_owner_empcode,
-                    'REQUEST_PIC' AS assignment_scope,
-                    CASE WHEN a_pic.ASSIGNEES_TO_ID IS NOT NULL THEN 1 ELSE 0 END AS current_owner_active,
+                    END AS CURRENT_GROUP_NAME,
+                    IFNULL(rr.ASSIGN_TO, '-') AS CURRENT_OWNER_EMPCODE,
+                    'REQUEST_PIC' AS ASSIGNMENT_SCOPE,
+                    CASE WHEN a_pic.ASSIGNEES_TO_ID IS NOT NULL THEN 1 ELSE 0 END AS CURRENT_OWNER_ACTIVE,
                     CASE
                         WHEN ras.REQUEST_APPROVAL_STEP_ID IS NOT NULL
                           AND LOWER(TRIM(IFNULL(rr.REQUEST_STATE, ''))) NOT IN (${terminalStatusSql})
                         THEN 1
                         ELSE 0
-                    END AS reassign_enabled,
+                    END AS REASSIGN_ENABLED,
                     CASE
                         WHEN a_pic.ASSIGNEES_TO_ID IS NOT NULL THEN 'Healthy'
                         ELSE 'Needs Reassign'
-                    END AS assignment_health,
-                    NULL AS gpr_c_flow_id,
-                    NULL AS gpr_c_step_id
+                    END AS ASSIGNMENT_HEALTH,
+                    NULL AS GPR_C_FLOW_ID,
+                    NULL AS GPR_C_STEP_ID
                 FROM request_register_vendor rr
                     LEFT JOIN request_approval_step ras
                         ON ras.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID

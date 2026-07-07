@@ -161,7 +161,7 @@ export const isPicStep = (step: any) => inferActorType(step) === 'PIC'
 export const isAccountStep = (step: any) => inferActorType(step) === 'ACCOUNT'
 
 export const requiresVendorReply = (step: any) => {
-  const requiresVendorReplyValue = step?.requiresVendorReply ?? step?.REQUIRES_VENDOR_REPLY
+  const requiresVendorReplyValue = step?.REQUIRES_VENDOR_REPLY
   if (requiresVendorReplyValue !== undefined && requiresVendorReplyValue !== null) {
     return Number(requiresVendorReplyValue) === 1
   }
@@ -170,7 +170,7 @@ export const requiresVendorReply = (step: any) => {
 }
 
 export const requiresVendorCode = (step: any) => {
-  const requiresVendorCodeValue = step?.requiresVendorCode ?? step?.REQUIRES_VENDOR_CODE
+  const requiresVendorCodeValue = step?.REQUIRES_VENDOR_CODE
   if (requiresVendorCodeValue !== undefined && requiresVendorCodeValue !== null) {
     return Number(requiresVendorCodeValue) === 1
   }

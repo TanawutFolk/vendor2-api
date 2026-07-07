@@ -67,9 +67,9 @@ describe('RequestRegisterPageSQL approval step identity', () => {
       TARGET_COMPACT: 'POCHECKERMAIN',
     })
 
-    expect(sql).toContain('EMPNAME AS empName')
-    expect(sql).toContain('EMPEMAIL AS empEmail')
-    expect(sql).toContain('GROUP_CODE AS group_code')
+    expect(sql).toContain('EMPNAME')
+    expect(sql).toContain('EMPEMAIL')
+    expect(sql).toContain('GROUP_CODE')
   })
 
   test('keeps GPR setup cache out of request_vendor_selections', () => {
@@ -179,7 +179,7 @@ describe('RequestRegisterPageSQL approval step identity', () => {
   test('loads GPR criteria remarks from DESCRIPTION without reject reason column', () => {
     const sql = RequestRegisterPageSQL.getCriteria({ REQUEST_VENDOR_SELECTIONS_ID: 10 })
 
-    expect(sql).toContain('DESCRIPTION AS remark')
+    expect(sql).toContain('DESCRIPTION AS REMARK')
     expect(sql).not.toContain('REJECT_REASON')
     expect(sql).not.toContain('reject_reason')
   })

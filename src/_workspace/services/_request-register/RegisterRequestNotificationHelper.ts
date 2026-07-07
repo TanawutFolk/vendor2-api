@@ -12,7 +12,7 @@ import {
   email_ToRequester_RegistrationIncomplete,
   email_ToPic_RejectedByApprover,
   email_ToPic_RejectedByChecker,
-  email_ToPic_NewRequest,
+  email_ToPic_RequestRegisterVendor,
   email_ToAccount_RegisterRequired,
   email_ToChecker_CheckRequired,
   email_ToMd_ApproveRequired,
@@ -710,7 +710,7 @@ export const sendMail_ToPic_NewRequest = async (
     (email) => email !== nextAssigneeEmail
   )
 
-  const emailHtml = email_ToPic_NewRequest({
+  const emailHtml = email_ToPic_RequestRegisterVendor({
     requestNumber,
     recipientName: resolveMailRecipientName([nextAssigneeProfile?.fullName, nextAssignee.empCode, nextAssigneeEmail], 'Recipient'),
     vendorName: vendorData.company_name || 'Error Connection',
@@ -726,7 +726,7 @@ export const sendMail_ToPic_NewRequest = async (
   })
 
   await sendTemplatedEmail({
-    templateName: 'email_ToPic_NewRequest',
+    templateName: 'email_ToPic_RequestRegisterVendor',
     emailHtml,
     toEmail: nextAssigneeEmail,
     subject: `[Request Check] Please request check register vendor follow as "${requestNumber}"`,
@@ -926,7 +926,7 @@ export const sendMail_NegotiationStageDispatch = async (requestId: number, stage
       emailHtml,
       toEmail: vendorEmail,
       subject: isGprBStage
-        ? `[Request Submit] Please submit ${requestNumber} - General Purchase Specification Form B`
+        ? `[Request Submit] Please Submit register vendor follow as "${requestNumber}" - General Purchase Specification Form B`
         : `[Request Submit] Document for ${requestNumber}`,
       ccEmails,
       requestId,
@@ -1244,7 +1244,7 @@ export const sendMail_ToPic_RequestRejected = async (dataItem: any, currentStep:
       toEmail: primaryToEmail,
       subject: isCheckerReject
         ? `[RECHECK] Register vendor "${requestNumber}" requires recheck`
-        : `[REJECT] Register vendor "${requestNumber}" has been rejected`,
+        : `[REJECT] Please recheck register vendor follow as "${requestNumber}" - General Purchase Specification Form B`,
       ccEmails,
       requestId,
       requestNumber,

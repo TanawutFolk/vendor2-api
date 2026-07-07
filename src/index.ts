@@ -47,8 +47,10 @@ app.get(prefix, (req: Request, res: Response) => {
 })
 
 // * Static Files
-// Serve uploaded documents at: GET /uploads/documents/<filename>
-app.use('/uploads', express.static(path.join(process.cwd(), 'uploads')))
+// Serve uploaded documents at: GET {prefix}/uploads/documents/<filename>
+// Mounted under the API prefix because every frontend caller builds this URL as
+// `${API_BASE}/uploads/documents/...`, and API_BASE already includes the prefix.
+app.use(`${prefix}/uploads`, express.static(path.join(process.cwd(), 'uploads')))
 
 app.use(prefix, Routers)
 

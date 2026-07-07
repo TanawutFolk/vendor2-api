@@ -113,7 +113,7 @@ export const RequestRegisterPageSQL = {
                                            )
                                          ),
                                          0
-                                       ) + 1 AS next_no
+                                       ) + 1 AS NEXT_NO
                             FROM
                                        request_register_vendor
                             WHERE
@@ -179,11 +179,11 @@ export const RequestRegisterPageSQL = {
   getPeerCcRowsByNormalizedGroup: async (dataItem: any) => {
     let sql = `
                             SELECT
-                                       EMPCODE AS empcode
-                                     , EMPNAME AS empName
-                                     , EMPEMAIL AS empEmail
-                                     , GROUP_CODE AS group_code
-                                     , GROUP_NAME AS group_name
+                                       EMPCODE
+                                     , EMPNAME
+                                     , EMPEMAIL
+                                     , GROUP_CODE
+                                     , GROUP_NAME
                             FROM
                                        assignees_to
                             WHERE
@@ -281,12 +281,12 @@ export const RequestRegisterPageSQL = {
                                      , v.ADDRESS
                                      , v.VENDOR_REGION
                                      , v.EMAILMAIN
-                                     , v.EMAILMAIN AS vendor_main_email
+                                     , v.EMAILMAIN AS VENDOR_MAIN_EMAIL
                                      , v.FFT_VENDOR_CODE
                                      , vc.CONTACT_NAME
-                                     , vc.EMAIL AS vendor_email
+                                     , vc.EMAIL AS VENDOR_EMAIL
                                      , vc.TEL_PHONE
-                                     , vc_sel.EMAIL AS selected_vendor_email
+                                     , vc_sel.EMAIL AS SELECTED_VENDOR_EMAIL
                             FROM
                                        request_register_vendor rr
                                             LEFT JOIN
@@ -454,6 +454,11 @@ export const RequestRegisterPageSQL = {
       throw new Error(`Invalid REQUEST_REGISTER_VENDOR_ID for createDocument: ${String(dataItem['REQUEST_REGISTER_VENDOR_ID'])}`)
     }
 
+    // MySQL string literals interpret backslash escape sequences (e.g. "\0" becomes a NUL byte),
+    // so Windows/UNC file paths must have backslashes escaped before quote-escaping, or they get
+    // silently mangled on INSERT.
+    const escape = (value: any) => String(value ?? '').replaceAll('\\', '\\\\').replaceAll("'", "''")
+
     let sql = `
                             INSERT INTO request_register_file (
                                        REQUEST_REGISTER_VENDOR_ID
@@ -479,11 +484,11 @@ export const RequestRegisterPageSQL = {
         `
 
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', requestId.toString())
-    sql = sql.replaceAll('dataItem.FILE_NAME', dataItem['FILE_NAME'])
-    sql = sql.replaceAll('dataItem.FILE_PATH', dataItem['FILE_PATH'])
+    sql = sql.replaceAll('dataItem.FILE_NAME', escape(dataItem['FILE_NAME']))
+    sql = sql.replaceAll('dataItem.FILE_PATH', escape(dataItem['FILE_PATH']))
     sql = sql.replaceAll('dataItem.FILE_SIZE', (dataItem['FILE_SIZE'] || 0).toString())
-    sql = sql.replaceAll('dataItem.FILE_TYPE', dataItem['FILE_TYPE'])
-    sql = sql.replaceAll('dataItem.CREATE_BY', dataItem['CREATE_BY'])
+    sql = sql.replaceAll('dataItem.FILE_TYPE', escape(dataItem['FILE_TYPE']))
+    sql = sql.replaceAll('dataItem.CREATE_BY', escape(dataItem['CREATE_BY']))
 
     return sql
   },
@@ -547,17 +552,17 @@ export const RequestRegisterPageSQL = {
   getStatusOptions: async (_dataItem?: any) => {
     const sql = `
                             SELECT
-                                       wsm.WORKFLOW_STEP_MASTER_ID AS workflowStepId
-                                     , mrs.M_REQUEST_STATUS_ID AS statusId
+                                       wsm.WORKFLOW_STEP_MASTER_ID
+                                     , mrs.M_REQUEST_STATUS_ID
                                      , mrs.STATUS_VALUE AS value
                                      , mrs.STATUS_VALUE AS label
-                                     , wsm.STEP_CODE AS stepCode
-                                     , wsm.ACTOR_TYPE AS actorType
-                                     , wsm.DEFAULT_GROUP_CODE_LOCAL AS defaultGroupCodeLocal
-                                     , wsm.DEFAULT_GROUP_CODE_OVERSEA AS defaultGroupCodeOversea
-                                     , wsm.REQUIRES_VENDOR_REPLY AS requiresVendorReply
-                                     , wsm.REQUIRES_VENDOR_CODE AS requiresVendorCode
-                                     , wsm.DEFAULT_STEP_ORDER AS sortOrder
+                                     , wsm.STEP_CODE
+                                     , wsm.ACTOR_TYPE
+                                     , wsm.DEFAULT_GROUP_CODE_LOCAL
+                                     , wsm.DEFAULT_GROUP_CODE_OVERSEA
+                                     , wsm.REQUIRES_VENDOR_REPLY
+                                     , wsm.REQUIRES_VENDOR_CODE
+                                     , wsm.DEFAULT_STEP_ORDER
                             FROM
                                        workflow_step_master wsm
                                             INNER JOIN
@@ -703,9 +708,9 @@ export const RequestRegisterPageSQL = {
                                      , ras.UPDATE_BY
                                      , ras.UPDATE_DATE
                                      , ras.INUSE
-                                     , mrs.STATUS_VALUE AS master_status_value
-                                     , mrs.STATUS_VALUE AS master_status_label
-                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS approver_name
+                                     , mrs.STATUS_VALUE AS MASTER_STATUS_VALUE
+                                     , mrs.STATUS_VALUE AS MASTER_STATUS_LABEL
+                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS APPROVER_NAME
                             FROM
                                        request_approval_step ras
                                             INNER JOIN
@@ -894,11 +899,11 @@ export const RequestRegisterPageSQL = {
   getCriteria: (dataItem: any) => {
     let sql = `
                             SELECT
-                                       CRITERIA_NO AS no
-                                     , CRITERIA_VALUE AS criteria
-                                     , DESCRIPTION AS remark
-                                     , UPLOADED_FILE_PATH AS uploaded_file
-                                     , UPLOADED_FILE_NAME AS uploaded_name
+                                       CRITERIA_NO AS NO
+                                     , CRITERIA_VALUE AS CRITERIA
+                                     , DESCRIPTION AS REMARK
+                                     , UPLOADED_FILE_PATH AS UPLOADED_FILE
+                                     , UPLOADED_FILE_NAME AS UPLOADED_NAME
                             FROM
                                        vendor_selection_criteria
                             WHERE
@@ -1485,6 +1490,56 @@ export const RequestRegisterPageSQL = {
 
     sql = sql.replaceAll('dataItem.CREATE_BY', dataItem.CREATE_BY || dataItem.UPDATE_BY || 'SYSTEM')
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM')
+
+    return sql
+  },
+
+  // Repoint a request_register_file row to its final storage path (e.g. after moving the
+  // uploaded file from uploads/documents into the request's 02.Request Documents folder).
+  updateDocumentFilePath: (dataItem: any) => {
+    // Backslashes must be escaped before quotes — MySQL string literals treat "\0" as a NUL
+    // byte and silently drop other backslashes, which corrupts Windows/UNC file paths.
+    const escape = (value: any) => String(value ?? '').replaceAll('\\', '\\\\').replaceAll("'", "''")
+
+    let sql = `
+                            UPDATE request_register_file
+                            SET
+                                       FILE_PATH = 'dataItem.FILE_PATH'
+                                     , UPDATE_BY = 'dataItem.UPDATE_BY'
+                                     , UPDATE_DATE = NOW()
+                            WHERE
+                                       REQUEST_REGISTER_FILE_ID = dataItem.REQUEST_REGISTER_FILE_ID
+        `
+
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_FILE_ID', (dataItem.REQUEST_REGISTER_FILE_ID || 0).toString())
+    sql = sql.replaceAll('dataItem.FILE_PATH', escape(dataItem.FILE_PATH))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', escape(dataItem.UPDATE_BY || 'SYSTEM'))
+
+    return sql
+  },
+
+  // Persist the single GPR B file reference (path + name) on the request's selection row.
+  updateGprBFile: (dataItem: any) => {
+    // Backslashes must be escaped before quotes — MySQL string literals treat "\0" as a NUL
+    // byte and silently drop other backslashes, which corrupts Windows/UNC file paths.
+    const escape = (value: any) => String(value ?? '').replaceAll('\\', '\\\\').replaceAll("'", "''")
+
+    let sql = `
+                            UPDATE request_vendor_selections
+                            SET
+                                       GPR_B_FILE_PATH = dataItem.PATH_NULL
+                                     , GPR_B_FILE_NAME = dataItem.NAME_NULL
+                                     , UPDATE_BY = 'dataItem.UPDATE_BY'
+                                     , UPDATE_DATE = NOW()
+                            WHERE
+                                       REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
+                                       AND INUSE = 1
+        `
+
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem.REQUEST_REGISTER_VENDOR_ID || 0).toString())
+    sql = sql.replaceAll('dataItem.PATH_NULL', dataItem.GPR_B_FILE_PATH ? `'${escape(dataItem.GPR_B_FILE_PATH)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.NAME_NULL', dataItem.GPR_B_FILE_NAME ? `'${escape(dataItem.GPR_B_FILE_NAME)}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', escape(dataItem.UPDATE_BY || 'SYSTEM'))
 
     return sql
   },

@@ -1,11 +1,12 @@
 import { FindVendorController } from '@src/_workspace/controllers/_find-vendor/FindVendorController'
 import { validateData } from '@src/middlewares/validationMiddleware'
-import { SearchVendorSchema, GetVendorByIdSchema, UpdateVendorSchema, ExportVendorSchema, UpdateVendorComprehensiveSchema, DeleteVendorSchema } from './validateSchema'
+import { SearchVendorSchema, GetVendorByIdSchema, VendorDetailsSchema, UpdateVendorSchema, ExportVendorSchema, UpdateVendorComprehensiveSchema, DeleteVendorSchema } from './validateSchema'
 import { Router } from 'express'
 
 const findVendorRoutes = Router()
 
 findVendorRoutes.post('/search', validateData(SearchVendorSchema), FindVendorController.search)
+findVendorRoutes.post('/vendor-details', validateData(VendorDetailsSchema), FindVendorController.getVendorDetails)
 findVendorRoutes.post('/getById', validateData(GetVendorByIdSchema), FindVendorController.getById)
 findVendorRoutes.post('/update', validateData(UpdateVendorSchema), FindVendorController.update)
 findVendorRoutes.post('/update-comprehensive', validateData(UpdateVendorComprehensiveSchema), FindVendorController.updateComprehensive)

@@ -38,7 +38,7 @@ describe('FindVendorSQL audit preservation', () => {
     expect(sql).not.toContain('FROM\n                                       vendors')
   })
 
-  test('loads vendor business category dropdown from info_business_category master data', () => {
+  test('loads vendor type dropdown from info_business_category master data', () => {
     const sql = FindVendorSQL.getVendorBusinessCategoryName()
 
     expect(sql).toContain('info_business_category')
@@ -46,6 +46,29 @@ describe('FindVendorSQL audit preservation', () => {
     expect(sql).toContain('BUSINESS_CATEGORY_NAME AS label')
     expect(sql).toContain('BUSINESS_CATEGORY_NAME ASC')
     expect(sql).not.toContain('master_vendor_types')
-    expect(sql).not.toContain('FROM\n                                       business_category')
+  })
+  test('keeps paged vendor search lightweight without aggregated detail arrays', () => {
+    const [, dataSql] = FindVendorSQL.search({
+      LIMIT: 20,
+      OFFSET: 0,
+      ORDER: 'v.COMPANY_NAME ASC',
+      SQLWHERECOLUMNFILTER: '',
+    }, '')
+
+    expect(dataSql).toContain('v.VENDORS_ID')
+    expect(dataSql).toContain('vc.VENDOR_CONTACTS_ID')
+    expect(dataSql).toContain('vp.VENDOR_PRODUCTS_ID')
+    expect(dataSql).not.toContain('CONTACTS_JSON')
+    expect(dataSql).not.toContain('PRODUCTS_JSON')
+    expect(dataSql).not.toContain('JSON_ARRAYAGG')
+  })
+
+  test('loads contact and product arrays only in vendor detail query', () => {
+    const sql = FindVendorSQL.getVendorDetails({ VENDORS_ID: 1 })
+
+    expect(sql).toContain('v.VENDORS_ID = 1')
+    expect(sql).toContain('CONTACTS_JSON')
+    expect(sql).toContain('PRODUCTS_JSON')
+    expect(sql).toContain('JSON_ARRAYAGG')
   })
 })

@@ -93,10 +93,11 @@ interface SelectionRecord extends RowDataPacket {
 
 interface CriteriaRow extends RowDataPacket {
   [key: string]: any
-  no?: string
-  criteria_no?: string
-  uploaded_file?: string
-  uploaded_file_path?: string
+  NO?: string
+  CRITERIA?: string
+  REMARK?: string
+  UPLOADED_FILE?: string
+  UPLOADED_NAME?: string
 }
 
 const normalizeApprovalStep = (step: any): ApprovalStep => ({
@@ -294,9 +295,9 @@ const normalizeGpr43AcceptanceStatus = (value: unknown) => {
 const evaluateGprCriteria = (criteriaRows: CriteriaRow[], selection?: SelectionRecord | null) => {
   const rows = Array.isArray(criteriaRows) ? criteriaRows : []
   const normalizedRows = rows.map((row) => ({
-    no: String(row?.no || row?.criteria_no || '').trim(),
-    remark: String(row?.remark || row?.DESCRIPTION || '').trim(),
-    uploaded_file: String(row?.uploaded_file || row?.uploaded_file_path || '').trim(),
+    no: String(row?.NO || '').trim(),
+    remark: String(row?.REMARK || '').trim(),
+    uploaded_file: String(row?.UPLOADED_FILE || '').trim(),
   }))
   const gpr43Status =
     normalizeGpr43AcceptanceStatus(selection?.gpr_43_acceptance_status) ||
@@ -701,7 +702,7 @@ const handleVendorReplyRequest = async (context: WorkflowContext, resolver: Work
   const resultData = await MySQLExecute.executeList(sqlList)
   const mailResult = await sendMail_NegotiationStageDispatch(dataItem.REQUEST_REGISTER_VENDOR_ID)
   const mailMessage = mailResult?.sent
-    ? 'Vendor notification sent. Waiting vendor response before next approval step.'
+    ? 'Document sent to vendor. Waiting for vendor response before the next approval step.'
     : `Request updated but vendor email failed: ${mailResult?.reason || 'unknown error'}`
 
   return {

@@ -1,15 +1,16 @@
 import { MySQLExecute } from '@businessData/dbExecute'
 import { ResultSetHeader, RowDataPacket } from 'mysql2'
 import sendEmail from '@src/config/sendEmail'
-import { email_ToUser_ActionRequired, email_ToGprCApprover_NextStep, email_ToRequester_GprCSetup, email_ToGprCApprover_FirstStep } from '@src/config/mailTemplate'
+import { email_ToUser_ActionRequired, email_ToUser_ActionResult, email_ToGprCApprover_NextStep, email_ToRequester_GprCSetup, email_ToGprCApprover_FirstStep } from '@src/config/mailTemplate'
 import { GprCApprovalSQL } from '../../sql/_approval-GPRC/GprCApprovalSQL'
 import { RequestRegisterPageSQL } from '../../sql/_request-register/RequestRegisterPageSQL'
+import { sendMail_ToApprover_NextStep, sendMail_ToPic_RequestRejected } from '../_request-register/RegisterRequestNotificationHelper'
+import { buildGprCBaseMailData as buildBaseMailData } from './GprCApprovalMailData'
 import {
   GROUP_CODE,
   inferStepCode,
   mergeUniqueEmails,
   normalizeEmail,
-  resolveRequestNumber,
   WORKFLOW_STEP_CODE,
 } from '../_request-register/RegisterRequestWorkflowHelper'
 
@@ -45,7 +46,7 @@ const compactGroupToken = (value: string) =>
 const resolveManagedGroupForGprCStep = (stepCodeRaw: any) => {
   const stepCode = normalizeValue(stepCodeRaw).toUpperCase()
   if (['EMR_CHECKER', 'EMR_APPROVER', 'QMS_CHECKER', 'QMS_APPROVER'].includes(stepCode)) return stepCode
-  if (['PM_MANAGER_CHECKER', 'PM_MANAGER_APPROVER'].includes(stepCode)) return GROUP_CODE.PO_MGR
+  if (stepCode === 'PM_MANAGER_APPROVER') return GROUP_CODE.PO_MGR
   return ''
 }
 
@@ -61,7 +62,7 @@ const getRequesterProfile = async (empcodeRaw: any) => {
   return getMemberProfile(empcodeRaw)
 }
 
-const isActionRequiredStep = (stepCode: string) => ['EMR_CHECKER', 'EMR_APPROVER', 'QMS_CHECKER', 'QMS_APPROVER', 'PM_MANAGER_CHECKER', 'PM_MANAGER_APPROVER'].includes(stepCode)
+const isActionRequiredStep = (stepCode: string) => ['REQUESTER_APPROVER', 'EMR_CHECKER', 'EMR_APPROVER', 'QMS_CHECKER', 'QMS_APPROVER', 'PM_MANAGER_APPROVER'].includes(stepCode)
 
 const GPR_C_STEP_DEFS = [
   { order: 1, code: 'REQUESTER_APPROVER', name: 'Requester Approver', source: 'REQUESTER_APPROVER' },
@@ -69,8 +70,7 @@ const GPR_C_STEP_DEFS = [
   { order: 3, code: 'EMR_APPROVER', name: 'EMR Approver', source: 'EMR_APPROVER' },
   { order: 4, code: 'QMS_CHECKER', name: 'QMS Checker', source: 'QMS_CHECKER' },
   { order: 5, code: 'QMS_APPROVER', name: 'QMS Approver', source: 'QMS_APPROVER' },
-  { order: 6, code: 'PM_MANAGER_CHECKER', name: 'PM Manager Checker', source: GROUP_CODE.PO_MGR },
-  { order: 7, code: 'PM_MANAGER_APPROVER', name: 'PM Manager Approver', source: GROUP_CODE.PO_MGR },
+  { order: 6, code: 'PM_MANAGER_APPROVER', name: 'PM Manager Approver', source: GROUP_CODE.PO_MGR },
 ]
 
 const response = (Status: boolean, Message: string, ResultOnDb: any, MethodOnDb: string, TotalCountOnDb = 1) => ({
@@ -80,6 +80,26 @@ const response = (Status: boolean, Message: string, ResultOnDb: any, MethodOnDb:
   MethodOnDb,
   TotalCountOnDb: Status ? TotalCountOnDb : 0,
 })
+
+type GprCPostCommitTask = () => Promise<unknown>
+
+// Mirrors ApprovalQueueService's post-commit pattern: side-effects (emails) run only after the DB
+// mutations have committed, failures are isolated with allSettled, and each failure is logged with
+// context instead of being swallowed by an inline .catch(console.error).
+const runGprCPostCommitTasks = async (tasks: GprCPostCommitTask[], requestId: number) => {
+  if (tasks.length === 0) return
+
+  const results = await Promise.allSettled(tasks.map((task) => task()))
+  results.forEach((result, index) => {
+    if (result.status === 'rejected') {
+      console.error('[GprCApprovalService] postCommitTask failed', {
+        taskIndex: index,
+        request_id: requestId,
+        error: result.reason instanceof Error ? result.reason.message : result.reason,
+      })
+    }
+  })
+}
 
 const getMemberProfile = async (empcodeRaw: any) => {
   const empcode = normalizeValue(empcodeRaw)
@@ -121,11 +141,11 @@ const getAssigneeByGroup = async (groupCode: string) => {
   if (!row) throw new Error(`No active assignee found for group ${groupCode}`)
 
   return {
-    empcode: normalizeValue(row.empcode),
-    name: buildDisplayName(row) || normalizeValue(row.empName),
-    email: normalizeEmail(row.empEmail),
-    group_code: normalizeValue(row.group_code),
-    group_name: normalizeValue(row.group_name),
+    empcode: normalizeValue(row.EMPCODE),
+    name: buildDisplayName(row) || normalizeValue(row.EMPNAME),
+    email: normalizeEmail(row.EMPEMAIL),
+    group_code: normalizeValue(row.GROUP_CODE),
+    group_name: normalizeValue(row.GROUP_NAME),
   }
 }
 
@@ -144,8 +164,8 @@ const getGroupEmails = async (groupCode: string, excludeEmpCode?: string, exclud
 
   return mergeUniqueEmails(
     rows.map((row: any) => {
-      if (excludedEmp && normalizeValue(row.empcode) === excludedEmp) return ''
-      const email = normalizeEmail(row.empEmail)
+      if (excludedEmp && normalizeValue(row.EMPCODE) === excludedEmp) return ''
+      const email = normalizeEmail(row.EMPEMAIL)
       if (excludedEmail && email === excludedEmail) return ''
       return email
     })
@@ -244,6 +264,19 @@ const resolveStepApprovers = async (requesterApprover: any) => {
   return result
 }
 
+// Re-resolve a GPR C step's approver from its managed group (assignees_to) at activation time,
+// mirroring the main workflow's resolveStepApprover. Returns null for steps that are not
+// group-managed (e.g. REQUESTER_APPROVER, whose approver is chosen by the requester at setup),
+// so those keep their configured approver.
+const resolveGprCStepApprover = async (step: any) => {
+  const stepCode = normalizeValue(getValue(step, 'STEP_CODE', 'step_code'))
+  const groupCode = resolveManagedGroupForGprCStep(stepCode)
+  if (!groupCode) return null
+
+  const assignee = await getAssigneeByGroup(groupCode)
+  return assignee?.empcode ? assignee : null
+}
+
 const sendGprCEmail = async (payload: { templateName: string; toEmail: string; ccEmails?: string[]; subject: string; requestId: number; requestNumber: string; html: string }) => {
   const mailResult = await sendEmail(payload.html, payload.toEmail, payload.subject, payload.ccEmails || [], {
     templateName: payload.templateName,
@@ -272,24 +305,6 @@ const sendGprCEmail = async (payload: { templateName: string; toEmail: string; c
     requestId: payload.requestId,
     requestNumber: payload.requestNumber,
   })
-}
-
-const buildBaseMailData = (summary: any, requestId: number, recipientName = 'Approver') => {
-  const requestNumber = resolveRequestNumber(summary.request_number, requestId, summary.CREATE_DATE)
-  return {
-    requestNumber,
-    recipientName,
-    vendorName: summary.company_name || 'N/A',
-    address: summary.address || 'N/A',
-    contactPic: summary.contact_name || 'N/A',
-    email: summary.vendor_email || summary.emailmain || 'N/A',
-    tel: summary.tel_phone || 'N/A',
-    supportProduct: summary.supportProduct_Process || 'N/A',
-    purchaseFrequency: summary.purchase_frequency || 'N/A',
-    systemLink: `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/approval-gpr-c`,
-    picName: '',
-    picTel: '',
-  }
 }
 
 const notifyRequesterSetup = async (requestId: number, updateBy: string) => {
@@ -338,13 +353,13 @@ const notifyStepApprover = async (requestId: number, step: any, ccEmails: string
           ...mailData,
           userName: approverName,
           recipientName: approverName,
-          picName: poPicContext.picName,
+          picName: requester?.name || poPicContext.picName,
         })
       : email_ToGprCApprover_NextStep({
           ...mailData,
           picNextStepName: approverName,
           recipientName: approverName,
-          picName: poPicContext.picName,
+          picName: requester?.name || poPicContext.picName,
         })
 
   await sendGprCEmail({
@@ -380,20 +395,64 @@ const notifyActionRequired = async (requestId: number, step: any, action: any) =
   })
 }
 
+// Closes the "Email result" loop: once the assigned PIC records their Action Required result, notify
+// the GPR C approver (the judge) who raised it.
+const notifyActionResultRecorded = async (record: any) => {
+  const requestId = Number(getValue(record, 'REQUEST_REGISTER_VENDOR_ID', 'request_register_vendor_id'))
+  const stepId = Number(getValue(record, 'REQUEST_VENDOR_GPR_C_STEPS_ID', 'gpr_c_step_id'))
+  if (!requestId || !stepId) return
+
+  const stepRows = (await MySQLExecute.search(
+    GprCApprovalSQL.getStepById({ REQUEST_VENDOR_GPR_C_STEPS_ID: stepId })
+  )) as RowDataPacket[]
+  const step = stepRows[0]
+  const approverEmail = normalizeEmail(getValue(step, 'APPROVER_EMAIL', 'approver_email'))
+  if (!approverEmail) return
+
+  const approverName = normalizeValue(getValue(step, 'APPROVER_NAME', 'approver_name')) || 'Approver'
+  const summary = await getRequestSummary(requestId)
+  const mailData = buildBaseMailData(summary, requestId, approverName)
+  const stageLabel = normalizeValue(getValue(record, 'STAGE_NAME', 'stage_name', 'STAGE_CODE', 'stage_code')) || 'Action Required'
+  const resultStatus = normalizeValue(getValue(record, 'RESULT_STATUS', 'result_status'))
+  const resultRemark = normalizeValue(getValue(record, 'RESULT_REMARK', 'result_remark'))
+  const picName = normalizeValue(getValue(record, 'PIC_NAME', 'pic_name')) || 'GPR C Workflow'
+  const note = [resultStatus ? `Status: ${resultStatus}` : '', resultRemark].filter(Boolean).join(' — ')
+
+  await sendGprCEmail({
+    templateName: 'email_ToUser_ActionResult',
+    toEmail: approverEmail,
+    ccEmails: [],
+    subject: `[GPR C Action Result] ${mailData.requestNumber} - ${stageLabel}`,
+    requestId,
+    requestNumber: mailData.requestNumber,
+    html: email_ToUser_ActionResult({
+      ...mailData,
+      recipientName: approverName,
+      stageLabel,
+      note,
+      picName,
+    }),
+  })
+}
+
+// Advances the main workflow past the "Issue GPR C" step once the GPR C sub-flow is fully approved.
+// Returns the next main approval step (or null) so the caller can dispatch the next-approver
+// notification as a post-commit task, matching the main workflow.
 const markMainIssueGprCApproved = async (requestId: number, actionBy: string, remark: string) => {
   const stepsSql = await GprCApprovalSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId })
   const steps = ((await MySQLExecute.search(stepsSql)) as RowDataPacket[]).map(normalizeMainApprovalStep)
   const currentStep = steps.find((step: any) => String(step.step_status || '').toLowerCase() === 'in_progress')
-  if (!currentStep) return
+  if (!currentStep) return null
 
-  if (inferStepCode(currentStep) !== WORKFLOW_STEP_CODE.ISSUE_GPR_C) return
+  if (inferStepCode(currentStep) !== WORKFLOW_STEP_CODE.ISSUE_GPR_C) return null
 
   const pendingSteps = steps
     .filter((step: any) => String(step.step_status || '').toLowerCase() === 'pending' && Number(step.step_order) > Number(currentStep.step_order))
     .sort((a: any, b: any) => Number(a.step_order || 0) - Number(b.step_order || 0))
-  const nextStep =
-    pendingSteps.find((step: any) => inferStepCode(step) === WORKFLOW_STEP_CODE.DOC_CHECK) ||
-    pendingSteps[0]
+  const nextStep = pendingSteps.find((step: any) => inferStepCode(step) === WORKFLOW_STEP_CODE.DOC_CHECK)
+  if (!nextStep) {
+    throw new Error('Doc Check step is not configured. GPR C completion must continue to Doc Check.')
+  }
 
   const sqlList = [
     await GprCApprovalSQL.updateApprovalStep({
@@ -410,34 +469,27 @@ const markMainIssueGprCApproved = async (requestId: number, actionBy: string, re
     }),
   ]
 
-  if (nextStep) {
-    sqlList.push(
-      await GprCApprovalSQL.updateApprovalStep({
-        REQUEST_APPROVAL_STEP_ID: nextStep.step_id,
-        STEP_STATUS: 'in_progress',
-        UPDATE_BY: actionBy || 'SYSTEM',
-      })
-    )
-    sqlList.push(
-      await GprCApprovalSQL.updateStatus({
-        REQUEST_REGISTER_VENDOR_ID: requestId,
-        REQUEST_STATUS: nextStep.DESCRIPTION || 'PO & SCM Check All Document',
-        APPROVE_BY: actionBy || '',
-        APPROVE_DATE: '',
-        APPROVER_REMARK: remark || '',
-        UPDATE_BY: actionBy || 'SYSTEM',
-      })
-    )
-  } else {
-    sqlList.push(
-      await GprCApprovalSQL.markRequestCompleted({
-        REQUEST_REGISTER_VENDOR_ID: requestId,
-        UPDATE_BY: actionBy || 'SYSTEM',
-      })
-    )
-  }
+  sqlList.push(
+    await GprCApprovalSQL.updateApprovalStep({
+      REQUEST_APPROVAL_STEP_ID: nextStep.step_id,
+      STEP_STATUS: 'in_progress',
+      UPDATE_BY: actionBy || 'SYSTEM',
+    })
+  )
+  sqlList.push(
+    await GprCApprovalSQL.updateStatus({
+      REQUEST_REGISTER_VENDOR_ID: requestId,
+      REQUEST_STATUS: nextStep.DESCRIPTION || 'PO & SCM Check All Document',
+      APPROVE_BY: actionBy || '',
+      APPROVE_DATE: '',
+      APPROVER_REMARK: remark || '',
+      UPDATE_BY: actionBy || 'SYSTEM',
+    })
+  )
 
   await MySQLExecute.executeList(sqlList)
+
+  return nextStep
 }
 
 const markMainIssueGprCRejected = async (requestId: number, actionBy: string, remark: string) => {
@@ -493,6 +545,12 @@ const markMainIssueGprCRejected = async (requestId: number, actionBy: string, re
   }
 
   await MySQLExecute.executeList(sqlList)
+
+  // Return the rejected step so the caller can dispatch the PO PIC rejection notification as a
+  // post-commit task (CC: sub PIC / requester / step approver), same pattern as the main workflow.
+  return currentStep
+    ? { ...currentStep, approver_id: getValue(currentStep, 'approver_id', 'APPROVER_EMPCODE') }
+    : { step_code: 'ISSUE_GPR_C' }
 }
 
 export const GprCApprovalService = {
@@ -716,7 +774,10 @@ export const GprCApprovalService = {
       const updatedFlow = await getFlowByRequest(requestId)
       const steps = await getStepsByFlow(flowId)
       const firstStep = steps.find((step: any) => Number(step.STEP_ORDER || step.step_order) === 1)
-      if (firstStep) await notifyStepApprover(requestId, firstStep, ccEmails).catch(console.error)
+      await runGprCPostCommitTasks(
+        firstStep ? [() => notifyStepApprover(requestId, firstStep, ccEmails)] : [],
+        requestId
+      )
 
       return response(true, 'GPR C setup submitted successfully', { flow: updatedFlow, steps }, 'Submit GPR C Setup')
     } catch (error: any) {
@@ -756,7 +817,29 @@ export const GprCApprovalService = {
         }),
       ]
 
+      const postCommitTasks: GprCPostCommitTask[] = []
+
       if (nextStep) {
+        // Re-resolve the next step's approver from its managed group (dynamic, like the main
+        // workflow) so a change in assignees_to takes effect instead of using the value that was
+        // snapshotted onto the step at GPR C setup.
+        const resolvedApprover = await resolveGprCStepApprover(nextStep).catch(() => null)
+        const currentNextApprover = normalizeValue(getValue(nextStep, 'APPROVER_EMPCODE', 'approver_empcode'))
+        if (resolvedApprover && resolvedApprover.empcode && resolvedApprover.empcode !== currentNextApprover) {
+          sqlList.push(
+            GprCApprovalSQL.updateStepApprover({
+              REQUEST_VENDOR_GPR_C_STEPS_ID: nextStep.REQUEST_VENDOR_GPR_C_STEPS_ID || nextStep.gpr_c_step_id,
+              APPROVER_EMPCODE: resolvedApprover.empcode,
+              APPROVER_NAME: resolvedApprover.name,
+              APPROVER_EMAIL: resolvedApprover.email,
+              UPDATE_BY: actionBy,
+            })
+          )
+          // Reflect the re-resolved approver in-memory so the notification targets the right person.
+          nextStep.APPROVER_EMPCODE = resolvedApprover.empcode
+          nextStep.APPROVER_NAME = resolvedApprover.name
+          nextStep.APPROVER_EMAIL = resolvedApprover.email
+        }
         sqlList.push(
           GprCApprovalSQL.activateStep({
             REQUEST_VENDOR_GPR_C_STEPS_ID: nextStep.REQUEST_VENDOR_GPR_C_STEPS_ID || nextStep.gpr_c_step_id,
@@ -772,20 +855,35 @@ export const GprCApprovalService = {
           })
         )
         await MySQLExecute.executeList(sqlList)
-        await notifyStepApprover(requestId, nextStep).catch(console.error)
+        // Notify the next GPR C approver.
+        postCommitTasks.push(() => notifyStepApprover(requestId, nextStep))
       } else {
         sqlList.push(
           GprCApprovalSQL.updateFlowStatus({
             REQUEST_VENDOR_GPR_C_FLOWS_ID: flowId,
             FLOW_STATUS: 'approved',
-            CURRENT_STEP_CODE: null as any,
+            CURRENT_STEP_CODE: 'Finished',
             COMPLETED_AT: 'NOW()',
             UPDATE_BY: actionBy,
           })
         )
         await MySQLExecute.executeList(sqlList)
-        await markMainIssueGprCApproved(requestId, actionBy, remark)
+        // GPR C sub-flow finished: hand back to the main workflow and notify its next approver,
+        // the same way the main workflow notifies on every advance.
+        const mainNextStep = await markMainIssueGprCApproved(requestId, actionBy, remark)
+        if (mainNextStep) {
+          const mainNextApprover = normalizeValue(getValue(mainNextStep, 'approver_id', 'APPROVER_EMPCODE', 'approver_empcode'))
+          postCommitTasks.push(() =>
+            sendMail_ToApprover_NextStep(
+              { REQUEST_REGISTER_VENDOR_ID: requestId, UPDATE_BY: actionBy },
+              mainNextStep,
+              mainNextApprover
+            )
+          )
+        }
       }
+
+      await runGprCPostCommitTasks(postCommitTasks, requestId)
 
       return response(true, 'GPR C step approved successfully', await getFlowByRequest(requestId), 'Approve GPR C Step')
     } catch (error: any) {
@@ -824,14 +922,28 @@ export const GprCApprovalService = {
         GprCApprovalSQL.updateFlowStatus({
           REQUEST_VENDOR_GPR_C_FLOWS_ID: flowId,
           FLOW_STATUS: 'rejected',
-          CURRENT_STEP_CODE: null as any,
+          CURRENT_STEP_CODE: 'Finished',
           REJECTED_AT: 'NOW()',
           REJECTED_BY: actionBy,
           REJECTED_REMARK: remark,
           UPDATE_BY: actionBy,
         }),
       ])
-      await markMainIssueGprCRejected(requestId, actionBy, remark)
+      const rejectedStep = await markMainIssueGprCRejected(requestId, actionBy, remark)
+      await runGprCPostCommitTasks(
+        [
+          () => sendMail_ToPic_RequestRejected(
+            {
+              REQUEST_REGISTER_VENDOR_ID: requestId,
+              APPROVER_REMARK: remark || 'GPR C sub-workflow rejected',
+              APPROVE_BY: actionBy,
+              UPDATE_BY: actionBy,
+            },
+            rejectedStep
+          ),
+        ],
+        requestId
+      )
       return response(true, 'GPR C step rejected and request cancelled', await getFlowByRequest(requestId), 'Reject GPR C Step')
     } catch (error: any) {
       return response(false, error?.message || 'Failed to reject GPR C step', [], 'Reject GPR C Step Failed', 0)
@@ -854,7 +966,7 @@ export const GprCApprovalService = {
       if (!currentStep) throw new Error('No GPR C step in progress')
       const currentStepCode = normalizeValue(currentStep.STEP_CODE || currentStep.step_code)
       if (!isActionRequiredStep(currentStepCode)) {
-        throw new Error('Action Required is available only for EMR/QMS/PM Manager GPR C steps')
+        throw new Error('Action Required is available only for GPR C approval steps (Requester Approver through PM Manager Approver)')
       }
       if (normalizeValue(currentStep.APPROVER_EMPCODE || currentStep.approver_empcode) !== actionBy) {
         throw new Error(`Unauthorized: current GPR C step requires ${currentStep.APPROVER_EMPCODE || currentStep.approver_empcode}`)
@@ -883,16 +995,9 @@ export const GprCApprovalService = {
         pic_email: picEmail,
         required_detail: normalizeValue(dataItem.REQUIRED_DETAIL || dataItem.REMARK),
       }
-      await notifyActionRequired(requestId, currentStep, actionRecord).catch(console.error)
+      await runGprCPostCommitTasks([() => notifyActionRequired(requestId, currentStep, actionRecord)], requestId)
 
-      await GprCApprovalService.approveStep({
-        REQUEST_REGISTER_VENDOR_ID: requestId,
-        ACTION_BY: actionBy,
-        ACTION_TYPE: 'ACTION_REQUIRED',
-        ACTION_REMARK: `Action Required: ${actionRecord.REQUIRED_DETAIL || actionRecord.required_detail || ''}`,
-      })
-
-      return response(true, 'Action Required sent and GPR C flow continued', actionRecord, 'GPR C Action Required')
+      return response(true, 'Action Required sent successfully. GPR C step is still pending approval.', actionRecord, 'GPR C Action Required')
     } catch (error: any) {
       return response(false, error?.message || 'Failed to send Action Required', [], 'GPR C Action Required Failed', 0)
     }
@@ -916,7 +1021,11 @@ export const GprCApprovalService = {
       )
       const sql = GprCApprovalSQL.getActionRequiredById({ REQUEST_VENDOR_GPR_C_ACTION_REQUIRED_ID: actionRequiredId })
       const rows = (await MySQLExecute.search(sql)) as RowDataPacket[]
-      return response(true, 'Action Required result recorded', rows[0] || {}, 'Record GPR C Action Result')
+      const record = rows[0] || {}
+      // Email the recorded result back to the GPR C approver who raised the Action Required.
+      const notifyRequestId = Number(getValue(record, 'REQUEST_REGISTER_VENDOR_ID', 'request_register_vendor_id'))
+      await runGprCPostCommitTasks([() => notifyActionResultRecorded(record)], notifyRequestId)
+      return response(true, 'Action Required result recorded', record, 'Record GPR C Action Result')
     } catch (error: any) {
       return response(false, error?.message || 'Failed to record Action Required result', [], 'Record GPR C Action Result Failed', 0)
     }

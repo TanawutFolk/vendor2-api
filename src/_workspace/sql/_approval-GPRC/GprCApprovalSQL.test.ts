@@ -58,4 +58,33 @@ describe('GprCApprovalSQL normalized circular members', () => {
     expect(stepReadSql).toContain('f.REQUEST_REGISTER_VENDOR_ID')
     expect(actionReadSql).toContain('f.REQUEST_REGISTER_VENDOR_ID')
   })
+  test('keeps the GPR C approval queue to one contact row per request', () => {
+    const queueSql = GprCApprovalSQL.getQueueByApprover({ APPROVER_EMPCODE: 'S00001' })
+    const [, pagedQueueSql] = GprCApprovalSQL.getQueueByApproverPaginated({
+      APPROVER_EMPCODE: 'S00001',
+      START: 0,
+      LIMIT: 20,
+      ORDER: [{ id: 'REQUEST_VENDOR_GPR_C_FLOWS_ID', desc: true }],
+    })
+
+    for (const sql of [queueSql, pagedQueueSql]) {
+      expect(sql).not.toContain('ON vc.VENDORS_ID = v.VENDORS_ID')
+      expect(sql).toContain('vc_fallback.VENDOR_CONTACTS_ID')
+      expect(sql).toContain('SELECT vc_any.VENDOR_CONTACTS_ID')
+      expect(sql).toContain('COALESCE(vc_sel.CONTACT_NAME, vc_fallback.CONTACT_NAME) AS CONTACT_NAME')
+      expect(sql).toContain('COALESCE(vc_sel.EMAIL, vc_fallback.EMAIL, v.EMAILMAIN) AS VENDOR_EMAIL')
+    }
+  })
+  test('marks terminal flow current step as Finished for the DB constraint', () => {
+    const sql = GprCApprovalSQL.updateFlowStatus({
+      REQUEST_VENDOR_GPR_C_FLOWS_ID: 1,
+      FLOW_STATUS: 'approved',
+      CURRENT_STEP_CODE: null,
+      COMPLETED_AT: 'NOW()',
+      UPDATE_BY: 'S00001',
+    })
+
+    expect(sql).toContain('CURRENT_STEP_CODE = \'Finished\'')
+    expect(sql).not.toContain('CURRENT_STEP_CODE = NULL')
+  })
 })

@@ -26,12 +26,15 @@ export const FindVendorService = {
     }
   },
 
-  // Get vendor by ID
-  getById: async (dataItem: any) => {
-    const sql = await FindVendorSQL.getById(dataItem)
+  // Get full vendor details for Find Vendor/Re-register modals
+  getVendorDetails: async (dataItem: any) => {
+    const sql = await FindVendorSQL.getVendorDetails(dataItem)
     const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
     return resultData
   },
+
+  // Legacy alias kept for older callers.
+  getById: async (dataItem: any) => FindVendorService.getVendorDetails(dataItem),
 
   // Update vendor
   updateVendor: async (dataItem: any) => {

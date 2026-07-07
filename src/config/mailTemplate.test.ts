@@ -8,7 +8,7 @@ import {
   email_ToRequester_RegistrationIncomplete,
   email_ToPic_RejectedByApprover,
   email_ToPic_RejectedByChecker,
-  email_ToPic_NewRequest,
+  email_ToPic_RequestRegisterVendor,
   email_ToAccount_RegisterRequired,
   email_ToChecker_CheckRequired,
   email_ToMd_ApproveRequired,
@@ -46,7 +46,7 @@ const sample: MailTemplateData = {
 }
 
 const templates = [
-  email_ToPic_NewRequest,
+  email_ToPic_RequestRegisterVendor,
   email_ToSupplier_RequestFormA,
   email_ToSupplier_RequestFormB,
   email_ToRequester_GprCSetup,

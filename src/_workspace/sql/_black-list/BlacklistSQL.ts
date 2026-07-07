@@ -40,22 +40,22 @@
 
     let usSql = `
             SELECT
-                  bu.BLACKLIST_US_ID AS blacklist_id
-                , 'US' AS group_code
-                , bu.SOURCE AS source_name
-                , bu.ENTITY_NUMBER AS entity_number
-                , bu.TYPE AS entity_type
-                , bu.PROGRAMS AS programs
-                , NULL AS country
-                , bu.NAME AS vendor_name
-                , NULL AS wmd_type
-                , bu.DESCRIPTION AS description
-                , bu.CREATE_BY AS create_by
-                , bu.UPDATE_BY AS update_by
-                , bu.INUSE AS in_use
-                , 0 AS alias_count
-                , bu.UPDATE_DATE AS updated_date
-                , bu.CREATE_DATE AS create_date
+                  bu.BLACKLIST_US_ID AS BLACKLIST_ID
+                , 'US' AS GROUP_CODE
+                , bu.SOURCE AS SOURCE_NAME
+                , bu.ENTITY_NUMBER AS ENTITY_NUMBER
+                , bu.TYPE AS ENTITY_TYPE
+                , bu.PROGRAMS AS PROGRAMS
+                , NULL AS COUNTRY
+                , bu.NAME AS VENDOR_NAME
+                , NULL AS WMD_TYPE
+                , bu.DESCRIPTION AS DESCRIPTION
+                , bu.CREATE_BY AS CREATE_BY
+                , bu.UPDATE_BY AS UPDATE_BY
+                , bu.INUSE AS IN_USE
+                , 0 AS ALIAS_COUNT
+                , bu.UPDATE_DATE AS UPDATED_DATE
+                , bu.CREATE_DATE AS CREATE_DATE
             FROM
                 blacklist_us bu
             WHERE
@@ -67,27 +67,27 @@
 
     let cnSql = `
             SELECT
-                  bc.BLACKLIST_CN_ID AS blacklist_id
-                , 'CN' AS group_code
+                  bc.BLACKLIST_CN_ID AS BLACKLIST_ID
+                , 'CN' AS GROUP_CODE
                 , bc.SOURCE_NAME
                 , bc.ENTITY_NUMBER
                 , bc.ENTITY_TYPE
                 , bc.PROGRAMS
                 , bc.COUNTRY
-                , bc.PRIMARY_NAME AS vendor_name
+                , bc.PRIMARY_NAME AS VENDOR_NAME
                 , bc.WMD_TYPE
-                , bc.DESCRIPTION AS description
-                , bc.CREATE_BY AS create_by
-                , bc.UPDATE_BY AS update_by
-                , bc.INUSE AS in_use
+                , bc.DESCRIPTION AS DESCRIPTION
+                , bc.CREATE_BY AS CREATE_BY
+                , bc.UPDATE_BY AS UPDATE_BY
+                , bc.INUSE AS IN_USE
                 , (
                     SELECT COUNT(*)
                     FROM blacklist_cn_aliases va
                     WHERE va.BLACKLIST_CN_ID = bc.BLACKLIST_CN_ID
                       AND va.INUSE = 1
-                ) AS alias_count
-                , bc.UPDATE_DATE AS updated_date
-                , bc.CREATE_DATE AS create_date
+                ) AS ALIAS_COUNT
+                , bc.UPDATE_DATE AS UPDATED_DATE
+                , bc.CREATE_DATE AS CREATE_DATE
             FROM
                 blacklist_cn bc
             WHERE
@@ -139,22 +139,22 @@
 
     const baseSql = `
             SELECT
-                  bu.BLACKLIST_US_ID AS blacklist_id
-                , 'US' AS group_code
-                , bu.SOURCE AS source_name
-                , bu.ENTITY_NUMBER AS entity_number
-                , bu.TYPE AS entity_type
-                , bu.PROGRAMS AS programs
-                , NULL AS country
-                , bu.NAME AS vendor_name
-                , NULL AS wmd_type
-                , bu.DESCRIPTION AS description
-                , bu.CREATE_BY AS create_by
-                , bu.UPDATE_BY AS update_by
-                , bu.INUSE AS in_use
-                , 0 AS alias_count
-                , bu.UPDATE_DATE AS updated_date
-                , bu.CREATE_DATE AS create_date
+                  bu.BLACKLIST_US_ID AS BLACKLIST_ID
+                , 'US' AS GROUP_CODE
+                , bu.SOURCE AS SOURCE_NAME
+                , bu.ENTITY_NUMBER AS ENTITY_NUMBER
+                , bu.TYPE AS ENTITY_TYPE
+                , bu.PROGRAMS AS PROGRAMS
+                , NULL AS COUNTRY
+                , bu.NAME AS VENDOR_NAME
+                , NULL AS WMD_TYPE
+                , bu.DESCRIPTION AS DESCRIPTION
+                , bu.CREATE_BY AS CREATE_BY
+                , bu.UPDATE_BY AS UPDATE_BY
+                , bu.INUSE AS IN_USE
+                , 0 AS ALIAS_COUNT
+                , bu.UPDATE_DATE AS UPDATED_DATE
+                , bu.CREATE_DATE AS CREATE_DATE
             FROM
                 blacklist_us bu
             WHERE
@@ -163,27 +163,27 @@
             UNION ALL
 
             SELECT
-                  bc.BLACKLIST_CN_ID AS blacklist_id
-                , 'CN' AS group_code
+                  bc.BLACKLIST_CN_ID AS BLACKLIST_ID
+                , 'CN' AS GROUP_CODE
                 , bc.SOURCE_NAME
                 , bc.ENTITY_NUMBER
                 , bc.ENTITY_TYPE
                 , bc.PROGRAMS
                 , bc.COUNTRY
-                , bc.PRIMARY_NAME AS vendor_name
+                , bc.PRIMARY_NAME AS VENDOR_NAME
                 , bc.WMD_TYPE
-                , bc.DESCRIPTION AS description
-                , bc.CREATE_BY AS create_by
-                , bc.UPDATE_BY AS update_by
-                , bc.INUSE AS in_use
+                , bc.DESCRIPTION AS DESCRIPTION
+                , bc.CREATE_BY AS CREATE_BY
+                , bc.UPDATE_BY AS UPDATE_BY
+                , bc.INUSE AS IN_USE
                 , (
                     SELECT COUNT(*)
                     FROM blacklist_cn_aliases va
                     WHERE va.BLACKLIST_CN_ID = bc.BLACKLIST_CN_ID
                       AND va.INUSE = 1
-                ) AS alias_count
-                , bc.UPDATE_DATE AS updated_date
-                , bc.CREATE_DATE AS create_date
+                ) AS ALIAS_COUNT
+                , bc.UPDATE_DATE AS UPDATED_DATE
+                , bc.CREATE_DATE AS CREATE_DATE
             FROM
                 blacklist_cn bc
             WHERE
@@ -434,23 +434,23 @@
     let sql = `
             SELECT
                   GROUP_CODE
-                , matched_name
-                , match_type
+                , MATCHED_NAME
+                , MATCH_TYPE
                 , SOURCE_NAME
                 , ENTITY_NUMBER
                 , ENTITY_TYPE
-                , addresses
+                , ADDRESSES
                 , PROGRAMS
             FROM (
                 SELECT
-                      'US' AS group_code
-                    , bu.NAME AS matched_name
-                    , 'name' AS match_type
-                    , bu.SOURCE AS source_name
-                    , bu.ENTITY_NUMBER AS entity_number
-                    , bu.TYPE AS entity_type
-                    , bu.ADDRESSES AS addresses
-                    , bu.PROGRAMS AS programs
+                      'US' AS GROUP_CODE
+                    , bu.NAME AS MATCHED_NAME
+                    , 'name' AS MATCH_TYPE
+                    , bu.SOURCE AS SOURCE_NAME
+                    , bu.ENTITY_NUMBER AS ENTITY_NUMBER
+                    , bu.TYPE AS ENTITY_TYPE
+                    , bu.ADDRESSES AS ADDRESSES
+                    , bu.PROGRAMS AS PROGRAMS
                 FROM blacklist_us bu
                 WHERE bu.INUSE = 1
                   AND TRIM(REGEXP_REPLACE(
@@ -461,13 +461,13 @@
                 UNION ALL
 
                 SELECT
-                      'CN' AS group_code
-                    , bc.PRIMARY_NAME AS matched_name
-                    , 'name' AS match_type
+                      'CN' AS GROUP_CODE
+                    , bc.PRIMARY_NAME AS MATCHED_NAME
+                    , 'name' AS MATCH_TYPE
                     , bc.SOURCE_NAME
                     , bc.ENTITY_NUMBER
                     , bc.ENTITY_TYPE
-                    , bc.COUNTRY AS addresses
+                    , bc.COUNTRY AS ADDRESSES
                     , bc.PROGRAMS
                 FROM blacklist_cn bc
                 WHERE bc.INUSE = 1
@@ -476,20 +476,20 @@
                 UNION ALL
 
                 SELECT
-                      'CN' AS group_code
-                    , bca.ALIAS_NAME AS matched_name
-                    , 'alias' AS match_type
+                      'CN' AS GROUP_CODE
+                    , bca.ALIAS_NAME AS MATCHED_NAME
+                    , 'alias' AS MATCH_TYPE
                     , bc.SOURCE_NAME
                     , bc.ENTITY_NUMBER
                     , bc.ENTITY_TYPE
-                    , bc.COUNTRY AS addresses
+                    , bc.COUNTRY AS ADDRESSES
                     , bc.PROGRAMS
                 FROM blacklist_cn_aliases bca
                 JOIN blacklist_cn bc ON bc.BLACKLIST_CN_ID = bca.BLACKLIST_CN_ID AND bc.INUSE = 1
                 WHERE bca.INUSE = 1
                   AND bca.NORMALIZED_ALIAS_NAME = 'dataItem.NORMALIZEDCOMPANYNAME'
-            ) AS matches
-            ORDER BY GROUP_CODE ASC, match_type ASC
+            ) AS MATCHES
+            ORDER BY GROUP_CODE ASC, MATCH_TYPE ASC
         `
 
     sql = sql.replaceAll('dataItem.NORMALIZEDCOMPANYNAME', normalizedNameValue)

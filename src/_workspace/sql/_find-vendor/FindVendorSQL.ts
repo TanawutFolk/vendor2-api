@@ -24,7 +24,7 @@ export const FindVendorSQL = {
                             FROM
                                        vendors v
                                             LEFT JOIN
-                                       master_vendor_types vt ON v.MASTER_VENDOR_TYPES_ID = vt.MASTER_VENDOR_TYPES_ID
+                                       info_business_category vt ON v.BUSINESS_CATEGORY_ID = vt.BUSINESS_CATEGORY_ID
                                             LEFT JOIN
                                        vendor_contacts vc ON v.VENDORS_ID = vc.VENDORS_ID AND vc.INUSE = 1
                                             LEFT JOIN
@@ -49,7 +49,7 @@ export const FindVendorSQL = {
                                      , vp.MASTER_PRODUCT_GROUPS_ID
                                      , vc.VENDOR_CONTACTS_ID
                                      , v.COMPANY_NAME
-                                     , vt.NAME AS VENDOR_TYPE_NAME
+                                     , vt.BUSINESS_CATEGORY_NAME AS VENDOR_TYPE_NAME
                                      , v.VENDOR_REGION
                                      , v.PROVINCE
                                      , v.POSTAL_CODE
@@ -85,57 +85,10 @@ export const FindVendorSQL = {
                                           WHERE rrv.VENDORS_ID = v.VENDORS_ID AND rrv.REQUEST_STATE = 'rejected'
                                           ORDER BY rrv.REQUEST_REGISTER_VENDOR_ID DESC LIMIT 1
                                      ) AS REJECT_REASON
-
-                                     -- Contacts JSON (aggregated)
-                                     , (
-                                                SELECT
-                                                           JSON_ARRAYAGG(
-                                                                JSON_OBJECT(
-                                                                    'vendor_contact_id', sub_vc.VENDOR_CONTACTS_ID,
-                                                                    'contact_name', sub_vc.CONTACT_NAME,
-                                                                    'tel_phone', sub_vc.TEL_PHONE,
-                                                                    'email', sub_vc.EMAIL,
-                                                                    'position', sub_vc.POSITION,
-                                                                    'CREATE_BY', sub_vc.CREATE_BY,
-                                                                    'UPDATE_BY', sub_vc.UPDATE_BY,
-                                                                    'CREATE_DATE', DATE_FORMAT(sub_vc.CREATE_DATE, '%Y-%m-%d %H:%i:%s'),
-                                                                    'UPDATE_DATE', DATE_FORMAT(sub_vc.UPDATE_DATE, '%Y-%m-%d %H:%i:%s')
-                                                                )
-                                                           )
-                                                FROM
-                                                           vendor_contacts sub_vc
-                                                WHERE
-                                                           sub_vc.VENDORS_ID = v.VENDORS_ID AND sub_vc.INUSE = 1
-                                       ) AS contacts_json
-
-                                     -- Products JSON (aggregated)
-                                     , (
-                                                SELECT
-                                                           JSON_ARRAYAGG(
-                                                                JSON_OBJECT(
-                                                                    'vendor_product_id', sub_vp.VENDOR_PRODUCTS_ID,
-                                                                    'product_group_id', sub_vp.MASTER_PRODUCT_GROUPS_ID,
-                                                                    'group_name', sub_mpg.GROUP_NAME,
-                                                                    'maker_name', sub_vp.MAKER_NAME,
-                                                                    'product_name', sub_vp.PRODUCT_NAME,
-                                                                    'model_list', sub_vp.MODEL_LIST,
-                                                                    'CREATE_BY', sub_vp.CREATE_BY,
-                                                                    'UPDATE_BY', sub_vp.UPDATE_BY,
-                                                                    'CREATE_DATE', DATE_FORMAT(sub_vp.CREATE_DATE, '%Y-%m-%d %H:%i:%s'),
-                                                                    'UPDATE_DATE', DATE_FORMAT(sub_vp.UPDATE_DATE, '%Y-%m-%d %H:%i:%s')
-                                                                )
-                                                           )
-                                                FROM
-                                                           vendor_products sub_vp
-                                                                LEFT JOIN
-                                                           master_product_groups sub_mpg ON sub_vp.MASTER_PRODUCT_GROUPS_ID = sub_mpg.MASTER_PRODUCT_GROUPS_ID
-                                                WHERE
-                                                           sub_vp.VENDORS_ID = v.VENDORS_ID AND sub_vp.INUSE = 1
-                                       ) AS products_json
                             FROM
                                        vendors v
                                             LEFT JOIN
-                                       master_vendor_types vt ON v.MASTER_VENDOR_TYPES_ID = vt.MASTER_VENDOR_TYPES_ID
+                                       info_business_category vt ON v.BUSINESS_CATEGORY_ID = vt.BUSINESS_CATEGORY_ID
                                             LEFT JOIN
                                        vendor_contacts vc ON v.VENDORS_ID = vc.VENDORS_ID AND vc.INUSE = 1
                                             LEFT JOIN
@@ -171,8 +124,8 @@ export const FindVendorSQL = {
     return [sqlCount, sqlData]
   },
 
-  // Get vendor by ID
-  getById: (dataItem: any) => {
+  // Get full vendor details for Find Vendor/Re-register modals
+  getVendorDetails: (dataItem: any) => {
     const statusCheckExpression = `
             CASE
                 WHEN v.FFT_STATUS = 2 THEN 'Cannot Register'
@@ -192,8 +145,8 @@ export const FindVendorSQL = {
                                      , v.FFT_VENDOR_CODE
                                      , v.FFT_STATUS
                                      , v.COMPANY_NAME
-                                     , v.MASTER_VENDOR_TYPES_ID
-                                     , vt.NAME AS VENDOR_TYPE_NAME
+                                     , v.BUSINESS_CATEGORY_ID AS MASTER_VENDOR_TYPES_ID
+                                     , vt.BUSINESS_CATEGORY_NAME AS VENDOR_TYPE_NAME
                                      , v.VENDOR_REGION
                                      , v.PROVINCE
                                      , v.POSTAL_CODE
@@ -219,38 +172,38 @@ export const FindVendorSQL = {
                                                 SELECT
                                                            JSON_ARRAYAGG(
                                                                 JSON_OBJECT(
-                                                                    'vendor_contact_id', sub_vc.VENDOR_CONTACTS_ID,
-                                                                    'contact_name', sub_vc.CONTACT_NAME,
-                                                                    'tel_phone', sub_vc.TEL_PHONE,
-                                                                    'email', sub_vc.EMAIL,
-                                                                    'position', sub_vc.POSITION,
-                                                                    'contact_create_by', sub_vc.CREATE_BY,
-                                                                    'contact_update_by', sub_vc.UPDATE_BY,
-                                                                    'contact_create_date', DATE_FORMAT(sub_vc.CREATE_DATE, '%Y-%m-%d %H:%i:%s'),
-                                                                    'contact_update_date', DATE_FORMAT(sub_vc.UPDATE_DATE, '%Y-%m-%d %H:%i:%s')
+                                                                    'VENDOR_CONTACT_ID', sub_vc.VENDOR_CONTACTS_ID,
+                                                                    'CONTACT_NAME', sub_vc.CONTACT_NAME,
+                                                                    'TEL_PHONE', sub_vc.TEL_PHONE,
+                                                                    'EMAIL', sub_vc.EMAIL,
+                                                                    'POSITION', sub_vc.POSITION,
+                                                                    'CONTACT_CREATE_BY', sub_vc.CREATE_BY,
+                                                                    'CONTACT_UPDATE_BY', sub_vc.UPDATE_BY,
+                                                                    'CONTACT_CREATE_DATE', DATE_FORMAT(sub_vc.CREATE_DATE, '%Y-%m-%d %H:%i:%s'),
+                                                                    'CONTACT_UPDATE_DATE', DATE_FORMAT(sub_vc.UPDATE_DATE, '%Y-%m-%d %H:%i:%s')
                                                                 )
                                                            )
                                                 FROM
                                                            vendor_contacts sub_vc
                                                 WHERE
                                                            sub_vc.VENDORS_ID = v.VENDORS_ID AND sub_vc.INUSE = 1
-                                        ) AS contacts_json
+                                        ) AS CONTACTS_JSON
 
                                      -- Products JSON (aggregated)
                                      , (
                                                 SELECT
                                                            JSON_ARRAYAGG(
                                                                 JSON_OBJECT(
-                                                                    'vendor_product_id', sub_vp.VENDOR_PRODUCTS_ID,
-                                                                    'product_group_id', sub_vp.MASTER_PRODUCT_GROUPS_ID,
-                                                                    'group_name', sub_mpg.GROUP_NAME,
-                                                                    'maker_name', sub_vp.MAKER_NAME,
-                                                                    'product_name', sub_vp.PRODUCT_NAME,
-                                                                    'model_list', sub_vp.MODEL_LIST,
-                                                                    'product_create_by', sub_vp.CREATE_BY,
-                                                                    'product_create_date', DATE_FORMAT(sub_vp.CREATE_DATE, '%Y-%m-%d %H:%i:%s'),
-                                                                    'product_update_by', sub_vp.UPDATE_BY,
-                                                                    'product_update_date', DATE_FORMAT(sub_vp.UPDATE_DATE, '%Y-%m-%d %H:%i:%s')
+                                                                    'VENDOR_PRODUCT_ID', sub_vp.VENDOR_PRODUCTS_ID,
+                                                                    'PRODUCT_GROUP_ID', sub_vp.MASTER_PRODUCT_GROUPS_ID,
+                                                                    'GROUP_NAME', sub_mpg.GROUP_NAME,
+                                                                    'MAKER_NAME', sub_vp.MAKER_NAME,
+                                                                    'PRODUCT_NAME', sub_vp.PRODUCT_NAME,
+                                                                    'MODEL_LIST', sub_vp.MODEL_LIST,
+                                                                    'PRODUCT_CREATE_BY', sub_vp.CREATE_BY,
+                                                                    'PRODUCT_CREATE_DATE', DATE_FORMAT(sub_vp.CREATE_DATE, '%Y-%m-%d %H:%i:%s'),
+                                                                    'PRODUCT_UPDATE_BY', sub_vp.UPDATE_BY,
+                                                                    'PRODUCT_UPDATE_DATE', DATE_FORMAT(sub_vp.UPDATE_DATE, '%Y-%m-%d %H:%i:%s')
                                                                 )
                                                            )
                                                 FROM
@@ -259,11 +212,11 @@ export const FindVendorSQL = {
                                                            master_product_groups sub_mpg ON sub_vp.MASTER_PRODUCT_GROUPS_ID = sub_mpg.MASTER_PRODUCT_GROUPS_ID
                                                 WHERE
                                                            sub_vp.VENDORS_ID = v.VENDORS_ID AND sub_vp.INUSE = 1
-                                        ) AS products_json
+                                        ) AS PRODUCTS_JSON
                             FROM
                                        vendors v
                                             LEFT JOIN
-                                       master_vendor_types vt ON v.MASTER_VENDOR_TYPES_ID = vt.MASTER_VENDOR_TYPES_ID
+                                       info_business_category vt ON v.BUSINESS_CATEGORY_ID = vt.BUSINESS_CATEGORY_ID
                                             LEFT JOIN
                                        vendor_match_result vmr ON v.VENDORS_ID = vmr.VENDORS_ID
                             WHERE
@@ -273,6 +226,9 @@ export const FindVendorSQL = {
     sql = sql.replaceAll('dataItem.VENDORS_ID', (dataItem['VENDORS_ID'] || 0).toString())
     return sql
   },
+
+  // Legacy alias kept for older callers while new page code uses getVendorDetails.
+  getById: (dataItem: any) => FindVendorSQL.getVendorDetails(dataItem),
 
   // Helper to escape single quotes for SQL
   toNullableNumberSql: (value: any) => {
@@ -290,7 +246,7 @@ export const FindVendorSQL = {
     let sql = `
                             UPDATE vendors SET
                                        COMPANY_NAME = 'dataItem.COMPANY_NAME'
-                                     , MASTER_VENDOR_TYPES_ID = dataItem.MASTER_VENDOR_TYPES_ID
+                                     , BUSINESS_CATEGORY_ID = dataItem.MASTER_VENDOR_TYPES_ID
                                      , VENDOR_REGION = 'dataItem.VENDOR_REGION'
                                      , PROVINCE = dataItem.PROVINCE_SQL
                                      , POSTAL_CODE = dataItem.POSTAL_CODE_SQL
@@ -494,7 +450,8 @@ export const FindVendorSQL = {
     return sql
   },
 
-  // Get vendor business category names for dropdown
+  // Get vendor types for dropdown (source of truth: info_business_category,
+  // which replaced the deprecated master_vendor_types table)
   getVendorBusinessCategoryName: (dataItem?: any) => {
     let sql = `
                             SELECT
@@ -569,7 +526,7 @@ export const FindVendorSQL = {
                                      , vp.VENDOR_PRODUCTS_ID
                                      , vc.VENDOR_CONTACTS_ID
                                      , v.COMPANY_NAME
-                                     , vt.NAME AS VENDOR_TYPE_NAME
+                                     , vt.BUSINESS_CATEGORY_NAME AS VENDOR_TYPE_NAME
                                      , v.VENDOR_REGION
                                      , v.PROVINCE
                                      , v.POSTAL_CODE
@@ -607,21 +564,21 @@ export const FindVendorSQL = {
                                      ) AS REJECT_REASON
 
                                      -- Contact Audit
-                                     , vc.CREATE_BY AS contact_create_by
-                                     , vc.UPDATE_BY AS contact_update_by
-                                     , vc.CREATE_DATE AS contact_create_date
-                                     , vc.UPDATE_DATE AS contact_update_date
+                                     , vc.CREATE_BY AS CONTACT_CREATE_BY
+                                     , vc.UPDATE_BY AS CONTACT_UPDATE_BY
+                                     , vc.CREATE_DATE AS CONTACT_CREATE_DATE
+                                     , vc.UPDATE_DATE AS CONTACT_UPDATE_DATE
 
                                      -- Product Audit
-                                     , vp.CREATE_BY AS product_create_by
-                                     , vp.CREATE_DATE AS product_create_date
-                                     , vp.UPDATE_BY AS product_update_by
-                                     , vp.UPDATE_DATE AS product_update_date
+                                     , vp.CREATE_BY AS PRODUCT_CREATE_BY
+                                     , vp.CREATE_DATE AS PRODUCT_CREATE_DATE
+                                     , vp.UPDATE_BY AS PRODUCT_UPDATE_BY
+                                     , vp.UPDATE_DATE AS PRODUCT_UPDATE_DATE
                                      , v.INUSE
                             FROM
                                        vendors v
                                             LEFT JOIN
-                                       master_vendor_types vt ON v.MASTER_VENDOR_TYPES_ID = vt.MASTER_VENDOR_TYPES_ID
+                                       info_business_category vt ON v.BUSINESS_CATEGORY_ID = vt.BUSINESS_CATEGORY_ID
                                             LEFT JOIN
                                        vendor_contacts vc ON v.VENDORS_ID = vc.VENDORS_ID AND vc.INUSE = 1
                                             LEFT JOIN
@@ -666,7 +623,7 @@ export const FindVendorSQL = {
                                      OR vp.MAKER_NAME LIKE 'searchVal'
                                      OR vp.MODEL_LIST LIKE 'searchVal'
                                      OR mpg.GROUP_NAME LIKE 'searchVal'
-                                     OR vt.NAME LIKE 'searchVal'
+                                     OR vt.BUSINESS_CATEGORY_NAME LIKE 'searchVal'
                             )
             `
 

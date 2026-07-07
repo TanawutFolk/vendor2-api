@@ -38,7 +38,7 @@ export const AddVendorService = {
       return {
         Status: true,
         isDuplicate: true,
-        existingVendorId: duplicateResult[0].vendor_id,
+        existingVendorId: duplicateResult[0].VENDORS_ID,
         isBlacklisted,
         blacklistMatches: blacklistResult,
         Message: 'Vendor already exists in the system',
@@ -92,29 +92,18 @@ export const AddVendorService = {
         }
       }
 
-      // Step 2: Insert main vendor
+      // Step 2: Build vendor + contacts + products as one statement list so they commit/rollback together.
+      // Contacts/products reference the new vendor via the @vendor_id session variable (set right after
+      // the insert) instead of a JS-side id, since executeList runs every statement on the same connection.
       const sqlCreateVendor = await AddVendorSQL.createVendor(dataItem)
-      const resultVendor = (await MySQLExecute.execute(sqlCreateVendor)) as ResultSetHeader
-
-      if (!resultVendor.insertId) {
-        return {
-          Status: false,
-          Message: 'Failed to create vendor',
-          ResultOnDb: [],
-          MethodOnDb: 'Create Vendor Failed',
-          TotalCountOnDb: 0,
-        }
-      }
-
-      const vendorId = resultVendor.insertId
-      const sqlList = []
+      const sqlList = [sqlCreateVendor, 'SET @vendor_id = LAST_INSERT_ID();']
 
       // Step 3: Prepare contacts
       if (dataItem.CONTACTS && Array.isArray(dataItem.CONTACTS)) {
         for (const contact of dataItem.CONTACTS) {
           const contactData = {
             ...contact,
-            VENDORS_ID: vendorId,
+            VENDORS_ID: '@vendor_id',
             CREATE_BY: dataItem.CREATE_BY,
           }
           sqlList.push(await AddVendorSQL.createVendorContact(contactData))
@@ -126,23 +115,21 @@ export const AddVendorService = {
         for (const product of dataItem.PRODUCTS) {
           const productData = {
             ...product,
-            VENDORS_ID: vendorId,
+            VENDORS_ID: '@vendor_id',
             CREATE_BY: dataItem.CREATE_BY,
           }
           sqlList.push(await AddVendorSQL.createVendorProduct(productData))
         }
       }
 
-      // Step 5: Execute sub-queries
-      let resultData = null
-      if (sqlList.length > 0) {
-        resultData = await MySQLExecute.executeList(sqlList)
-      }
+      // Step 5: Execute everything atomically
+      const resultData = await MySQLExecute.executeList(sqlList)
+      const vendorResult = resultData[0] as ResultSetHeader
 
       return {
         Status: true,
         Message: 'บันทึกข้อมูลเรียบร้อยแล้ว Data has been saved successfully',
-        ResultOnDb: { vendorId, subQueries: resultData },
+        ResultOnDb: { vendorId: vendorResult.insertId, subQueries: resultData.slice(2) },
         MethodOnDb: 'Create Vendor Success',
         TotalCountOnDb: 1,
       }

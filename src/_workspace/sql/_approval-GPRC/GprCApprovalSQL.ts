@@ -228,7 +228,10 @@ export const GprCApprovalSQL = {
             WHERE REQUEST_VENDOR_GPR_C_FLOWS_ID = dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID
         `
     sql = sql.replaceAll('dataItem.FLOW_STATUS', String(dataItem.FLOW_STATUS || '').toLowerCase())
-    sql = sql.replaceAll('dataItem.CURRENT_STEP_CODE', dataItem.CURRENT_STEP_CODE === null ? 'NULL' : `'${dataItem.CURRENT_STEP_CODE}'`)
+    const currentStepCode = dataItem.CURRENT_STEP_CODE === null || dataItem.CURRENT_STEP_CODE === undefined
+      ? 'Finished'
+      : String(dataItem.CURRENT_STEP_CODE)
+    sql = sql.replaceAll('dataItem.CURRENT_STEP_CODE', `'${currentStepCode}'`)
     sql = sql.replaceAll('dataItem.COMPLETED_AT', GprCApprovalSQL.nullableDate(dataItem.COMPLETED_AT))
     sql = sql.replaceAll('dataItem.REJECTED_AT', GprCApprovalSQL.nullableDate(dataItem.REJECTED_AT))
     sql = sql.replaceAll('dataItem.REJECTED_BY', dataItem.REJECTED_BY)
@@ -600,9 +603,9 @@ export const GprCApprovalSQL = {
                 v.PROVINCE,
                 v.POSTAL_CODE,
                 v.COUNTRY,
-                vc.CONTACT_NAME,
-                COALESCE(vc_sel.EMAIL, vc.EMAIL, v.EMAILMAIN) AS vendor_email,
-                vc.TEL_PHONE
+                COALESCE(vc_sel.CONTACT_NAME, vc_fallback.CONTACT_NAME) AS CONTACT_NAME,
+                COALESCE(vc_sel.EMAIL, vc_fallback.EMAIL, v.EMAILMAIN) AS VENDOR_EMAIL,
+                COALESCE(vc_sel.TEL_PHONE, vc_fallback.TEL_PHONE) AS TEL_PHONE
             FROM REQUEST_VENDOR_GPR_C_FLOWS f
                 JOIN REQUEST_VENDOR_GPR_C_STEPS s
                     ON s.REQUEST_VENDOR_GPR_C_FLOWS_ID = f.REQUEST_VENDOR_GPR_C_FLOWS_ID
@@ -612,11 +615,12 @@ export const GprCApprovalSQL = {
                     ON rr.REQUEST_REGISTER_VENDOR_ID = f.REQUEST_REGISTER_VENDOR_ID
                 LEFT JOIN vendors v
                     ON v.VENDORS_ID = rr.VENDORS_ID
-                LEFT JOIN vendor_contacts vc
-                    ON vc.VENDORS_ID = v.VENDORS_ID
                 LEFT JOIN vendor_contacts vc_sel
                     ON vc_sel.VENDOR_CONTACTS_ID = ${RequestVendorContactSqlSnippets.primaryVendorContactIdExpr('rr')}
                     AND vc_sel.INUSE = 1
+                LEFT JOIN vendor_contacts vc_fallback
+                    ON vc_fallback.VENDOR_CONTACTS_ID = ${RequestVendorContactSqlSnippets.firstActiveVendorContactIdExpr('v')}
+                    AND vc_fallback.INUSE = 1
             WHERE f.INUSE = 1
               AND f.FLOW_STATUS = 'in_progress'
               AND s.APPROVER_EMPCODE = 'dataItem.APPROVER_EMPCODE'
@@ -685,9 +689,9 @@ export const GprCApprovalSQL = {
                     v.COMPANY_NAME,
                     v.ADDRESS,
                     v.VENDOR_REGION,
-                    vc.CONTACT_NAME,
-                    COALESCE(vc_sel.EMAIL, vc.EMAIL, v.EMAILMAIN) AS vendor_email,
-                    vc.TEL_PHONE
+                    COALESCE(vc_sel.CONTACT_NAME, vc_fallback.CONTACT_NAME) AS CONTACT_NAME,
+                    COALESCE(vc_sel.EMAIL, vc_fallback.EMAIL, v.EMAILMAIN) AS VENDOR_EMAIL,
+                    COALESCE(vc_sel.TEL_PHONE, vc_fallback.TEL_PHONE) AS TEL_PHONE
                 FROM REQUEST_VENDOR_GPR_C_FLOWS f
                     JOIN REQUEST_VENDOR_GPR_C_STEPS s
                         ON s.REQUEST_VENDOR_GPR_C_FLOWS_ID = f.REQUEST_VENDOR_GPR_C_FLOWS_ID
@@ -696,12 +700,13 @@ export const GprCApprovalSQL = {
                     JOIN request_register_vendor rr
                         ON rr.REQUEST_REGISTER_VENDOR_ID = f.REQUEST_REGISTER_VENDOR_ID
                     LEFT JOIN vendors v
-                    ON v.VENDORS_ID = rr.VENDORS_ID
-                    LEFT JOIN vendor_contacts vc
-                        ON vc.VENDORS_ID = v.VENDORS_ID
+                        ON v.VENDORS_ID = rr.VENDORS_ID
                     LEFT JOIN vendor_contacts vc_sel
                         ON vc_sel.VENDOR_CONTACTS_ID = ${RequestVendorContactSqlSnippets.primaryVendorContactIdExpr('rr')}
                         AND vc_sel.INUSE = 1
+                    LEFT JOIN vendor_contacts vc_fallback
+                        ON vc_fallback.VENDOR_CONTACTS_ID = ${RequestVendorContactSqlSnippets.firstActiveVendorContactIdExpr('v')}
+                        AND vc_fallback.INUSE = 1
                 WHERE f.INUSE = 1
                   AND f.FLOW_STATUS = 'in_progress'
             ) t
@@ -826,7 +831,7 @@ export const GprCApprovalSQL = {
                 v.COUNTRY,
                 v.EMAILMAIN,
                 vc.CONTACT_NAME,
-                vc.EMAIL AS vendor_email,
+                vc.EMAIL AS VENDOR_EMAIL,
                 vc.TEL_PHONE
             FROM request_register_vendor rr
                 LEFT JOIN vendors v ON v.VENDORS_ID = rr.VENDORS_ID
@@ -878,11 +883,11 @@ export const GprCApprovalSQL = {
   getPeerCcRowsByNormalizedGroup: async (dataItem: any) => {
     let sql = `
                             SELECT
-                                       EMPCODE AS empcode
-                                     , EMPNAME AS empName
-                                     , EMPEMAIL AS empEmail
-                                     , GROUP_CODE AS group_code
-                                     , GROUP_NAME AS group_name
+                                       EMPCODE
+                                     , EMPNAME
+                                     , EMPEMAIL
+                                     , GROUP_CODE
+                                     , GROUP_NAME
                             FROM
                                        assignees_to
                             WHERE
@@ -927,9 +932,9 @@ export const GprCApprovalSQL = {
                                      , ras.CREATE_DATE
                                      , ras.UPDATE_BY
                                      , ras.UPDATE_DATE
-                                     , mrs.STATUS_VALUE AS master_status_value
-                                     , mrs.STATUS_VALUE AS master_status_label
-                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS approver_name
+                                     , mrs.STATUS_VALUE AS MASTER_STATUS_VALUE
+                                     , mrs.STATUS_VALUE AS MASTER_STATUS_LABEL
+                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS APPROVER_NAME
                             FROM
                                        request_approval_step ras
                                             INNER JOIN

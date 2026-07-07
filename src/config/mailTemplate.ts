@@ -234,7 +234,7 @@ const renderStandardWorkflowMail = (
     `,
   })
 
-export const email_ToPic_NewRequest = (data: MailTemplateData) =>
+export const email_ToPic_RequestRegisterVendor = (data: MailTemplateData) =>
   renderStandardWorkflowMail(data, {
     recipient: data.recipientName,
     status: 'Under request register vendor',
@@ -304,6 +304,10 @@ export const email_ToSupplier_RequestFormA = (data: MailTemplateData) => {
           รบกวนดูรายละเอียดเพิ่มเติมจากไฟล์แนบ<br>
           หากมีข้อสงสัย โปรดแจ้งกลับมาให้เราทราบค่ะ
         </p>
+        <p style="margin: 0 0 26px 0; font-size: 11px; color: #666666; line-height: 1.65;">
+          <em>หมายเหตุ: ข้อความนี้ (รวมถึงไฟล์แนบทั้งหมด) มีข้อมูลที่เป็นความลับซึ่งมีไว้สำหรับบุคคลและวัตถุประสงค์ที่เฉพาะเจาะจง และได้รับการคุ้มครองตามกฎหมาย หากท่านไม่ใช่ผู้รับที่ระบุไว้ กรุณาลบข้อความนี้<br>
+          ห้ามเปิดเผย ทำสำเนา หรือเผยแพร่ข้อความนี้ หรือดำเนินการใด ๆ โดยอ้างอิงจากข้อความนี้โดยเด็ดขาด</em>
+        </p>
       </div>
     `,
   })
@@ -317,12 +321,12 @@ export const email_ToSupplier_RequestFormB = (data: MailTemplateData) =>
     signerRole: 'PO & SCM PIC',
     content: `
       ${renderStatus(
-        'General Purchase Specification Form B required',
-        `The General Purchase Specification Form A was not accepted. Please complete Form B for request <strong>"${text(data.requestNumber)}"</strong> and reply within 7 days.`
+        'Under Submit register vendor',
+        `Since you <strong style="color: #d32f2f; text-decoration: underline;">Not Accept</strong> the General Purchase Specification Form A document.<br>Please submit register vendor follow as <strong>"${text(data.requestNumber)}"</strong>. General Purchase Specification Form B and reply within 7 days.`
       )}
       ${renderThaiStatus(
-        'ต้องดำเนินการ General Purchase Specification Form B',
-        `เนื่องจากไม่ยอมรับเงื่อนไขใน Form A กรุณากรอก Form B สำหรับคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong> และตอบกลับภายใน 7 วัน`
+        'อยู่ระหว่างการดำเนินการลงทะเบียนผู้ขาย',
+        `เนื่องจากทางผู้ขาย <strong style="color: #d32f2f; text-decoration: underline;">ไม่ยอมรับ</strong> ข้อกำหนดตามเอกสาร General Purchase Specification Form A<br>โปรดกรอกข้อมูล ลงทะเบียนผู้ขายตามหมายเลข <strong>"${text(data.requestNumber)}"</strong> สำหรับเอกสาร General Purchase Specification Form B และตอบกลับภายใน 7 วัน`
       )}
     `,
   })
@@ -345,6 +349,7 @@ export const email_ToGprCApprover_FirstStep = (data: MailTemplateData) =>
     thaiStatus: 'รอการตรวจสอบและอนุมัติ GPR C',
     thaiMessage: `กรุณาตรวจสอบและอนุมัติคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong> สำหรับ General Purchase Specification Form C`,
     thaiDetail: 'กรุณาตรวจสอบ Vendor Form B ที่แนบมาก่อนอนุมัติขั้นตอนนี้',
+    signerRole: 'Requester',
   })
 
 export const email_ToGprCApprover_NextStep = (data: MailTemplateData) =>
@@ -353,11 +358,11 @@ export const email_ToGprCApprover_NextStep = (data: MailTemplateData) =>
 export const email_ToPic_RejectedByApprover = (data: MailTemplateData) =>
   renderStandardWorkflowMail(data, {
     recipient: data.recipientName || 'PO PIC',
-    status: 'Rejected - General Purchase Specification Form B',
-    message: `Please recheck vendor request <strong>"${text(data.requestNumber)}"</strong>.`,
+    status: '[REJECT] register vendor',
+    message: `Please recheck register vendor follow as <strong>"${text(data.requestNumber)}"</strong>. General Purchase Specification Form B.`,
     detail: `Reason: ${text(data.remarkEN)}`,
-    thaiStatus: 'ปฏิเสธการตรวจสอบ General Purchase Specification Form B',
-    thaiMessage: `กรุณาตรวจสอบคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong> อีกครั้ง`,
+    thaiStatus: '[ปฏิเสธการตรวจสอบ] การลงทะเบียนผู้ขาย',
+    thaiMessage: `โปรดตรวจสอบลงทะเบียนผู้ขายตามหมายเลข <strong>"${text(data.requestNumber)}"</strong> เอกสาร General Purchase Specification Form B อีกครั้ง`,
     thaiDetail: `สาเหตุ: ${text(data.remarkTH || data.remarkEN)}`,
   })
 
@@ -457,6 +462,35 @@ export const email_ToUser_ActionRequired = (data: MailTemplateData) =>
         'ต้องดำเนินการเพิ่มเติม',
         `ขั้นตอน ${text(data.stageLabel, 'ปัจจุบัน')} ต้องการให้คุณดำเนินการสำหรับคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong>`,
         data.note ? `หมายเหตุ: ${text(data.note)}` : ''
+      )}
+    `,
+  })
+
+// Sent back to the GPR C approver (the judge who raised the Action Required) once the assigned PIC
+// records their result — closes the "Email result" loop in the GPR C flow.
+export const email_ToUser_ActionResult = (data: MailTemplateData) =>
+  renderMailLayout({
+    recipient: data.recipientName || 'Approver',
+    signerName: data.picName,
+    signerTel: data.picTel,
+    signerRole: 'PO & SCM PIC',
+    content: `
+      ${renderStatus(
+        'Action Required Result Recorded',
+        `The assigned PIC has recorded the Action Required result for ${text(data.stageLabel, 'the current stage')} of request <strong>"${text(data.requestNumber)}"</strong>.`,
+        data.note ? `Result: ${text(data.note)}` : ''
+      )}
+      ${renderDetails([
+        ['Vendor Name', data.vendorName],
+        ['Support Product / Process', data.supportProduct],
+        ['Stage', data.stageLabel],
+        ['Result', data.note],
+      ])}
+      ${renderLink(data.systemLink)}
+      ${renderThaiStatus(
+        'บันทึกผลการดำเนินการแล้ว',
+        `PIC ที่ได้รับมอบหมายได้บันทึกผลการดำเนินการของขั้นตอน ${text(data.stageLabel, 'ปัจจุบัน')} สำหรับคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong> แล้ว`,
+        data.note ? `ผลลัพธ์: ${text(data.note)}` : ''
       )}
     `,
   })

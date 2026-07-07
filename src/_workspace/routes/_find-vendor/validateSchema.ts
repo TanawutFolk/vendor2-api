@@ -49,6 +49,8 @@ export const GetVendorByIdSchema = z
     path: ['VENDORS_ID'],
   })
 
+export const VendorDetailsSchema = GetVendorByIdSchema
+
 // --- Update Vendor Schema ---
 export const UpdateVendorSchema = z.object({
   vendor_id: z.union([z.number().int().positive('Vendor ID is required'), z.string().regex(/^\d+$/, 'Vendor ID must be numeric')]),

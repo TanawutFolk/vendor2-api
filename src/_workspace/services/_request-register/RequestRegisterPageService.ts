@@ -16,6 +16,7 @@ import {
 import { sendMail_ToSupplier_RequestFormA, sendMail_ToPic_NewRequest, sendMail_NegotiationStageDispatch } from './RegisterRequestNotificationHelper'
 import { RequestRegisterGprService } from './RequestRegisterGprService'
 import { GprCApprovalService } from '../_approval-GPRC/GprCApprovalService'
+import { SelectionFileService } from './SelectionFileService'
 
 const normalizeVendorContactIds = (dataItem: any): string[] => {
   const rawValue = dataItem.VENDOR_CONTACT_IDS || dataItem['VENDOR_CONTACT_IDS[]'] || dataItem.VENDOR_CONTACTS_ID || []
@@ -117,7 +118,7 @@ export const RequestRegisterPageService = {
       const workflowStatuses = statusRows.filter((s: any) => !isRejectedStatus(s.value))
       const getConfiguredStepCode = (status: any) =>
         inferStepCode({
-          step_code: status.stepCode,
+          step_code: status.STEP_CODE,
           DESCRIPTION: status.label || status.value,
         })
       const pendingAgreementStatus = workflowStatuses.find(
@@ -190,7 +191,7 @@ export const RequestRegisterPageService = {
         REQUEST_NUMBER_PREFIX: requestNumberPrefixFinal,
       })
       const runningRows = await queryRows(runningSql)
-      const nextRunningNo = Number(runningRows[0]?.next_no || insertedId) || insertedId
+      const nextRunningNo = Number(runningRows[0]?.NEXT_NO || insertedId) || insertedId
       const requestNumber = formatRequestNumber(nextRunningNo, undefined, requestNumberPrefixFinal)
       const setRequestNumberSql = await RequestRegisterPageSQL.updateRequestNumber({
         REQUEST_REGISTER_VENDOR_ID: insertedId,
@@ -214,21 +215,31 @@ export const RequestRegisterPageService = {
       }
 
       const uploadedFiles = Array.isArray(dataItem.UPLOADED_FILES) ? dataItem.UPLOADED_FILES : []
+      const requestDocsToRelocate: Array<{ documentId: number; filename: string; originalName: string }> = []
       if (uploadedFiles.length > 0) {
+        const normalizedFiles: Array<{ file: any; originalName: string }> = uploadedFiles.map((file: any) => ({
+          file,
+          originalName: Buffer.from(file.originalname || '', 'latin1').toString('utf8') || file.filename || '',
+        }))
         const fileSqlList = await Promise.all(
-          uploadedFiles.map((file: any) => {
-            const fileName = Buffer.from(file.originalname || '', 'latin1').toString('utf8') || file.filename || ''
-            return RequestRegisterPageSQL.createDocument({
+          normalizedFiles.map(({ file, originalName }) =>
+            RequestRegisterPageSQL.createDocument({
               REQUEST_REGISTER_VENDOR_ID: insertedId,
-              FILE_NAME: fileName,
+              FILE_NAME: originalName,
               FILE_PATH: file.filename || '',
               FILE_SIZE: file.size || 0,
               FILE_TYPE: file.mimetype || '',
               CREATE_BY: dataItem.CREATE_BY || 'SYSTEM',
             })
-          })
+          )
         )
-        await executeSqlList(fileSqlList)
+        const fileInsertResults = await executeSqlList(fileSqlList)
+        normalizedFiles.forEach(({ file, originalName }, index) => {
+          const documentId = Number(fileInsertResults[index]?.insertId || 0)
+          if (documentId && file?.filename) {
+            requestDocsToRelocate.push({ documentId, filename: file.filename, originalName })
+          }
+        })
       }
 
       const sqlList = []
@@ -239,15 +250,15 @@ export const RequestRegisterPageService = {
         let initialStatus = 'pending'
 
         const stepCode = inferStepCode({
-          step_code: ws.stepCode,
+          step_code: ws.STEP_CODE,
           DESCRIPTION: ws.label || ws.value,
         })
         const actorType = inferActorType({
-          actor_type: ws.actorType,
+          actor_type: ws.ACTOR_TYPE,
           step_code: stepCode,
           DESCRIPTION: ws.label,
         })
-        const groupCode = (isOversea ? ws.defaultGroupCodeOversea : ws.defaultGroupCodeLocal) || resolveGroupCodeForStep({ step_code: stepCode, actor_type: actorType }, isOversea)
+        const groupCode = (isOversea ? ws.DEFAULT_GROUP_CODE_OVERSEA : ws.DEFAULT_GROUP_CODE_LOCAL) || resolveGroupCodeForStep({ step_code: stepCode, actor_type: actorType }, isOversea)
         const isPicOwnedStep = actorType === 'PIC'
         const isRequestSubmittedStep = stepCode === WORKFLOW_STEP_CODE.REQUEST_SUBMITTED
         const isPicReviewStep = stepCode === WORKFLOW_STEP_CODE.PIC_REVIEW
@@ -278,8 +289,8 @@ export const RequestRegisterPageService = {
         sqlList.push(
           await RequestRegisterPageSQL.createApprovalStep({
             REQUEST_REGISTER_VENDOR_ID: insertedId,
-            WORKFLOW_STEP_MASTER_ID: ws.workflowStepId,
-            M_REQUEST_STATUS_ID: ws.statusId,
+            WORKFLOW_STEP_MASTER_ID: ws.WORKFLOW_STEP_MASTER_ID,
+            M_REQUEST_STATUS_ID: ws.M_REQUEST_STATUS_ID,
             STEP_ORDER: stepOrder,
             APPROVER_EMPCODE: approverId,
             STEP_STATUS: initialStatus,
@@ -341,6 +352,36 @@ export const RequestRegisterPageService = {
       }
       conn.release()
       conn = null
+
+      // Always provision the request's folder structure ({year}/{requestNumber}/00.Sending,
+      // 01.Receiving, 02.Request Documents) as soon as the request is created — even with no
+      // attachments — so 02.Request Documents exists up front. If the request is later rejected,
+      // the folders are simply left in place. Runs after commit and never fails the request.
+      try {
+        SelectionFileService.createFolderStructure(requestNumber)
+      } catch (folderError: any) {
+        console.warn('[SelectionFile] Failed to ensure request folder structure:', folderError?.message)
+      }
+
+      // Move the requester's attached files into 02.Request Documents and repoint each
+      // request_register_file row to the network path (single source of truth — no uploads/documents
+      // copy is kept). Per-file failure is isolated so a network-share hiccup on one file cannot
+      // fail the request or block the others.
+      for (const doc of requestDocsToRelocate) {
+        try {
+          const { destPath } = SelectionFileService.moveToRequestDocuments(requestNumber, doc.filename, doc.originalName)
+          await MySQLExecute.execute(
+            RequestRegisterPageSQL.updateDocumentFilePath({
+              REQUEST_REGISTER_FILE_ID: doc.documentId,
+              FILE_PATH: destPath,
+              UPDATE_BY: dataItem.CREATE_BY || 'SYSTEM',
+            })
+          )
+        } catch (fileError: any) {
+          // Leave this file in uploads/documents with its original DB FILE_PATH so it still downloads.
+          console.warn(`[SelectionFile] Failed to move request document ${doc.filename} to 02.Request Documents:`, fileError?.message)
+        }
+      }
 
       let message = isReRegisterRequest ? 'Re-register request created and sent to vendor successfully' : 'Request created successfully'
 
@@ -418,6 +459,28 @@ export const RequestRegisterPageService = {
         Message: error?.message || 'Upload failed',
         ResultOnDb: [],
         MethodOnDb: 'Create Document Failed',
+        TotalCountOnDb: 0,
+      }
+    }
+  },
+
+  updateGprBFile: async (dataItem: any) => {
+    try {
+      const sql = RequestRegisterPageSQL.updateGprBFile(dataItem)
+      await MySQLExecute.execute(sql)
+      return {
+        Status: true,
+        Message: 'GPR B file saved successfully',
+        ResultOnDb: { gpr_b_file_path: dataItem.GPR_B_FILE_PATH || '', gpr_b_file_name: dataItem.GPR_B_FILE_NAME || '' },
+        MethodOnDb: 'Update GPR B File Success',
+        TotalCountOnDb: 1,
+      }
+    } catch (error: any) {
+      return {
+        Status: false,
+        Message: error?.message || 'Failed to save GPR B file',
+        ResultOnDb: [],
+        MethodOnDb: 'Update GPR B File Failed',
         TotalCountOnDb: 0,
       }
     }

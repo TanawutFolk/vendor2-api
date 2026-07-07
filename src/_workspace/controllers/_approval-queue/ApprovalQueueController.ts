@@ -59,20 +59,20 @@ export const ApprovalQueueController = {
     try {
       // Table mapping for AG Grid ColumnFilters and SearchFilters
       const tableIds = [
-        { table: 'rr', id: 'request_id', column: 'REQUEST_REGISTER_VENDOR_ID', Fns: '=' },
         { table: 'rr', id: 'REQUEST_REGISTER_VENDOR_ID', column: 'REQUEST_REGISTER_VENDOR_ID', Fns: '=' },
-        { table: 'rr', id: 'supportProduct_Process', Fns: 'LIKE' },
-        { table: 'rr', id: 'purchase_frequency', Fns: 'LIKE' },
-        { table: 'rr', id: 'assign_to', Fns: '=' },
-        { table: 'rr', id: 'PIC_Email', Fns: 'LIKE' },
-        { table: 'rr', id: 'Request_By_EmployeeCode', Fns: '=' },
+        { table: 'rr', id: 'REQUEST_NUMBER', Fns: 'LIKE' },
+        { table: 'rr', id: 'SUPPORTPRODUCT_PROCESS', Fns: 'LIKE' },
+        { table: 'rr', id: 'PURCHASE_FREQUENCY', Fns: 'LIKE' },
+        { table: 'rr', id: 'ASSIGN_TO', Fns: '=' },
+        { table: 'rr', id: 'PIC_EMAIL', Fns: 'LIKE' },
+        { table: 'rr', id: 'REQUEST_BY_EMPLOYEECODE', Fns: '=' },
         // Vendor Info
-        { table: 'v', id: 'company_name', Fns: 'LIKE' },
-        { table: 'v', id: 'fft_vendor_code', Fns: 'LIKE' },
-        { table: 'v', id: 'fft_status', Fns: '=' },
-        { table: 'v', id: 'vendor_region', Fns: '=' },
-        { table: 'v', id: 'province', Fns: 'LIKE' },
-        { table: 'vt', id: 'vendor_type_name', alias: 'name', Fns: 'LIKE' },
+        { table: 'v', id: 'COMPANY_NAME', Fns: 'LIKE' },
+        { table: 'v', id: 'FFT_VENDOR_CODE', Fns: 'LIKE' },
+        { table: 'v', id: 'FFT_STATUS', Fns: '=' },
+        { table: 'v', id: 'VENDOR_REGION', Fns: '=' },
+        { table: 'v', id: 'PROVINCE', Fns: 'LIKE' },
+        { table: 'vt', id: 'VENDOR_TYPE_NAME', alias: 'BUSINESS_CATEGORY_NAME', Fns: 'LIKE' },
       ]
 
       // Filter out null/empty values from SearchFilters before passing to helper
@@ -83,21 +83,21 @@ export const ApprovalQueueController = {
       const requestStatusFilters: string[] = []
       if (Array.isArray(dataItem.SEARCHFILTERS)) {
         dataItem.SEARCHFILTERS = dataItem.SEARCHFILTERS.filter((item: any) => {
-          if (item.id !== 'request_status') return true
+          if (item.id !== 'REQUEST_STATUS') return true
           requestStatusFilters.push(String(item.value ?? ''))
           return false
         })
       }
       if (Array.isArray(dataItem.COLUMNFILTERS)) {
         dataItem.COLUMNFILTERS = dataItem.COLUMNFILTERS.filter((item: any) => {
-          if (item.id !== 'request_status') return true
+          if (item.id !== 'REQUEST_STATUS') return true
           requestStatusFilters.push(String(item.value ?? ''))
           return false
         })
       }
 
       // Create SQL WHERE, ORDER BY, and Offset using AG Grid-compatible helper
-      getSqlWhere_aggrid(dataItem, tableIds, 'request_id')
+      getSqlWhere_aggrid(dataItem, tableIds, 'REQUEST_REGISTER_VENDOR_ID')
 
       // Default Limit if not provided by frontend
       dataItem.LIMIT = dataItem.LIMIT || 50

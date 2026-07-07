@@ -50,7 +50,7 @@ export const AddVendorSQL = {
                                      , PROVINCE
                                      , POSTAL_CODE
                                      , COUNTRY
-                                     , MASTER_VENDOR_TYPES_ID
+                                     , BUSINESS_CATEGORY_ID
                                      , VENDOR_REGION
                                      , WEBSITE
                                      , TEL_CENTER
@@ -175,14 +175,14 @@ export const AddVendorSQL = {
   getVendorTypes: async (dataItem?: any) => {
     let sql = `
                             SELECT
-                                       MASTER_VENDOR_TYPES_ID
-                                     , NAME
+                                       BUSINESS_CATEGORY_ID
+                                     , BUSINESS_CATEGORY_NAME
                             FROM
-                                       master_vendor_types
+                                       info_business_category
                             WHERE
                                        INUSE = 1
                             ORDER BY
-                                       NAME ASC
+                                       BUSINESS_CATEGORY_NAME ASC
         `
     return sql
   },
@@ -205,7 +205,7 @@ export const AddVendorSQL = {
 
   // Get last inserted vendor id
   getLastInsertId: async (dataItem?: any) => {
-    let sql = `SELECT LAST_INSERT_ID() AS vendor_id`
+    let sql = `SELECT LAST_INSERT_ID() AS VENDORS_ID`
     return sql
   },
 

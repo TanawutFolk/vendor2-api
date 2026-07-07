@@ -84,7 +84,7 @@ export const ApprovalQueueSQL = {
                                             LEFT JOIN
                                        vendors v ON v.VENDORS_ID = rr.VENDORS_ID
                                             LEFT JOIN
-                                       master_vendor_types vt ON vt.MASTER_VENDOR_TYPES_ID = v.MASTER_VENDOR_TYPES_ID
+                                       info_business_category vt ON vt.BUSINESS_CATEGORY_ID = v.BUSINESS_CATEGORY_ID
                                             LEFT JOIN
                                        person.member_fed m ON m.EMPCODE = rr.REQUEST_BY_EMPLOYEECODE
                             WHERE
@@ -130,7 +130,7 @@ export const ApprovalQueueSQL = {
                                      , v.TEL_CENTER
                                      , v.WEBSITE
                                      , v.EMAILMAIN
-                                     , vt.NAME AS vendor_type_name
+                                     , vt.BUSINESS_CATEGORY_NAME AS VENDOR_TYPE_NAME
 
                                      -- Lightweight list-only values
                                      , (
@@ -171,7 +171,7 @@ export const ApprovalQueueSQL = {
                                             LEFT JOIN
                                        vendors v ON v.VENDORS_ID = rr.VENDORS_ID
                                             LEFT JOIN
-                                       master_vendor_types vt ON vt.MASTER_VENDOR_TYPES_ID = v.MASTER_VENDOR_TYPES_ID
+                                       info_business_category vt ON vt.BUSINESS_CATEGORY_ID = v.BUSINESS_CATEGORY_ID
                                             LEFT JOIN
                                        person.member_fed m ON m.EMPCODE = rr.REQUEST_BY_EMPLOYEECODE
                             WHERE
@@ -200,17 +200,17 @@ export const ApprovalQueueSQL = {
   getStatusOptions: async (_dataItem?: any) => {
     const sql = `
                             SELECT
-                                       wsm.WORKFLOW_STEP_MASTER_ID AS workflowStepId
-                                     , mrs.M_REQUEST_STATUS_ID AS statusId
+                                       wsm.WORKFLOW_STEP_MASTER_ID
+                                     , mrs.M_REQUEST_STATUS_ID
                                      , mrs.STATUS_VALUE AS value
                                      , mrs.STATUS_VALUE AS label
-                                     , wsm.STEP_CODE AS stepCode
-                                     , wsm.ACTOR_TYPE AS actorType
-                                     , wsm.DEFAULT_GROUP_CODE_LOCAL AS defaultGroupCodeLocal
-                                     , wsm.DEFAULT_GROUP_CODE_OVERSEA AS defaultGroupCodeOversea
-                                     , wsm.REQUIRES_VENDOR_REPLY AS requiresVendorReply
-                                     , wsm.REQUIRES_VENDOR_CODE AS requiresVendorCode
-                                     , wsm.DEFAULT_STEP_ORDER AS sortOrder
+                                     , wsm.STEP_CODE
+                                     , wsm.ACTOR_TYPE
+                                     , wsm.DEFAULT_GROUP_CODE_LOCAL
+                                     , wsm.DEFAULT_GROUP_CODE_OVERSEA
+                                     , wsm.REQUIRES_VENDOR_REPLY
+                                     , wsm.REQUIRES_VENDOR_CODE
+                                     , wsm.DEFAULT_STEP_ORDER
                             FROM
                                        workflow_step_master wsm
                                             INNER JOIN
@@ -271,9 +271,9 @@ export const ApprovalQueueSQL = {
                                      , ras.UPDATE_BY
                                      , ras.UPDATE_DATE
                                      , ras.INUSE
-                                     , mrs.STATUS_VALUE AS master_status_value
-                                     , mrs.STATUS_VALUE AS master_status_label
-                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS approver_name
+                                     , mrs.STATUS_VALUE AS MASTER_STATUS_VALUE
+                                     , mrs.STATUS_VALUE AS MASTER_STATUS_LABEL
+                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS APPROVER_NAME
                             FROM
                                        request_approval_step ras
                                             INNER JOIN
@@ -395,7 +395,10 @@ export const ApprovalQueueSQL = {
     sql = sql.replaceAll('dataItem.ACTION_BY', dataItem['ACTION_BY'])
     sql = sql.replaceAll('dataItem.ACTION_TYPE', dataItem['ACTION_TYPE'])
     sql = sql.replaceAll('dataItem.REMARK', dataItem['REMARK'])
-    sql = sql.replaceAll('dataItem.REJECT_REASON', dataItem['REJECT_REASON'] ?? '')
+    // Reject rows: store the full reason (up to 500 chars) in the dedicated REJECT_REASON column,
+    // falling back to REMARK so callers that only pass REMARK still populate it. The column is only
+    // written for 'rejected'/'vendor_disagreed' actions (enforced by the CASE in the INSERT above).
+    sql = sql.replaceAll('dataItem.REJECT_REASON', dataItem['REJECT_REASON'] ?? dataItem['REMARK'] ?? '')
 
     return sql
   },
@@ -417,7 +420,7 @@ export const ApprovalQueueSQL = {
                                      , ral.CREATE_DATE
                                      , ral.UPDATE_DATE
                                      , ral.INUSE
-                                     , COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), CONCAT(m.EMPNAME, ' ', m.EMPSURNAME)) AS action_by_name
+                                     , COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), CONCAT(m.EMPNAME, ' ', m.EMPSURNAME)) AS ACTION_BY_NAME
                             FROM
                                        request_approval_log ral
                                             LEFT JOIN
@@ -551,11 +554,11 @@ export const ApprovalQueueSQL = {
   getCriteria: (dataItem: any) => {
     let sql = `
                             SELECT
-                                       CRITERIA_NO AS no
-                                     , CRITERIA_VALUE AS criteria
-                                     , DESCRIPTION AS remark
-                                     , UPLOADED_FILE_PATH AS uploaded_file
-                                     , UPLOADED_FILE_NAME AS uploaded_name
+                                       CRITERIA_NO AS NO
+                                     , CRITERIA_VALUE AS CRITERIA
+                                     , DESCRIPTION AS REMARK
+                                     , UPLOADED_FILE_PATH AS UPLOADED_FILE
+                                     , UPLOADED_FILE_NAME AS UPLOADED_NAME
                             FROM
                                        vendor_selection_criteria
                             WHERE
@@ -769,7 +772,7 @@ export const ApprovalQueueSQL = {
                                      , v.TEL_CENTER
                                      , v.WEBSITE
                                      , v.EMAILMAIN
-                                     , vt.NAME AS vendor_type_name
+                                     , vt.BUSINESS_CATEGORY_NAME AS VENDOR_TYPE_NAME
 
                                      -- Contacts (as JSON array)
                                      , IFNULL(
@@ -777,10 +780,10 @@ export const ApprovalQueueSQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
-                                                                               'contact_name', vc.CONTACT_NAME,
-                                                                               'tel_phone', vc.TEL_PHONE,
-                                                                               'email', vc.EMAIL,
-                                                                               'position', vc.POSITION
+                                                                               'CONTACT_NAME', vc.CONTACT_NAME,
+                                                                               'TEL_PHONE', vc.TEL_PHONE,
+                                                                               'EMAIL', vc.EMAIL,
+                                                                               'POSITION', vc.POSITION
                                                                            )
                                                                       )
                                                            FROM
@@ -789,7 +792,7 @@ export const ApprovalQueueSQL = {
                                                                       vc.VENDORS_ID = v.VENDORS_ID AND vc.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
-                                       ) AS contacts
+                                       ) AS CONTACTS
 
                                      -- Products (as JSON array)
                                      , IFNULL(
@@ -797,10 +800,10 @@ export const ApprovalQueueSQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
-                                                                               'product_group', mpg.GROUP_NAME,
-                                                                               'maker_name', vp.MAKER_NAME,
-                                                                               'product_name', vp.PRODUCT_NAME,
-                                                                               'model_list', vp.MODEL_LIST
+                                                                               'PRODUCT_GROUP', mpg.GROUP_NAME,
+                                                                               'MAKER_NAME', vp.MAKER_NAME,
+                                                                               'PRODUCT_NAME', vp.PRODUCT_NAME,
+                                                                               'MODEL_LIST', vp.MODEL_LIST
                                                                            )
                                                                       )
                                                            FROM
@@ -811,7 +814,7 @@ export const ApprovalQueueSQL = {
                                                                       vp.VENDORS_ID = v.VENDORS_ID AND vp.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
-                                       ) AS products
+                                       ) AS PRODUCTS
 
                                      -- Documents (as JSON array)
                                      , IFNULL(
@@ -819,11 +822,11 @@ export const ApprovalQueueSQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                 JSON_OBJECT(
-                                                  'document_id', rrf.REQUEST_REGISTER_FILE_ID,
-                                                  'file_name', rrf.FILE_NAME,
-                                                  'file_path', rrf.FILE_PATH,
-                                                  'file_size', rrf.FILE_SIZE,
-                                                  'file_type', rrf.FILE_TYPE
+                                                  'DOCUMENT_ID', rrf.REQUEST_REGISTER_FILE_ID,
+                                                  'FILE_NAME', rrf.FILE_NAME,
+                                                  'FILE_PATH', rrf.FILE_PATH,
+                                                  'FILE_SIZE', rrf.FILE_SIZE,
+                                                  'FILE_TYPE', rrf.FILE_TYPE
                                                 )
                                                                       )
                                                            FROM
@@ -832,7 +835,7 @@ export const ApprovalQueueSQL = {
                                                                       rrf.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND rrf.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
-                                       ) AS documents
+                                       ) AS DOCUMENTS
 
                                      -- Approval Steps (as JSON array)
                                      , IFNULL(
@@ -844,15 +847,15 @@ export const ApprovalQueueSQL = {
                                                                                'M_REQUEST_STATUS_ID', wsm.M_REQUEST_STATUS_ID,
                                                                                'STEP_ORDER', ras.STEP_ORDER,
                                                                                'APPROVER_EMPCODE', ras.APPROVER_EMPCODE,
-                                                                               'approver_name', (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM person.member_fed pm WHERE pm.EMPCODE = ras.APPROVER_EMPCODE LIMIT 1),
+                                                                               'APPROVER_NAME', (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM person.member_fed pm WHERE pm.EMPCODE = ras.APPROVER_EMPCODE LIMIT 1),
                                                                                'STEP_STATUS', ras.STEP_STATUS,
                                                                                'DESCRIPTION', mrs.STATUS_VALUE,
                                                                                'STEP_CODE', wsm.STEP_CODE,
                                                                                'ACTOR_TYPE', wsm.ACTOR_TYPE,
                                                                                'GROUP_CODE', ras.GROUP_CODE,
                                                                                'ASSIGNMENT_MODE', ras.ASSIGNMENT_MODE,
-                                                                               'master_status_value', mrs.STATUS_VALUE,
-                                                                               'master_status_label', mrs.STATUS_VALUE,
+                                                                               'MASTER_STATUS_VALUE', mrs.STATUS_VALUE,
+                                                                               'MASTER_STATUS_LABEL', mrs.STATUS_VALUE,
                                                                                'CREATE_DATE', ras.CREATE_DATE,
                                                                                'UPDATE_BY', ras.UPDATE_BY,
                                                                                'UPDATE_DATE', ras.UPDATE_DATE
@@ -868,7 +871,7 @@ export const ApprovalQueueSQL = {
                                                                       ras.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND ras.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
-                                       ) AS approval_steps
+                                       ) AS APPROVAL_STEPS
 
                                      -- Approval Logs (as JSON array)
                                      , IFNULL(
@@ -892,7 +895,7 @@ export const ApprovalQueueSQL = {
                                                                       ral.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID
                                                 ),
                                                 JSON_ARRAY()
-                                       ) AS approval_logs
+                                       ) AS APPROVAL_LOGS
 
                                      -- GPR Criteria (inline JSON for pass/fail evaluation)
                                      , IFNULL(
@@ -900,10 +903,10 @@ export const ApprovalQueueSQL = {
                                                            SELECT
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
-                                                                               'no', vsc.CRITERIA_NO,
-                                                                               'criteria', vsc.CRITERIA_VALUE,
-                                                                               'uploaded_file', vsc.UPLOADED_FILE_PATH,
-                                                                               'uploaded_name', vsc.UPLOADED_FILE_NAME
+                                                                               'NO', vsc.CRITERIA_NO,
+                                                                               'CRITERIA', vsc.CRITERIA_VALUE,
+                                                                               'UPLOADED_FILE', vsc.UPLOADED_FILE_PATH,
+                                                                               'UPLOADED_NAME', vsc.UPLOADED_FILE_NAME
                                                                            )
                                                                       )
                                                            FROM
@@ -914,7 +917,7 @@ export const ApprovalQueueSQL = {
                                                                       rvs2.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND rvs2.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
-                                       ) AS gpr_criteria
+                                       ) AS GPR_CRITERIA
 
                             FROM
                                        request_register_vendor rr
@@ -923,7 +926,7 @@ export const ApprovalQueueSQL = {
                                             LEFT JOIN
                                        vendors v ON v.VENDORS_ID = rr.VENDORS_ID
                                             LEFT JOIN
-                                       master_vendor_types vt ON vt.MASTER_VENDOR_TYPES_ID = v.MASTER_VENDOR_TYPES_ID
+                                       info_business_category vt ON vt.BUSINESS_CATEGORY_ID = v.BUSINESS_CATEGORY_ID
                                             LEFT JOIN
                                        person.member_fed m ON m.EMPCODE = rr.REQUEST_BY_EMPLOYEECODE
                             WHERE

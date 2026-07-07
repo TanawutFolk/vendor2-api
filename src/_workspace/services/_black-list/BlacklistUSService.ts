@@ -10,23 +10,23 @@ export const BlacklistUSService = {
   searchAgGrid: async (dataItem: any) => {
     const payload = { ...(dataItem || {}) }
     const tableIds = [
-      { table: 'bl', id: 'blacklist_id', Fns: '=' },
-      { table: 'bl', id: 'group_code', Fns: '=' },
-      { table: 'bl', id: 'vendor_name', Fns: 'LIKE' },
-      { table: 'bl', id: 'source_name', Fns: 'LIKE' },
-      { table: 'bl', id: 'entity_number', Fns: 'LIKE' },
-      { table: 'bl', id: 'entity_type', Fns: 'LIKE' },
-      { table: 'bl', id: 'programs', Fns: 'LIKE' },
-      { table: 'bl', id: 'country', Fns: 'LIKE' },
-      { table: 'bl', id: 'wmd_type', Fns: 'LIKE' },
-      { table: 'bl', id: 'update_by', Fns: 'LIKE' },
-      { table: 'bl', id: 'updated_date', Fns: '=' },
-      { table: 'bl', id: 'create_date', Fns: '=' },
-      { table: 'bl', id: 'in_use', Fns: '=' },
-      { table: 'bl', id: 'alias_count', Fns: '=' },
+      { table: 'bl', id: 'BLACKLIST_ID', Fns: '=' },
+      { table: 'bl', id: 'GROUP_CODE', Fns: '=' },
+      { table: 'bl', id: 'VENDOR_NAME', Fns: 'LIKE' },
+      { table: 'bl', id: 'SOURCE_NAME', Fns: 'LIKE' },
+      { table: 'bl', id: 'ENTITY_NUMBER', Fns: 'LIKE' },
+      { table: 'bl', id: 'ENTITY_TYPE', Fns: 'LIKE' },
+      { table: 'bl', id: 'PROGRAMS', Fns: 'LIKE' },
+      { table: 'bl', id: 'COUNTRY', Fns: 'LIKE' },
+      { table: 'bl', id: 'WMD_TYPE', Fns: 'LIKE' },
+      { table: 'bl', id: 'UPDATE_BY', Fns: 'LIKE' },
+      { table: 'bl', id: 'UPDATED_DATE', Fns: '=' },
+      { table: 'bl', id: 'CREATE_DATE', Fns: '=' },
+      { table: 'bl', id: 'IN_USE', Fns: '=' },
+      { table: 'bl', id: 'ALIAS_COUNT', Fns: '=' },
     ]
 
-    getSqlWhere_aggrid(payload, tableIds, 'updated_date')
+    getSqlWhere_aggrid(payload, tableIds, 'UPDATED_DATE')
     const sql = BlacklistSQL.searchAgGrid(payload)
     const result = await Promise.all(sql.map((item) => MySQLExecute.search(item) as Promise<RowDataPacket[]>))
 

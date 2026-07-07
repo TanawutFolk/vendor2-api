@@ -577,10 +577,16 @@ export const RequestRegisterPageController = {
       if (documentScope === 'GPR_PDF' && !REQUEST_NUMBER) {
         throw new Error('Missing REQUEST_NUMBER for GPR PDF upload')
       }
+      if (documentScope === 'GPR_B' && !REQUEST_NUMBER) {
+        throw new Error('Missing REQUEST_NUMBER for GPR B file upload')
+      }
 
-      const isSelectionDocument = documentScope === 'GPR_CRITERIA' || documentScope === 'GPR_PDF'
+      // Selection documents live in the request's network folder, not the DB file table.
+      // GPR B is a selection document too, but it belongs to the GPR B/C stage and must not
+      // be gated by the Selection Sheet edit lock (which only guards GPR A criteria editing).
+      const isSelectionDocument = documentScope === 'GPR_CRITERIA' || documentScope === 'GPR_PDF' || documentScope === 'GPR_B'
 
-      if (isSelectionDocument) {
+      if (documentScope === 'GPR_CRITERIA' || documentScope === 'GPR_PDF') {
         await RequestRegisterPageModel.assertSelectionSheetEditable(reqId)
       }
 
@@ -598,10 +604,36 @@ export const RequestRegisterPageController = {
             file.path,
             file_name || path.basename(file.path),
           )
-          : null
+          : documentScope === 'GPR_B'
+            ? SelectionFileService.saveGprBToReceiving(
+              String(REQUEST_NUMBER),
+              file.path,
+              file_name || path.basename(file.path),
+            )
+            : null
 
       const storedFilePath = selectionFileResult?.destPath || file.filename || path.basename(file.path)
       const storedFileName = selectionFileResult?.newFileName || file_name || path.basename(file.path)
+
+      // Persist the single GPR B file reference on the request's selection row.
+      if (documentScope === 'GPR_B') {
+        const gprBResult = await RequestRegisterPageModel.updateGprBFile({
+          REQUEST_REGISTER_VENDOR_ID: reqId,
+          GPR_B_FILE_PATH: storedFilePath,
+          GPR_B_FILE_NAME: storedFileName,
+          UPDATE_BY: CREATE_BY || 'SYSTEM',
+        })
+
+        if (!gprBResult?.Status) {
+          return res.status(200).json({
+            Status: false,
+            ResultOnDb: {},
+            TotalCountOnDb: 0,
+            MethodOnDb: 'Add Document',
+            Message: gprBResult?.Message || 'Failed to save GPR B file',
+          } as ResponseI)
+        }
+      }
 
       let document_id = 0
 
@@ -638,7 +670,7 @@ export const RequestRegisterPageController = {
         }
       }
 
-      // â”€â”€ Selection File: Save criteria uploads directly to 01.Receiving â”€â”€
+      // Ã¢â€â‚¬Ã¢â€â‚¬ Selection File: Save criteria uploads directly to 01.Receiving Ã¢â€â‚¬Ã¢â€â‚¬
       if (false && CRITERIA_NO && REQUEST_NUMBER) {
         try {
           SelectionFileService.saveToReceiving(
@@ -649,7 +681,7 @@ export const RequestRegisterPageController = {
             file_name || path.basename(file!.path),
           )
         } catch (selectionFileError: any) {
-          // Never block the document upload â€” log warning only
+          // Never block the document upload Ã¢â‚¬â€ log warning only
           console.warn('[SelectionFile] Failed to save to Receiving:', selectionFileError?.message)
         }
       }
@@ -657,11 +689,11 @@ export const RequestRegisterPageController = {
       res.status(200).json({
         Status: true,
         ResultOnDb: {
-          document_id,
-          file_path: storedFilePath,
-          file_name: storedFileName,
-          selection_file_path: selectionFileResult?.destPath || '',
-          selection_file_name: selectionFileResult?.newFileName || '',
+          DOCUMENT_ID: document_id,
+          FILE_PATH: storedFilePath,
+          FILE_NAME: storedFileName,
+          SELECTION_FILE_PATH: selectionFileResult?.destPath || '',
+          SELECTION_FILE_NAME: selectionFileResult?.newFileName || '',
         },
         TotalCountOnDb: 1,
         MethodOnDb: 'Add Document',
@@ -698,7 +730,7 @@ export const RequestRegisterPageController = {
         } as ResponseI)
       }
 
-      const resolvedPath = SelectionFileService.resolveDownloadPath(rawFilePath, rawFileName, rawRequestNumber)
+      const resolvedPath = SelectionFileService.resolveDownloadPath(rawFilePath, rawFileName, rawRequestNumber, { allowUploadedFallback: true })
       if (!resolvedPath) {
         return res.status(400).json({
           Status: false,
@@ -719,7 +751,16 @@ export const RequestRegisterPageController = {
         } as ResponseI)
       }
 
-      return res.download(resolvedPath, rawFileName || path.basename(resolvedPath))
+      const resolvedName = rawFileName || path.basename(resolvedPath)
+      // GET (or explicit DISPOSITION=inline) is used for in-app preview â†’ serve inline so the
+      // browser renders PDFs/images instead of forcing a save. POST keeps the attachment download.
+      const wantsInline = req.method === 'GET' || String(dataItem.DISPOSITION || '').toLowerCase() === 'inline'
+      if (wantsInline) {
+        res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(resolvedName)}`)
+        return res.sendFile(resolvedPath)
+      }
+
+      return res.download(resolvedPath, resolvedName)
     } catch (error: any) {
       console.error('Download Selection Document Error:', error)
 

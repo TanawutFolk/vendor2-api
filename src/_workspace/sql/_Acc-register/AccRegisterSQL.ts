@@ -20,9 +20,9 @@ export const AccRegisterSQL = {
                                      , ras.CREATE_DATE
                                      , ras.UPDATE_BY
                                      , ras.UPDATE_DATE
-                                     , mrs.STATUS_VALUE AS master_status_value
-                                     , mrs.STATUS_VALUE AS master_status_label
-                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS approver_name
+                                     , mrs.STATUS_VALUE AS MASTER_STATUS_VALUE
+                                     , mrs.STATUS_VALUE AS MASTER_STATUS_LABEL
+                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS APPROVER_NAME
                             FROM
                                        request_approval_step ras
                                             INNER JOIN

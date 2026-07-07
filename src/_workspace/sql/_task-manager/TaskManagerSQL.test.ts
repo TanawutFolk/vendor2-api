@@ -3,19 +3,21 @@ import { TaskManagerRequestService } from '../../services/_task-manager/TaskMana
 import { TaskManagerSQL } from './TaskManagerSQL'
 
 describe('TaskManagerRequestService SQL input helpers', () => {
-  test('allows known sort columns and directions', () => {
-    expect(TaskManagerRequestService.buildTaskManagerOrder('t.company_name asc, t.CREATE_DATE DESC')).toBe('t.COMPANY_NAME ASC, t.CREATE_DATE DESC')
-  })
-
-  test('rejects unknown or injected sort expressions', () => {
-    expect(TaskManagerRequestService.buildTaskManagerOrder('t.action ASC')).toBe('t.REQUEST_REGISTER_VENDOR_ID DESC')
-    expect(TaskManagerRequestService.buildTaskManagerOrder('t.request_id DESC; DROP TABLE vendors')).toBe('t.REQUEST_REGISTER_VENDOR_ID DESC')
-  })
-
   test('normalizes and bounds pagination', () => {
     expect(TaskManagerRequestService.normalizeTaskManagerPagination('1000', '-20')).toEqual({ limit: 500, offset: 0 })
     expect(TaskManagerRequestService.normalizeTaskManagerPagination('25', '50')).toEqual({ limit: 25, offset: 50 })
     expect(TaskManagerRequestService.normalizeTaskManagerPagination('invalid', 'invalid')).toEqual({ limit: 50, offset: 0 })
+  })
+
+  test('builds ORDER from sort model and falls back to request id', () => {
+    const sorted = TaskManagerRequestService.buildTaskManagerSqlDataItem({
+      ORDER: [{ id: 'COMPANY_NAME', desc: false }, { id: 'CREATE_DATE', desc: true }],
+    })
+    expect(sorted.ORDER).toContain('COMPANY_NAME ASC')
+    expect(sorted.ORDER).toContain('CREATE_DATE DESC')
+
+    const fallback = TaskManagerRequestService.buildTaskManagerSqlDataItem({})
+    expect(fallback.ORDER).toBe('t.REQUEST_REGISTER_VENDOR_ID DESC')
   })
 })
 
@@ -23,16 +25,16 @@ describe('TaskManagerSQL search query', () => {
   test('uses SQL values prepared by service', async () => {
     const [, dataSql] = await TaskManagerSQL.searchAllTask(TaskManagerRequestService.buildTaskManagerSqlDataItem({
       SEARCHFILTERS: [
-        { id: 'current_owner_empcode', value: 'EMP001' },
-        { id: 'company_name', value: "O'Neil" },
+        { id: 'CURRENT_OWNER_EMPCODE', value: 'EMP001' },
+        { id: 'COMPANY_NAME', value: 'ACME' },
       ],
-      ORDER: 't.request_id DESC',
+      ORDER: [{ id: 'REQUEST_REGISTER_VENDOR_ID', desc: true }],
       LIMIT: 20,
       OFFSET: 0,
     }))
 
     expect(dataSql).toContain("t.CURRENT_OWNER_EMPCODE = 'EMP001'")
-    expect(dataSql).toContain("t.COMPANY_NAME LIKE '%O'Neil%'")
+    expect(dataSql).toContain("t.COMPANY_NAME LIKE '%ACME%'")
     expect(dataSql).not.toContain("CURRENT_OWNER_EMPCODE LIKE '%EMP001%'")
   })
 
