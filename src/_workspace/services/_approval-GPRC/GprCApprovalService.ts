@@ -92,11 +92,11 @@ const runGprCPostCommitTasks = async (tasks: GprCPostCommitTask[], requestId: nu
   const results = await Promise.allSettled(tasks.map((task) => task()))
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
-      console.error('[GprCApprovalService] postCommitTask failed', {
-        taskIndex: index,
-        request_id: requestId,
-        error: result.reason instanceof Error ? result.reason.message : result.reason,
-      })
+      // console.error('[GprCApprovalService] postCommitTask failed', {
+        // taskIndex: index,
+        // request_id: requestId,
+        // error: result.reason instanceof Error ? result.reason.message : result.reason,
+      // })
     }
   })
 }
@@ -285,26 +285,26 @@ const sendGprCEmail = async (payload: { templateName: string; toEmail: string; c
     flow: 'GPR C',
   })
   if (!mailResult.success) {
-    console.error('[GPR C MAIL][failed]', {
-      templateName: payload.templateName,
-      toEmail: payload.toEmail,
-      ccCount: payload.ccEmails?.length || 0,
-      subject: payload.subject,
-      requestId: payload.requestId,
-      requestNumber: payload.requestNumber,
-      reason: mailResult.reason || 'sendEmail returned failed',
-    })
+    // console.error('[GPR C MAIL][failed]', {
+      // templateName: payload.templateName,
+      // toEmail: payload.toEmail,
+      // ccCount: payload.ccEmails?.length || 0,
+      // subject: payload.subject,
+      // requestId: payload.requestId,
+      // requestNumber: payload.requestNumber,
+      // reason: mailResult.reason || 'sendEmail returned failed',
+    // })
     return
   }
 
-  console.log('[GPR C MAIL][sent]', {
-    templateName: payload.templateName,
-    toEmail: payload.toEmail,
-    ccCount: payload.ccEmails?.length || 0,
-    subject: payload.subject,
-    requestId: payload.requestId,
-    requestNumber: payload.requestNumber,
-  })
+  // console.log('[GPR C MAIL][sent]', {
+    // templateName: payload.templateName,
+    // toEmail: payload.toEmail,
+    // ccCount: payload.ccEmails?.length || 0,
+    // subject: payload.subject,
+    // requestId: payload.requestId,
+    // requestNumber: payload.requestNumber,
+  // })
 }
 
 const notifyRequesterSetup = async (requestId: number, updateBy: string) => {
@@ -561,7 +561,7 @@ export const GprCApprovalService = {
       const existingFlow = await getFlowByRequest(requestId)
       const flow = existingFlow || (await ensureFlow(requestId, normalizeValue(dataItem.UPDATE_BY) || 'SYSTEM'))
       if (!existingFlow) {
-        await notifyRequesterSetup(requestId, normalizeValue(dataItem.UPDATE_BY) || 'SYSTEM').catch(console.error)
+        await notifyRequesterSetup(requestId, normalizeValue(dataItem.UPDATE_BY) || 'SYSTEM').catch(() => undefined /* console.error */)
       }
       const flowId = Number(getValue(flow, 'REQUEST_VENDOR_GPR_C_FLOWS_ID', 'gpr_c_flow_id'))
       const steps = flowId ? await getStepsByFlow(flowId) : []

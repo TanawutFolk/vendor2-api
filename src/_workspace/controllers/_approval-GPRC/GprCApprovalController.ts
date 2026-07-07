@@ -26,7 +26,7 @@ export const GprCApprovalController = {
       })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      console.error('Approve GPR C Step Error:', error)
+      // console.error('Approve GPR C Step Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -60,7 +60,7 @@ export const GprCApprovalController = {
       })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      console.error('Reject GPR C Step Error:', error)
+      // console.error('Reject GPR C Step Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -96,7 +96,7 @@ export const GprCApprovalController = {
       })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      console.error('GPR C Action Required Error:', error)
+      // console.error('GPR C Action Required Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -131,7 +131,7 @@ export const GprCApprovalController = {
       })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      console.error('Record GPR C Action Result Error:', error)
+      // console.error('Record GPR C Action Result Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -163,7 +163,7 @@ export const GprCApprovalController = {
       })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      console.error('Get GPR C Queue Error:', error)
+      // console.error('Get GPR C Queue Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: [],
@@ -195,7 +195,7 @@ export const GprCApprovalController = {
       })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      console.error('Get GPR C Action Required Queue Error:', error)
+      // console.error('Get GPR C Action Required Queue Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: [],

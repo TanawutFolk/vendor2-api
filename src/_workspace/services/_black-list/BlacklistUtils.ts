@@ -316,21 +316,21 @@ export const parseUsRows = (worksheet: XLSX.WorkSheet): ParsedBlacklistUsRow[] =
   const startRow = bestHeader ? bestHeader.rowIndex + 1 : 1
 
   // ── Debug: print header detection result ──────────────────────────────────
-  console.log('\n====== [BlacklistUS] parseUsRows DEBUG ======')
-  console.log(`Total rows in file  : ${rows.length}`)
-  console.log(`Header detected     : ${bestHeader ? `YES at row ${bestHeader.rowIndex} (score=${bestHeader.score})` : 'NO — using positional fallback'}`)
-  console.log(`Data starts at row  : ${startRow}`)
-  console.log(`Column mapping:`)
-  console.log(`  name              = col ${columns.name}`)
-  console.log(`  source            = col ${columns.source}`)
-  console.log(`  entity_number     = col ${columns.entity_number}`)
-  console.log(`  entity_type       = col ${columns.entity_type}`)
-  console.log(`  programs          = col ${columns.programs}`)
+  // console.log('\n====== [BlacklistUS] parseUsRows DEBUG ======')
+  // console.log(`Total rows in file  : ${rows.length}`)
+  // console.log(`Header detected     : ${bestHeader ? `YES at row ${bestHeader.rowIndex} (score=${bestHeader.score})` : 'NO — using positional fallback'}`)
+  // console.log(`Data starts at row  : ${startRow}`)
+  // console.log(`Column mapping:`)
+  // console.log(`  name              = col ${columns.name}`)
+  // console.log(`  source            = col ${columns.source}`)
+  // console.log(`  entity_number     = col ${columns.entity_number}`)
+  // console.log(`  entity_type       = col ${columns.entity_type}`)
+  // console.log(`  programs          = col ${columns.programs}`)
   if (rows[0]) {
-    console.log(`Row 0 (raw)         : ${(rows[0] || []).slice(0, 8).map(String).join(' | ')}`)
+    // console.log(`Row 0 (raw)         : ${(rows[0] || []).slice(0, 8).map(String).join(' | ')}`)
   }
   if (rows[startRow]) {
-    console.log(`Row ${startRow} (first data): ${(rows[startRow] || []).slice(0, 8).map(String).join(' | ')}`)
+    // console.log(`Row ${startRow} (first data): ${(rows[startRow] || []).slice(0, 8).map(String).join(' | ')}`)
   }
   // ─────────────────────────────────────────────────────────────────────────
 
@@ -386,11 +386,11 @@ export const parseUsRows = (worksheet: XLSX.WorkSheet): ParsedBlacklistUsRow[] =
     })
   }
 
-  console.log(`Rows skipped (empty): ${skippedEmpty}`)
-  console.log(`Rows skipped (header-like): ${skippedHeader}`)
-  console.log(`Rows skipped (no name at col ${columns.name}): ${skippedNoName}`)
-  console.log(`Rows parsed OK      : ${parsedRows.length}`)
-  console.log('============================================\n')
+  // console.log(`Rows skipped (empty): ${skippedEmpty}`)
+  // console.log(`Rows skipped (header-like): ${skippedHeader}`)
+  // console.log(`Rows skipped (no name at col ${columns.name}): ${skippedNoName}`)
+  // console.log(`Rows parsed OK      : ${parsedRows.length}`)
+  // console.log('============================================\n')
   ;(parsedRows as any).__debug = {
     rowCount: rows.length,
     headerRow: bestHeader?.rowIndex ?? null,

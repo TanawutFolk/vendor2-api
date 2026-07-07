@@ -51,11 +51,11 @@ const getVendorDocumentFormBPath = () => process.env.VENDOR_DOCUMENT_FORM_B_PATH
 
 const logVendorDocumentFolder = (message: string, detail?: unknown) => {
   if (detail === undefined) {
-    console.log(`[VendorDocumentFolder] ${message}`)
+    // console.log(`[VendorDocumentFolder] ${message}`)
     return
   }
 
-  console.log(`[VendorDocumentFolder] ${message}:`, detail)
+  // console.log(`[VendorDocumentFolder] ${message}:`, detail)
 }
 
 const STAGE_KEY = {
@@ -554,14 +554,14 @@ const logTemplateEvent = (
   }
 
   if (phase === 'failed') {
-    console.error(`[MAIL TEMPLATE][${phase}]`, {
-      ...logPayload,
-      error: payload.error?.message || payload.error || 'unknown error',
-    })
+    // console.error(`[MAIL TEMPLATE][${phase}]`, {
+      // ...logPayload,
+      // error: payload.error?.message || payload.error || 'unknown error',
+    // })
     return
   }
 
-  console.log(`[MAIL TEMPLATE][${phase}]`, logPayload)
+  // console.log(`[MAIL TEMPLATE][${phase}]`, logPayload)
 }
 
 const sendTemplatedEmail = async (payload: {
@@ -937,7 +937,7 @@ export const sendMail_NegotiationStageDispatch = async (requestId: number, stage
 
     return { sent: true, to: vendorEmail, ccCount: ccEmails.length }
   } catch (err: any) {
-    console.error('[triggerVendorDocumentEmail] Failed:', err?.message)
+    // console.error('[triggerVendorDocumentEmail] Failed:', err?.message)
     return { sent: false, reason: err?.message || 'send failed' }
   }
 }
@@ -1045,7 +1045,7 @@ export const sendMail_ToApprover_NextStep = async (dataItem: any, nextStep: any,
       },
     })
   } catch (err: any) {
-    console.error('[triggerApprovalEmails] Failed:', err?.message)
+    // console.error('[triggerApprovalEmails] Failed:', err?.message)
   }
 }
 
@@ -1106,7 +1106,7 @@ export const sendMail_ToUser_ActionRequired = async (dataItem: any, currentStep:
       extra: { flow: 'triggerActionRequiredEmail', stageKey, stageLabel },
     })
   } catch (err: any) {
-    console.error('[triggerActionRequiredEmail] Failed:', err?.message)
+    // console.error('[triggerActionRequiredEmail] Failed:', err?.message)
   }
 }
 
@@ -1171,7 +1171,7 @@ export const sendMail_ToRequester_GprCApproved = async (dataItem: any) => {
       extra: { flow: 'triggerAfterGprCApprovedEmail' },
     })
   } catch (err: any) {
-    console.error('[triggerAfterGprCApprovedEmail] Failed:', err?.message)
+    // console.error('[triggerAfterGprCApprovedEmail] Failed:', err?.message)
   }
 }
 
@@ -1255,7 +1255,7 @@ export const sendMail_ToPic_RequestRejected = async (dataItem: any, currentStep:
       },
     })
   } catch (err: any) {
-    console.error('[triggerRejectionEmail] Failed:', err?.message)
+    // console.error('[triggerRejectionEmail] Failed:', err?.message)
   }
 }
 
@@ -1315,7 +1315,7 @@ export const sendMail_ToRequester_RegistrationCompleted = async (dataItem: any) 
       extra: { flow: 'triggerCompletionEmail', vendorCode: dataItem.VENDOR_CODE || vd.vendor_code || '' },
     })
   } catch (err: any) {
-    console.error('[triggerCompletionEmail] Failed:', err?.message)
+    // console.error('[triggerCompletionEmail] Failed:', err?.message)
   }
 }
 
@@ -1379,6 +1379,6 @@ export const sendMail_ToRequester_RegistrationIncomplete = async (dataItem: any)
       extra: { flow: 'triggerVendorDisagreeEmail' },
     })
   } catch (err: any) {
-    console.error('[triggerVendorDisagreeEmail] Failed:', err?.message)
+    // console.error('[triggerVendorDisagreeEmail] Failed:', err?.message)
   }
 }

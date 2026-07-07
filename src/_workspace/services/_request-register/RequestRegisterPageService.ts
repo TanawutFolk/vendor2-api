@@ -360,7 +360,7 @@ export const RequestRegisterPageService = {
       try {
         SelectionFileService.createFolderStructure(requestNumber)
       } catch (folderError: any) {
-        console.warn('[SelectionFile] Failed to ensure request folder structure:', folderError?.message)
+        // console.warn('[SelectionFile] Failed to ensure request folder structure:', folderError?.message)
       }
 
       // Move the requester's attached files into 02.Request Documents and repoint each
@@ -379,7 +379,7 @@ export const RequestRegisterPageService = {
           )
         } catch (fileError: any) {
           // Leave this file in uploads/documents with its original DB FILE_PATH so it still downloads.
-          console.warn(`[SelectionFile] Failed to move request document ${doc.filename} to 02.Request Documents:`, fileError?.message)
+          // console.warn(`[SelectionFile] Failed to move request document ${doc.filename} to 02.Request Documents:`, fileError?.message)
         }
       }
 
@@ -393,7 +393,7 @@ export const RequestRegisterPageService = {
       } else {
         RequestRegisterPageService
           .sendMail_ToPic_NewRequest(dataItem, vendorData, nextAssignee, insertedId, requestNumber, assignmentGroupCode)
-          .catch(console.error)
+          .catch(() => undefined /* console.error */)
       }
 
       return {
@@ -413,7 +413,7 @@ export const RequestRegisterPageService = {
         conn.release()
         conn = null
       }
-      console.error('Error in RequestRegisterPageService.createRequest:', error)
+      // console.error('Error in RequestRegisterPageService.createRequest:', error)
       return {
         Status: false,
         Message: error?.message || 'Failed to create request',

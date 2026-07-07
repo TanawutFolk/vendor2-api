@@ -80,7 +80,7 @@ export const AssigneesService = {
         TotalCountOnDb: 1,
       }
     } catch (error: any) {
-      console.error('Error in AssigneesService.save:', error)
+      // console.error('Error in AssigneesService.save:', error)
       return {
         Status: false,
         Message: error?.message || 'Failed to save data',

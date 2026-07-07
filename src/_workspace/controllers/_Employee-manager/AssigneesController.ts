@@ -16,7 +16,7 @@ export const AssigneesController = {
         Message: 'Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Get Assignee Groups Error:', error)
+      // console.error('Get Assignee Groups Error:', error)
       return res.status(200).json({
         Status: false,
         ResultOnDb: [],
@@ -46,7 +46,7 @@ export const AssigneesController = {
         Message: 'Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Search Assignees Error:', error)
+      // console.error('Search Assignees Error:', error)
       return res.status(200).json({
         Status: false,
         ResultOnDb: [],
@@ -76,7 +76,7 @@ export const AssigneesController = {
         Message: result?.Message || 'Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Save Assignee Error:', error)
+      // console.error('Save Assignee Error:', error)
       return res.status(200).json({
         Status: false,
         ResultOnDb: {},

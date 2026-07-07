@@ -36,7 +36,7 @@ export const ApprovalQueueController = {
         Message: 'Get Data Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Get Registration Request By Id Error:', error)
+      // console.error('Get Registration Request By Id Error:', error)
       return res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -215,7 +215,7 @@ export const ApprovalQueueController = {
         Message: 'Get Data Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Get All Registration Requests Error:', error)
+      // console.error('Get All Registration Requests Error:', error)
       return res.status(200).json({
         Status: false,
         ResultOnDb: [],
@@ -273,7 +273,7 @@ export const ApprovalQueueController = {
 
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      console.error('Update Status Error:', error)
+      // console.error('Update Status Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -295,7 +295,7 @@ export const ApprovalQueueController = {
         Message: 'Get Data Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Get Status Options Error:', error)
+      // console.error('Get Status Options Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: [],
@@ -337,7 +337,7 @@ export const ApprovalQueueController = {
 
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      console.error('Reassign Request Error:', error)
+      // console.error('Reassign Request Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},

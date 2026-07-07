@@ -13,11 +13,11 @@ const getSelectionFileBasePath = () => process.env.SELECTION_FILE_BASE_PATH || D
 
 const logFolder = (message: string, detail?: unknown) => {
   if (detail === undefined) {
-    console.log(`[SelectionFile] ${message}`)
+    // console.log(`[SelectionFile] ${message}`)
     return
   }
 
-  console.log(`[SelectionFile] ${message}:`, detail)
+  // console.log(`[SelectionFile] ${message}:`, detail)
 }
 
 // Helpers

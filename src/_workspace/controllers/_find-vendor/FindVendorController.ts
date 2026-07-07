@@ -123,7 +123,7 @@ export const FindVendorController = {
             console.time('[PERF] MySQL Query');
             const { resultData, totalCount } = await FindVendorModel.searchVendors(dataItem);
             console.timeEnd('[PERF] MySQL Query');
-            console.log(`[PERF] MySQL returned ${resultData.length} rows`);
+            // console.log(`[PERF] MySQL returned ${resultData.length} rows`);
             const finalResult = resultData.map((row: any) => {
                 delete row.CONTACTS_JSON
                 delete row.PRODUCTS_JSON
@@ -131,7 +131,7 @@ export const FindVendorController = {
             });
 
             console.timeEnd('[PERF] Total Search');
-            console.log(`[PERF] Returning ${finalResult.length} lightweight rows to client`);
+            // console.log(`[PERF] Returning ${finalResult.length} lightweight rows to client`);
 
             return res.status(200).json({
                 Status: true,
@@ -141,7 +141,7 @@ export const FindVendorController = {
                 Message: 'Search Data Success'
             } as ResponseI)
         } catch (error: any) {
-            console.error('Search Vendors Error:', error);
+            // console.error('Search Vendors Error:', error);
             return res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
@@ -187,7 +187,7 @@ export const FindVendorController = {
                         contacts = typeof row.CONTACTS_JSON === 'string' ? JSON.parse(row.CONTACTS_JSON) : row.CONTACTS_JSON
                     }
                 } catch (e) {
-                    console.warn('Failed to parse contacts_json for getVendorDetails VENDORS_ID ' + vendor_id)
+                    // console.warn('Failed to parse contacts_json for getVendorDetails VENDORS_ID ' + vendor_id)
                 }
 
                 try {
@@ -195,7 +195,7 @@ export const FindVendorController = {
                         products = typeof row.PRODUCTS_JSON === 'string' ? JSON.parse(row.PRODUCTS_JSON) : row.PRODUCTS_JSON
                     }
                 } catch (e) {
-                    console.warn('Failed to parse products_json for getVendorDetails VENDORS_ID ' + vendor_id)
+                    // console.warn('Failed to parse products_json for getVendorDetails VENDORS_ID ' + vendor_id)
                 }
 
                 // Filter out [null] from empty JSON_ARRAYAGG
@@ -228,7 +228,7 @@ export const FindVendorController = {
                 } as ResponseI)
             }
         } catch (error: any) {
-            console.error('Get Vendor Details Error:', error);
+            // console.error('Get Vendor Details Error:', error);
             return res.status(200).json({
                 Status: false,
                 ResultOnDb: {},
@@ -279,7 +279,7 @@ export const FindVendorController = {
                 Message: 'Update Data Success'
             } as ResponseI)
         } catch (error: any) {
-            console.error('Update Vendor Error:', error);
+            // console.error('Update Vendor Error:', error);
             res.status(200).json({
                 Status: false,
                 ResultOnDb: {},
@@ -313,7 +313,7 @@ export const FindVendorController = {
 
             return res.status(200).json(result as ResponseI)
         } catch (error: any) {
-            console.error('Update Vendor Comprehensive Error:', error)
+            // console.error('Update Vendor Comprehensive Error:', error)
             return res.status(200).json({
                 Status: false,
                 ResultOnDb: {},
@@ -347,7 +347,7 @@ export const FindVendorController = {
 
             return res.status(200).json(result as ResponseI)
         } catch (error: any) {
-            console.error('Delete Vendor Error:', error)
+            // console.error('Delete Vendor Error:', error)
             return res.status(200).json({
                 Status: false,
                 ResultOnDb: {},
@@ -377,7 +377,7 @@ export const FindVendorController = {
                 Message: 'Delete Success'
             } as ResponseI)
         } catch (error: any) {
-            console.error('Delete Vendor Contact Error:', error);
+            // console.error('Delete Vendor Contact Error:', error);
             res.status(200).json({
                 Status: false,
                 ResultOnDb: false,
@@ -407,7 +407,7 @@ export const FindVendorController = {
                 Message: 'Delete Success'
             } as ResponseI)
         } catch (error: any) {
-            console.error('Delete Vendor Product Error:', error);
+            // console.error('Delete Vendor Product Error:', error);
             res.status(200).json({
                 Status: false,
                 ResultOnDb: false,
@@ -438,7 +438,7 @@ export const FindVendorController = {
                 Message: 'Get Data Success'
             } as ResponseI)
         } catch (error: any) {
-            console.error('Get Vendor Business Category Name Error:', error);
+            // console.error('Get Vendor Business Category Name Error:', error);
             res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
@@ -469,7 +469,7 @@ export const FindVendorController = {
                 Message: 'Get Data Success'
             } as ResponseI)
         } catch (error: any) {
-            console.error('Get Provinces Error:', error);
+            // console.error('Get Provinces Error:', error);
             res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
@@ -500,7 +500,7 @@ export const FindVendorController = {
                 Message: 'Get Data Success'
             } as ResponseI)
         } catch (error: any) {
-            console.error('Get Product Groups Error:', error);
+            // console.error('Get Product Groups Error:', error);
             res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
@@ -725,7 +725,7 @@ export const FindVendorController = {
             res.end(buffer);
 
         } catch (error: any) {
-            console.error('downloadFileForExport error:', error)
+            // console.error('downloadFileForExport error:', error)
             if (!res.headersSent) return res.status(500).json({ error: 'Export failed', message: error?.message })
         }
     },
@@ -974,7 +974,7 @@ export const FindVendorController = {
             } as ResponseI);
 
         } catch (error: any) {
-            console.error('Match Prones Error:', error);
+            // console.error('Match Prones Error:', error);
             res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
@@ -996,7 +996,7 @@ export const FindVendorController = {
                 Message: 'Get Data Success'
             } as ResponseI)
         } catch (error: any) {
-            console.error('Get All Vendor Names Error:', error)
+            // console.error('Get All Vendor Names Error:', error)
             res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
@@ -1026,7 +1026,7 @@ export const FindVendorController = {
                 Message: 'Get Data Success'
             } as ResponseI)
         } catch (error: any) {
-            console.error('Get Prones Data All Error:', error)
+            // console.error('Get Prones Data All Error:', error)
             res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
@@ -1055,7 +1055,7 @@ export const FindVendorController = {
                 Message: 'Get Prones Raw Test Success'
             } as ResponseI)
         } catch (error: any) {
-            console.error('Get Prones Raw Test Error:', error)
+            // console.error('Get Prones Raw Test Error:', error)
             res.status(200).json({
                 Status: false,
                 ResultOnDb: [],

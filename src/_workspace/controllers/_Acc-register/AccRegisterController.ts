@@ -30,7 +30,7 @@ export const AccRegisterController = {
       })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      console.error('Complete Registration Error:', error)
+      // console.error('Complete Registration Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},

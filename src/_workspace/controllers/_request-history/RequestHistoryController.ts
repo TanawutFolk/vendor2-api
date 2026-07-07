@@ -34,7 +34,7 @@ export const RequestHistoryController = {
         Message: 'Get Data Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Get Registration Request Error:', error)
+      // console.error('Get Registration Request Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -75,7 +75,7 @@ export const RequestHistoryController = {
         Message: 'Get Data Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Get Approval Steps Error:', error)
+      // console.error('Get Approval Steps Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: [],
@@ -116,7 +116,7 @@ export const RequestHistoryController = {
         Message: 'Get Data Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Get Approval Logs Error:', error)
+      // console.error('Get Approval Logs Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: [],
@@ -146,7 +146,7 @@ export const RequestHistoryController = {
       const result = await RequestHistoryModel.resolveEmployeeProfile({ EMPCODE: empcode })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      console.error('Resolve Employee Profile Error:', error)
+      // console.error('Resolve Employee Profile Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -186,7 +186,7 @@ export const RequestHistoryController = {
         Message: 'Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Get GPR Form Error:', error)
+      // console.error('Get GPR Form Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},

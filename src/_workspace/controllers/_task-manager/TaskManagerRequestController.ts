@@ -29,7 +29,7 @@ export const TaskManagerRequestController = {
         Message: 'Get Data Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('SearchAllTask Error:', error)
+      // console.error('SearchAllTask Error:', error)
       return res.status(200).json({
         Status: false,
         ResultOnDb: [],
@@ -45,7 +45,7 @@ export const TaskManagerRequestController = {
       const result = await TaskManagerRequestModel.gprCTaskManagerQueue()
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      console.error('Get GPR C Task Manager Queue Error:', error)
+      // console.error('Get GPR C Task Manager Queue Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: [],

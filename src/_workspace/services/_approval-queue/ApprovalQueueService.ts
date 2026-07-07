@@ -1023,11 +1023,11 @@ const runPostCommitTasks = async (tasks: PostCommitTask[], requestId: number) =>
   const results = await Promise.allSettled(tasks.map((task) => task()))
   results.forEach((result, index) => {
     if (result.status === 'rejected') {
-      console.error('[ApprovalQueueService.updateStatus] postCommitTask failed', {
-        taskIndex: index,
-        request_id: requestId,
-        error: result.reason instanceof Error ? result.reason.message : result.reason,
-      })
+      // console.error('[ApprovalQueueService.updateStatus] postCommitTask failed', {
+        // taskIndex: index,
+        // request_id: requestId,
+        // error: result.reason instanceof Error ? result.reason.message : result.reason,
+      // })
     }
   })
 }
@@ -1161,9 +1161,9 @@ export const ApprovalQueueService = {
     } catch (error: unknown) {
       const message = getErrorMessage(error, 'Update status failed')
       if (isExpectedUpdateStatusError(error)) {
-        console.warn('ApprovalQueueService.updateStatus blocked:', message)
+        // console.warn('ApprovalQueueService.updateStatus blocked:', message)
       } else {
-        console.error('Error in ApprovalQueueService.updateStatus:', error)
+        // console.error('Error in ApprovalQueueService.updateStatus:', error)
       }
 
       return {
@@ -1316,7 +1316,7 @@ export const ApprovalQueueService = {
       try {
         await sendMail_ToRequester_RegistrationCompleted(dataItem)
       } catch (mailErr: unknown) {
-        console.error('[completeRegistration] Completion email failed:', mailErr instanceof Error ? mailErr.message : mailErr)
+        // console.error('[completeRegistration] Completion email failed:', mailErr instanceof Error ? mailErr.message : mailErr)
       }
 
       return {

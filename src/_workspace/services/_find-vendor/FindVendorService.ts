@@ -73,7 +73,7 @@ export const FindVendorService = {
         TotalCountOnDb: sqlList.length,
       }
     } catch (error: any) {
-      console.error('Error in FindVendorService.updateVendor:', error)
+      // console.error('Error in FindVendorService.updateVendor:', error)
       return {
         Status: false,
         Message: error?.message || 'Update Failed',
@@ -169,7 +169,7 @@ export const FindVendorService = {
         TotalCountOnDb: sqlList.length,
       }
     } catch (error: any) {
-      console.error('Error in FindVendorService.updateVendorComprehensive:', error)
+      // console.error('Error in FindVendorService.updateVendorComprehensive:', error)
       return {
         Status: false,
         Message: error?.message || 'Update Failed',
@@ -343,7 +343,7 @@ export const FindVendorService = {
         TotalCountOnDb: rows.length,
       }
     } catch (error: any) {
-      console.error('Error in FindVendorService.syncPronesToStaging:', error)
+      // console.error('Error in FindVendorService.syncPronesToStaging:', error)
       return {
         Status: false,
         Message: error?.message || 'Sync Failed',
@@ -467,7 +467,7 @@ export const FindVendorService = {
         TotalCountOnDb: matchResults.length,
       }
     } catch (error: any) {
-      console.error('Error in FindVendorService.runVendorMatching:', error)
+      // console.error('Error in FindVendorService.runVendorMatching:', error)
       return {
         Status: false,
         Message: error?.message || 'Matching Failed',

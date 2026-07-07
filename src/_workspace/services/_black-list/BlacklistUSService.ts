@@ -52,9 +52,9 @@ export const BlacklistUSService = {
 
       const workbook = XLSX.read(file.buffer, { type: 'buffer' })
 
-      console.log('\n====== [BlacklistUS] Import File ======')
-      console.log(`File name  : ${file.originalname}`)
-      console.log(`All sheets : ${workbook.SheetNames.join(', ')}`)
+      // console.log('\n====== [BlacklistUS] Import File ======')
+      // console.log(`File name  : ${file.originalname}`)
+      // console.log(`All sheets : ${workbook.SheetNames.join(', ')}`)
 
       // Merge rows from ALL sheets that can be parsed as US format
       // (instruction/empty sheets produce 0 rows and are automatically ignored)
@@ -65,7 +65,7 @@ export const BlacklistUSService = {
         const ws = workbook.Sheets[sheetName]
         if (!ws) continue
         const candidate = parseUsRows(ws)
-        console.log(`  Sheet "${sheetName}" → ${candidate.length} rows parsed`)
+        // console.log(`  Sheet "${sheetName}" → ${candidate.length} rows parsed`)
         if (candidate.length > 0) {
           allParsedRows.push(...candidate)
           usedSheets.push(sheetName)
@@ -73,9 +73,9 @@ export const BlacklistUSService = {
       }
 
       const parsedRows = allParsedRows
-      console.log(`Used sheets: [${usedSheets.join(', ')}]`)
-      console.log(`Total rows  : ${parsedRows.length}`)
-      console.log('======================================\n')
+      // console.log(`Used sheets: [${usedSheets.join(', ')}]`)
+      // console.log(`Total rows  : ${parsedRows.length}`)
+      // console.log('======================================\n')
 
       if (parsedRows.length === 0) {
         throw new Error('No blacklist rows found in any sheet. ' + `Sheets scanned: [${workbook.SheetNames.join(', ')}]. ` + 'Please verify this is a US blacklist file.')

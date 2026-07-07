@@ -134,7 +134,7 @@ export const AddVendorService = {
         TotalCountOnDb: 1,
       }
     } catch (error: any) {
-      console.error('Error in AddVendorService.createVendor:', error)
+      // console.error('Error in AddVendorService.createVendor:', error)
       return {
         Status: false,
         Message: error?.message || 'Failed to create vendor',
@@ -198,7 +198,7 @@ export const AddVendorService = {
         TotalCountOnDb: 0,
       }
     } catch (error: any) {
-      console.error('Error in AddVendorService.createProductGroup:', error)
+      // console.error('Error in AddVendorService.createProductGroup:', error)
       return {
         Status: false,
         Message: error?.message || 'Failed to create product group',

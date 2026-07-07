@@ -145,7 +145,7 @@ export const RequestRegisterPageController = {
     } catch (error: any) {
       const files = (req.files as any[]) || []
       files.forEach((uploadedFile) => removeTempUpload(uploadedFile?.path))
-      console.error('Create Registration Request Error:', error)
+      // console.error('Create Registration Request Error:', error)
       return res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -189,7 +189,7 @@ export const RequestRegisterPageController = {
 
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      console.error('Update Request Error:', error)
+      // console.error('Update Request Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -230,7 +230,7 @@ export const RequestRegisterPageController = {
         Message: `Agreement email sent to ${result.sent_to}`,
       } as ResponseI)
     } catch (error: any) {
-      console.error('Send Agreement Email Error:', error)
+      // console.error('Send Agreement Email Error:', error)
       return res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -281,7 +281,7 @@ export const RequestRegisterPageController = {
         Message: 'Create Data Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Create Approval Step Error:', error)
+      // console.error('Create Approval Step Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -338,7 +338,7 @@ export const RequestRegisterPageController = {
         Message: 'Update Data Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Update Approval Step Error:', error)
+      // console.error('Update Approval Step Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -381,7 +381,7 @@ export const RequestRegisterPageController = {
         Message: 'CC emails updated successfully',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Update CC Emails Error:', error)
+      // console.error('Update CC Emails Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -420,7 +420,7 @@ export const RequestRegisterPageController = {
       })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      console.error('Save GPR Form Error:', error)
+      // console.error('Save GPR Form Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -461,7 +461,7 @@ export const RequestRegisterPageController = {
 
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      console.error('Save GPR C Notification Error:', error)
+      // console.error('Save GPR C Notification Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -490,7 +490,7 @@ export const RequestRegisterPageController = {
       const result = await RequestRegisterPageModel.gprCGetFlow({ REQUEST_REGISTER_VENDOR_ID: request_id })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      console.error('Get GPR C Flow Error:', error)
+      // console.error('Get GPR C Flow Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -523,7 +523,7 @@ export const RequestRegisterPageController = {
       })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      console.error('Submit GPR C Setup Error:', error)
+      // console.error('Submit GPR C Setup Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -682,7 +682,7 @@ export const RequestRegisterPageController = {
           )
         } catch (selectionFileError: any) {
           // Never block the document upload Ã¢â‚¬â€ log warning only
-          console.warn('[SelectionFile] Failed to save to Receiving:', selectionFileError?.message)
+          // console.warn('[SelectionFile] Failed to save to Receiving:', selectionFileError?.message)
         }
       }
 
@@ -701,7 +701,7 @@ export const RequestRegisterPageController = {
       } as ResponseI)
     } catch (error: any) {
       removeTempUpload(file?.path)
-      console.error('Add Document Error:', error)
+      // console.error('Add Document Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -762,7 +762,7 @@ export const RequestRegisterPageController = {
 
       return res.download(resolvedPath, resolvedName)
     } catch (error: any) {
-      console.error('Download Selection Document Error:', error)
+      // console.error('Download Selection Document Error:', error)
 
       return res.status(200).json({
         Status: false,
@@ -849,7 +849,7 @@ export const RequestRegisterPageController = {
           : 'Selection document record cleared, but physical file was not found',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Delete Selection Document Error:', error)
+      // console.error('Delete Selection Document Error:', error)
 
       return res.status(200).json({
         Status: false,

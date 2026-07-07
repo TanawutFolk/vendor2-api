@@ -59,7 +59,7 @@ export const AccRegisterService = {
       try {
         await sendMail_ToRequester_RegistrationCompleted(dataItem)
       } catch (mailErr: any) {
-        console.error('[completeRegistration] Completion email failed:', mailErr?.message)
+        // console.error('[completeRegistration] Completion email failed:', mailErr?.message)
       }
 
       return {

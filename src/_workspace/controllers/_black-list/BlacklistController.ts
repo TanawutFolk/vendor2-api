@@ -44,7 +44,7 @@ export const BlacklistController = {
         Message: 'Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Search Blacklist Error:', error)
+      // console.error('Search Blacklist Error:', error)
       return res.status(200).json({
         Status: false,
         ResultOnDb: [],
@@ -70,7 +70,7 @@ export const BlacklistUSController = {
         Message: 'Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Search Blacklist US Error:', error)
+      // console.error('Search Blacklist US Error:', error)
       return res.status(200).json({
         Status: false,
         ResultOnDb: [],
@@ -98,7 +98,7 @@ export const BlacklistUSController = {
         Message: result?.Message || 'Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Import Blacklist US Error:', error)
+      // console.error('Import Blacklist US Error:', error)
       return res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -126,7 +126,7 @@ export const BlacklistCNController = {
         Message: 'Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Search Blacklist CN Error:', error)
+      // console.error('Search Blacklist CN Error:', error)
       return res.status(200).json({
         Status: false,
         ResultOnDb: [],
@@ -154,7 +154,7 @@ export const BlacklistCNController = {
         Message: result?.Message || 'Success',
       } as ResponseI)
     } catch (error: any) {
-      console.error('Import Blacklist CN Error:', error)
+      // console.error('Import Blacklist CN Error:', error)
       return res.status(200).json({
         Status: false,
         ResultOnDb: {},
