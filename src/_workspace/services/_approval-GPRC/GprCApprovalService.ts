@@ -327,7 +327,7 @@ const notifyRequesterSetup = async (requestId: number, updateBy: string) => {
       ...mailData,
       userName: requester.name,
       recipientName: requester.name,
-      systemLink: `${process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-history`,
+      systemLink: `${process.env.VENDOR_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/request-history`,
       picName: poPicContext.picName || 'Vendor Registration System',
     }),
   })

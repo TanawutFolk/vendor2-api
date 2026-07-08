@@ -263,6 +263,13 @@ export const FindVendorService = {
     const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
     return resultData
   },
+  // Get countries
+  getCountries: async (dataItem: any) => {
+    const sql = await FindVendorSQL.getCountries(dataItem)
+    const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
+    return resultData
+  },
+
 
   // Get product groups
   getProductGroups: async (dataItem: any) => {

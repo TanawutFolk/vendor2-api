@@ -35,7 +35,7 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SYSTEM_ORIGIN = process.env.LEAVE_SYSTEM_ORIGIN || 'http://localhost:5173'
+const SYSTEM_ORIGIN = process.env.VENDOR_SYSTEM_ORIGIN || 'http://localhost:5173'
 
 const DEFAULT_VENDOR_DOCUMENT_LOCAL_PATH =
   '\\\\192.168.14.35\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier Test\\00.DocumentSet\\01.New (Full)\\Local\\00.Sending'

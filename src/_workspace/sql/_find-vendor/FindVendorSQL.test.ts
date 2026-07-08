@@ -37,6 +37,15 @@ describe('FindVendorSQL audit preservation', () => {
     expect(sql).toContain('IFNULL(INUSE, 1) = 1')
     expect(sql).not.toContain('FROM\n                                       vendors')
   })
+  test('loads country dropdown from info_country master data', () => {
+    const sql = FindVendorSQL.getCountries()
+
+    expect(sql).toContain('info_country')
+    expect(sql).toContain('INFO_COUNTRY_NAME AS value')
+    expect(sql).toContain('INFO_COUNTRY_NAME AS label')
+    expect(sql).toContain('IFNULL(INUSE, 1) = 1')
+    expect(sql).not.toContain('FROM\n                                       vendors')
+  })
 
   test('loads vendor type dropdown from info_business_category master data', () => {
     const sql = FindVendorSQL.getVendorBusinessCategoryName()

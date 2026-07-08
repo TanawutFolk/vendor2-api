@@ -486,6 +486,26 @@ export const FindVendorSQL = {
         `
     return sql
   },
+  // Get countries for dropdown
+  getCountries: (dataItem?: any) => {
+    let sql = `
+                            SELECT
+                                       INFO_COUNTRY_NAME AS value
+                                     , INFO_COUNTRY_NAME AS label
+                                     , INFO_COUNTRY_ID
+                                     , DESCRIPTION
+                            FROM
+                                       info_country
+                            WHERE
+                                       IFNULL(INUSE, 1) = 1
+                                       AND INFO_COUNTRY_NAME IS NOT NULL
+                                       AND TRIM(INFO_COUNTRY_NAME) != ''
+                            ORDER BY
+                                       INFO_COUNTRY_NAME ASC
+        `
+    return sql
+  },
+
 
   // Get product groups for dropdown
   getProductGroups: (dataItem?: any) => {

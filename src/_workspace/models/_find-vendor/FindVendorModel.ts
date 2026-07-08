@@ -10,6 +10,7 @@ export const FindVendorModel = {
   getVendorBusinessCategoryName: async (dataItem: any = {}) => FindVendorService.getVendorBusinessCategoryName(dataItem),
   getVendorTypes: async (dataItem: any = {}) => FindVendorService.getVendorBusinessCategoryName(dataItem),
   getProvinces: async (dataItem: any = {}) => FindVendorService.getProvinces(dataItem),
+  getCountries: async (dataItem: any = {}) => FindVendorService.getCountries(dataItem),
   getProductGroups: async (dataItem: any = {}) => FindVendorService.getProductGroups(dataItem),
   searchAllForExport: async (dataItem: any) => FindVendorService.searchAllForExport(dataItem),
   // streamAllForExport is omitted as it does not exist on FindVendorService

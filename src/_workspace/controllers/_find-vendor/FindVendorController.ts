@@ -471,6 +471,36 @@ export const FindVendorController = {
             } as ResponseI)
         }
     },
+    // Get countries for dropdown
+    getCountries: async (req: Request, res: Response) => {
+        let dataItem
+
+        if (!req.body || Object.entries(req.body).length === 0) {
+            dataItem = req.query
+        } else {
+            dataItem = req.body
+        }
+
+        try {
+            const result = await FindVendorModel.getCountries()
+            res.status(200).json({
+                Status: true,
+                ResultOnDb: result,
+                TotalCountOnDb: result.length,
+                MethodOnDb: 'Get Countries',
+                Message: 'Get Data Success'
+            } as ResponseI)
+        } catch (error: any) {
+            res.status(200).json({
+                Status: false,
+                ResultOnDb: [],
+                TotalCountOnDb: 0,
+                MethodOnDb: 'Get Countries',
+                Message: error?.message || 'Failed to get countries'
+            } as ResponseI)
+        }
+    },
+
 
     // Get product groups for dropdown
     getProductGroups: async (req: Request, res: Response) => {
