@@ -524,7 +524,7 @@ const previewRecipientList = (emails: string[] = []) =>
     .filter(Boolean)
     .slice(0, 10)
 
-const systemLink = (page: 'request-register' | 'request-history') =>
+const systemLink = (page: 'request-register' | 'request-register-history') =>
   `${SYSTEM_ORIGIN}/en/${page}`
 
 // ─── Email send & log ─────────────────────────────────────────────────────────
@@ -874,7 +874,7 @@ export const sendMail_NegotiationStageDispatch = async (requestId: number, stage
         tel: vd.tel_phone || 'N/A',
         supportProduct: vd.supportProduct_Process || 'N/A',
         purchaseFrequency: vd.purchase_frequency || 'N/A',
-        systemLink: systemLink('request-history'),
+        systemLink: systemLink('request-register-history'),
       })
 
       await sendTemplatedEmail({
