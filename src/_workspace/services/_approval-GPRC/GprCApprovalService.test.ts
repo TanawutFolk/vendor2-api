@@ -129,6 +129,13 @@ describe('GprCApprovalService approval flow transitions', () => {
     mock.module('../_request-register/RegisterRequestNotificationHelper', () => ({
       sendMail_ToApprover_NextStep: mock(async () => undefined),
       sendMail_ToPic_RequestRejected: mock(async () => undefined),
+      // Full superset so this mock never breaks ApprovalQueueService's import under bun's shared
+      // global mock.module registry when the whole suite runs together.
+      sendMail_ToUser_ActionRequired: mock(async () => undefined),
+      sendMail_ToRequester_GprCApproved: mock(async () => undefined),
+      sendMail_ToRequester_RegistrationCompleted: mock(async () => undefined),
+      sendMail_ToRequester_RegistrationIncomplete: mock(async () => undefined),
+      sendMail_NegotiationStageDispatch: mock(async () => undefined),
     }))
     mock.module('@src/config/sendEmail', () => ({
       default: mock(async () => ({ messageId: 'test-message' })),

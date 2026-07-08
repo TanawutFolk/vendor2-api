@@ -609,7 +609,9 @@ export const GprCApprovalSQL = {
             FROM REQUEST_VENDOR_GPR_C_FLOWS f
                 JOIN REQUEST_VENDOR_GPR_C_STEPS s
                     ON s.REQUEST_VENDOR_GPR_C_FLOWS_ID = f.REQUEST_VENDOR_GPR_C_FLOWS_ID
-                    AND s.STEP_STATUS = 'in_progress'
+                    -- Keep actionable steps plus this approver's action history (approved/rejected),
+                    -- so a task stays visible after it has been actioned.
+                    AND s.STEP_STATUS IN ('in_progress', 'approved', 'rejected')
                     AND s.INUSE = 1
                 JOIN request_register_vendor rr
                     ON rr.REQUEST_REGISTER_VENDOR_ID = f.REQUEST_REGISTER_VENDOR_ID
@@ -622,7 +624,6 @@ export const GprCApprovalSQL = {
                     ON vc_fallback.VENDOR_CONTACTS_ID = ${RequestVendorContactSqlSnippets.firstActiveVendorContactIdExpr('v')}
                     AND vc_fallback.INUSE = 1
             WHERE f.INUSE = 1
-              AND f.FLOW_STATUS = 'in_progress'
               AND s.APPROVER_EMPCODE = 'dataItem.APPROVER_EMPCODE'
             ORDER BY f.REQUEST_VENDOR_GPR_C_FLOWS_ID DESC
         `
@@ -695,7 +696,10 @@ export const GprCApprovalSQL = {
                 FROM REQUEST_VENDOR_GPR_C_FLOWS f
                     JOIN REQUEST_VENDOR_GPR_C_STEPS s
                         ON s.REQUEST_VENDOR_GPR_C_FLOWS_ID = f.REQUEST_VENDOR_GPR_C_FLOWS_ID
-                        AND s.STEP_STATUS = 'in_progress'
+                        -- Keep actionable steps plus this approver's action history (approved/rejected),
+                        -- so a task stays visible after it has been actioned. The Approve/Reject/Action
+                        -- Required buttons are hidden on the frontend when STEP_STATUS is not 'in_progress'.
+                        AND s.STEP_STATUS IN ('in_progress', 'approved', 'rejected')
                         AND s.INUSE = 1
                     JOIN request_register_vendor rr
                         ON rr.REQUEST_REGISTER_VENDOR_ID = f.REQUEST_REGISTER_VENDOR_ID
@@ -708,7 +712,6 @@ export const GprCApprovalSQL = {
                         ON vc_fallback.VENDOR_CONTACTS_ID = ${RequestVendorContactSqlSnippets.firstActiveVendorContactIdExpr('v')}
                         AND vc_fallback.INUSE = 1
                 WHERE f.INUSE = 1
-                  AND f.FLOW_STATUS = 'in_progress'
             ) t
         `
 

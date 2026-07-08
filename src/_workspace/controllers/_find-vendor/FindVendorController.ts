@@ -118,20 +118,12 @@ export const FindVendorController = {
         // console.log('dataItem:', dataItem)
 
         try {
-            console.time('[PERF] Total Search');
-
-            console.time('[PERF] MySQL Query');
             const { resultData, totalCount } = await FindVendorModel.searchVendors(dataItem);
-            console.timeEnd('[PERF] MySQL Query');
-            // console.log(`[PERF] MySQL returned ${resultData.length} rows`);
             const finalResult = resultData.map((row: any) => {
                 delete row.CONTACTS_JSON
                 delete row.PRODUCTS_JSON
                 return row
             });
-
-            console.timeEnd('[PERF] Total Search');
-            // console.log(`[PERF] Returning ${finalResult.length} lightweight rows to client`);
 
             return res.status(200).json({
                 Status: true,
