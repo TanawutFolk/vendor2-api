@@ -13,7 +13,7 @@ export const GprCApprovalSQL = {
   buildLikeCondition: (column: any, rawValue: any) => {
     const value = String(rawValue ?? '').trim()
     if (!value) return ''
-    let condition = column + ` LIKE 'dataItem.LIKE_VALUE'`
+    let condition = column + ' LIKE \'dataItem.LIKE_VALUE\''
     condition = condition.replaceAll('dataItem.LIKE_VALUE', GprCApprovalSQL.likeValue(value))
     return condition
   },
@@ -58,7 +58,7 @@ export const GprCApprovalSQL = {
           })
           .filter(Boolean)
         if (values.length > 0) {
-          let condition = column + ` IN (dataItem.FILTER_VALUES)`
+          let condition = column + ' IN (dataItem.FILTER_VALUES)'
           condition = condition.replaceAll('dataItem.FILTER_VALUES', values.join(', '))
           conditions.push(condition)
         }
@@ -70,28 +70,28 @@ export const GprCApprovalSQL = {
       switch (fn) {
         case 'equals':
           {
-            let condition = column + ` = 'dataItem.FILTER_VALUE'`
+            let condition = column + ' = \'dataItem.FILTER_VALUE\''
             condition = condition.replaceAll('dataItem.FILTER_VALUE', safeValue)
             conditions.push(condition)
           }
           break
         case 'notEqual':
           {
-            let condition = column + ` <> 'dataItem.FILTER_VALUE'`
+            let condition = column + ' <> \'dataItem.FILTER_VALUE\''
             condition = condition.replaceAll('dataItem.FILTER_VALUE', safeValue)
             conditions.push(condition)
           }
           break
         case 'startsWith':
           {
-            let condition = column + ` LIKE 'dataItem.FILTER_VALUE%'`
+            let condition = column + ' LIKE \'dataItem.FILTER_VALUE%\''
             condition = condition.replaceAll('dataItem.FILTER_VALUE', safeValue)
             conditions.push(condition)
           }
           break
         case 'endsWith':
           {
-            let condition = column + ` LIKE '%dataItem.FILTER_VALUE'`
+            let condition = column + ' LIKE \'%dataItem.FILTER_VALUE\''
             condition = condition.replaceAll('dataItem.FILTER_VALUE', safeValue)
             conditions.push(condition)
           }
@@ -99,7 +99,7 @@ export const GprCApprovalSQL = {
         case 'contains':
         default:
           {
-            let condition = column + ` LIKE '%dataItem.FILTER_VALUE%'`
+            let condition = column + ' LIKE \'%dataItem.FILTER_VALUE%\''
             condition = condition.replaceAll('dataItem.FILTER_VALUE', safeValue)
             conditions.push(condition)
           }
@@ -172,7 +172,10 @@ export const GprCApprovalSQL = {
             )
         `
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', GprCApprovalSQL.num(dataItem.REQUEST_REGISTER_VENDOR_ID).toString())
-    sql = sql.replaceAll('dataItem.REQUEST_VENDOR_SELECTIONS_ID', dataItem.REQUEST_VENDOR_SELECTIONS_ID ? GprCApprovalSQL.num(dataItem.REQUEST_VENDOR_SELECTIONS_ID).toString() : 'NULL')
+    sql = sql.replaceAll(
+      'dataItem.REQUEST_VENDOR_SELECTIONS_ID',
+      dataItem.REQUEST_VENDOR_SELECTIONS_ID ? GprCApprovalSQL.num(dataItem.REQUEST_VENDOR_SELECTIONS_ID).toString() : 'NULL'
+    )
     sql = sql.replaceAll('dataItem.FLOW_STATUS', String(dataItem.FLOW_STATUS || 'requester_setup').toLowerCase())
     sql = sql.replaceAll('dataItem.CURRENT_STEP_CODE', dataItem.CURRENT_STEP_CODE || 'REQUESTER_SETUP')
     sql = sql.replaceAll('dataItem.REQUESTER_EMPCODE', dataItem.REQUESTER_EMPCODE)
@@ -199,7 +202,10 @@ export const GprCApprovalSQL = {
                 UPDATE_DATE = NOW()
             WHERE REQUEST_VENDOR_GPR_C_FLOWS_ID = dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID
         `
-    sql = sql.replaceAll('dataItem.REQUEST_VENDOR_SELECTIONS_ID', dataItem.REQUEST_VENDOR_SELECTIONS_ID ? GprCApprovalSQL.num(dataItem.REQUEST_VENDOR_SELECTIONS_ID).toString() : 'REQUEST_VENDOR_SELECTIONS_ID')
+    sql = sql.replaceAll(
+      'dataItem.REQUEST_VENDOR_SELECTIONS_ID',
+      dataItem.REQUEST_VENDOR_SELECTIONS_ID ? GprCApprovalSQL.num(dataItem.REQUEST_VENDOR_SELECTIONS_ID).toString() : 'REQUEST_VENDOR_SELECTIONS_ID'
+    )
     sql = sql.replaceAll('dataItem.FLOW_STATUS', String(dataItem.FLOW_STATUS || 'in_progress').toLowerCase())
     sql = sql.replaceAll('dataItem.CURRENT_STEP_CODE', dataItem.CURRENT_STEP_CODE || 'REQUESTER_APPROVER')
     sql = sql.replaceAll('dataItem.REQUESTER_EMPCODE', dataItem.REQUESTER_EMPCODE)
@@ -488,7 +494,7 @@ export const GprCApprovalSQL = {
 
   getActionRequiredQueueByPicEmailPaginated: (dataItem: any) => {
     const conditions = [
-      `t.PIC_EMAIL_NORMALIZED = LOWER('dataItem.PIC_EMAIL')`,
+      't.PIC_EMAIL_NORMALIZED = LOWER(\'dataItem.PIC_EMAIL\')',
       't.RESULT_STATUS IN (\'pending\', \'incomplete\')',
       ...GprCApprovalSQL.buildKeywordConditions(dataItem, {
         request_number: ['t.REQUEST_NUMBER', 'CAST(t.REQUEST_REGISTER_VENDOR_ID AS CHAR)'],
@@ -633,7 +639,7 @@ export const GprCApprovalSQL = {
 
   getQueueByApproverPaginated: (dataItem: any) => {
     const conditions = [
-      `t.APPROVER_EMPCODE = 'dataItem.APPROVER_EMPCODE'`,
+      't.APPROVER_EMPCODE = \'dataItem.APPROVER_EMPCODE\'',
       ...GprCApprovalSQL.buildKeywordConditions(dataItem, {
         request_number: ['t.REQUEST_NUMBER', 'CAST(t.REQUEST_REGISTER_VENDOR_ID AS CHAR)'],
         vendor_name: ['t.COMPANY_NAME'],
@@ -1063,7 +1069,9 @@ export const GprCApprovalSQL = {
   updateStatus: async (dataItem: any) => {
     let sql = `
                             UPDATE request_register_vendor SET
-                                       CURRENT_M_REQUEST_STATUS_ID = COALESCE(${RequestStatusSqlSnippets.requestStatusIdByValueExpr("'dataItem.REQUEST_STATUS'")}, CURRENT_M_REQUEST_STATUS_ID)
+                                       CURRENT_M_REQUEST_STATUS_ID = COALESCE(
+                                           ${RequestStatusSqlSnippets.requestStatusIdByValueExpr("'dataItem.REQUEST_STATUS'")}
+                                           , CURRENT_M_REQUEST_STATUS_ID)
                                      , REQUEST_STATE = CASE
                                            WHEN LOWER('dataItem.REQUEST_STATUS') = 'completed' THEN 'completed'
                                            WHEN LOWER('dataItem.REQUEST_STATUS') IN ('rejected', 'vendor disagreed') THEN 'rejected'

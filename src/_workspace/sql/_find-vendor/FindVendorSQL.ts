@@ -729,7 +729,8 @@ export const FindVendorSQL = {
   insertStagingPronesBatch: (rows: any[]) => {
     const values = rows
       .map((row: any, index: any) => {
-        let valueSql = `('dataItem.CUSTOMER_CODE_${index}', 'dataItem.CUSTOMER_NAME_${index}', 'dataItem.CUSTOMER_ADDRESS1_${index}', 'dataItem.CUSTOMER_ADDRESS2_${index}', 'dataItem.CUSTOMER_ADDRESS3_${index}', 'dataItem.CUSTOMER_TEL_${index}', LEFT('dataItem.CUSTOMER_NAME_${index}', 100), 'SYSTEM', 'SYSTEM', NOW(), NOW(), 1)`
+        let valueSql = `('dataItem.CUSTOMER_CODE_${index}', 'dataItem.CUSTOMER_NAME_${index}', 'dataItem.CUSTOMER_ADDRESS1_${index}', 'dataItem.CUSTOMER_ADDRESS2_${index}',
+          'dataItem.CUSTOMER_ADDRESS3_${index}', 'dataItem.CUSTOMER_TEL_${index}', LEFT('dataItem.CUSTOMER_NAME_${index}', 100), 'SYSTEM', 'SYSTEM', NOW(), NOW(), 1)`
         valueSql = valueSql.replaceAll(`dataItem.CUSTOMER_CODE_${index}`, row.CUSTOMER_CODE)
         valueSql = valueSql.replaceAll(`dataItem.CUSTOMER_NAME_${index}`, row.CUSTOMER_NAME)
         valueSql = valueSql.replaceAll(`dataItem.CUSTOMER_ADDRESS1_${index}`, row.CUSTOMER_ADDRESS1)
@@ -762,13 +763,13 @@ export const FindVendorSQL = {
 
   // Vendor Matching - Get staging prones data (from MySQL)
   getStagingPronesData: (dataItem?: any) => {
-    let sql = `SELECT CUSTOMER_CODE, CUSTOMER_NAME, CUSTOMER_ADDRESS1, CUSTOMER_ADDRESS2, CUSTOMER_ADDRESS3, CUSTOMER_TEL FROM staging_prones_data WHERE INUSE = 1`
+    let sql = 'SELECT CUSTOMER_CODE, CUSTOMER_NAME, CUSTOMER_ADDRESS1, CUSTOMER_ADDRESS2, CUSTOMER_ADDRESS3, CUSTOMER_TEL FROM staging_prones_data WHERE INUSE = 1'
     return sql
   },
 
   // Vendor Matching - Get vendors for matching
   getVendorsForMatch: (dataItem?: any) => {
-    let sql = `SELECT VENDORS_ID, COMPANY_NAME, ADDRESS, TEL_CENTER FROM vendors WHERE INUSE = 1`
+    let sql = 'SELECT VENDORS_ID, COMPANY_NAME, ADDRESS, TEL_CENTER FROM vendors WHERE INUSE = 1'
     return sql
   },
 
@@ -786,7 +787,8 @@ export const FindVendorSQL = {
   insertMatchResultBatch: (rows: any[]) => {
     const values = rows
       .map((row: any, index: any) => {
-        let valueSql = `(dataItem.VENDOR_ID_${index}, 'dataItem.STATUS_CHECK_${index}', 'dataItem.PRONES_CODE_${index}', 'dataItem.PRONES_NAME_${index}', 'dataItem.MATCH_METHOD_${index}', NOW(), LEFT('dataItem.MATCH_METHOD_${index}', 100), 'SYSTEM', 'SYSTEM', NOW(), NOW(), 1)`
+        let valueSql = `(dataItem.VENDOR_ID_${index}, 'dataItem.STATUS_CHECK_${index}', 'dataItem.PRONES_CODE_${index}', 'dataItem.PRONES_NAME_${index}',
+          'dataItem.MATCH_METHOD_${index}', NOW(), LEFT('dataItem.MATCH_METHOD_${index}', 100), 'SYSTEM', 'SYSTEM', NOW(), NOW(), 1)`
         valueSql = valueSql.replaceAll(`dataItem.VENDOR_ID_${index}`, (Number(row.VENDORS_ID) || 0).toString())
         valueSql = valueSql.replaceAll(`dataItem.STATUS_CHECK_${index}`, row.STATUS_CHECK)
         valueSql = valueSql.replaceAll(`dataItem.PRONES_CODE_${index}`, row.PRONES_CODE)
@@ -829,14 +831,14 @@ export const FindVendorSQL = {
   // Vendor Matching - Get match result by vendor_id
   getMatchResultByVendorIds: (dataItem: any) => {
     const ids = dataItem.VENDORIDS.map((id: any) => Number(id) || 0).join(',')
-    let sql = `SELECT VENDORS_ID, STATUS_CHECK, PRONES_CODE, PRONES_NAME, MATCH_METHOD FROM vendor_match_result WHERE VENDORS_ID IN (dataItem.VENDOR_IDS) AND INUSE = 1`
+    let sql = 'SELECT VENDORS_ID, STATUS_CHECK, PRONES_CODE, PRONES_NAME, MATCH_METHOD FROM vendor_match_result WHERE VENDORS_ID IN (dataItem.VENDOR_IDS) AND INUSE = 1'
     sql = sql.replaceAll('dataItem.VENDOR_IDS', ids)
     return sql
   },
 
   // Vendor Matching - Get all match results
   getAllMatchResults: (dataItem?: any) => {
-    let sql = `SELECT VENDORS_ID, STATUS_CHECK, PRONES_CODE, PRONES_NAME, MATCH_METHOD FROM vendor_match_result WHERE INUSE = 1`
+    let sql = 'SELECT VENDORS_ID, STATUS_CHECK, PRONES_CODE, PRONES_NAME, MATCH_METHOD FROM vendor_match_result WHERE INUSE = 1'
     return sql
   },
 }

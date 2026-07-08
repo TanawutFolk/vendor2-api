@@ -40,8 +40,24 @@ async function setup() {
     // Main workflow steps: in-progress Issue GPR C + pending Doc Check.
     if (query.includes('request_approval_step ras')) {
       return [
-        { REQUEST_APPROVAL_STEP_ID: 201, REQUEST_REGISTER_VENDOR_ID: 101, STEP_ORDER: 4, STEP_STATUS: 'in_progress', DESCRIPTION: 'Issue GPR C', STEP_CODE: 'ISSUE_GPR_C', APPROVER_EMPCODE: 'S00001' },
-        { REQUEST_APPROVAL_STEP_ID: 202, REQUEST_REGISTER_VENDOR_ID: 101, STEP_ORDER: 5, STEP_STATUS: 'pending', DESCRIPTION: 'PO & SCM Check All Document', STEP_CODE: 'DOC_CHECK', APPROVER_EMPCODE: 'S00002' },
+        {
+          REQUEST_APPROVAL_STEP_ID: 201,
+          REQUEST_REGISTER_VENDOR_ID: 101,
+          STEP_ORDER: 4,
+          STEP_STATUS: 'in_progress',
+          DESCRIPTION: 'Issue GPR C',
+          STEP_CODE: 'ISSUE_GPR_C',
+          APPROVER_EMPCODE: 'S00001',
+        },
+        {
+          REQUEST_APPROVAL_STEP_ID: 202,
+          REQUEST_REGISTER_VENDOR_ID: 101,
+          STEP_ORDER: 5,
+          STEP_STATUS: 'pending',
+          DESCRIPTION: 'PO & SCM Check All Document',
+          STEP_CODE: 'DOC_CHECK',
+          APPROVER_EMPCODE: 'S00002',
+        },
       ]
     }
     if (query.includes('VENDOR_CODE_SELECTOR') || query.includes('GPR_43_ACCEPTANCE_STATUS')) {

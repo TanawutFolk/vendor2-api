@@ -258,7 +258,9 @@ export const RequestRegisterPageService = {
           step_code: stepCode,
           DESCRIPTION: ws.label,
         })
-        const groupCode = (isOversea ? ws.DEFAULT_GROUP_CODE_OVERSEA : ws.DEFAULT_GROUP_CODE_LOCAL) || resolveGroupCodeForStep({ step_code: stepCode, actor_type: actorType }, isOversea)
+        const groupCode =
+          (isOversea ? ws.DEFAULT_GROUP_CODE_OVERSEA : ws.DEFAULT_GROUP_CODE_LOCAL) ||
+          resolveGroupCodeForStep({ step_code: stepCode, actor_type: actorType }, isOversea)
         const isPicOwnedStep = actorType === 'PIC'
         const isRequestSubmittedStep = stepCode === WORKFLOW_STEP_CODE.REQUEST_SUBMITTED
         const isPicReviewStep = stepCode === WORKFLOW_STEP_CODE.PIC_REVIEW

@@ -119,7 +119,8 @@ export const RequestHistorySQL = {
                                                                                'M_REQUEST_STATUS_ID', wsm.M_REQUEST_STATUS_ID,
                                                                                'STEP_ORDER', ras.STEP_ORDER,
                                                                                'APPROVER_EMPCODE', ras.APPROVER_EMPCODE,
-                                                                               'APPROVER_NAME', (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM person.member_fed pm WHERE pm.EMPCODE = ras.APPROVER_EMPCODE LIMIT 1),
+                                                                               'APPROVER_NAME', (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME)
+                                                                               FROM person.member_fed pm WHERE pm.EMPCODE = ras.APPROVER_EMPCODE LIMIT 1),
                                                                                'STEP_STATUS', ras.STEP_STATUS,
                                                                                'DESCRIPTION', mrs.STATUS_VALUE,
                                                                                'STEP_CODE', wsm.STEP_CODE,
@@ -154,7 +155,9 @@ export const RequestHistorySQL = {
                                                                                'REQUEST_APPROVAL_LOG_ID', ral.REQUEST_APPROVAL_LOG_ID,
                                                                                'REQUEST_APPROVAL_STEP_ID', ral.REQUEST_APPROVAL_STEP_ID,
                                                                                'ACTION_BY', ral.ACTION_BY,
-                                                                               'ACTION_BY_NAME', COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME) FROM person.member_fed pm WHERE pm.EMPCODE = ral.ACTION_BY LIMIT 1)),
+                                                                               'ACTION_BY_NAME', COALESCE(NULLIF(ral.ACTION_BY_NAME, ''),
+                                                                               (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME)
+                                                                               FROM person.member_fed pm WHERE pm.EMPCODE = ral.ACTION_BY LIMIT 1)),
                                                                                'ACTION_TYPE', ral.ACTION_TYPE,
                                                                                'DESCRIPTION', ral.DESCRIPTION,
                                                                                'REJECT_REASON', ral.REJECT_REASON,

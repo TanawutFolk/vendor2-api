@@ -54,7 +54,7 @@ export const RequestRegisterPageSQL = {
   getLastAssignedPicByVendorRegion: async (dataItem: any) => {
     const isOversea = String(dataItem['IS_OVERSEA'] || '').toLowerCase() === 'true' || Number(dataItem['IS_OVERSEA']) === 1
 
-    const vendorRegionClause = isOversea ? `= 'Oversea'` : `!= 'Oversea' OR v.VENDOR_REGION IS NULL`
+    const vendorRegionClause = isOversea ? '= \'Oversea\'' : '!= \'Oversea\' OR v.VENDOR_REGION IS NULL'
 
     let sql = `
                             SELECT
@@ -189,9 +189,12 @@ export const RequestRegisterPageSQL = {
                             WHERE
                                        (
                                            UPPER(TRIM(COALESCE(GROUP_CODE, ''))) = 'dataItem.TARGET_GROUP'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(GROUP_NAME, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_') = 'dataItem.TARGET_GROUP'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(GROUP_CODE, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.TARGET_COMPACT'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(GROUP_NAME, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.TARGET_COMPACT'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(GROUP_NAME, ''))), ' ', '_'), '(', ''),
+                                           ')', ''), '-', '_') = 'dataItem.TARGET_GROUP'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(GROUP_CODE, ''))), ' ', ''), '_', ''),
+                                           '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.TARGET_COMPACT'
+                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(GROUP_NAME, ''))), ' ', ''), '_', ''),
+                                           '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.TARGET_COMPACT'
                                        )
                                        AND INUSE = 1
                             ORDER BY
@@ -296,7 +299,8 @@ export const RequestRegisterPageSQL = {
                                             LEFT JOIN
                                        vendor_contacts vc ON vc.VENDORS_ID = v.VENDORS_ID
                                             LEFT JOIN
-                                       vendor_contacts vc_sel ON vc_sel.VENDOR_CONTACTS_ID = ${RequestVendorContactSqlSnippets.primaryVendorContactIdExpr('rr')} AND vc_sel.INUSE = 1
+                                       vendor_contacts vc_sel ON vc_sel.VENDOR_CONTACTS_ID = ${RequestVendorContactSqlSnippets.primaryVendorContactIdExpr('rr')}
+                                           AND vc_sel.INUSE = 1
                             WHERE
                                        rr.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
                             ORDER BY
@@ -851,7 +855,7 @@ export const RequestRegisterPageSQL = {
   },
 
   updateCcEmails: async (_dataItem: any) => {
-    return `SELECT 1 AS noop`
+    return 'SELECT 1 AS noop'
   },
 
   getSelection: (dataItem: any) => {

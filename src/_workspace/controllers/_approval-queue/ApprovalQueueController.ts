@@ -150,7 +150,8 @@ export const ApprovalQueueController = {
           // Queue view: keep actionable + action history for this queue step.
           actorFilters.push(
             [
-              'EXISTS (SELECT 1 FROM request_approval_step ras INNER JOIN workflow_step_master wsm ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID INNER JOIN m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID',
+              'EXISTS (SELECT 1 FROM request_approval_step ras INNER JOIN workflow_step_master wsm ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID',
+              'INNER JOIN m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID',
               'WHERE ras.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID',
               `AND ras.APPROVER_EMPCODE = '${dataItem.APPROVER_EMPCODE}'`,
               'AND ras.STEP_STATUS IN (\'in_progress\', \'approved\', \'rejected\')',
@@ -162,7 +163,8 @@ export const ApprovalQueueController = {
           // Fallback (legacy): include in-progress and action history for this approver.
           actorFilters.push(
             [
-              'EXISTS (SELECT 1 FROM request_approval_step ras INNER JOIN workflow_step_master wsm ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID INNER JOIN m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID',
+              'EXISTS (SELECT 1 FROM request_approval_step ras INNER JOIN workflow_step_master wsm ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID',
+              'INNER JOIN m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID',
               'WHERE ras.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID',
               `AND ras.APPROVER_EMPCODE = '${dataItem.APPROVER_EMPCODE}'`,
               'AND ras.STEP_STATUS IN (\'in_progress\', \'approved\', \'rejected\')',

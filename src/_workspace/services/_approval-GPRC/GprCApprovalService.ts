@@ -1,7 +1,13 @@
 import { MySQLExecute } from '@businessData/dbExecute'
 import { ResultSetHeader, RowDataPacket } from 'mysql2'
 import sendEmail from '@src/config/sendEmail'
-import { email_ToUser_ActionRequired, email_ToUser_ActionResult, email_ToGprCApprover_NextStep, email_ToRequester_GprCSetup, email_ToGprCApprover_FirstStep } from '@src/config/mailTemplate'
+import {
+  email_ToUser_ActionRequired,
+  email_ToUser_ActionResult,
+  email_ToGprCApprover_NextStep,
+  email_ToRequester_GprCSetup,
+  email_ToGprCApprover_FirstStep,
+} from '@src/config/mailTemplate'
 import { GprCApprovalSQL } from '../../sql/_approval-GPRC/GprCApprovalSQL'
 import { RequestRegisterPageSQL } from '../../sql/_request-register/RequestRegisterPageSQL'
 import { sendMail_ToApprover_NextStep, sendMail_ToPic_RequestRejected } from '../_request-register/RegisterRequestNotificationHelper'

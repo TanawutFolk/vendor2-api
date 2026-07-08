@@ -93,7 +93,8 @@ const renderDetails = (rows: DetailRow[]) => `
       .map(
         ([label, value]) => `
           <tr>
-            <td width="42%" valign="top" style="border-bottom: 1px solid #c9c9c9; padding: 7px 8px 7px 0; color: #555555; font-size: 12px; line-height: 1.45;">${escapeHtml(label)}</td>
+            <td width="42%" valign="top"
+              style="border-bottom: 1px solid #c9c9c9; padding: 7px 8px 7px 0; color: #555555; font-size: 12px; line-height: 1.45;">${escapeHtml(label)}</td>
             <td valign="top" style="border-bottom: 1px solid #c9c9c9; padding: 7px 0 7px 8px; color: #111111; font-size: 12px; line-height: 1.45;">${text(value)}</td>
           </tr>
         `
@@ -144,7 +145,9 @@ const renderSignature = (name: unknown, tel: unknown, role: string) => {
   return `
     <div style="border-top: 1px solid #c9c9c9; margin-top: 20px; padding-top: 13px; color: #111111; font-size: 12px; line-height: 1.55;">
       <div style="font-weight: 700;">Thank you &amp; Best regards,</div>
-      <div style="font-weight: 700;">${text(safeName, 'Vendor Registration System')}${String(tel || '').trim() ? ` <span style="font-weight: 400;">(#Tel. ${text(tel)})</span>` : ''}</div>
+      <div style="font-weight: 700;">${text(safeName, 'Vendor Registration System')}${
+        String(tel || '').trim() ? ` <span style="font-weight: 400;">(#Tel. ${text(tel)})</span>` : ''
+      }</div>
       <div>${escapeHtml(role)}</div>
     </div>
   `
@@ -172,11 +175,15 @@ const renderMailLayout = ({
 }: MailLayoutOptions) => `
   <!doctype html>
   <html>
-    <body style="margin: 0; padding: 0; background-color: #ffffff; background-image: linear-gradient(to bottom, #F02016 0%, #F02016 40%, #ffffff 40%, #ffffff 100%); background-repeat: no-repeat;">
-      <table role="presentation" width="100%" height="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff" style="width: 100%; min-height: 100%; border-collapse: collapse; background-color: #ffffff; background-image: linear-gradient(to bottom, #F02016 0%, #F02016 40%, #ffffff 40%, #ffffff 100%); background-repeat: no-repeat;">
+    <body style="margin: 0; padding: 0; background-color: #ffffff;
+      background-image: linear-gradient(to bottom, #F02016 0%, #F02016 40%, #ffffff 40%, #ffffff 100%); background-repeat: no-repeat;">
+      <table role="presentation" width="100%" height="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff"
+        style="width: 100%; min-height: 100%; border-collapse: collapse; background-color: #ffffff;
+        background-image: linear-gradient(to bottom, #F02016 0%, #F02016 40%, #ffffff 40%, #ffffff 100%); background-repeat: no-repeat;">
         <tr>
           <td align="center" valign="top" style="padding: 28px 12px 40px 12px; background-color: transparent;">
-            <table role="presentation" width="820" cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 820px; border-collapse: collapse; font-family: Arial, 'Segoe UI', Tahoma, sans-serif;">
+            <table role="presentation" width="820" cellspacing="0" cellpadding="0" border="0"
+              style="width: 100%; max-width: 820px; border-collapse: collapse; font-family: Arial, 'Segoe UI', Tahoma, sans-serif;">
               <tr>
                 <td style="padding: 0 16px; background-color: transparent;">
                   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; background: #ededed;">
@@ -250,11 +257,17 @@ export const email_ToSupplier_RequestFormA = (data: MailTemplateData) => {
   const requestNumber = data.topicRef || data.requestNumber
   const supplierType = data.isNewSupplier ? 'new supplier registration' : 'supplier re-registration'
   const englishIntro = data.isNewSupplier
-    ? `As <strong>Furukawa <span style="color: #ef1239;">FITEL</span> (Thailand) Co., Ltd.</strong> has never contacted or used the service from your company, it is necessary to <strong>request more information to register a new supplier</strong>. Including informing about company policies such as Environmental Policy, Quality Policy and Export Control Policy. Therefore, we kindly request the following documents:`
-    : `As <strong>Furukawa <span style="color: #ef1239;">FITEL</span> (Thailand) Co., Ltd.</strong> needs to update supplier registration information and confirm company policies such as Environmental Policy, Quality Policy and Export Control Policy, we kindly request the following documents:`
+    ? 'As <strong>Furukawa <span style="color: #ef1239;">FITEL</span> (Thailand) Co., Ltd.</strong> has never contacted or used the service from your company, it is ' +
+      'necessary to <strong>request more information to register a new supplier</strong>. Including informing about company policies such as Environmental Policy, Quality ' +
+      'Policy and Export Control Policy. Therefore, we kindly request the following documents:'
+    : 'As <strong>Furukawa <span style="color: #ef1239;">FITEL</span> (Thailand) Co., Ltd.</strong> needs to update supplier registration information and confirm company ' +
+      'policies such as Environmental Policy, Quality Policy and Export Control Policy, we kindly request the following documents:'
   const thaiIntro = data.isNewSupplier
-    ? `เนื่องด้วยทาง <strong>บริษัท ฟูรูกาวา <span style="color: #ef1239;">ไฟเทล</span> (ประเทศไทย) จำกัด</strong> ยังไม่เคยติดต่อใช้บริการร่วมกับบริษัทของคุณ จึงจำเป็นต้องมีการ<strong>ร้องขอข้อมูลที่จำเป็นเพื่อใช้ในการลงทะเบียนผู้ผลิต / ผู้จัดจำหน่ายใหม่</strong> รวมถึงการแจ้งข้อมูลเกี่ยวกับนโยบายของบริษัท ได้แก่ นโยบายด้านสิ่งแวดล้อม ด้านคุณภาพ และด้านการควบคุมการส่งออก ดังนั้นทางเราจึงรบกวนขอเอกสารต่าง ๆ ดังนี้`
-    : `เนื่องด้วยทาง <strong>บริษัท ฟูรูกาวา <span style="color: #ef1239;">ไฟเทล</span> (ประเทศไทย) จำกัด</strong> มีความจำเป็นต้องอัปเดตข้อมูลการลงทะเบียนผู้ผลิต / ผู้จัดจำหน่าย และยืนยันข้อมูลเกี่ยวกับนโยบายของบริษัท ได้แก่ นโยบายด้านสิ่งแวดล้อม ด้านคุณภาพ และด้านการควบคุมการส่งออก ดังนั้นทางเราจึงรบกวนขอเอกสารต่าง ๆ ดังนี้`
+    ? 'เนื่องด้วยทาง <strong>บริษัท ฟูรูกาวา <span style="color: #ef1239;">ไฟเทล</span> (ประเทศไทย) จำกัด</strong> ยังไม่เคยติดต่อใช้บริการร่วมกับบริษัทของคุณ ' +
+      'จึงจำเป็นต้องมีการ<strong>ร้องขอข้อมูลที่จำเป็นเพื่อใช้ในการลงทะเบียนผู้ผลิต / ผู้จัดจำหน่ายใหม่</strong> รวมถึงการแจ้งข้อมูลเกี่ยวกับนโยบายของบริษัท ได้แก่ ' +
+      'นโยบายด้านสิ่งแวดล้อม ด้านคุณภาพ และด้านการควบคุมการส่งออก ดังนั้นทางเราจึงรบกวนขอเอกสารต่าง ๆ ดังนี้'
+    : 'เนื่องด้วยทาง <strong>บริษัท ฟูรูกาวา <span style="color: #ef1239;">ไฟเทล</span> (ประเทศไทย) จำกัด</strong> มีความจำเป็นต้องอัปเดตข้อมูลการลงทะเบียนผู้ผลิต / ' +
+      'ผู้จัดจำหน่าย และยืนยันข้อมูลเกี่ยวกับนโยบายของบริษัท ได้แก่ นโยบายด้านสิ่งแวดล้อม ด้านคุณภาพ และด้านการควบคุมการส่งออก ดังนั้นทางเราจึงรบกวนขอเอกสารต่าง ๆ ดังนี้'
 
   return renderMailLayout({
     recipient: 'Supplier',
@@ -284,7 +297,8 @@ export const email_ToSupplier_RequestFormA = (data: MailTemplateData) => {
           If you have any comments, please let me know.
         </p>
         <p style="margin: 0 0 26px 0; font-size: 11px; color: #666666; line-height: 1.55;">
-          <em>Remark: This message (including any attachments) contains confidential information intended for a specific individual and purpose, and is protected by law. If you are not the intended recipient, you should delete this message.<br>
+          <em>Remark: This message (including any attachments) contains confidential information intended for a specific individual and purpose, and is protected by law. If you
+            are not the intended recipient, you should delete this message.<br>
           Any disclosure, copying, or distribution of this message, or the taking of any action based on it, is strictly prohibited.</em>
         </p>
       </div>
@@ -305,7 +319,8 @@ export const email_ToSupplier_RequestFormA = (data: MailTemplateData) => {
           หากมีข้อสงสัย โปรดแจ้งกลับมาให้เราทราบค่ะ
         </p>
         <p style="margin: 0 0 26px 0; font-size: 11px; color: #666666; line-height: 1.65;">
-          <em>หมายเหตุ: ข้อความนี้ (รวมถึงไฟล์แนบทั้งหมด) มีข้อมูลที่เป็นความลับซึ่งมีไว้สำหรับบุคคลและวัตถุประสงค์ที่เฉพาะเจาะจง และได้รับการคุ้มครองตามกฎหมาย หากท่านไม่ใช่ผู้รับที่ระบุไว้ กรุณาลบข้อความนี้<br>
+          <em>หมายเหตุ: ข้อความนี้ (รวมถึงไฟล์แนบทั้งหมด) มีข้อมูลที่เป็นความลับซึ่งมีไว้สำหรับบุคคลและวัตถุประสงค์ที่เฉพาะเจาะจง และได้รับการคุ้มครองตามกฎหมาย
+            หากท่านไม่ใช่ผู้รับที่ระบุไว้ กรุณาลบข้อความนี้<br>
           ห้ามเปิดเผย ทำสำเนา หรือเผยแพร่ข้อความนี้ หรือดำเนินการใด ๆ โดยอ้างอิงจากข้อความนี้โดยเด็ดขาด</em>
         </p>
       </div>
@@ -322,11 +337,13 @@ export const email_ToSupplier_RequestFormB = (data: MailTemplateData) =>
     content: `
       ${renderStatus(
         'Under Submit register vendor',
-        `Since you <strong style="color: #d32f2f; text-decoration: underline;">Not Accept</strong> the General Purchase Specification Form A document.<br>Please submit register vendor follow as <strong>"${text(data.requestNumber)}"</strong>. General Purchase Specification Form B and reply within 7 days.`
+        `Since you <strong style="color: #d32f2f; text-decoration: underline;">Not Accept</strong> the General Purchase Specification Form A document.<br>Please submit register
+          vendor follow as <strong>"${text(data.requestNumber)}"</strong>. General Purchase Specification Form B and reply within 7 days.`
       )}
       ${renderThaiStatus(
         'อยู่ระหว่างการดำเนินการลงทะเบียนผู้ขาย',
-        `เนื่องจากทางผู้ขาย <strong style="color: #d32f2f; text-decoration: underline;">ไม่ยอมรับ</strong> ข้อกำหนดตามเอกสาร General Purchase Specification Form A<br>โปรดกรอกข้อมูล ลงทะเบียนผู้ขายตามหมายเลข <strong>"${text(data.requestNumber)}"</strong> สำหรับเอกสาร General Purchase Specification Form B และตอบกลับภายใน 7 วัน`
+        `เนื่องจากทางผู้ขาย <strong style="color: #d32f2f; text-decoration: underline;">ไม่ยอมรับ</strong> ข้อกำหนดตามเอกสาร General Purchase Specification Form
+          A<br>โปรดกรอกข้อมูล ลงทะเบียนผู้ขายตามหมายเลข <strong>"${text(data.requestNumber)}"</strong> สำหรับเอกสาร General Purchase Specification Form B และตอบกลับภายใน 7 วัน`
       )}
     `,
   })

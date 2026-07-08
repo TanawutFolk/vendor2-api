@@ -205,7 +205,7 @@ export const AddVendorSQL = {
 
   // Get last inserted vendor id
   getLastInsertId: async (dataItem?: any) => {
-    let sql = `SELECT LAST_INSERT_ID() AS VENDORS_ID`
+    let sql = 'SELECT LAST_INSERT_ID() AS VENDORS_ID'
     return sql
   },
 

@@ -21,23 +21,23 @@ export const FindVendorController = {
 
         // Translate 'status' frontend filter ID to backend filter logic
         if (dataItem.SEARCHFILTERS && Array.isArray(dataItem.SEARCHFILTERS)) {
-            const statusIdx = dataItem.SEARCHFILTERS.findIndex((item: any) => item.id === 'status');
+            const statusIdx = dataItem.SEARCHFILTERS.findIndex((item: any) => item.id === 'status')
             if (statusIdx > -1) {
-                const val = dataItem.SEARCHFILTERS[statusIdx].value;
+                const val = dataItem.SEARCHFILTERS[statusIdx].value
                 if (val === '1' || val === 1) {
-                    dataItem.PRONESSTATUSFILTER = 'Registered';
-                    dataItem.SEARCHFILTERS.splice(statusIdx, 1);
+                    dataItem.PRONESSTATUSFILTER = 'Registered'
+                    dataItem.SEARCHFILTERS.splice(statusIdx, 1)
                 } else if (val === '0' || val === 0) {
-                    dataItem.PRONESSTATUSFILTER = 'Not Registered';
-                    dataItem.SEARCHFILTERS.splice(statusIdx, 1);
+                    dataItem.PRONESSTATUSFILTER = 'Not Registered'
+                    dataItem.SEARCHFILTERS.splice(statusIdx, 1)
                 } else if (val === 'In Progress') {
-                    dataItem.PRONESSTATUSFILTER = 'In Progress';
-                    dataItem.SEARCHFILTERS.splice(statusIdx, 1);
+                    dataItem.PRONESSTATUSFILTER = 'In Progress'
+                    dataItem.SEARCHFILTERS.splice(statusIdx, 1)
                 } else if (val === 'Cannot Register') {
-                    dataItem.PRONESSTATUSFILTER = 'Cannot Register';
-                    dataItem.SEARCHFILTERS.splice(statusIdx, 1);
+                    dataItem.PRONESSTATUSFILTER = 'Cannot Register'
+                    dataItem.SEARCHFILTERS.splice(statusIdx, 1)
                 } else {
-                    dataItem.SEARCHFILTERS.splice(statusIdx, 1);
+                    dataItem.SEARCHFILTERS.splice(statusIdx, 1)
                 }
             }
         }
@@ -118,12 +118,12 @@ export const FindVendorController = {
         // console.log('dataItem:', dataItem)
 
         try {
-            const { resultData, totalCount } = await FindVendorModel.searchVendors(dataItem);
+            const { resultData, totalCount } = await FindVendorModel.searchVendors(dataItem)
             const finalResult = resultData.map((row: any) => {
                 delete row.CONTACTS_JSON
                 delete row.PRODUCTS_JSON
                 return row
-            });
+            })
 
             return res.status(200).json({
                 Status: true,
@@ -170,7 +170,7 @@ export const FindVendorController = {
             const resultData = await FindVendorModel.getVendorDetails(vendor_id)
             if (resultData && resultData.length > 0) {
                 // Parse JSON_ARRAYAGG strings if they exist
-                const row = resultData[0];
+                const row = resultData[0]
                 let contacts = []
                 let products = []
 
@@ -580,11 +580,11 @@ export const FindVendorController = {
                 )
             }
 
-            const statusFilter = dataItem.DATAFORFETCH?.SEARCHFILTERS?.find((item: any) => item.id === 'status');
-            const requiredStatus = statusFilter && statusFilter.value ? statusFilter.value.toString() : null;
+            const statusFilter = dataItem.DATAFORFETCH?.SEARCHFILTERS?.find((item: any) => item.id === 'status')
+            const requiredStatus = statusFilter && statusFilter.value ? statusFilter.value.toString() : null
 
             // Intercept Order for SQL fallback
-            let statusSort: any = null;
+            let statusSort: any = null
             if (query.ORDER && Array.isArray(query.ORDER)) {
                 statusSort = query.ORDER.find((o: any) => o.id === 'status_check' || o.id === 'STATUS_CHECK')
                 if (statusSort) {
@@ -604,64 +604,64 @@ export const FindVendorController = {
             }
 
             // 1. Fetch Data
-            const searchQuery = { ...query, SQLWHERECOLUMNFILTER: '', ORDER: query.ORDER || 'v.COMPANY_NAME ASC' };
-            let vendorRows: any[] = [];
+            const searchQuery = { ...query, SQLWHERECOLUMNFILTER: '', ORDER: query.ORDER || 'v.COMPANY_NAME ASC' }
+            let vendorRows: any[] = []
 
             const vendorIds = query.VENDOR_IDS || []
             if (Array.isArray(vendorIds) && vendorIds.length > 0) {
                 // CASE A: Export Specific IDs (Current Page from Client-Side)
                 // We fetch these specific IDs.
                 // We must modify sqlWhere to filter by these IDs.
-                const ids = vendorIds.join(',');
-                const idsSqlWhere = ` AND v.VENDORS_ID IN (${ids})`;
+                const ids = vendorIds.join(',')
+                const idsSqlWhere = ` AND v.VENDORS_ID IN (${ids})`
                 // We use searchAllForExport but with specific IDs override
                 // We ignore Order from SQL, because we will sort by ID order in JS
-                searchQuery.SQLWHERE = idsSqlWhere;
-                vendorRows = await FindVendorModel.searchAllForExport(searchQuery) as any[];
+                searchQuery.SQLWHERE = idsSqlWhere
+                vendorRows = await FindVendorModel.searchAllForExport(searchQuery) as any[]
 
                 // Re-sort in Memory to match input ID order
-                const idMap = new Map();
+                const idMap = new Map()
                 if (Array.isArray(vendorIds)) {
-                    vendorIds.forEach((id: number, index: number) => idMap.set(id, index));
+                    vendorIds.forEach((id: number, index: number) => idMap.set(id, index))
                 }
 
                 vendorRows.sort((a: any, b: any) => {
-                    const idxA = idMap.has(a?.VENDORS_ID) ? idMap.get(a.VENDORS_ID) : 999999;
-                    const idxB = idMap.has(b?.VENDORS_ID) ? idMap.get(b.VENDORS_ID) : 999999;
-                    return (Number(idxA) || 0) - (Number(idxB) || 0);
-                });
+                    const idxA = idMap.has(a?.VENDORS_ID) ? idMap.get(a.VENDORS_ID) : 999999
+                    const idxB = idMap.has(b?.VENDORS_ID) ? idMap.get(b.VENDORS_ID) : 999999
+                    return (Number(idxA) || 0) - (Number(idxB) || 0)
+                })
 
             } else if (dataItem.TYPE === 'currentPage') {
                 // CASE B: Fallback Current Page (if no vendor_ids sent)
                 searchQuery['OFFSET'] = Number(searchQuery['START'] || 0) * Number(searchQuery['LIMIT'] || 20)
-                searchQuery.SQLWHERE = sqlWhere;
-                const { resultData } = await FindVendorModel.searchVendors(searchQuery);
-                vendorRows = resultData;
+                searchQuery.SQLWHERE = sqlWhere
+                const { resultData } = await FindVendorModel.searchVendors(searchQuery)
+                vendorRows = resultData
             } else {
                 // CASE C: All Pages
-                searchQuery.SQLWHERE = sqlWhere;
-                vendorRows = await FindVendorModel.searchAllForExport(searchQuery) as any[];
+                searchQuery.SQLWHERE = sqlWhere
+                vendorRows = await FindVendorModel.searchAllForExport(searchQuery) as any[]
             }
 
             // 2. Fetch Prones Data & Match
-            let resultData = await matchVendorsWithPrones(vendorRows, requiredStatus);
+            let resultData = await matchVendorsWithPrones(vendorRows, requiredStatus)
 
             // 2.1 Post-Fetch Sorting for 'STATUS_CHECK'
             if (statusSort) {
-                const desc = statusSort.desc;
+                const desc = statusSort.desc
                 resultData.sort((a: any, b: any) => {
-                    const valA = a.STATUS_CHECK || '';
-                    const valB = b.STATUS_CHECK || '';
-                    if (valA < valB) return desc ? 1 : -1;
-                    if (valA > valB) return desc ? -1 : 1;
-                    return 0;
-                });
+                    const valA = a.STATUS_CHECK || ''
+                    const valB = b.STATUS_CHECK || ''
+                    if (valA < valB) return desc ? 1 : -1
+                    if (valA > valB) return desc ? -1 : 1
+                    return 0
+                })
             }
 
             // 3. Create Workbook & Worksheet (Memory Approach - like ClearTimeExport)
             // Note: If you have a template file, use workbook.xlsx.readFile('path/to/template.xlsx')
-            const workbook = new excel.Workbook();
-            const worksheet = workbook.addWorksheet('Vendor List');
+            const workbook = new excel.Workbook()
+            const worksheet = workbook.addWorksheet('Vendor List')
 
             // 4. Setup Headers
             const headerMap: Record<string, string> = {
@@ -687,46 +687,46 @@ export const FindVendorController = {
                 CREATE_DATE: 'Created Date',
                 UPDATE_DATE: 'Updated Date'
             }
-            const visibleColumns = Object.keys(headerMap);
+            const visibleColumns = Object.keys(headerMap)
 
             // Set Title Row
-            worksheet.getCell('A1').value = 'Export : Vendor List';
-            worksheet.getCell('A1').font = { name: 'Aptos Display', size: 18, bold: true };
+            worksheet.getCell('A1').value = 'Export : Vendor List'
+            worksheet.getCell('A1').font = { name: 'Aptos Display', size: 18, bold: true }
 
             // Set Header Row (Row 2)
             visibleColumns.forEach((col, idx) => {
-                const cell = worksheet.getCell(2, idx + 1);
-                cell.value = headerMap[col];
-                cell.font = { name: 'Aptos Display', bold: true };
-                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBCD8F1' } };
-                cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-                cell.alignment = { vertical: 'middle', horizontal: 'center' };
-                worksheet.getColumn(idx + 1).width = 20;
-            });
+                const cell = worksheet.getCell(2, idx + 1)
+                cell.value = headerMap[col]
+                cell.font = { name: 'Aptos Display', bold: true }
+                cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBCD8F1' } }
+                cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }
+                cell.alignment = { vertical: 'middle', horizontal: 'center' }
+                worksheet.getColumn(idx + 1).width = 20
+            })
 
             // 5. Populate Data (Row 3+)
             resultData.forEach((row: any, rIdx: number) => {
-                const rowIndex = 3 + rIdx;
+                const rowIndex = 3 + rIdx
 
                 visibleColumns.forEach((col, cIdx) => {
-                    let cellValue = row[col];
+                    let cellValue = row[col]
 
                     // Date Fmt
                     if ((col === 'CREATE_DATE' || col === 'UPDATE_DATE') && cellValue) {
-                        const date = new Date(cellValue);
-                        cellValue = date.toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit' });
+                        const date = new Date(cellValue)
+                        cellValue = date.toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit' })
                     }
-                    if (col === 'MODEL_LIST' && cellValue) cellValue = cellValue.replace(/\n/g, ', ');
+                    if (col === 'MODEL_LIST' && cellValue) cellValue = cellValue.replace(/\n/g, ', ')
 
-                    const finalValue = cellValue !== undefined && cellValue !== null ? cellValue.toString() : '';
+                    const finalValue = cellValue !== undefined && cellValue !== null ? cellValue.toString() : ''
 
-                    const cell = worksheet.getCell(rowIndex, cIdx + 1);
-                    cell.value = finalValue;
-                    cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-                    cell.font = { name: 'Aptos Display', size: 11 };
-                    cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-                });
-            });
+                    const cell = worksheet.getCell(rowIndex, cIdx + 1)
+                    cell.value = finalValue
+                    cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true }
+                    cell.font = { name: 'Aptos Display', size: 11 }
+                    cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }
+                })
+            })
 
             // 6. Send Response logic (similar to ClearTime sendFile)
             const date = new Date()
@@ -738,13 +738,13 @@ export const FindVendorController = {
             const seconds = String(date.getSeconds()).padStart(2, '0')
             const filename = `Vendor_List_${year}${month}${day}_${hours}${minutes}${seconds}.xlsx`
 
-            const buffer = await workbook.xlsx.writeBuffer();
+            const buffer = await workbook.xlsx.writeBuffer()
 
-            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-            res.setHeader('Content-Length', (buffer as any).length);
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+            res.setHeader('Content-Length', (buffer as any).length)
 
-            res.end(buffer);
+            res.end(buffer)
 
         } catch (error: any) {
             // console.error('downloadFileForExport error:', error)
@@ -979,10 +979,10 @@ export const FindVendorController = {
             }
 
             // 1. à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ vendor à¸à¸±à¹ˆà¸‡à¹€à¸£à¸²
-            const myVendors = await FindVendorModel.getAllVendorNames();
+            const myVendors = await FindVendorModel.getAllVendorNames()
 
             // 2. à¹ƒà¸Šà¹‰ Helper à¹€à¸žà¸·à¹ˆà¸­ Match à¸à¸±à¸š Prones Data
-            const resultRows = await matchVendorsWithPrones(myVendors);
+            const resultRows = await matchVendorsWithPrones(myVendors)
 
             // 3. à¸ªà¹ˆà¸‡ JSON à¸à¸¥à¸±à¸š
             res.status(200).json({
@@ -993,7 +993,7 @@ export const FindVendorController = {
                 TotalCountOnDb: resultRows.length,
                 MethodOnDb: 'Comparison Prones',
                 Message: 'Comparison Success'
-            } as ResponseI);
+            } as ResponseI)
 
         } catch (error: any) {
             // console.error('Match Prones Error:', error);
@@ -1003,7 +1003,7 @@ export const FindVendorController = {
                 TotalCountOnDb: 0,
                 MethodOnDb: 'Comparison Prones',
                 Message: error?.message || 'Internal Server Error'
-            } as ResponseI);
+            } as ResponseI)
         }
     },
     // Get all vendor names

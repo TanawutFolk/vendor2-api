@@ -28,7 +28,7 @@
 
     if (filters.keyword) {
       const keywordVal = `%${filters.keyword}%`
-      let keywordSql = `(EMPNAME LIKE 'dataItem.KEYWORDVAL' OR EMPCODE LIKE 'dataItem.KEYWORDVAL' OR EMPEMAIL LIKE 'dataItem.KEYWORDVAL')`
+      let keywordSql = '(EMPNAME LIKE \'dataItem.KEYWORDVAL\' OR EMPCODE LIKE \'dataItem.KEYWORDVAL\' OR EMPEMAIL LIKE \'dataItem.KEYWORDVAL\')'
       keywordSql = keywordSql.replaceAll('dataItem.KEYWORDVAL', keywordVal)
       whereParts.push(keywordSql)
     }
@@ -38,8 +38,10 @@
       let groupSql = `(
       UPPER(TRIM(COALESCE(GROUP_CODE, ''))) = 'dataItem.GROUP_CODE'
       OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(GROUP_NAME, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_') = 'dataItem.GROUP_CODE'
-      OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(GROUP_CODE, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.GROUP_COMPACT'
-      OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(GROUP_NAME, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.GROUP_COMPACT'
+      OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(GROUP_CODE, ''))), ' ', ''), '_', ''),
+      '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.GROUP_COMPACT'
+      OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(GROUP_NAME, ''))), ' ', ''), '_', ''),
+      '-', ''), '(', ''), ')', ''), '.', '') = 'dataItem.GROUP_COMPACT'
     )`
       groupSql = groupSql.replaceAll('dataItem.GROUP_CODE', filters.group_code)
       groupSql = groupSql.replaceAll('dataItem.GROUP_COMPACT', groupCompact)
@@ -47,7 +49,7 @@
     }
 
     if (filters.in_use !== '') {
-      let inUseSql = `INUSE = dataItem.IN_USE`
+      let inUseSql = 'INUSE = dataItem.IN_USE'
       inUseSql = inUseSql.replaceAll('dataItem.IN_USE', AssigneesSQL.num(filters.in_use).toString())
       whereParts.push(inUseSql)
     }
@@ -219,7 +221,7 @@
         `
     let excludeIdSql = ''
     if (dataItem.ASSIGNEES_TO_ID) {
-      excludeIdSql = ` AND ASSIGNEES_TO_ID <> dataItem.ASSIGNEES_TO_ID`
+      excludeIdSql = ' AND ASSIGNEES_TO_ID <> dataItem.ASSIGNEES_TO_ID'
       excludeIdSql = excludeIdSql.replaceAll('dataItem.ASSIGNEES_TO_ID', (Number(dataItem.ASSIGNEES_TO_ID) || 0).toString())
     }
 
