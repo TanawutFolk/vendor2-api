@@ -145,7 +145,7 @@ export const RequestRegisterPageController = {
     } catch (error: any) {
       const files = (req.files as any[]) || []
       files.forEach((uploadedFile) => removeTempUpload(uploadedFile?.path))
-      // console.error('Create Registration Request Error:', error)
+      console.error('Create Registration Request Error:', error)
       return res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -230,7 +230,7 @@ export const RequestRegisterPageController = {
         Message: `Agreement email sent to ${result.sent_to}`,
       } as ResponseI)
     } catch (error: any) {
-      // console.error('Send Agreement Email Error:', error)
+      console.error('Send Agreement Email Error:', error)
       return res.status(200).json({
         Status: false,
         ResultOnDb: {},
@@ -682,7 +682,7 @@ export const RequestRegisterPageController = {
           )
         } catch (selectionFileError: any) {
           // Never block the document upload Ã¢â‚¬â€ log warning only
-          // console.warn('[SelectionFile] Failed to save to Receiving:', selectionFileError?.message)
+          console.warn('[SelectionFile] Failed to save to Receiving:', selectionFileError?.message)
         }
       }
 
@@ -701,7 +701,7 @@ export const RequestRegisterPageController = {
       } as ResponseI)
     } catch (error: any) {
       removeTempUpload(file?.path)
-      // console.error('Add Document Error:', error)
+      console.error('Add Document Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},

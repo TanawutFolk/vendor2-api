@@ -3,9 +3,9 @@ module.exports = {
     {
       name: 'master-data-system-new-template-web-api-7035-expressjs',
       script: 'npm',
-      args: 'run start:prod',
+      args: 'run start:dev',
       env: {
-        NODE_ENV: 'production',
+        NODE_ENV: 'develpoment',
       },
       out_file: '/dev/null', // Prevent output logs
       error_file: '/dev/null', // Prevent error logs

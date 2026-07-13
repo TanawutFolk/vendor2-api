@@ -37,12 +37,12 @@ import {
 
 const SYSTEM_ORIGIN = process.env.VENDOR_SYSTEM_ORIGIN || 'http://localhost:5173'
 
-const DEFAULT_VENDOR_DOCUMENT_LOCAL_PATH =
-  '\\\\192.168.14.35\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier Test\\00.DocumentSet\\01.New (Full)\\Local\\00.Sending'
-const DEFAULT_VENDOR_DOCUMENT_OVERSEA_PATH =
-  '\\\\192.168.14.35\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier Test\\00.DocumentSet\\01.New (Full)\\Oversea\\00.Sending'
-const DEFAULT_VENDOR_DOCUMENT_FORM_B_PATH =
-  '\\\\192.168.14.35\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier Test\\00.DocumentSet\\00.Purchase Form\\FORM B.xlsx'
+// POSIX paths: the c01_qms share is mounted at /mnt/c01_qms on the host. See SelectionFileService.
+const DEFAULT_VENDOR_DOCUMENT_BASE =
+  '/mnt/c01_qms/PM/02_Record/FM-PM-303 Selection Supplier/FM-PM-303 Selection Supplier Test/00.DocumentSet'
+const DEFAULT_VENDOR_DOCUMENT_LOCAL_PATH = `${DEFAULT_VENDOR_DOCUMENT_BASE}/01.New (Full)/Local/00.Sending`
+const DEFAULT_VENDOR_DOCUMENT_OVERSEA_PATH = `${DEFAULT_VENDOR_DOCUMENT_BASE}/01.New (Full)/Oversea/00.Sending`
+const DEFAULT_VENDOR_DOCUMENT_FORM_B_PATH = `${DEFAULT_VENDOR_DOCUMENT_BASE}/00.Purchase Form/FORM B.xlsx`
 const VENDOR_DOCUMENT_ATTACHMENT_EXTENSIONS = new Set(['.pdf', '.xlsx', '.xls', '.doc', '.docx'])
 
 const getVendorDocumentLocalPath = () => process.env.VENDOR_DOCUMENT_LOCAL_PATH || DEFAULT_VENDOR_DOCUMENT_LOCAL_PATH
@@ -51,11 +51,11 @@ const getVendorDocumentFormBPath = () => process.env.VENDOR_DOCUMENT_FORM_B_PATH
 
 const logVendorDocumentFolder = (message: string, detail?: unknown) => {
   if (detail === undefined) {
-    // console.log(`[VendorDocumentFolder] ${message}`)
+    console.log(`[VendorDocumentFolder] ${message}`)
     return
   }
 
-  // console.log(`[VendorDocumentFolder] ${message}:`, detail)
+  console.log(`[VendorDocumentFolder] ${message}:`, detail)
 }
 
 const STAGE_KEY = {
@@ -554,14 +554,14 @@ const logTemplateEvent = (
   }
 
   if (phase === 'failed') {
-    // console.error(`[MAIL TEMPLATE][${phase}]`, {
-      // ...logPayload,
-      // error: payload.error?.message || payload.error || 'unknown error',
-    // })
+    console.error(`[MAIL TEMPLATE][${phase}]`, {
+      ...logPayload,
+      error: payload.error?.message || payload.error || 'unknown error',
+    })
     return
   }
 
-  // console.log(`[MAIL TEMPLATE][${phase}]`, logPayload)
+  console.log(`[MAIL TEMPLATE][${phase}]`, logPayload)
 }
 
 const sendTemplatedEmail = async (payload: {
@@ -787,12 +787,15 @@ export const sendMail_ToSupplier_RequestFormA = async (dataItem: any) => {
     throw new Error('Request number is required before sending Agreement to Vendor')
   }
 
+  // Create the folder structure before reading the template attachments: a missing template
+  // folder must not stop the request's own folders from being provisioned.
+  SelectionFileService.createFolderStructure(resolvedRequestNumber)
+
   const attachments = buildVendorDocumentAttachments(
     vd.vendor_region || dataItem.VENDOR_REGION,
     false
   )
 
-  SelectionFileService.createFolderStructure(resolvedRequestNumber)
   if (attachments.length > 0) {
     SelectionFileService.copyAttachmentsToSending(resolvedRequestNumber, attachments)
   }
@@ -898,8 +901,9 @@ export const sendMail_NegotiationStageDispatch = async (requestId: number, stage
 
     if (!vendorEmail) return { sent: false, reason: 'missing vendor email' }
 
-    const attachments = buildVendorDocumentAttachments(vd.vendor_region, isGprBStage)
     SelectionFileService.createFolderStructure(requestNumber)
+
+    const attachments = buildVendorDocumentAttachments(vd.vendor_region, isGprBStage)
     if (attachments.length > 0) {
       SelectionFileService.copyAttachmentsToSending(requestNumber, attachments)
     }
@@ -937,7 +941,7 @@ export const sendMail_NegotiationStageDispatch = async (requestId: number, stage
 
     return { sent: true, to: vendorEmail, ccCount: ccEmails.length }
   } catch (err: any) {
-    // console.error('[triggerVendorDocumentEmail] Failed:', err?.message)
+    console.error('[triggerVendorDocumentEmail] Failed:', err?.message)
     return { sent: false, reason: err?.message || 'send failed' }
   }
 }
@@ -1045,7 +1049,7 @@ export const sendMail_ToApprover_NextStep = async (dataItem: any, nextStep: any,
       },
     })
   } catch (err: any) {
-    // console.error('[triggerApprovalEmails] Failed:', err?.message)
+    console.error('[triggerApprovalEmails] Failed:', err?.message)
   }
 }
 
@@ -1106,7 +1110,7 @@ export const sendMail_ToUser_ActionRequired = async (dataItem: any, currentStep:
       extra: { flow: 'triggerActionRequiredEmail', stageKey, stageLabel },
     })
   } catch (err: any) {
-    // console.error('[triggerActionRequiredEmail] Failed:', err?.message)
+    console.error('[triggerActionRequiredEmail] Failed:', err?.message)
   }
 }
 
@@ -1171,7 +1175,7 @@ export const sendMail_ToRequester_GprCApproved = async (dataItem: any) => {
       extra: { flow: 'triggerAfterGprCApprovedEmail' },
     })
   } catch (err: any) {
-    // console.error('[triggerAfterGprCApprovedEmail] Failed:', err?.message)
+    console.error('[triggerAfterGprCApprovedEmail] Failed:', err?.message)
   }
 }
 
@@ -1255,7 +1259,7 @@ export const sendMail_ToPic_RequestRejected = async (dataItem: any, currentStep:
       },
     })
   } catch (err: any) {
-    // console.error('[triggerRejectionEmail] Failed:', err?.message)
+    console.error('[triggerRejectionEmail] Failed:', err?.message)
   }
 }
 
@@ -1315,7 +1319,7 @@ export const sendMail_ToRequester_RegistrationCompleted = async (dataItem: any) 
       extra: { flow: 'triggerCompletionEmail', vendorCode: dataItem.VENDOR_CODE || vd.vendor_code || '' },
     })
   } catch (err: any) {
-    // console.error('[triggerCompletionEmail] Failed:', err?.message)
+    console.error('[triggerCompletionEmail] Failed:', err?.message)
   }
 }
 
@@ -1379,6 +1383,6 @@ export const sendMail_ToRequester_RegistrationIncomplete = async (dataItem: any)
       extra: { flow: 'triggerVendorDisagreeEmail' },
     })
   } catch (err: any) {
-    // console.error('[triggerVendorDisagreeEmail] Failed:', err?.message)
+    console.error('[triggerVendorDisagreeEmail] Failed:', err?.message)
   }
 }

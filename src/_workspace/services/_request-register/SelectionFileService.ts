@@ -2,9 +2,12 @@ import fs from 'fs'
 import path from 'path'
 
 // Configuration
-// Base path for Selection Supplier file storage.
+// Base path for Selection Supplier file storage. On the host the c01_qms share is mounted at
+// /mnt/c01_qms, so this stays a POSIX path — a backslash here would be a literal filename
+// character, and a UNC default would be treated as a relative path and silently create junk
+// folders under the process cwd.
 const DEFAULT_SELECTION_FILE_BASE_PATH =
-  '\\\\192.168.14.35\\c01_qms\\PM\\02_Record\\FM-PM-303 Selection Supplier Test\\01.Selection_File'
+  '/mnt/c01_qms/PM/02_Record/FM-PM-303 Selection Supplier/FM-PM-303 Selection Supplier Test/01.Selection_File'
 
 // Upload directory where multer stores temporary files
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads', 'documents')
@@ -13,11 +16,11 @@ const getSelectionFileBasePath = () => process.env.SELECTION_FILE_BASE_PATH || D
 
 const logFolder = (message: string, detail?: unknown) => {
   if (detail === undefined) {
-    // console.log(`[SelectionFile] ${message}`)
+    console.log(`[SelectionFile] ${message}`)
     return
   }
 
-  // console.log(`[SelectionFile] ${message}:`, detail)
+  console.log(`[SelectionFile] ${message}:`, detail)
 }
 
 // Helpers

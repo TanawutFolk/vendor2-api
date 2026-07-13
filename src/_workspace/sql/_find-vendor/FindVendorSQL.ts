@@ -611,6 +611,8 @@ export const FindVendorSQL = {
                                        1 = 1
                                        dataItem.SQLWHERE
                                        dataItem.SQLWHERECOLUMNFILTER
+                            GROUP BY
+                                       v.VENDORS_ID
                             ORDER BY
                                        dataItem.ORDER
         `
@@ -768,8 +770,25 @@ export const FindVendorSQL = {
   },
 
   // Vendor Matching - Get vendors for matching
+  // CONTACT_TELS carries every active contact phone, comma-separated, so the matcher can
+  // score a Prones tel against the company line or any contact line.
   getVendorsForMatch: (dataItem?: any) => {
-    let sql = 'SELECT VENDORS_ID, COMPANY_NAME, ADDRESS, TEL_CENTER FROM vendors WHERE INUSE = 1'
+    let sql = `
+      SELECT
+        v.VENDORS_ID,
+        v.COMPANY_NAME,
+        v.ADDRESS,
+        v.TEL_CENTER,
+        GROUP_CONCAT(DISTINCT vc.TEL_PHONE SEPARATOR ',') AS CONTACT_TELS
+      FROM vendors v
+      LEFT JOIN vendor_contacts vc
+        ON vc.VENDORS_ID = v.VENDORS_ID
+       AND vc.INUSE = 1
+       AND vc.TEL_PHONE IS NOT NULL
+       AND vc.TEL_PHONE <> ''
+      WHERE v.INUSE = 1
+      GROUP BY v.VENDORS_ID, v.COMPANY_NAME, v.ADDRESS, v.TEL_CENTER
+    `
     return sql
   },
 

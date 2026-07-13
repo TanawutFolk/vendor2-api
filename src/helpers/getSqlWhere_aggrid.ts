@@ -23,6 +23,16 @@ export default function getSqlWhere_aggrid(body: any, tableIds: any, orderByDefa
   body.OFFSET = Number(startInput || 0)
   body.Offset = body.OFFSET
 
+  // Map Limit → LIMIT the same way Start → OFFSET is mapped above. Without this,
+  // callers sending mixed-case `Limit` fall through to each SQL file's hardcoded
+  // fallback (e.g. 10), returning fewer rows than the grid's block size — AG Grid
+  // then re-requests the same block forever.
+  const limitInput = body.LIMIT ?? body.Limit
+  if (limitInput != null) {
+    body.LIMIT = Number(limitInput)
+    body.Limit = body.LIMIT
+  }
+
   let orderBy =
     orderInput && orderInput.length
       ? orderInput

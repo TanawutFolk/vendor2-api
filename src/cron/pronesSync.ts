@@ -1,6 +1,6 @@
 import { FindVendorService } from '../_workspace/services/_find-vendor/FindVendorService'
 
-const DAILY_HOUR = 12.3 // 18:00 น. (6 โมงเย็น) เวลาไทย
+const DAILY_HOUR = 12.00 // ทำงานทุกวันเวลา 12:00 น. (เวลาไทย)
 const INTERVAL_MS = 24 * 60 * 60 * 1000 // 24 ชั่วโมง
 
 const runSync = async () => {

@@ -23,6 +23,7 @@
     "test:vendor:db": "bun run db:audit:inspect && bun run db:normalize:smoke",
     "test:vendor": "bun run test:vendor:unit && bun run test:vendor:db",
     "build:prod": "npm run format && npm run lint && cross-env NODE_ENV=production tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
+    "build:dev": "npm run format && npm run lint && cross-env NODE_ENV=development tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
     "start:prod": "cross-env NODE_ENV=production node -r tsconfig-paths/register dist/index.js",
     "build:azure": "npm run lint && cross-env NODE_ENV=azure tsc --project tsconfig.json && tsc-alias -p tsconfig.json",
     "start:azure": "cross-env NODE_ENV=azure node -r tsconfig-paths/register dist/index.js",

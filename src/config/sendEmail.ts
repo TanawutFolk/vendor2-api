@@ -285,11 +285,11 @@ const sendEmail = async (
   })
 
   if (normalizedToEmails.length === 0) {
-    // console.error('[MAIL TEMPLATE][skipped]', {
-      // ...logPayload,
-      // reason: 'Invalid TO recipient',
-      // rawToEmail: send_to,
-    // })
+    console.error('[MAIL TEMPLATE][skipped]', {
+      ...logPayload,
+      reason: 'Invalid TO recipient',
+      rawToEmail: send_to,
+    })
     return { success: false, skipped: true, reason: 'Invalid TO recipient' }
   }
 
@@ -310,21 +310,21 @@ const sendEmail = async (
       .join(', ')
     const reason = `Attachment exceeds the 3 MB per-file limit: ${details}`
 
-    // console.error('[MAIL TEMPLATE][skipped]', {
-      // ...logPayload,
-      // reason,
-    // })
+    console.error('[MAIL TEMPLATE][skipped]', {
+      ...logPayload,
+      reason,
+    })
     return { success: false, skipped: true, reason }
   }
 
   missingAttachments.forEach((item) => {
-    // console.error('[MAIL TEMPLATE][attachment skipped]', {
-      // ...logPayload,
-      // filename: item.filename,
-      // contentType: item.contentType,
-      // path: item.attachment?.path || '',
-      // reason: item.reason,
-    // })
+    console.error('[MAIL TEMPLATE][attachment skipped]', {
+      ...logPayload,
+      filename: item.filename,
+      contentType: item.contentType,
+      path: item.attachment?.path || '',
+      reason: item.reason,
+    })
   })
 
   readableAttachments.forEach((item) => {
@@ -332,15 +332,15 @@ const sendEmail = async (
   })
 
   try {
-    // console.log('[MAIL TEMPLATE][sending]', {
-      // ...logPayload,
-      // toEmail: normalizedTo,
-      // attachmentCount: readableAttachments.length,
-      // attachedFiles: readableAttachments.map((item) => ({
-        // filename: item.filename,
-        // contentType: item.contentType,
-      // })),
-    // })
+    console.log('[MAIL TEMPLATE][sending]', {
+      ...logPayload,
+      toEmail: normalizedTo,
+      attachmentCount: readableAttachments.length,
+      attachedFiles: readableAttachments.map((item) => ({
+        filename: item.filename,
+        contentType: item.contentType,
+      })),
+    })
 
     const response = await axios.post(API_URL, form, {
       headers: await getFormHeaders(form),
@@ -349,24 +349,24 @@ const sendEmail = async (
     })
 
     if (response.status === 200) {
-      // console.log(`ส่งเมลหา ${send_to} สำเร็จ!`);
+      console.log(`ส่งเมลหา ${send_to} สำเร็จ!`)
     }
-    // console.log('[MAIL TEMPLATE][sent]', {
-      // ...logPayload,
-      // status: response.status,
-    // })
+    console.log('[MAIL TEMPLATE][sent]', {
+      ...logPayload,
+      status: response.status,
+    })
 
     return { success: true }
   } catch (error: any) {
-    // console.error('[MAIL TEMPLATE][failed]', {
-      // ...logPayload,
-      // message: error?.message,
-      // status: error?.response?.status,
-      // data: error?.response?.data,
-    // })
-    // console.error(`ส่งเมลหา ${send_to} ไม่สำเร็จ:`, error.message);
+    console.error('[MAIL TEMPLATE][failed]', {
+      ...logPayload,
+      message: error?.message,
+      status: error?.response?.status,
+      data: error?.response?.data,
+    })
+    console.error(`ส่งเมลหา ${send_to} ไม่สำเร็จ:`, error.message)
     if (error.response) {
-      // console.error("Response Data:", error.response.data);
+      console.error('Response Data:', error.response.data)
     }
     return { success: false, reason: error?.message || 'Mail API error' }
   }

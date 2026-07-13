@@ -273,15 +273,16 @@ export const RequestRegisterPageService = {
             : ''
 
         if (isReRegisterRequest) {
-          if (isRequestSubmittedStep) {
-            initialStatus = 'approved'
-          } else if (isPicReviewStep || isVendorRequestStep) {
-            initialStatus = 'approved'
-          } else if (isPendingAgreementStep) {
-            initialStatus = 'approved'
-          } else if (!reRegisterInProgressAssigned && stepOrder > 2) {
+          // Re-register is raised by the PO PIC, so submission and PIC review are already done.
+          // The request stops at Pending Agreement To Vendor, waiting for the vendor's reply.
+          if (isPendingAgreementStep && !reRegisterInProgressAssigned) {
             initialStatus = 'in_progress'
             reRegisterInProgressAssigned = true
+          } else if (
+            !reRegisterInProgressAssigned &&
+            (isRequestSubmittedStep || isPicReviewStep || isVendorRequestStep)
+          ) {
+            initialStatus = 'approved'
           }
         } else {
           if (isRequestSubmittedStep) initialStatus = 'approved'
@@ -362,7 +363,7 @@ export const RequestRegisterPageService = {
       try {
         SelectionFileService.createFolderStructure(requestNumber)
       } catch (folderError: any) {
-        // console.warn('[SelectionFile] Failed to ensure request folder structure:', folderError?.message)
+        console.warn('[SelectionFile] Failed to ensure request folder structure:', folderError?.message)
       }
 
       // Move the requester's attached files into 02.Request Documents and repoint each
@@ -381,7 +382,7 @@ export const RequestRegisterPageService = {
           )
         } catch (fileError: any) {
           // Leave this file in uploads/documents with its original DB FILE_PATH so it still downloads.
-          // console.warn(`[SelectionFile] Failed to move request document ${doc.filename} to 02.Request Documents:`, fileError?.message)
+          console.warn(`[SelectionFile] Failed to move request document ${doc.filename} to 02.Request Documents:`, fileError?.message)
         }
       }
 
@@ -395,7 +396,7 @@ export const RequestRegisterPageService = {
       } else {
         RequestRegisterPageService
           .sendMail_ToPic_NewRequest(dataItem, vendorData, nextAssignee, insertedId, requestNumber, assignmentGroupCode)
-          .catch(() => undefined /* console.error */)
+          .catch((mailError) => console.error('[sendMail_ToPic_NewRequest] Failed:', mailError?.message || mailError))
       }
 
       return {
@@ -415,7 +416,7 @@ export const RequestRegisterPageService = {
         conn.release()
         conn = null
       }
-      // console.error('Error in RequestRegisterPageService.createRequest:', error)
+      console.error('Error in RequestRegisterPageService.createRequest:', error)
       return {
         Status: false,
         Message: error?.message || 'Failed to create request',

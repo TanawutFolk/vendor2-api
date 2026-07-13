@@ -416,8 +416,11 @@ export const FindVendorService = {
       }
 
       for (const vendor of vendors) {
-        const mTel = cleanTel(vendor.TEL_CENTER),
-          mName = cleanName(vendor.COMPANY_NAME),
+        // A Prones tel counts as a match against the company line or any of the vendor's contact lines.
+        const mTels = [vendor.TEL_CENTER, ...String(vendor.CONTACT_TELS || '').split(',')]
+          .map(cleanTel)
+          .filter(Boolean)
+        const mName = cleanName(vendor.COMPANY_NAME),
           mAddress = vendor.ADDRESS || ''
         let bestScore = 0,
           bestMethods: string[] = [],
@@ -429,7 +432,8 @@ export const FindVendorService = {
             score++
             methods.push('name')
           }
-          if (mTel && cleanTel(prones.CUSTOMER_TEL) === mTel) {
+          const pTel = cleanTel(prones.CUSTOMER_TEL)
+          if (pTel && mTels.includes(pTel)) {
             score++
             methods.push('tel')
           }

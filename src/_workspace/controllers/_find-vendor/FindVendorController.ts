@@ -263,13 +263,7 @@ export const FindVendorController = {
             }
 
             const result = await FindVendorModel.updateVendor(updateData)
-            res.status(200).json({
-                Status: true,
-                ResultOnDb: result,
-                TotalCountOnDb: 1,
-                MethodOnDb: 'Update Vendor',
-                Message: 'Update Data Success'
-            } as ResponseI)
+            res.status(200).json(result as ResponseI)
         } catch (error: any) {
             // console.error('Update Vendor Error:', error);
             res.status(200).json({
@@ -360,14 +354,8 @@ export const FindVendorController = {
         }
 
         try {
-            await FindVendorModel.deleteVendorContact(dataItem)
-            res.status(200).json({
-                Status: true,
-                ResultOnDb: true,
-                TotalCountOnDb: 1,
-                MethodOnDb: 'Delete Vendor Contact',
-                Message: 'Delete Success'
-            } as ResponseI)
+            const result = await FindVendorModel.deleteVendorContact(dataItem)
+            res.status(200).json(result as ResponseI)
         } catch (error: any) {
             // console.error('Delete Vendor Contact Error:', error);
             res.status(200).json({
@@ -390,14 +378,8 @@ export const FindVendorController = {
         }
 
         try {
-            await FindVendorModel.deleteVendorProduct(dataItem)
-            res.status(200).json({
-                Status: true,
-                ResultOnDb: true,
-                TotalCountOnDb: 1,
-                MethodOnDb: 'Delete Vendor Product',
-                Message: 'Delete Success'
-            } as ResponseI)
+            const result = await FindVendorModel.deleteVendorProduct(dataItem)
+            res.status(200).json(result as ResponseI)
         } catch (error: any) {
             // console.error('Delete Vendor Product Error:', error);
             res.status(200).json({
@@ -633,7 +615,9 @@ export const FindVendorController = {
 
             } else if (dataItem.TYPE === 'currentPage') {
                 // CASE B: Fallback Current Page (if no vendor_ids sent)
-                searchQuery['OFFSET'] = Number(searchQuery['START'] || 0) * Number(searchQuery['LIMIT'] || 20)
+                // START from the AG Grid pages is already a row offset — do not multiply by LIMIT
+                // (getSqlWhere_elysia above has also already applied its own START scaling).
+                searchQuery['OFFSET'] = Number(searchQuery['START'] || 0)
                 searchQuery.SQLWHERE = sqlWhere
                 const { resultData } = await FindVendorModel.searchVendors(searchQuery)
                 vendorRows = resultData
@@ -664,7 +648,9 @@ export const FindVendorController = {
             const worksheet = workbook.addWorksheet('Vendor List')
 
             // 4. Setup Headers
-            const headerMap: Record<string, string> = {
+            // The grid sends its own visible columns (id + header, in display order) so the sheet
+            // mirrors exactly what the user sees. Fall back to the full column set when it doesn't.
+            const defaultHeaderMap: Record<string, string> = {
                 FFT_VENDOR_CODE: 'Vendor Code',
                 STATUS_CHECK: 'Prones Status',
                 COMPANY_NAME: 'Company Name',
@@ -687,7 +673,22 @@ export const FindVendorController = {
                 CREATE_DATE: 'Created Date',
                 UPDATE_DATE: 'Updated Date'
             }
-            const visibleColumns = Object.keys(headerMap)
+
+            type ExportColumn = { id: string; header: string; empty: string; width: number }
+
+            const requestedColumns: ExportColumn[] = (Array.isArray(query.COLUMNS) ? query.COLUMNS : [])
+                .map((col: any) => ({
+                    id: String(col?.id || '').trim(),
+                    header: String(col?.header || defaultHeaderMap[String(col?.id || '')] || col?.id || ''),
+                    // Placeholder the grid's valueFormatter renders for a blank cell (e.g. '-').
+                    empty: String(col?.empty ?? ''),
+                    width: Number(col?.width) > 0 ? Math.round(Number(col.width) / 7) : 20,
+                }))
+                .filter((col: ExportColumn) => Boolean(col.id))
+
+            const visibleColumns: ExportColumn[] = requestedColumns.length > 0
+                ? requestedColumns
+                : Object.entries(defaultHeaderMap).map(([id, header]) => ({ id, header, empty: '', width: 20 }))
 
             // Set Title Row
             worksheet.getCell('A1').value = 'Export : Vendor List'
@@ -696,12 +697,12 @@ export const FindVendorController = {
             // Set Header Row (Row 2)
             visibleColumns.forEach((col, idx) => {
                 const cell = worksheet.getCell(2, idx + 1)
-                cell.value = headerMap[col]
+                cell.value = col.header
                 cell.font = { name: 'Aptos Display', bold: true }
                 cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBCD8F1' } }
                 cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } }
                 cell.alignment = { vertical: 'middle', horizontal: 'center' }
-                worksheet.getColumn(idx + 1).width = 20
+                worksheet.getColumn(idx + 1).width = col.width
             })
 
             // 5. Populate Data (Row 3+)
@@ -709,16 +710,18 @@ export const FindVendorController = {
                 const rowIndex = 3 + rIdx
 
                 visibleColumns.forEach((col, cIdx) => {
-                    let cellValue = row[col]
+                    let cellValue = row[col.id]
 
                     // Date Fmt
-                    if ((col === 'CREATE_DATE' || col === 'UPDATE_DATE') && cellValue) {
+                    if ((col.id === 'CREATE_DATE' || col.id === 'UPDATE_DATE') && cellValue) {
                         const date = new Date(cellValue)
                         cellValue = date.toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit' })
                     }
-                    if (col === 'MODEL_LIST' && cellValue) cellValue = cellValue.replace(/\n/g, ', ')
+                    if (col.id === 'MODEL_LIST' && cellValue) cellValue = cellValue.replace(/\n/g, ', ')
 
-                    const finalValue = cellValue !== undefined && cellValue !== null ? cellValue.toString() : ''
+                    const finalValue = cellValue !== undefined && cellValue !== null && cellValue !== ''
+                        ? cellValue.toString()
+                        : col.empty
 
                     const cell = worksheet.getCell(rowIndex, cIdx + 1)
                     cell.value = finalValue
