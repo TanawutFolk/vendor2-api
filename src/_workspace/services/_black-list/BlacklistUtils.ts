@@ -334,10 +334,6 @@ export const parseUsRows = (worksheet: XLSX.WorkSheet): ParsedBlacklistUsRow[] =
   }
   // ─────────────────────────────────────────────────────────────────────────
 
-  let skippedEmpty = 0
-  let skippedHeader = 0
-  let skippedNoName = 0
-
   for (let rowIndex = startRow; rowIndex < rows.length; rowIndex++) {
     const row = (rows[rowIndex] || []).slice(0, MAX_TRACKED_COLUMNS)
     const sourceName = normalizeText(getCellValue(row, columns.source))
@@ -347,15 +343,12 @@ export const parseUsRows = (worksheet: XLSX.WorkSheet): ParsedBlacklistUsRow[] =
     const primaryName = normalizeText(getCellValue(row, columns.name))
 
     if (!sourceName && !entityNumber && !entityType && !programs && !primaryName) {
-      skippedEmpty++
       continue
     }
     if (looksLikeUsHeaderRow(sourceName, entityNumber, entityType, programs, primaryName)) {
-      skippedHeader++
       continue
     }
     if (!primaryName) {
-      skippedNoName++
       continue
     }
 
@@ -386,9 +379,6 @@ export const parseUsRows = (worksheet: XLSX.WorkSheet): ParsedBlacklistUsRow[] =
     })
   }
 
-  // console.log(`Rows skipped (empty): ${skippedEmpty}`)
-  // console.log(`Rows skipped (header-like): ${skippedHeader}`)
-  // console.log(`Rows skipped (no name at col ${columns.name}): ${skippedNoName}`)
   // console.log(`Rows parsed OK      : ${parsedRows.length}`)
   // console.log('============================================\n')
   ;(parsedRows as any).__debug = {

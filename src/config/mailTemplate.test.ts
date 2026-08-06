@@ -11,6 +11,7 @@ import {
   email_ToPic_RequestRegisterVendor,
   email_ToAccount_RegisterRequired,
   email_ToChecker_CheckRequired,
+  email_ToChecker_ReturnedByPoMgr,
   email_ToMd_ApproveRequired,
   email_ToPoGm_ApproveRequired,
   email_ToPoManager_ApproveRequired,
@@ -54,6 +55,7 @@ const templates = [
   email_ToGprCApprover_NextStep,
   email_ToPic_RejectedByApprover,
   email_ToChecker_CheckRequired,
+  email_ToChecker_ReturnedByPoMgr,
   email_ToPic_RejectedByChecker,
   email_ToPoManager_ApproveRequired,
   email_ToPoGm_ApproveRequired,
@@ -69,7 +71,7 @@ describe('mail templates', () => {
     const html = template(sample)
 
     expect(html).toContain('Vendor Registration Request')
-    expect(html).toContain('linear-gradient(to bottom, #F02016 0%, #F02016 40%, #ffffff 40%, #ffffff 100%)')
+    expect(html).not.toContain('#F02016')
     expect(html).toContain('padding: 28px 12px 40px 12px')
     expect(html).toContain('background: #ededed')
     expect(html).toContain('border-left: 4px solid #111111')
@@ -84,6 +86,14 @@ describe('mail templates', () => {
     expect(html).toContain('<div style="font-weight: 700;">Thank you &amp; Best regards,</div>')
     expect(html).toContain('<div style="font-weight: 700;">TANAWUT PATRAWAN</div>')
     expect(html).toContain('<div>PO &amp; SCM PIC</div>')
+  })
+
+  test('renders the PO Mgr return remark for Document Check', () => {
+    const html = email_ToChecker_ReturnedByPoMgr(sample)
+
+    expect(html).toContain('Returned by PO Mgr for document recheck')
+    expect(html).toContain('Please correct the document.')
+    expect(html).toContain('PO &amp; SCM Check All Document')
   })
 
   test('does not render empcode or email values as signature names', () => {

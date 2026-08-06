@@ -9,13 +9,14 @@ export const GprCApprovalController = {
     try {
       const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Approve GPR C Step',
           Message: 'Invalid request_id',
         } as ResponseI)
+        return
       }
 
       const result = await GprCApprovalModel.gprCApproveStep({
@@ -43,13 +44,14 @@ export const GprCApprovalController = {
     try {
       const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Reject GPR C Step',
           Message: 'Invalid request_id',
         } as ResponseI)
+        return
       }
 
       const result = await GprCApprovalModel.gprCRejectStep({
@@ -77,13 +79,14 @@ export const GprCApprovalController = {
     try {
       const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'GPR C Action Required',
           Message: 'Invalid request_id',
         } as ResponseI)
+        return
       }
 
       const result = await GprCApprovalModel.gprCActionRequired({
@@ -113,18 +116,31 @@ export const GprCApprovalController = {
     try {
       const action_required_id = parseInt(dataItem.REQUEST_VENDOR_GPR_C_ACTION_REQUIRED_ID as string)
       if (!action_required_id || isNaN(action_required_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Record GPR C Action Result',
           Message: 'Invalid action_required_id',
         } as ResponseI)
+        return
+      }
+
+      const actionResultStatusId = Number(dataItem.M_ACTION_RESULT_STATUS_ID)
+      if (!Number.isInteger(actionResultStatusId) || actionResultStatusId <= 0) {
+        res.status(400).json({
+          Status: false,
+          ResultOnDb: {},
+          TotalCountOnDb: 0,
+          MethodOnDb: 'Record GPR C Action Result',
+          Message: 'Invalid action result status ID',
+        } as ResponseI)
+        return
       }
 
       const result = await GprCApprovalModel.gprCRecordActionResult({
         REQUEST_VENDOR_GPR_C_ACTION_REQUIRED_ID: action_required_id,
-        RESULT_STATUS: dataItem.RESULT_STATUS || 'COMPLETED',
+        M_ACTION_RESULT_STATUS_ID: actionResultStatusId,
         RESULT_REMARK: dataItem.RESULT_REMARK || '',
         RESULT_BY: dataItem.RESULT_BY || dataItem.UPDATE_BY || '',
         UPDATE_BY: dataItem.UPDATE_BY || dataItem.RESULT_BY || 'SYSTEM',
@@ -148,13 +164,14 @@ export const GprCApprovalController = {
     try {
       const approver_empcode = String(dataItem.APPROVER_EMPCODE || dataItem.APPROVER_EMPCODE || '').trim()
       if (!approver_empcode) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: [],
           TotalCountOnDb: 0,
           MethodOnDb: 'Get GPR C Queue',
           Message: 'Missing approver_empcode',
         } as ResponseI)
+        return
       }
 
       const result = await GprCApprovalModel.gprCQueue({
@@ -180,13 +197,14 @@ export const GprCApprovalController = {
     try {
       const pic_email = String(dataItem.PIC_EMAIL || '').trim()
       if (!pic_email) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: [],
           TotalCountOnDb: 0,
           MethodOnDb: 'Get GPR C Action Required Queue',
           Message: 'Missing pic_email',
         } as ResponseI)
+        return
       }
 
       const result = await GprCApprovalModel.gprCActionRequiredQueue({

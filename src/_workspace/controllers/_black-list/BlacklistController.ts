@@ -36,22 +36,24 @@ export const BlacklistController = {
 
     try {
       const result = await BlacklistModel.search(dataItem)
-      return res.status(200).json({
+      res.status(200).json({
         Status: true,
         ResultOnDb: result[1],
         TotalCountOnDb: result[0]?.[0]?.TOTAL_COUNT ?? 0,
         MethodOnDb: 'Search Blacklist',
         Message: 'Success',
       } as ResponseI)
+      return
     } catch (error: any) {
       // console.error('Search Blacklist Error:', error)
-      return res.status(200).json({
+      res.status(200).json({
         Status: false,
         ResultOnDb: [],
         TotalCountOnDb: 0,
         MethodOnDb: 'Search Blacklist',
         Message: error?.message || 'Failed to search blacklist',
       } as ResponseI)
+      return
     }
   },
 }
@@ -62,22 +64,24 @@ export const BlacklistUSController = {
 
     try {
       const result = await BlacklistUSModel.search(dataItem)
-      return res.status(200).json({
+      res.status(200).json({
         Status: true,
         ResultOnDb: result,
         TotalCountOnDb: result.length,
         MethodOnDb: 'Search Blacklist US',
         Message: 'Success',
       } as ResponseI)
+      return
     } catch (error: any) {
       // console.error('Search Blacklist US Error:', error)
-      return res.status(200).json({
+      res.status(200).json({
         Status: false,
         ResultOnDb: [],
         TotalCountOnDb: 0,
         MethodOnDb: 'Search Blacklist US',
         Message: error?.message || 'Failed to search US blacklist',
       } as ResponseI)
+      return
     }
   },
 
@@ -90,22 +94,24 @@ export const BlacklistUSController = {
         FILE: req.file,
       })
 
-      return res.status(200).json({
+      res.status(200).json({
         Status: result?.Status ?? false,
         ResultOnDb: result?.ResultOnDb ?? {},
         TotalCountOnDb: result?.TotalCountOnDb ?? 0,
         MethodOnDb: result?.MethodOnDb || 'Import Blacklist US',
         Message: result?.Message || 'Success',
       } as ResponseI)
+      return
     } catch (error: any) {
       // console.error('Import Blacklist US Error:', error)
-      return res.status(200).json({
+      res.status(200).json({
         Status: false,
         ResultOnDb: {},
         TotalCountOnDb: 0,
         MethodOnDb: 'Import Blacklist US',
         Message: error?.message || 'Failed to import US blacklist',
       } as ResponseI)
+      return
     }
   },
 }
@@ -118,22 +124,24 @@ export const BlacklistCNController = {
 
     try {
       const result = await BlacklistCNModel.search(dataItem)
-      return res.status(200).json({
+      res.status(200).json({
         Status: true,
         ResultOnDb: result,
         TotalCountOnDb: result.length,
         MethodOnDb: 'Search Blacklist CN',
         Message: 'Success',
       } as ResponseI)
+      return
     } catch (error: any) {
       // console.error('Search Blacklist CN Error:', error)
-      return res.status(200).json({
+      res.status(200).json({
         Status: false,
         ResultOnDb: [],
         TotalCountOnDb: 0,
         MethodOnDb: 'Search Blacklist CN',
         Message: error?.message || 'Failed to search CN blacklist',
       } as ResponseI)
+      return
     }
   },
 
@@ -146,22 +154,24 @@ export const BlacklistCNController = {
         FILE: req.file,
       })
 
-      return res.status(200).json({
+      res.status(200).json({
         Status: result?.Status ?? false,
         ResultOnDb: result?.ResultOnDb ?? {},
         TotalCountOnDb: result?.TotalCountOnDb ?? 0,
         MethodOnDb: result?.MethodOnDb || 'Import Blacklist CN',
         Message: result?.Message || 'Success',
       } as ResponseI)
+      return
     } catch (error: any) {
       // console.error('Import Blacklist CN Error:', error)
-      return res.status(200).json({
+      res.status(200).json({
         Status: false,
         ResultOnDb: {},
         TotalCountOnDb: 0,
         MethodOnDb: 'Import Blacklist CN',
         Message: error?.message || 'Failed to import CN blacklist',
       } as ResponseI)
+      return
     }
   },
 }

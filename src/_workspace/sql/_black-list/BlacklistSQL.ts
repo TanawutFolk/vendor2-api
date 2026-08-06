@@ -228,30 +228,42 @@
     return [sqlCount, sqlData]
   },
 
-  deactivateUs: (updateBy: any) => `
+  deactivateUs: (updateBy: any) => {
+    let sql = `
     UPDATE blacklist_us
     SET
       INUSE = 0,
-      UPDATE_BY = '${updateBy || 'SYSTEM'}',
+      UPDATE_BY = 'dataItem.UPDATE_BY',
       UPDATE_DATE = NOW()
     WHERE INUSE = 1
-  `,
-  deactivateCnAliases: (updateBy: any) => `
+  `
+    sql = sql.replaceAll('dataItem.UPDATE_BY', String(updateBy || 'SYSTEM'))
+    return sql
+  },
+  deactivateCnAliases: (updateBy: any) => {
+    let sql = `
     UPDATE blacklist_cn_aliases
     SET
       INUSE = 0,
-      UPDATE_BY = '${updateBy || 'SYSTEM'}',
+      UPDATE_BY = 'dataItem.UPDATE_BY',
       UPDATE_DATE = NOW()
     WHERE INUSE = 1
-  `,
-  deactivateCn: (updateBy: any) => `
+  `
+    sql = sql.replaceAll('dataItem.UPDATE_BY', String(updateBy || 'SYSTEM'))
+    return sql
+  },
+  deactivateCn: (updateBy: any) => {
+    let sql = `
     UPDATE blacklist_cn
     SET
       INUSE = 0,
-      UPDATE_BY = '${updateBy || 'SYSTEM'}',
+      UPDATE_BY = 'dataItem.UPDATE_BY',
       UPDATE_DATE = NOW()
     WHERE INUSE = 1
-  `,
+  `
+    sql = sql.replaceAll('dataItem.UPDATE_BY', String(updateBy || 'SYSTEM'))
+    return sql
+  },
 
   insertUs: (dataItem: any) => {
     let sql = `
@@ -314,31 +326,31 @@
 
     // âš ï¸  Order matters: replace longer keys BEFORE shorter ones that share a prefix
     //    e.g. 'dataItem.SOURCE_LIST_URL' must come before 'dataItem.SOURCE'
-    sql = sql.replaceAll('dataItem.SOURCE_LIST_URL', dataItem.SOURCE_LIST_URL ? `'${dataItem.SOURCE_LIST_URL}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.SOURCE_INFORMATION_URL', dataItem.SOURCE_INFORMATION_URL ? `'${dataItem.SOURCE_INFORMATION_URL}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.SOURCE', dataItem.SOURCE ? `'${dataItem.SOURCE}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.ENTITY_NUMBER', dataItem.ENTITY_NUMBER ? `'${dataItem.ENTITY_NUMBER}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.ENTITY_TYPE', dataItem.ENTITY_TYPE ? `'${dataItem.ENTITY_TYPE}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.PROGRAMS', dataItem.PROGRAMS ? `'${dataItem.PROGRAMS}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.SOURCE_LIST_URL', nullableSqlText(dataItem.SOURCE_LIST_URL))
+    sql = sql.replaceAll('dataItem.SOURCE_INFORMATION_URL', nullableSqlText(dataItem.SOURCE_INFORMATION_URL))
+    sql = sql.replaceAll('dataItem.SOURCE', nullableSqlText(dataItem.SOURCE))
+    sql = sql.replaceAll('dataItem.ENTITY_NUMBER', nullableSqlText(dataItem.ENTITY_NUMBER))
+    sql = sql.replaceAll('dataItem.ENTITY_TYPE', nullableSqlText(dataItem.ENTITY_TYPE))
+    sql = sql.replaceAll('dataItem.PROGRAMS', nullableSqlText(dataItem.PROGRAMS))
     sql = sql.replaceAll('dataItem.NAME', dataItem.NAME)
-    sql = sql.replaceAll('dataItem.TITLE', dataItem.TITLE ? `'${dataItem.TITLE}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.ADDRESSES', dataItem.ADDRESSES ? `'${dataItem.ADDRESSES}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.FEDERAL_REGISTER_NOTICE', dataItem.FEDERAL_REGISTER_NOTICE ? `'${dataItem.FEDERAL_REGISTER_NOTICE}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.START_DATE', dataItem.START_DATE ? `'${dataItem.START_DATE}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.END_DATE', dataItem.END_DATE ? `'${dataItem.END_DATE}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.STANDARD_ORDER', dataItem.STANDARD_ORDER ? `'${dataItem.STANDARD_ORDER}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.LICENSE_REQUIREMENT', dataItem.LICENSE_REQUIREMENT ? `'${dataItem.LICENSE_REQUIREMENT}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.LICENSE_POLICY', dataItem.LICENSE_POLICY ? `'${dataItem.LICENSE_POLICY}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.VESSEL_INFORMATION', dataItem.VESSEL_INFORMATION ? `'${dataItem.VESSEL_INFORMATION}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.REMARKS', dataItem.REMARKS ? `'${dataItem.REMARKS}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.ALT_NAMES', dataItem.ALT_NAMES ? `'${dataItem.ALT_NAMES}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.CITIZENSHIPS', dataItem.CITIZENSHIPS ? `'${dataItem.CITIZENSHIPS}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.DATES_OF_BIRTH', dataItem.DATES_OF_BIRTH ? `'${dataItem.DATES_OF_BIRTH}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.NATIONALITIES', dataItem.NATIONALITIES ? `'${dataItem.NATIONALITIES}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.PLACES_OF_BIRTH', dataItem.PLACES_OF_BIRTH ? `'${dataItem.PLACES_OF_BIRTH}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem.DESCRIPTION ? `'${dataItem.DESCRIPTION}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.TITLE', nullableSqlText(dataItem.TITLE))
+    sql = sql.replaceAll('dataItem.ADDRESSES', nullableSqlText(dataItem.ADDRESSES))
+    sql = sql.replaceAll('dataItem.FEDERAL_REGISTER_NOTICE', nullableSqlText(dataItem.FEDERAL_REGISTER_NOTICE))
+    sql = sql.replaceAll('dataItem.START_DATE', nullableSqlText(dataItem.START_DATE))
+    sql = sql.replaceAll('dataItem.END_DATE', nullableSqlText(dataItem.END_DATE))
+    sql = sql.replaceAll('dataItem.STANDARD_ORDER', nullableSqlText(dataItem.STANDARD_ORDER))
+    sql = sql.replaceAll('dataItem.LICENSE_REQUIREMENT', nullableSqlText(dataItem.LICENSE_REQUIREMENT))
+    sql = sql.replaceAll('dataItem.LICENSE_POLICY', nullableSqlText(dataItem.LICENSE_POLICY))
+    sql = sql.replaceAll('dataItem.VESSEL_INFORMATION', nullableSqlText(dataItem.VESSEL_INFORMATION))
+    sql = sql.replaceAll('dataItem.REMARKS', nullableSqlText(dataItem.REMARKS))
+    sql = sql.replaceAll('dataItem.ALT_NAMES', nullableSqlText(dataItem.ALT_NAMES))
+    sql = sql.replaceAll('dataItem.CITIZENSHIPS', nullableSqlText(dataItem.CITIZENSHIPS))
+    sql = sql.replaceAll('dataItem.DATES_OF_BIRTH', nullableSqlText(dataItem.DATES_OF_BIRTH))
+    sql = sql.replaceAll('dataItem.NATIONALITIES', nullableSqlText(dataItem.NATIONALITIES))
+    sql = sql.replaceAll('dataItem.PLACES_OF_BIRTH', nullableSqlText(dataItem.PLACES_OF_BIRTH))
+    sql = sql.replaceAll('dataItem.DESCRIPTION', nullableSqlText(dataItem.DESCRIPTION))
     sql = sql.replaceAll('dataItem.CREATE_BY', dataItem.CREATE_BY)
-    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY ? `'${dataItem.UPDATE_BY}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', nullableSqlText(dataItem.UPDATE_BY))
     sql = sql.replaceAll('dataItem.INUSE', String(dataItem.INUSE ?? 1))
 
     return sql
@@ -377,18 +389,18 @@
         )
     `
 
-    sql = sql.replaceAll('dataItem.SOURCE_NAME', dataItem.SOURCE_NAME ? `'${dataItem.SOURCE_NAME}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.ENTITY_NUMBER', dataItem.ENTITY_NUMBER ? `'${dataItem.ENTITY_NUMBER}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.ENTITY_TYPE', dataItem.ENTITY_TYPE ? `'${dataItem.ENTITY_TYPE}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.PROGRAMS', dataItem.PROGRAMS ? `'${dataItem.PROGRAMS}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.COUNTRY', dataItem.COUNTRY ? `'${dataItem.COUNTRY}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.SOURCE_NAME', nullableSqlText(dataItem.SOURCE_NAME))
+    sql = sql.replaceAll('dataItem.ENTITY_NUMBER', nullableSqlText(dataItem.ENTITY_NUMBER))
+    sql = sql.replaceAll('dataItem.ENTITY_TYPE', nullableSqlText(dataItem.ENTITY_TYPE))
+    sql = sql.replaceAll('dataItem.PROGRAMS', nullableSqlText(dataItem.PROGRAMS))
+    sql = sql.replaceAll('dataItem.COUNTRY', nullableSqlText(dataItem.COUNTRY))
     sql = sql.replaceAll('dataItem.PRIMARY_NAME', dataItem.PRIMARY_NAME)
     sql = sql.replaceAll('dataItem.NORMALIZED_NAME', dataItem.NORMALIZED_NAME)
-    sql = sql.replaceAll('dataItem.WMD_TYPE', dataItem.WMD_TYPE ? `'${dataItem.WMD_TYPE}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.RAW_PAYLOAD', dataItem.RAW_PAYLOAD ? `'${dataItem.RAW_PAYLOAD}'` : 'NULL')
-    sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem.DESCRIPTION ? `'${dataItem.DESCRIPTION}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.WMD_TYPE', nullableSqlText(dataItem.WMD_TYPE))
+    sql = sql.replaceAll('dataItem.RAW_PAYLOAD', nullableSqlText(dataItem.RAW_PAYLOAD))
+    sql = sql.replaceAll('dataItem.DESCRIPTION', nullableSqlText(dataItem.DESCRIPTION))
     sql = sql.replaceAll('dataItem.CREATE_BY', dataItem.CREATE_BY)
-    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY ? `'${dataItem.UPDATE_BY}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', nullableSqlText(dataItem.UPDATE_BY))
     sql = sql.replaceAll('dataItem.INUSE', String(dataItem.INUSE ?? 1))
 
     return sql
@@ -418,9 +430,9 @@
     sql = sql.replaceAll('dataItem.BLACKLIST_CN_ID', String(dataItem.BLACKLIST_CN_ID ?? dataItem.blacklist_cn_id))
     sql = sql.replaceAll('dataItem.ALIAS_NAME', dataItem.ALIAS_NAME)
     sql = sql.replaceAll('dataItem.NORMALIZED_ALIAS_NAME', dataItem.NORMALIZED_ALIAS_NAME)
-    sql = sql.replaceAll('dataItem.DESCRIPTION', dataItem.DESCRIPTION ? `'${dataItem.DESCRIPTION}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.DESCRIPTION', nullableSqlText(dataItem.DESCRIPTION))
     sql = sql.replaceAll('dataItem.CREATE_BY', dataItem.CREATE_BY)
-    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY ? `'${dataItem.UPDATE_BY}'` : 'NULL')
+    sql = sql.replaceAll('dataItem.UPDATE_BY', nullableSqlText(dataItem.UPDATE_BY))
     sql = sql.replaceAll('dataItem.INUSE', String(dataItem.INUSE ?? 1))
 
     return sql
@@ -496,4 +508,8 @@
 
     return sql
   },
+}
+
+function nullableSqlText(value: any) {
+  return value ? "'" + value + "'" : 'NULL'
 }

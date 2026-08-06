@@ -1,121 +1,14 @@
 import { FindVendorModel } from '@src/_workspace/models/_find-vendor/FindVendorModel'
-import { getSqlWhereByColumnFilters_elysia } from '@src/helpers/getSqlWhereByFilterColumn'
-import getSqlWhere_aggrid from '@src/helpers/getSqlWhere_aggrid'
 import getSqlWhere_elysia from '@src/helpers/getSqlWhere_elysia'
 import { ResponseI } from '@src/types/ResponseI'
 import { Request, Response } from 'express'
 import excel from 'exceljs'
+import { toVendorStatusId } from '@src/_workspace/utils/StatusId'
 
 export const FindVendorController = {
     // Search vendors
     search: async (req: Request, res: Response) => {
-        let dataItem
-
-        if (!req.body || Object.entries(req.body).length === 0) {
-            dataItem = req.query
-        } else {
-            dataItem = req.body
-        }
-
-        // Intercept Order for SQL fallback (Removed: status_check is now natively supported in SQL)
-
-        // Translate 'status' frontend filter ID to backend filter logic
-        if (dataItem.SEARCHFILTERS && Array.isArray(dataItem.SEARCHFILTERS)) {
-            const statusIdx = dataItem.SEARCHFILTERS.findIndex((item: any) => item.id === 'status')
-            if (statusIdx > -1) {
-                const val = dataItem.SEARCHFILTERS[statusIdx].value
-                if (val === '1' || val === 1) {
-                    dataItem.PRONESSTATUSFILTER = 'Registered'
-                    dataItem.SEARCHFILTERS.splice(statusIdx, 1)
-                } else if (val === '0' || val === 0) {
-                    dataItem.PRONESSTATUSFILTER = 'Not Registered'
-                    dataItem.SEARCHFILTERS.splice(statusIdx, 1)
-                } else if (val === 'In Progress') {
-                    dataItem.PRONESSTATUSFILTER = 'In Progress'
-                    dataItem.SEARCHFILTERS.splice(statusIdx, 1)
-                } else if (val === 'Cannot Register') {
-                    dataItem.PRONESSTATUSFILTER = 'Cannot Register'
-                    dataItem.SEARCHFILTERS.splice(statusIdx, 1)
-                } else {
-                    dataItem.SEARCHFILTERS.splice(statusIdx, 1)
-                }
-            }
-        }
-
-        // Table mapping for ColumnFilters and SearchFilters
-        const tableIds = [
-            { table: 'v', id: 'COMPANY_NAME', Fns: 'LIKE' },
-            { table: 'v', id: 'FFT_VENDOR_CODE', Fns: 'LIKE' },
-            { table: 'v', id: 'FFT_STATUS', Fns: '=' },
-            { table: 'v', id: 'INUSE', Fns: '=' },
-            { table: 'v', id: 'PROVINCE', Fns: 'LIKE' },
-            { table: 'v', id: 'COUNTRY', Fns: 'LIKE' },
-            { table: 'v', id: 'VENDOR_REGION', Fns: '=' },
-            { table: 'v', id: 'WEBSITE', Fns: 'LIKE' },
-            { table: 'v', id: 'ADDRESS', Fns: 'LIKE' },
-            { table: 'v', id: 'TEL_CENTER', Fns: 'LIKE' },
-            { table: 'v', id: 'EMAILMAIN', Fns: 'LIKE' },
-            { table: 'v', id: 'MASTER_VENDOR_TYPES_ID', column: 'BUSINESS_CATEGORY_ID', Fns: '=' },
-            { table: 'vt', id: 'VENDOR_TYPE_NAME', alias: 'BUSINESS_CATEGORY_NAME', Fns: 'LIKE' },
-            { table: 'mpg', id: 'GROUP_NAME', Fns: 'LIKE' },
-            { table: 'vp', id: 'MASTER_PRODUCT_GROUPS_ID', Fns: '=' },
-            { table: 'vp', id: 'MAKER_NAME', Fns: 'LIKE' },
-            { table: 'vp', id: 'PRODUCT_NAME', Fns: 'LIKE' },
-            { table: 'vp', id: 'MODEL_LIST', Fns: 'LIKE' },
-            { table: 'vc', id: 'CONTACT_NAME', Fns: 'LIKE' },
-            { table: 'vc', id: 'TEL_PHONE', Fns: 'LIKE' },
-            { table: 'vc', id: 'EMAIL', Fns: 'LIKE' },
-            { table: 'vc', id: 'CREATE_BY', Fns: 'LIKE' },
-            { table: 'vc', id: 'UPDATE_BY', Fns: 'LIKE' },
-            { table: 'vc', id: 'CREATE_DATE', Fns: '=' },
-            { table: 'vc', id: 'UPDATE_DATE', Fns: '=' },
-            { table: 'vmr', id: 'PRONES_CODE', Fns: 'LIKE' },
-        ]
-
-        // Filter out null/empty values from SearchFilters before passing to helper
-        if (dataItem.SEARCHFILTERS && Array.isArray(dataItem.SEARCHFILTERS)) {
-            dataItem.SEARCHFILTERS = dataItem.SEARCHFILTERS.filter((item: any) =>
-                item.value !== null && item.value !== undefined && item.value !== ''
-            )
-        }
-
-        // Create SQL WHERE, ORDER BY, and Offset using AG Grid-compatible helper
-        // (uses Start directly as row offset â€” no Start * Limit multiplication)
-        getSqlWhere_aggrid(dataItem, tableIds, 'COMPANY_NAME')
-
-        // Extract sqlWhere from dataItem (it now contains both SearchFilters and ColumnFilters)
-        let sqlWhere = ''
-        if (dataItem.SQLWHERE) {
-            sqlWhere = dataItem.SQLWHERE.trim()
-            sqlWhere = sqlWhere.replace(/^WHERE\s+/i, '')
-            if (sqlWhere) {
-                sqlWhere = ` AND ${sqlWhere}`
-            }
-        }
-        // for prones Status
-        if (dataItem.PRONESSTATUSFILTER) {
-            const statusValue = String(dataItem.PRONESSTATUSFILTER).replace(/'/g, "\\'")
-            sqlWhere += `
-                AND (
-                    CASE
-                        WHEN v.FFT_STATUS = 2 THEN 'Cannot Register'
-                        WHEN EXISTS (
-                            SELECT 1
-                            FROM request_register_vendor rrv_ip
-                            WHERE rrv_ip.VENDORS_ID = v.VENDORS_ID
-                              AND rrv_ip.INUSE = 1
-                              AND rrv_ip.REQUEST_STATE = 'in_progress'
-                        ) THEN 'In Progress'
-                        ELSE IFNULL(vmr.STATUS_CHECK, 'Not Registered')
-                    END
-                ) = '${statusValue}'
-            `
-        }
-
-        dataItem['SQLWHERECOLUMNFILTER'] = '' // No longer needed as it's merged into sqlWhere
-        dataItem.SQLWHERE = sqlWhere
-
-        // console.log('dataItem:', dataItem)
+        const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 
         try {
             const { resultData, totalCount } = await FindVendorModel.searchVendors(dataItem)
@@ -125,27 +18,28 @@ export const FindVendorController = {
                 return row
             })
 
-            return res.status(200).json({
+            res.status(200).json({
                 Status: true,
                 ResultOnDb: finalResult,
                 TotalCountOnDb: totalCount,
                 MethodOnDb: 'Search Vendors',
                 Message: 'Search Data Success'
             } as ResponseI)
+            return
         } catch (error: any) {
-            // console.error('Search Vendors Error:', error);
-            return res.status(200).json({
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: [],
                 TotalCountOnDb: 0,
                 MethodOnDb: 'Search Vendors',
                 Message: error?.message || 'Failed to search vendors'
             } as ResponseI)
+            return
         }
     },
 
-    // Get full vendor details for Find Vendor/Re-register modals
-    getVendorDetails: async (req: Request, res: Response) => {
+    // Find Vendor owns this detail contract. The response already matches the frontend form.
+    getVendorDetail: async (req: Request, res: Response) => {
         let dataItem
 
         if (!req.body || Object.entries(req.body).length === 0) {
@@ -158,81 +52,49 @@ export const FindVendorController = {
             const vendor_id = parseInt(String(dataItem.VENDORS_ID ?? dataItem.vendor_id ?? ''))
 
             if (!vendor_id || isNaN(vendor_id)) {
-                return res.status(400).json({
+                res.status(400).json({
                     Status: false,
                     ResultOnDb: [],
                     TotalCountOnDb: 0,
-                    MethodOnDb: 'Get Vendor Details',
+                    MethodOnDb: 'Get Vendor Detail',
                     Message: 'Invalid vendor ID'
                 } as ResponseI)
+                return
             }
 
-            const resultData = await FindVendorModel.getVendorDetails(vendor_id)
-            if (resultData && resultData.length > 0) {
-                // Parse JSON_ARRAYAGG strings if they exist
-                const row = resultData[0]
-                let contacts = []
-                let products = []
-
-                try {
-                    if (row.CONTACTS_JSON) {
-                        contacts = typeof row.CONTACTS_JSON === 'string' ? JSON.parse(row.CONTACTS_JSON) : row.CONTACTS_JSON
-                    }
-                } catch (e) {
-                    // console.warn('Failed to parse contacts_json for getVendorDetails VENDORS_ID ' + vendor_id)
-                }
-
-                try {
-                    if (row.PRODUCTS_JSON) {
-                        products = typeof row.PRODUCTS_JSON === 'string' ? JSON.parse(row.PRODUCTS_JSON) : row.PRODUCTS_JSON
-                    }
-                } catch (e) {
-                    // console.warn('Failed to parse products_json for getVendorDetails VENDORS_ID ' + vendor_id)
-                }
-
-                // Filter out [null] from empty JSON_ARRAYAGG
-                if (contacts.length === 1 && contacts[0] === null) contacts = []
-                if (products.length === 1 && products[0] === null) products = []
-
-                delete row.CONTACTS_JSON
-                delete row.PRODUCTS_JSON
-
-                const vendorObj = { ...row, CONTACTS: contacts, PRODUCTS: products }
-
-                // Enrich with Prones Status Logic (helper expects array)
-                const enrichedData = await matchVendorsWithPrones([vendorObj], null)
-
-                return res.status(200).json({
+            const resultData = await FindVendorModel.getVendorDetail(vendor_id)
+            if (resultData) {
+                res.status(200).json({
                     Status: true,
-                    ResultOnDb: enrichedData[0],
+                    ResultOnDb: resultData,
                     TotalCountOnDb: 1,
-                    MethodOnDb: 'Get Vendor Details',
+                    MethodOnDb: 'Get Vendor Detail',
                     Message: 'Get Data Success'
                 } as ResponseI)
+                return
             } else {
 
-                return res.status(200).json({
+                res.status(200).json({
                     Status: false,
                     ResultOnDb: [],
                     TotalCountOnDb: 0,
-                    MethodOnDb: 'Get Vendor Details',
+                    MethodOnDb: 'Get Vendor Detail',
                     Message: 'Vendor not found'
                 } as ResponseI)
+                return
             }
         } catch (error: any) {
             // console.error('Get Vendor Details Error:', error);
-            return res.status(200).json({
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: {},
                 TotalCountOnDb: 0,
-                MethodOnDb: 'Get Vendor Details',
+                MethodOnDb: 'Get Vendor Detail',
                 Message: error?.message || 'Failed to get vendor details'
             } as ResponseI)
+            return
         }
     },
-
-    // Legacy alias kept for older callers.
-    getById: async (req: Request, res: Response) => FindVendorController.getVendorDetails(req, res),
 
     // Update vendor
     update: async (req: Request, res: Response) => {
@@ -248,13 +110,14 @@ export const FindVendorController = {
             const vendor_id = parseInt(String(dataItem.VENDORS_ID ?? dataItem.vendor_id ?? ''))
 
             if (!vendor_id || isNaN(vendor_id)) {
-                return res.status(400).json({
+                res.status(400).json({
                     Status: false,
                     ResultOnDb: {},
                     TotalCountOnDb: 0,
                     MethodOnDb: 'Update Vendor',
                     Message: 'Invalid vendor ID'
                 } as ResponseI)
+                return
             }
 
             const updateData = {
@@ -283,13 +146,14 @@ export const FindVendorController = {
             const vendor_id = parseInt(String(dataItem.VENDORS_ID ?? dataItem.vendor_id ?? ''))
 
             if (!vendor_id || isNaN(vendor_id)) {
-                return res.status(400).json({
+                res.status(400).json({
                     Status: false,
                     ResultOnDb: {},
                     TotalCountOnDb: 0,
                     MethodOnDb: 'Update Vendor Comprehensive',
                     Message: 'Invalid vendor ID'
                 } as ResponseI)
+                return
             }
 
             const result = await FindVendorModel.updateVendorComprehensive({
@@ -297,16 +161,18 @@ export const FindVendorController = {
                 VENDORS_ID: vendor_id,
             })
 
-            return res.status(200).json(result as ResponseI)
+            res.status(200).json(result as ResponseI)
+            return
         } catch (error: any) {
             // console.error('Update Vendor Comprehensive Error:', error)
-            return res.status(200).json({
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: {},
                 TotalCountOnDb: 0,
                 MethodOnDb: 'Update Vendor Comprehensive',
                 Message: error?.message || 'Failed to update vendor'
             } as ResponseI)
+            return
         }
     },
 
@@ -317,13 +183,14 @@ export const FindVendorController = {
             const vendor_id = parseInt(String(dataItem.VENDORS_ID ?? dataItem.vendor_id ?? ''))
 
             if (!vendor_id || isNaN(vendor_id)) {
-                return res.status(400).json({
+                res.status(400).json({
                     Status: false,
                     ResultOnDb: {},
                     TotalCountOnDb: 0,
                     MethodOnDb: 'Delete Vendor',
                     Message: 'Invalid vendor ID'
                 } as ResponseI)
+                return
             }
 
             const result = await FindVendorModel.deleteVendor({
@@ -331,16 +198,18 @@ export const FindVendorController = {
                 UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
             })
 
-            return res.status(200).json(result as ResponseI)
+            res.status(200).json(result as ResponseI)
+            return
         } catch (error: any) {
             // console.error('Delete Vendor Error:', error)
-            return res.status(200).json({
+            res.status(200).json({
                 Status: false,
                 ResultOnDb: {},
                 TotalCountOnDb: 0,
                 MethodOnDb: 'Delete Vendor',
                 Message: error?.message || 'Failed to delete vendor'
             } as ResponseI)
+            return
         }
     },
 
@@ -393,15 +262,7 @@ export const FindVendorController = {
     },
 
     // Get vendor business category names for dropdown
-    getVendorBusinessCategoryName: async (req: Request, res: Response) => {
-        let dataItem
-
-        if (!req.body || Object.entries(req.body).length === 0) {
-            dataItem = req.query
-        } else {
-            dataItem = req.body
-        }
-
+    getVendorBusinessCategoryName: async (_req: Request, res: Response) => {
         try {
             const result = await FindVendorModel.getVendorBusinessCategoryName()
             res.status(200).json({
@@ -424,15 +285,7 @@ export const FindVendorController = {
     },
 
     // Get provinces for dropdown
-    getProvinces: async (req: Request, res: Response) => {
-        let dataItem
-
-        if (!req.body || Object.entries(req.body).length === 0) {
-            dataItem = req.query
-        } else {
-            dataItem = req.body
-        }
-
+    getProvinces: async (_req: Request, res: Response) => {
         try {
             const result = await FindVendorModel.getProvinces()
             res.status(200).json({
@@ -454,15 +307,7 @@ export const FindVendorController = {
         }
     },
     // Get countries for dropdown
-    getCountries: async (req: Request, res: Response) => {
-        let dataItem
-
-        if (!req.body || Object.entries(req.body).length === 0) {
-            dataItem = req.query
-        } else {
-            dataItem = req.body
-        }
-
+    getCountries: async (_req: Request, res: Response) => {
         try {
             const result = await FindVendorModel.getCountries()
             res.status(200).json({
@@ -485,15 +330,7 @@ export const FindVendorController = {
 
 
     // Get product groups for dropdown
-    getProductGroups: async (req: Request, res: Response) => {
-        let dataItem
-
-        if (!req.body || Object.entries(req.body).length === 0) {
-            dataItem = req.query
-        } else {
-            dataItem = req.body
-        }
-
+    getProductGroups: async (_req: Request, res: Response) => {
         try {
             const result = await FindVendorModel.getProductGroups()
             res.status(200).json({
@@ -562,13 +399,23 @@ export const FindVendorController = {
                 )
             }
 
-            const statusFilter = dataItem.DATAFORFETCH?.SEARCHFILTERS?.find((item: any) => item.id === 'status')
-            const requiredStatus = statusFilter && statusFilter.value ? statusFilter.value.toString() : null
+            const statusFilter = query.SEARCHFILTERS?.find(
+                (item: any) => String(item?.id || '').trim().toUpperCase() === 'M_VENDOR_STATUS_ID'
+            )
+            const requiredStatusId = statusFilter ? toVendorStatusId(statusFilter.value) : null
+            if (statusFilter && requiredStatusId === null) {
+                throw new Error('Invalid vendor status ID')
+            }
+            if (statusFilter) {
+                query.SEARCHFILTERS = query.SEARCHFILTERS.filter((item: any) => item !== statusFilter)
+            }
 
             // Intercept Order for SQL fallback
             let statusSort: any = null
             if (query.ORDER && Array.isArray(query.ORDER)) {
-                statusSort = query.ORDER.find((o: any) => o.id === 'status_check' || o.id === 'STATUS_CHECK')
+                statusSort = query.ORDER.find((o: any) =>
+                    ['VENDOR_STATUS_CODE', 'VENDOR_STATUS_LABEL'].includes(String(o.id || '').toUpperCase())
+                )
                 if (statusSort) {
                     query.ORDER = [{ id: 'COMPANY_NAME', desc: false }]
                 }
@@ -627,15 +474,18 @@ export const FindVendorController = {
                 vendorRows = await FindVendorModel.searchAllForExport(searchQuery) as any[]
             }
 
-            // 2. Fetch Prones Data & Match
-            let resultData = await matchVendorsWithPrones(vendorRows, requiredStatus)
+            // 2. Apply the computed vendor-status filter for export paths that do
+            // not pass through the normal search controller.
+            let resultData = requiredStatusId !== null
+                ? vendorRows.filter((row: any) => Number(row.M_VENDOR_STATUS_ID) === requiredStatusId)
+                : vendorRows
 
-            // 2.1 Post-Fetch Sorting for 'STATUS_CHECK'
+            // 2.1 Post-fetch sorting for the computed Vendor Status column.
             if (statusSort) {
                 const desc = statusSort.desc
                 resultData.sort((a: any, b: any) => {
-                    const valA = a.STATUS_CHECK || ''
-                    const valB = b.STATUS_CHECK || ''
+                    const valA = a.VENDOR_STATUS_LABEL || ''
+                    const valB = b.VENDOR_STATUS_LABEL || ''
                     if (valA < valB) return desc ? 1 : -1
                     if (valA > valB) return desc ? -1 : 1
                     return 0
@@ -652,10 +502,10 @@ export const FindVendorController = {
             // mirrors exactly what the user sees. Fall back to the full column set when it doesn't.
             const defaultHeaderMap: Record<string, string> = {
                 FFT_VENDOR_CODE: 'Vendor Code',
-                STATUS_CHECK: 'Prones Status',
+                VENDOR_STATUS_LABEL: 'Vendor Status',
                 COMPANY_NAME: 'Company Name',
                 VENDOR_TYPE_NAME: 'Vendor Type',
-                VENDOR_REGION: 'Region',
+                VENDOR_REGION: 'Trade Term',
                 PROVINCE: 'Province',
                 WEBSITE: 'Website',
                 ADDRESS: 'Address',
@@ -751,264 +601,12 @@ export const FindVendorController = {
 
         } catch (error: any) {
             // console.error('downloadFileForExport error:', error)
-            if (!res.headersSent) return res.status(500).json({ error: 'Export failed', message: error?.message })
-        }
-    },
-
-    // Export vendors to Excel (Streaming)
-    // downloadFileForExport_Streaming: async (req: Request, res: Response) => {
-    //     try {
-    //         let dataItem
-    //         if (Object.entries(req.body).length === 0) {
-    //             dataItem = req.query.data ? JSON.parse(req.query.data as any) : req.query
-    //         } else {
-    //             dataItem = req.body
-    //         }
-    //
-    //         const query = dataItem.DATAFORFETCH || dataItem || {}
-    //
-    //         // Table mapping
-    //         const tableIds = [
-    //             { table: 'v', id: 'COMPANY_NAME', Fns: 'LIKE' },
-    //             { table: 'v', id: 'FFT_VENDOR_CODE', Fns: 'LIKE' },
-    //             { table: 'v', id: 'FFT_STATUS', Fns: '=' },
-    //             { table: 'v', id: 'INUSE', Fns: '=' },
-    //             { table: 'v', id: 'PROVINCE', Fns: 'LIKE' },
-    //             { table: 'v', id: 'COUNTRY', Fns: 'LIKE' },
-    //             { table: 'v', id: 'WEBSITE', Fns: 'LIKE' },
-    //             { table: 'v', id: 'ADDRESS', Fns: 'LIKE' },
-    //             { table: 'v', id: 'TEL_CENTER', Fns: 'LIKE' },
-    //             { table: 'v', id: 'vendor_type_id', Fns: '=' },
-    //             { table: 'vt', id: 'VENDOR_TYPE_NAME', alias: 'name', Fns: 'LIKE' },
-    //             { table: 'mpg', id: 'GROUP_NAME', Fns: 'LIKE' },
-    //             { table: 'vp', id: 'product_group_id', Fns: '=' },
-    //             { table: 'vp', id: 'MAKER_NAME', Fns: 'LIKE' },
-    //             { table: 'vp', id: 'PRODUCT_NAME', Fns: 'LIKE' },
-    //             { table: 'vp', id: 'MODEL_LIST', Fns: 'LIKE' },
-    //             { table: 'vc', id: 'CONTACT_NAME', Fns: 'LIKE' },
-    //             { table: 'vc', id: 'TEL_PHONE', Fns: 'LIKE' },
-    //             { table: 'vc', id: 'EMAIL', Fns: 'LIKE' },
-    //             { table: 'vc', id: 'CREATE_BY', Fns: 'LIKE' },
-    //             { table: 'vc', id: 'UPDATE_BY', Fns: 'LIKE' },
-    //             { table: 'vc', id: 'CREATE_DATE', Fns: '=' },
-    //             { table: 'vc', id: 'UPDATE_DATE', Fns: '=' },
-    //         ]
-    //
-    //         // Filter out 'status' to prevent SQL errors (status is computed)
-    //         if (query.SearchFilters && Array.isArray(query.SearchFilters)) {
-    //             query.SearchFilters = query.SearchFilters.filter((item: any) =>
-    //                 item.value !== null && item.value !== undefined && item.value !== ''
-    //             )
-    //         }
-    //
-    //         const statusFilter = dataItem.DATAFORFETCH?.SearchFilters?.find((item: any) => item.id === 'status');
-    //         const requiredStatus = statusFilter && statusFilter.value ? statusFilter.value.toString() : null;
-    //
-    //         // Intercept Order: if 'status_check', use default for SQL, but we generally can't sort effective streaming by computed field easily.
-    //         // For streaming large datasets, sorting by computed field is expensive/impossible without buffering.
-    //         // We will fallback to company_name ASC for SQL if status_check is requested.
-    //         if (query.Order && Array.isArray(query.Order)) {
-    //             const statusSort = query.Order.find((o: any) => o.id === 'status_check')
-    //             if (statusSort) {
-    //                 query.Order = [{ id: 'company_name', desc: false }]
-    //             }
-    //         }
-    //
-    //         // Generate SQL Where
-    //         getSqlWhere_elysia(query, tableIds, 'company_name')
-    //
-    //         let sqlWhere = ''
-    //         if (query.sqlWhere) {
-    //             sqlWhere = query.sqlWhere.replace(/^WHERE\s+/i, '')
-    //             if (sqlWhere) {
-    //                 sqlWhere = ` AND ${sqlWhere}`
-    //             }
-    //         }
-    //
-    //         // 1. Prepare Response Headers for Streaming
-    //         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    //         res.setHeader('Content-Disposition', `attachment; filename=Vendor_List_${new Date().getTime()}.xlsx`);
-    //
-    //         // 2. Initialize Excel Streaming Writer
-    //         const options = {
-    //             stream: res,
-    //             useStyles: true,
-    //             useSharedStrings: true
-    //         };
-    //         const workbook = new excel.stream.xlsx.WorkbookWriter(options);
-    //         const worksheet = workbook.addWorksheet('Vendor List');
-    //
-    //         // 3. Define Columns & Headers
-    //         const headerMap: Record<string, string> = {
-    //             fft_vendor_code: 'Vendor Code',
-    //             status_check: 'Prones Status',
-    //             company_name: 'Company Name',
-    //             vendor_type_name: 'Vendor Type',
-    //             province: 'Province',
-    //             website: 'Website',
-    //             address: 'Address',
-    //             tel_center: 'Tel Company',
-    //             group_name: 'Group Name',
-    //             maker_name: 'Maker Name',
-    //             product_name: 'Product Name',
-    //             model_list: 'Model List',
-    //             contact_name: 'Contact Name',
-    //             tel_phone: 'Tel Contact',
-    //             email: 'Email Contact',
-    //             CREATE_BY: 'Created By',
-    //             UPDATE_BY: 'Updated By',
-    //             CREATE_DATE: 'Created Date',
-    //             UPDATE_DATE: 'Updated Date'
-    //         }
-    //
-    //         const visibleColumns = Object.keys(headerMap);
-    //
-    //         // Set Title
-    //         worksheet.getCell('A1').value = 'Export : Vendor List';
-    //         worksheet.getCell('A1').font = { name: 'Aptos Display', size: 18, bold: true };
-    //
-    //         // Set Headers
-    //         visibleColumns.forEach((col, idx) => {
-    //             const cell = worksheet.getCell(2, idx + 1);
-    //             cell.value = headerMap[col];
-    //             cell.font = { name: 'Aptos Display', bold: true };
-    //             cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBCD8F1' } };
-    //             cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-    //             cell.alignment = { vertical: 'middle', horizontal: 'center' };
-    //             // Manually set width as best effort since auto-fit isn't perfect in stream
-    //             worksheet.getColumn(idx + 1).width = 20;
-    //         });
-    //         worksheet.commit(); // Commit headers
-    //
-    //         // 4. Fetch Prones Lookup Data (Cache in Memory)
-    //         const pronesResponse = await FindVendorModel.getPronesData({}) as any;
-    //         const pronesRows = pronesResponse?.rows || [];
-    //
-    //         // Build Lookup Maps
-    //         const pronesTelMap = new Map();
-    //         const pronesNameMap = new Map();
-    //         pronesRows.forEach((p: any) => {
-    //             const pTel = cleanTel(p.CUSTOMER_TEL);
-    //             const pName = cleanName(p.CUSTOMER_NAME);
-    //             if (pTel) pronesTelMap.set(pTel, p);
-    //             if (pName) pronesNameMap.set(pName, p);
-    //         });
-    //
-    //         // 5. Start DB Stream
-    //         const searchQuery = { ...query, sqlWhereColumnFilter: '', Order: query.Order || 'v.company_name ASC' }; // Ensure order
-    //         const { stream, connection } = await FindVendorModel.streamAllForExport(searchQuery, sqlWhere);
-    //
-    //         let rowIndex = 3;
-    //
-    //         stream.on('data', (row: any) => {
-    //             // Determine Prones Status
-    //             const mTel = cleanTel(row.tel_center);
-    //             const mName = cleanName(row.company_name);
-    //             const mAddress = row.address || '';
-    //
-    //             let status_check = 'Not Registered';
-    //
-    //             if (mTel && pronesTelMap.has(mTel)) {
-    //                 status_check = 'Registered';
-    //             } else if (mName && pronesNameMap.has(mName)) {
-    //                 status_check = 'Registered';
-    //             } else {
-    //                 // Similar match logic - might be eager but included for completeness logic
-    //                 const similarMatch = pronesRows.find((p: any) => {
-    //                     const pFullAddr = `${p.CUSTOMER_ADDRESS1 || ''} ${p.CUSTOMER_ADDRESS2 || ''} ${p.CUSTOMER_ADDRESS3 || ''}`;
-    //                     return calculateSimilarity(mAddress, pFullAddr) > 0.7;
-    //                 });
-    //                 if (similarMatch) status_check = 'Registered';
-    //             }
-    //
-    //             // Filter on the fly
-    //             if (requiredStatus) {
-    //                 if (requiredStatus === '1' && status_check !== 'Registered') return; // Skip
-    //                 if (requiredStatus === '0' && status_check !== 'Not Registered') return; // Skip
-    //             }
-    //
-    //             row.status_check = status_check;
-    //
-    //             // Write Row
-    //             visibleColumns.forEach((col, colIndex) => {
-    //                 let cellValue = row[col];
-    //
-    //                 // Date Fmt
-    //                 if ((col === 'CREATE_DATE' || col === 'UPDATE_DATE') && cellValue) {
-    //                     const date = new Date(cellValue);
-    //                     cellValue = date.toLocaleDateString('th-TH', { year: 'numeric', month: '2-digit', day: '2-digit' });
-    //                 }
-    //                 if (col === 'model_list' && cellValue) cellValue = cellValue.replace(/\n/g, ', ');
-    //
-    //                 const finalValue = cellValue !== undefined && cellValue !== null ? cellValue.toString() : '';
-    //
-    //                 const cell = worksheet.getCell(rowIndex, colIndex + 1);
-    //                 cell.value = finalValue;
-    //                 cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-    //                 cell.font = { name: 'Aptos Display', size: 11 };
-    //                 cell.border = { top: { style: 'thin' }, left: { style: 'thin' }, bottom: { style: 'thin' }, right: { style: 'thin' } };
-    //             });
-    //
-    //             worksheet.getRow(rowIndex).commit();
-    //             rowIndex++;
-    //         });
-    //
-    //         stream.on('end', async () => {
-    //             connection.release(); // Important: Release DB connection
-    //             await workbook.commit(); // Finish Excel file
-    //         });
-    //
-    //         stream.on('error', (err: any) => {
-    //             console.error('Stream Error:', err);
-    //             connection.release();
-    //             if (!res.headersSent) res.status(500).send('Error generating file');
-    //         });
-    //
-    //     } catch (error: any) {
-    //         console.error('downloadFileForExport error:', error)
-    //         if (!res.headersSent) return res.status(500).json({ error: 'Export failed', message: error?.message })
-    //     }
-    // },
-
-    // Get prones data
-    getPronesData: async (req: Request, res: Response) => {
-        try {
-            let dataItem
-
-            if (!req.body || Object.entries(req.body).length === 0) {
-                dataItem = req.query
-            } else {
-                dataItem = req.body
+            if (!res.headersSent) {
+                res.status(500).json({ error: 'Export failed', message: error?.message })
             }
-
-            // 1. à¸”à¸¶à¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥ vendor à¸à¸±à¹ˆà¸‡à¹€à¸£à¸²
-            const myVendors = await FindVendorModel.getAllVendorNames()
-
-            // 2. à¹ƒà¸Šà¹‰ Helper à¹€à¸žà¸·à¹ˆà¸­ Match à¸à¸±à¸š Prones Data
-            const resultRows = await matchVendorsWithPrones(myVendors)
-
-            // 3. à¸ªà¹ˆà¸‡ JSON à¸à¸¥à¸±à¸š
-            res.status(200).json({
-                Status: true,
-                ResultOnDb: {
-                    rows: resultRows
-                },
-                TotalCountOnDb: resultRows.length,
-                MethodOnDb: 'Comparison Prones',
-                Message: 'Comparison Success'
-            } as ResponseI)
-
-        } catch (error: any) {
-            // console.error('Match Prones Error:', error);
-            res.status(200).json({
-                Status: false,
-                ResultOnDb: [],
-                TotalCountOnDb: 0,
-                MethodOnDb: 'Comparison Prones',
-                Message: error?.message || 'Internal Server Error'
-            } as ResponseI)
         }
     },
+
     // Get all vendor names
     getAllVendorNames: async (req: Request, res: Response) => {
         try {
@@ -1028,36 +626,6 @@ export const FindVendorController = {
                 TotalCountOnDb: 0,
                 MethodOnDb: 'Get All Vendor Names',
                 Message: error?.message || 'Failed to get all vendor names'
-            } as ResponseI)
-        }
-    },
-    getPronesDataAll: async (req: Request, res: Response) => {
-        // Simple fetch without status check
-        try {
-            let dataItem
-
-            if (!req.body || Object.entries(req.body).length === 0) {
-                dataItem = req.query
-            } else {
-                dataItem = req.body
-            }
-
-            const resultData = await FindVendorModel.getPronesData(dataItem)
-            res.status(200).json({
-                Status: true,
-                ResultOnDb: resultData,
-                TotalCountOnDb: resultData.length,
-                MethodOnDb: 'Get Prones Data All',
-                Message: 'Get Data Success'
-            } as ResponseI)
-        } catch (error: any) {
-            // console.error('Get Prones Data All Error:', error)
-            res.status(200).json({
-                Status: false,
-                ResultOnDb: [],
-                TotalCountOnDb: 0,
-                MethodOnDb: 'Get Prones Data All',
-                Message: error?.message || 'Failed to get prones data'
             } as ResponseI)
         }
     },
@@ -1091,49 +659,3 @@ export const FindVendorController = {
         }
     }
 }
-
-
-// ------- Helper Functions  -------
-const matchVendorsWithPrones = async (vendors: any[], filterStatus: string | null = null) => {
-    // Read pre-computed match results from vendor_match_result table
-    const vendorIds = [...new Set(vendors.map((v: any) => v.VENDORS_ID).filter(Boolean))] as number[]
-
-    let matchMap = new Map<number, any>()
-
-    if (vendorIds.length > 0) {
-        const matchResults = await FindVendorModel.getMatchResultsByVendorIds(vendorIds) as any[]
-        matchResults.forEach((r: any) => {
-            matchMap.set(r.VENDORS_ID, r)
-        })
-    }
-
-    // Enrich vendors with match results
-    let enrichedData = vendors.map((vendor: any) => {
-        const match = matchMap.get(vendor.VENDORS_ID)
-
-        let finalStatus = match ? match.STATUS_CHECK : 'Not Registered'
-        if (vendor.FFT_STATUS == 2 || vendor.FFT_STATUS === 'Cannot Register') {
-            finalStatus = 'Cannot Register'
-        }
-
-        return {
-            ...vendor,
-            STATUS_CHECK: finalStatus,
-            PRONES_CODE: match ? match.PRONES_CODE : (vendor.FFT_VENDOR_CODE || null),
-            PRONES_NAME_EN: match ? match.PRONES_NAME : null,
-            MATCH_METHOD: match ? match.MATCH_METHOD : null,
-        }
-    })
-
-    // Filter by Prones Status if requested
-    if (filterStatus) {
-        if (filterStatus === '1') {
-            enrichedData = enrichedData.filter((item: any) => item.STATUS_CHECK === 'Registered')
-        } else if (filterStatus === '0') {
-            enrichedData = enrichedData.filter((item: any) => item.STATUS_CHECK === 'Not Registered')
-        }
-    }
-
-    return enrichedData
-}
-

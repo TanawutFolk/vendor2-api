@@ -49,6 +49,12 @@ export const AssigneesService = {
       let sql = ''
       let method = ''
 
+      const upsertGroupSql = await AssigneesSQL.upsertGroup({
+        GROUP_CODE: groupCode,
+        GROUP_NAME: String(dataItem.GROUP_NAME || groupCode).trim(),
+        UPDATE_BY: updateBy,
+      })
+
       if (dataItem.ASSIGNEES_TO_ID) {
         sql = await AssigneesSQL.update({
           ...dataItem,
@@ -70,7 +76,8 @@ export const AssigneesService = {
         method = 'Create Assignee'
       }
 
-      const resultData = (await MySQLExecute.execute(sql)) as ResultSetHeader
+      const transactionResults = await MySQLExecute.executeList([upsertGroupSql, sql])
+      const resultData = transactionResults[1] as ResultSetHeader
 
       return {
         Status: true,

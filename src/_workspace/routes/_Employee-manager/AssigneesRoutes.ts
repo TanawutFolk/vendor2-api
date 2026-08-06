@@ -3,8 +3,11 @@ import { AssigneesController } from '../../controllers/_Employee-manager/Assigne
 
 const router = Router()
 
-router.post('/groups', AssigneesController.getGroups)
+router.post('/getGroups', AssigneesController.getGroups)
 router.post('/search', AssigneesController.search)
 router.post('/save', AssigneesController.save)
+
+// Compatibility alias used by the current frontend.
+router.post('/groups', AssigneesController.getGroups)
 
 export default router

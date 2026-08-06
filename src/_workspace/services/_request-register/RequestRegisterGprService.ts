@@ -1,6 +1,21 @@
 import { MySQLExecute } from '@businessData/dbExecute'
 import { RequestRegisterPageSQL } from '../../sql/_request-register/RequestRegisterPageSQL'
 import { GprCApprovalService } from '../_approval-GPRC/GprCApprovalService'
+import { ResultSetHeader } from 'mysql2'
+import { isVendorCodeComplete } from './RegisterRequestWorkflowHelper'
+import {
+  getApprovalStepStatusIdentity,
+  getWorkflowStepIdentity,
+} from '../_status-master/StatusIdentityService'
+
+const getSelectionSheetWorkflowIdentity = async () => {
+  const [workflowStep, approvalStep] = await Promise.all([
+    getWorkflowStepIdentity(),
+    getApprovalStepStatusIdentity(),
+  ])
+
+  return { workflowStep, approvalStep }
+}
 
 const normalizeValue = (value: any) => String(value || '').trim()
 
@@ -28,44 +43,27 @@ const resolveGpr43AcceptanceStatus = (formData: any) => {
 }
 
 const SELECTION_SHEET_LOCKED_MESSAGE = 'Selection Sheet is read-only after Document Checker approval.'
-
-const isDocCheckStep = (step: any) => {
-  const stepCode = normalizeValue(getValue(step, 'STEP_CODE', 'step_code')).toUpperCase()
-  const description = normalizeValue(getValue(step, 'DESCRIPTION', 'description')).toLowerCase()
-  return stepCode === 'DOC_CHECK' || description.includes('check all document')
-}
-
-const isAccountRegisteredStep = (step: any) => {
-  const stepCode = normalizeValue(getValue(step, 'STEP_CODE', 'step_code')).toUpperCase()
-  const description = normalizeValue(getValue(step, 'DESCRIPTION', 'description')).toLowerCase()
-  return stepCode === 'ACCOUNT_REGISTERED' || description.includes('account registered')
-}
-
-const isApprovedStepStatus = (status: any) => {
-  const normalized = normalizeValue(status).toLowerCase()
-  return normalized === 'approved' || normalized === 'completed'
-}
+const SELECTION_SHEET_EDITABLE_MESSAGE =
+  'Selection Sheet can only be edited during PO PIC In Progress or PO & SCM Check All Document.'
 
 const getSelectionSheetLockState = async (requestId: number) => {
   if (!requestId) {
     return {
       isLocked: false,
-      isAccountRegisteredInProgress: false,
     }
   }
 
-  const stepsSql = await RequestRegisterPageSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId })
+  const [stepsSql, statusIdentity] = await Promise.all([
+    RequestRegisterPageSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId }),
+    getSelectionSheetWorkflowIdentity(),
+  ])
   const steps = (await MySQLExecute.search(stepsSql)) as any[]
   const isLocked = steps.some((step: any) =>
-    isDocCheckStep(step) && isApprovedStepStatus(getValue(step, 'STEP_STATUS', 'step_status'))
+    Number(getValue(step, 'WORKFLOW_STEP_MASTER_ID', 'workflow_step_id')) === statusIdentity.workflowStep.docCheck &&
+    Number(getValue(step, 'M_APPROVAL_STEP_STATUS_ID', 'approval_step_status_id')) === statusIdentity.approvalStep.approved
   )
-  const isAccountRegisteredInProgress = steps.some((step: any) =>
-    isAccountRegisteredStep(step) && normalizeValue(getValue(step, 'STEP_STATUS', 'step_status')).toLowerCase() === 'in_progress'
-  )
-
   return {
     isLocked,
-    isAccountRegisteredInProgress,
   }
 }
 
@@ -75,9 +73,25 @@ const isSelectionSheetLocked = async (requestId: number) => {
 }
 
 const assertSelectionSheetEditable = async (requestId: number) => {
-  const state = await getSelectionSheetLockState(requestId)
-  if (state.isLocked) {
-    throw new Error(SELECTION_SHEET_LOCKED_MESSAGE)
+  if (!requestId) {
+    throw new Error('Missing request_id')
+  }
+
+  const statusIdentity = await getSelectionSheetWorkflowIdentity()
+  const accessSql = await RequestRegisterPageSQL.getSelectionSheetEditAccess({
+    REQUEST_REGISTER_VENDOR_ID: requestId,
+    EDITABLE_WORKFLOW_STEP_MASTER_IDS: [
+      statusIdentity.workflowStep.poPicInProgress,
+      statusIdentity.workflowStep.docCheck,
+    ],
+    M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID: statusIdentity.approvalStep.inProgress,
+  })
+  const accessRows = (await MySQLExecute.search(accessSql)) as any[]
+  const access = accessRows[0]
+  const isEditable = Number(getValue(access, 'IS_SELECTION_SHEET_EDITABLE', 'is_selection_sheet_editable')) === 1
+
+  if (!isEditable) {
+    throw new Error(SELECTION_SHEET_EDITABLE_MESSAGE)
   }
 }
 
@@ -92,32 +106,6 @@ const parseStoredObject = (raw: any): Record<string, any> => {
   }
 }
 
-const parseCircularMembers = (raw: any) => {
-  if (!raw) return []
-
-  try {
-    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
-    if (!Array.isArray(parsed)) return []
-
-    return parsed
-      .map((item) => {
-        if (typeof item === 'string') {
-          return { empcode: '', name: '', email: normalizeValue(item) }
-        }
-
-        return {
-          empcode: normalizeValue(item?.empcode),
-          name: normalizeValue(item?.name),
-          email: normalizeValue(item?.email),
-        }
-      })
-      .filter((item) => item.empcode || item.name || item.email)
-      .slice(0, 6)
-  } catch {
-    return []
-  }
-}
-
 const resolveMemberByEmpCode = async (empcode: string) => {
   const safeEmpCode = normalizeValue(empcode)
   if (!safeEmpCode) return null
@@ -127,14 +115,14 @@ const resolveMemberByEmpCode = async (empcode: string) => {
   const member = memberRes[0]
 
   if (!member) {
-    throw new Error(`Employee code not found in person.member_fed: ${safeEmpCode}`)
+    throw new Error(`Employee code not found in PERSON directory: ${safeEmpCode}`)
   }
 
   const name = [getValue(member, 'empName', 'EMPNAME'), getValue(member, 'empSurname', 'EMPSURNAME')].map(normalizeValue).filter(Boolean).join(' ')
   const email = normalizeValue(getValue(member, 'empEmail', 'EMPEMAIL'))
 
   if (!email) {
-    throw new Error(`Employee code has no email in person.member_fed: ${safeEmpCode}`)
+    throw new Error(`Employee code has no email in PERSON directory: ${safeEmpCode}`)
   }
 
   return {
@@ -218,33 +206,6 @@ const buildNormalizedGprSetupSql = async (
   return Promise.all(sqlList)
 }
 
-const saveAccountSelectorFields = async (requestId: number, rawFormData: any, dataItem: any) => {
-  const selectionSql = RequestRegisterPageSQL.getSelection({ REQUEST_REGISTER_VENDOR_ID: requestId })
-  const selectionRows = (await MySQLExecute.search(selectionSql)) as any[]
-  const selectionId = getValue(selectionRows[0], 'REQUEST_VENDOR_SELECTIONS_ID', 'request_vendor_selections_id')
-
-  if (!selectionId) {
-    throw new Error('Selection Sheet record not found. Please complete Selection Sheet before Account Registered step.')
-  }
-
-  const resultData = await MySQLExecute.executeList([
-    await RequestRegisterPageSQL.updateSelectionAccountSelector({
-      REQUEST_VENDOR_SELECTIONS_ID: selectionId,
-      VENDOR_CODE_SELECTOR: rawFormData.vendor_code_selector || '',
-      COMPLETION_DATE: rawFormData.completion_date || '',
-      UPDATE_BY: dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM',
-    }),
-  ])
-
-  return {
-    Status: true,
-    Message: 'Account selector fields saved successfully',
-    ResultOnDb: resultData,
-    MethodOnDb: 'Save Account Selector Fields',
-    TotalCountOnDb: 1,
-  }
-}
-
 export const RequestRegisterGprService = {
   isSelectionSheetLocked,
   assertSelectionSheetEditable,
@@ -267,21 +228,15 @@ export const RequestRegisterGprService = {
     }
   },
 
-  saveGprForm: async (dataItem: any) => {
+  saveSelectionForm: async (dataItem: any) => {
     try {
       const reqId = dataItem.REQUEST_REGISTER_VENDOR_ID
       if (!reqId) throw new Error('Missing request_id')
-      const rawFormData = typeof dataItem.GPR_DATA === 'string' ? JSON.parse(dataItem.GPR_DATA) : dataItem.GPR_DATA || {}
+      const rawFormData = typeof dataItem.SELECTION_FORM_DATA === 'string'
+        ? JSON.parse(dataItem.SELECTION_FORM_DATA)
+        : dataItem.SELECTION_FORM_DATA || {}
       const updateBy = dataItem.UPDATE_BY || 'SYSTEM'
-      const lockState = await getSelectionSheetLockState(Number(reqId))
-
-      if (lockState.isLocked) {
-        if (!lockState.isAccountRegisteredInProgress) {
-          throw new Error(SELECTION_SHEET_LOCKED_MESSAGE)
-        }
-
-        return saveAccountSelectorFields(Number(reqId), rawFormData, dataItem)
-      }
+      await assertSelectionSheetEditable(Number(reqId))
 
       const circularList = Array.isArray(rawFormData.gpr_c_circular_list) ? rawFormData.gpr_c_circular_list.map((email: any) => String(email || '').trim()).filter(Boolean) : []
 
@@ -325,7 +280,7 @@ export const RequestRegisterGprService = {
         formData.REQUEST_VENDOR_SELECTIONS_ID = selection_id
       }
 
-      if (!selection_id) throw new Error('Failed to create/identify GPR selection record')
+      if (!selection_id) throw new Error('Failed to create/identify Selection Form record')
 
       sqlList.push(await RequestRegisterPageSQL.deleteFinancials({ REQUEST_VENDOR_SELECTIONS_ID: selection_id }))
       sqlList.push(await RequestRegisterPageSQL.deleteCriteria({ REQUEST_VENDOR_SELECTIONS_ID: selection_id }))
@@ -354,13 +309,12 @@ export const RequestRegisterGprService = {
       }
       if (rawFormData.criteria) {
         for (const cr of rawFormData.criteria) {
+          const criteriaNo = getValue(cr, 'NO', 'no') || ''
           sqlList.push(await RequestRegisterPageSQL.insertCriteria({
             REQUEST_VENDOR_SELECTIONS_ID: selection_id,
-            NO: getValue(cr, 'NO', 'no') || '',
-            CRITERIA: getValue(cr, 'CRITERIA', 'criteria') || '',
+            NO: criteriaNo,
+            CRITERIA: criteriaNo === '4.11' ? 'Optional' : (getValue(cr, 'CRITERIA', 'criteria') || ''),
             REMARK: getValue(cr, 'REMARK', 'remark') || '',
-            UPLOADED_FILE: getValue(cr, 'UPLOADED_FILE', 'uploaded_file') || '',
-            UPLOADED_NAME: getValue(cr, 'UPLOADED_NAME', 'uploaded_name') || '',
             CREATE_BY: formData.CREATE_BY || formData.UPDATE_BY || 'SYSTEM',
             UPDATE_BY: formData.UPDATE_BY || formData.CREATE_BY || 'SYSTEM',
           }))
@@ -372,7 +326,7 @@ export const RequestRegisterGprService = {
         Status: true,
         Message: 'Selection Sheet saved successfully',
         ResultOnDb: resultData,
-        MethodOnDb: 'Save GPR Form',
+        MethodOnDb: 'Save Selection Form',
         TotalCountOnDb: 1,
       }
     } catch (error: any) {
@@ -386,11 +340,66 @@ export const RequestRegisterGprService = {
     }
   },
 
+  saveAccountVendorCode: async (dataItem: any) => {
+    try {
+      const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID) || 0
+      const updateBy = normalizeValue(dataItem.UPDATE_BY).toUpperCase()
+      const vendorCode = normalizeValue(dataItem.VENDOR_CODE).toUpperCase()
+
+      if (!requestId) throw new Error('Missing request_id')
+      if (!updateBy) throw new Error('Missing Account employee code')
+
+      const vendorRegionSql = await RequestRegisterPageSQL.getRequestVendorRegion({
+        REQUEST_REGISTER_VENDOR_ID: requestId,
+      })
+      const vendorRegionRows = (await MySQLExecute.search(vendorRegionSql)) as any[]
+      const vendorRegion = normalizeValue(getValue(vendorRegionRows[0], 'VENDOR_REGION', 'vendor_region'))
+      if (!vendorRegion) throw new Error('Vendor region was not found')
+
+      const isOversea = vendorRegion.toLowerCase() === 'oversea'
+      if (!isVendorCodeComplete(vendorCode, isOversea)) {
+        throw new Error('Vendor Code must include the code after the 20030/20031 prefix.')
+      }
+      const statusIdentity = await getSelectionSheetWorkflowIdentity()
+
+      const updateSql = await RequestRegisterPageSQL.updateAccountVendorCode({
+        REQUEST_REGISTER_VENDOR_ID: requestId,
+        WORKFLOW_STEP_MASTER_ID: statusIdentity.workflowStep.accountRegistered,
+        M_APPROVAL_STEP_STATUS_ID: statusIdentity.approvalStep.inProgress,
+        VENDOR_CODE: vendorCode,
+        UPDATE_BY: updateBy,
+      })
+      const result = (await MySQLExecute.execute(updateSql)) as ResultSetHeader
+
+      if (Number(result.affectedRows || 0) !== 1) {
+        throw new Error('Vendor Code can only be saved by the assigned Account during Account Register In Progress.')
+      }
+
+      return {
+        Status: true,
+        Message: 'Vendor Code saved successfully',
+        ResultOnDb: {
+          VENDOR_CODE_SELECTOR: vendorCode,
+        },
+        MethodOnDb: 'Save Account Vendor Code',
+        TotalCountOnDb: 1,
+      }
+    } catch (error: any) {
+      return {
+        Status: false,
+        Message: error?.message || 'Failed to save Vendor Code',
+        ResultOnDb: {},
+        MethodOnDb: 'Save Account Vendor Code',
+        TotalCountOnDb: 0,
+      }
+    }
+  },
+
   saveGprCNotification: async (dataItem: any) => {
     try {
       const reqId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID)
       if (!reqId || Number.isNaN(reqId)) throw new Error('Missing request_id')
-      await assertSelectionSheetEditable(reqId)
+      if (await isSelectionSheetLocked(reqId)) throw new Error(SELECTION_SHEET_LOCKED_MESSAGE)
 
       const creator = String(dataItem.CREATE_BY || dataItem.UPDATE_BY || '').trim() || 'SYSTEM'
       const updater = String(dataItem.UPDATE_BY || '').trim() || 'SYSTEM'
@@ -516,7 +525,7 @@ export const RequestRegisterGprService = {
     }
   },
 
-  getGprForm: async (dataItem: any) => {
+  getSelectionForm: async (dataItem: any) => {
     const requestId = Number(typeof dataItem === 'number' ? dataItem : dataItem?.REQUEST_REGISTER_VENDOR_ID)
 
     if (!requestId || Number.isNaN(requestId)) {
@@ -532,12 +541,14 @@ export const RequestRegisterGprService = {
     const critSql = await RequestRegisterPageSQL.getCriteria({ REQUEST_VENDOR_SELECTIONS_ID: selection_id })
 
     const circularSql = RequestRegisterPageSQL.getGprCircularMembers({ REQUEST_VENDOR_SELECTIONS_ID: selection_id })
+    const productCheckerSql = RequestRegisterPageSQL.getGprProductCheckers({ REQUEST_VENDOR_SELECTIONS_ID: selection_id })
     const actionSetupSql = RequestRegisterPageSQL.getGprActionSetup({ REQUEST_VENDOR_SELECTIONS_ID: selection_id })
     const flowSetupSql = RequestRegisterPageSQL.getGprFlowSetup({ REQUEST_REGISTER_VENDOR_ID: requestId })
-    const [finRes, critRes, circularRows, actionSetupRows, flowSetupRows] = await Promise.all([
+    const [finRes, critRes, circularRows, productCheckerRows, actionSetupRows, flowSetupRows] = await Promise.all([
       MySQLExecute.search(finSql) as Promise<any[]>,
       MySQLExecute.search(critSql) as Promise<any[]>,
       MySQLExecute.search(circularSql) as Promise<any[]>,
+      MySQLExecute.search(productCheckerSql) as Promise<any[]>,
       MySQLExecute.search(actionSetupSql) as Promise<any[]>,
       MySQLExecute.search(flowSetupSql) as Promise<any[]>,
     ])
@@ -546,7 +557,7 @@ export const RequestRegisterGprService = {
     const relationalActionRequiredSetup = actionSetupRowsToPayload(actionSetupRows)
     const meta = {
       gpr_c_approver_empcode: normalizeValue(getValue(flowSetup, 'gpr_c_approver_empcode', 'GPR_C_APPROVER_EMPCODE')),
-      gpr_c_pc_pic_empcode: '',
+      gpr_c_pc_pic_empcode: normalizeValue(getValue(flowSetup, 'gpr_c_pc_pic_empcode', 'GPR_C_PC_PIC_EMPCODE')),
     }
     const actionRequiredSetup = { ...relationalActionRequiredSetup, _meta: meta }
     const circularMembers = circularRows.map((row) => ({
@@ -554,6 +565,13 @@ export const RequestRegisterGprService = {
         name: normalizeValue(getValue(row, 'member_name', 'MEMBER_NAME')),
         email: normalizeValue(getValue(row, 'email', 'EMAIL')),
       }))
+    const productCheckers = productCheckerRows.map((row) => ({
+      product_main_id: Number(getValue(row, 'product_main_id', 'PRODUCT_MAIN_ID')) || null,
+      product_main_name: normalizeValue(getValue(row, 'product_main_name', 'PRODUCT_MAIN_NAME')),
+      checker_empcode: normalizeValue(getValue(row, 'checker_empcode', 'CHECKER_EMPCODE')),
+      checker_name: normalizeValue(getValue(row, 'checker_name', 'CHECKER_NAME')),
+      checker_email: normalizeValue(getValue(row, 'checker_email', 'CHECKER_EMAIL')),
+    }))
 
     return {
       ...selRes[0],
@@ -566,6 +584,8 @@ export const RequestRegisterGprService = {
       GPR_C_PC_PIC_EMPCODE: normalizeValue(meta.gpr_c_pc_pic_empcode),
       GPR_C_CIRCULAR_EMPCODES: circularMembers.map((item) => item.empcode).filter(Boolean),
       GPR_C_CIRCULAR_MEMBERS: circularMembers,
+      GPR_C_PRODUCT_CHECKERS: productCheckers,
+      gpr_c_product_checkers: productCheckers,
       GPR_43_ACCEPTANCE_STATUS: normalizeGpr43AcceptanceStatus(getValue(selRes[0], 'gpr_43_acceptance_status', 'GPR_43_ACCEPTANCE_STATUS')),
       SALES_PROFIT: finRes,
       CRITERIA: critRes,

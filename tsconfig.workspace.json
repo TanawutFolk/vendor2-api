@@ -1,0 +1,5 @@
+{
+  "extends": "./tsconfig.json",
+  "include": ["src/_workspace/**/*.ts"],
+  "exclude": ["node_modules", "src/_workspace_prototype/**/*"]
+}

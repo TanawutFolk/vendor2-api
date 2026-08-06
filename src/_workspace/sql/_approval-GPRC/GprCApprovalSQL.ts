@@ -1,6 +1,19 @@
-import { GprCSelectionSqlSnippets } from '../_request-register/GprCSelectionSqlSnippets'
-import { RequestVendorContactSqlSnippets } from '../_request-register/RequestVendorContactSqlSnippets'
-import { RequestStatusSqlSnippets } from '../_request-register/RequestStatusSqlSnippets'
+import { GprCSelectionSqlSnippets } from '../common/GprCSelectionSqlSnippets'
+import { RequestVendorContactSqlSnippets } from '../common/RequestVendorContactSqlSnippets'
+import { RequestStatusSqlSnippets } from '../common/RequestStatusSqlSnippets'
+import {
+  APPROVAL_STEP_STATUS_ID_SQL,
+  ApprovalMasterSqlSnippets,
+} from '../_status-master/StatusMasterSQL'
+import { RequestStateSqlSnippets } from '../_status-master/StatusMasterSQL'
+import {
+  GPR_C_FLOW_STATUS_ID_SQL,
+  GprStatusSqlSnippets,
+} from '../_status-master/StatusMasterSQL'
+import { PersonSqlSnippets } from '../common/PersonSqlSnippets'
+import { requireStatusId, requireVendorStatusId } from '../../utils/StatusId'
+
+const escapeSqlText = (value: any) => String(value ?? '').replaceAll("'", "''")
 
 
 export const GprCApprovalSQL = {
@@ -8,7 +21,11 @@ export const GprCApprovalSQL = {
 
   nullableDate: (value: any) => (value === 'NOW()' ? 'NOW()' : 'NULL'),
 
-  likeValue: (value: any) => `%${String(value ?? '').trim()}%`,
+  likeValue: (value: any) => {
+    let sql = '%dataItem.LIKE_VALUE%'
+    sql = sql.replaceAll('dataItem.LIKE_VALUE', String(String(value ?? '').trim()))
+    return sql
+  },
 
   buildLikeCondition: (column: any, rawValue: any) => {
     const value = String(rawValue ?? '').trim()
@@ -32,8 +49,31 @@ export const GprCApprovalSQL = {
         .join(' OR ')
 
       if (clause) {
-        conditions.push(`(${clause})`)
+        let sql = '(dataItem.FILTER_CLAUSE)'
+        sql = sql.replaceAll('dataItem.FILTER_CLAUSE', clause)
+        conditions.push(sql)
       }
+    }
+
+    return conditions
+  },
+
+  buildIdConditions: (dataItem: any, mapping: Record<string, string>) => {
+    const conditions: string[] = []
+
+    for (const filter of Array.isArray(dataItem.SEARCHFILTERS) ? dataItem.SEARCHFILTERS : []) {
+      const column = mapping[String(filter?.id || '')]
+      if (!column || filter?.value === null || filter?.value === undefined || filter?.value === '') continue
+
+      const id = Number(filter.value)
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new Error('Invalid status ID for ' + String(filter?.id || ''))
+      }
+
+      let sql = 'dataItem.STATUS_COLUMN = dataItem.STATUS_ID'
+      sql = sql.replaceAll('dataItem.STATUS_COLUMN', column)
+      sql = sql.replaceAll('dataItem.STATUS_ID', id.toString())
+      conditions.push(sql)
     }
 
     return conditions
@@ -51,9 +91,9 @@ export const GprCApprovalSQL = {
 
       if (Array.isArray(value)) {
         const values = value
-          .map((item, index) => {
-            let valueSql = `'dataItem.FILTER_VALUE_${index}'`
-            valueSql = valueSql.replaceAll(`dataItem.FILTER_VALUE_${index}`, item)
+          .map((item) => {
+            let valueSql = '\'dataItem.FILTER_VALUE\''
+            valueSql = valueSql.replaceAll('dataItem.FILTER_VALUE', escapeSqlText(item))
             return valueSql
           })
           .filter(Boolean)
@@ -65,7 +105,7 @@ export const GprCApprovalSQL = {
         continue
       }
 
-      const safeValue = value
+      const safeValue = escapeSqlText(value)
 
       switch (fn) {
         case 'equals':
@@ -115,7 +155,10 @@ export const GprCApprovalSQL = {
       .map((item: any) => {
         const column = mapping[item?.id || '']
         if (!column) return null
-        return `${column} ${item?.desc ? 'DESC' : 'ASC'}`
+        let sql = 'dataItem.SORT_COLUMN dataItem.SORT_DIRECTION'
+        sql = sql.replaceAll('dataItem.SORT_COLUMN', String(column))
+        sql = sql.replaceAll('dataItem.SORT_DIRECTION', String(item?.desc ? 'DESC' : 'ASC'))
+        return sql
       })
       .filter(Boolean)
 
@@ -136,13 +179,16 @@ export const GprCApprovalSQL = {
 
   getFlowByRequestId: (dataItem: any) => {
     let sql = `
-            SELECT *
-            FROM REQUEST_VENDOR_GPR_C_FLOWS
-            WHERE REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
-              AND INUSE = 1
-            ORDER BY REQUEST_VENDOR_GPR_C_FLOWS_ID DESC
+            SELECT
+                f.*,
+                dataItem.GPR_C_FLOW_STATUS_SQL AS FLOW_STATUS
+            FROM REQUEST_VENDOR_GPR_C_FLOWS f
+            WHERE f.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
+              AND f.INUSE = 1
+            ORDER BY f.REQUEST_VENDOR_GPR_C_FLOWS_ID DESC
             LIMIT 1
         `
+    sql = sql.replaceAll('dataItem.GPR_C_FLOW_STATUS_SQL', String(GprStatusSqlSnippets.flowStatusCodeExpr('f')))
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', GprCApprovalSQL.num(dataItem.REQUEST_REGISTER_VENDOR_ID).toString())
     return sql
   },
@@ -152,7 +198,7 @@ export const GprCApprovalSQL = {
             INSERT INTO REQUEST_VENDOR_GPR_C_FLOWS (
                 REQUEST_REGISTER_VENDOR_ID,
                 REQUEST_VENDOR_SELECTIONS_ID,
-                FLOW_STATUS,
+                M_GPR_C_FLOW_STATUS_ID,
                 CURRENT_STEP_CODE,
                 REQUESTER_EMPCODE,
                 DESCRIPTION,
@@ -162,7 +208,7 @@ export const GprCApprovalSQL = {
             ) VALUES (
                 dataItem.REQUEST_REGISTER_VENDOR_ID,
                 dataItem.REQUEST_VENDOR_SELECTIONS_ID,
-                'dataItem.FLOW_STATUS',
+                dataItem.M_GPR_C_FLOW_STATUS_ID,
                 'dataItem.CURRENT_STEP_CODE',
                 'dataItem.REQUESTER_EMPCODE',
                 LEFT(CONCAT('dataItem.FLOW_STATUS', ': ', 'dataItem.CURRENT_STEP_CODE'), 100),
@@ -176,6 +222,11 @@ export const GprCApprovalSQL = {
       'dataItem.REQUEST_VENDOR_SELECTIONS_ID',
       dataItem.REQUEST_VENDOR_SELECTIONS_ID ? GprCApprovalSQL.num(dataItem.REQUEST_VENDOR_SELECTIONS_ID).toString() : 'NULL'
     )
+    const flowStatusId = requireStatusId(dataItem.M_GPR_C_FLOW_STATUS_ID, 'M_GPR_C_FLOW_STATUS_ID')
+    sql = sql.replaceAll(
+      'dataItem.M_GPR_C_FLOW_STATUS_ID',
+      flowStatusId.toString()
+    )
     sql = sql.replaceAll('dataItem.FLOW_STATUS', String(dataItem.FLOW_STATUS || 'requester_setup').toLowerCase())
     sql = sql.replaceAll('dataItem.CURRENT_STEP_CODE', dataItem.CURRENT_STEP_CODE || 'REQUESTER_SETUP')
     sql = sql.replaceAll('dataItem.REQUESTER_EMPCODE', dataItem.REQUESTER_EMPCODE)
@@ -188,13 +239,14 @@ export const GprCApprovalSQL = {
     let sql = `
             UPDATE REQUEST_VENDOR_GPR_C_FLOWS SET
                 REQUEST_VENDOR_SELECTIONS_ID = dataItem.REQUEST_VENDOR_SELECTIONS_ID,
-                FLOW_STATUS = 'dataItem.FLOW_STATUS',
+                M_GPR_C_FLOW_STATUS_ID = dataItem.M_GPR_C_FLOW_STATUS_ID,
                 CURRENT_STEP_CODE = 'dataItem.CURRENT_STEP_CODE',
                 REQUESTER_EMPCODE = 'dataItem.REQUESTER_EMPCODE',
                 REQUESTER_SUBMITTED_AT = NOW(),
                 GPR_C_APPROVER_EMPCODE = 'dataItem.GPR_C_APPROVER_EMPCODE',
                 GPR_C_APPROVER_NAME = 'dataItem.GPR_C_APPROVER_NAME',
                 GPR_C_APPROVER_EMAIL = 'dataItem.GPR_C_APPROVER_EMAIL',
+                PC_PIC_EMPCODE = 'dataItem.PC_PIC_EMPCODE',
                 PC_PIC_NAME = 'dataItem.PC_PIC_NAME',
                 PC_PIC_EMAIL = 'dataItem.PC_PIC_EMAIL',
                 DESCRIPTION = LEFT(CONCAT('dataItem.FLOW_STATUS', ': ', 'dataItem.CURRENT_STEP_CODE'), 100),
@@ -206,12 +258,18 @@ export const GprCApprovalSQL = {
       'dataItem.REQUEST_VENDOR_SELECTIONS_ID',
       dataItem.REQUEST_VENDOR_SELECTIONS_ID ? GprCApprovalSQL.num(dataItem.REQUEST_VENDOR_SELECTIONS_ID).toString() : 'REQUEST_VENDOR_SELECTIONS_ID'
     )
+    const flowStatusId = requireStatusId(dataItem.M_GPR_C_FLOW_STATUS_ID, 'M_GPR_C_FLOW_STATUS_ID')
+    sql = sql.replaceAll(
+      'dataItem.M_GPR_C_FLOW_STATUS_ID',
+      flowStatusId.toString()
+    )
     sql = sql.replaceAll('dataItem.FLOW_STATUS', String(dataItem.FLOW_STATUS || 'in_progress').toLowerCase())
     sql = sql.replaceAll('dataItem.CURRENT_STEP_CODE', dataItem.CURRENT_STEP_CODE || 'REQUESTER_APPROVER')
     sql = sql.replaceAll('dataItem.REQUESTER_EMPCODE', dataItem.REQUESTER_EMPCODE)
     sql = sql.replaceAll('dataItem.GPR_C_APPROVER_EMPCODE', dataItem.GPR_C_APPROVER_EMPCODE)
     sql = sql.replaceAll('dataItem.GPR_C_APPROVER_NAME', dataItem.GPR_C_APPROVER_NAME)
     sql = sql.replaceAll('dataItem.GPR_C_APPROVER_EMAIL', dataItem.GPR_C_APPROVER_EMAIL)
+    sql = sql.replaceAll('dataItem.PC_PIC_EMPCODE', dataItem.PC_PIC_EMPCODE)
     sql = sql.replaceAll('dataItem.PC_PIC_NAME', dataItem.PC_PIC_NAME)
     sql = sql.replaceAll('dataItem.PC_PIC_EMAIL', dataItem.PC_PIC_EMAIL)
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY || 'SYSTEM')
@@ -222,7 +280,7 @@ export const GprCApprovalSQL = {
   updateFlowStatus: (dataItem: any) => {
     let sql = `
             UPDATE REQUEST_VENDOR_GPR_C_FLOWS SET
-                FLOW_STATUS = 'dataItem.FLOW_STATUS',
+                M_GPR_C_FLOW_STATUS_ID = dataItem.M_GPR_C_FLOW_STATUS_ID,
                 CURRENT_STEP_CODE = dataItem.CURRENT_STEP_CODE,
                 COMPLETED_AT = dataItem.COMPLETED_AT,
                 REJECTED_AT = dataItem.REJECTED_AT,
@@ -233,11 +291,16 @@ export const GprCApprovalSQL = {
                 UPDATE_DATE = NOW()
             WHERE REQUEST_VENDOR_GPR_C_FLOWS_ID = dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID
         `
+    const flowStatusId = requireStatusId(dataItem.M_GPR_C_FLOW_STATUS_ID, 'M_GPR_C_FLOW_STATUS_ID')
+    sql = sql.replaceAll(
+      'dataItem.M_GPR_C_FLOW_STATUS_ID',
+      flowStatusId.toString()
+    )
     sql = sql.replaceAll('dataItem.FLOW_STATUS', String(dataItem.FLOW_STATUS || '').toLowerCase())
     const currentStepCode = dataItem.CURRENT_STEP_CODE === null || dataItem.CURRENT_STEP_CODE === undefined
       ? 'Finished'
       : String(dataItem.CURRENT_STEP_CODE)
-    sql = sql.replaceAll('dataItem.CURRENT_STEP_CODE', `'${currentStepCode}'`)
+    sql = sql.replaceAll('dataItem.CURRENT_STEP_CODE', "'" + currentStepCode + "'")
     sql = sql.replaceAll('dataItem.COMPLETED_AT', GprCApprovalSQL.nullableDate(dataItem.COMPLETED_AT))
     sql = sql.replaceAll('dataItem.REJECTED_AT', GprCApprovalSQL.nullableDate(dataItem.REJECTED_AT))
     sql = sql.replaceAll('dataItem.REJECTED_BY', dataItem.REJECTED_BY)
@@ -271,7 +334,7 @@ export const GprCApprovalSQL = {
                 APPROVER_EMPCODE,
                 APPROVER_NAME,
                 APPROVER_EMAIL,
-                STEP_STATUS,
+                M_APPROVAL_STEP_STATUS_ID,
                 DESCRIPTION,
                 CREATE_BY,
                 UPDATE_BY,
@@ -284,7 +347,7 @@ export const GprCApprovalSQL = {
                 'dataItem.APPROVER_EMPCODE',
                 'dataItem.APPROVER_NAME',
                 'dataItem.APPROVER_EMAIL',
-                'dataItem.STEP_STATUS',
+                dataItem.M_APPROVAL_STEP_STATUS_ID,
                 LEFT(COALESCE(NULLIF('dataItem.STEP_NAME', ''), 'dataItem.STEP_CODE'), 100),
                 'dataItem.CREATE_BY',
                 'dataItem.UPDATE_BY',
@@ -293,20 +356,25 @@ export const GprCApprovalSQL = {
         `
     sql = sql.replaceAll('dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID', GprCApprovalSQL.num(dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID).toString())
     sql = sql.replaceAll('dataItem.STEP_ORDER', GprCApprovalSQL.num(dataItem.STEP_ORDER).toString())
-    sql = sql.replaceAll('dataItem.STEP_CODE', dataItem.STEP_CODE)
-    sql = sql.replaceAll('dataItem.STEP_NAME', dataItem.STEP_NAME)
-    sql = sql.replaceAll('dataItem.APPROVER_EMPCODE', dataItem.APPROVER_EMPCODE)
-    sql = sql.replaceAll('dataItem.APPROVER_NAME', dataItem.APPROVER_NAME)
-    sql = sql.replaceAll('dataItem.APPROVER_EMAIL', dataItem.APPROVER_EMAIL)
-    sql = sql.replaceAll('dataItem.STEP_STATUS', String(dataItem.STEP_STATUS || 'pending').toLowerCase())
-    sql = sql.replaceAll('dataItem.CREATE_BY', dataItem.CREATE_BY || 'SYSTEM')
-    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.STEP_CODE', escapeSqlText(dataItem.STEP_CODE))
+    sql = sql.replaceAll('dataItem.STEP_NAME', escapeSqlText(dataItem.STEP_NAME))
+    sql = sql.replaceAll('dataItem.APPROVER_EMPCODE', escapeSqlText(dataItem.APPROVER_EMPCODE))
+    sql = sql.replaceAll('dataItem.APPROVER_NAME', escapeSqlText(dataItem.APPROVER_NAME))
+    sql = sql.replaceAll('dataItem.APPROVER_EMAIL', escapeSqlText(dataItem.APPROVER_EMAIL))
+    const approvalStatusId = requireStatusId(dataItem.M_APPROVAL_STEP_STATUS_ID, 'M_APPROVAL_STEP_STATUS_ID')
+    sql = sql.replaceAll(
+      'dataItem.M_APPROVAL_STEP_STATUS_ID',
+      approvalStatusId.toString()
+    )
+    sql = sql.replaceAll('dataItem.CREATE_BY', escapeSqlText(dataItem.CREATE_BY || 'SYSTEM'))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', escapeSqlText(dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM'))
     return sql
   },
   getStepsByFlow: (dataItem: any) => {
     let sql = `
             SELECT
                 s.*,
+                dataItem.APPROVAL_STEP_STATUS_SQL AS STEP_STATUS,
                 f.REQUEST_REGISTER_VENDOR_ID
             FROM REQUEST_VENDOR_GPR_C_STEPS s
                 JOIN REQUEST_VENDOR_GPR_C_FLOWS f
@@ -315,6 +383,7 @@ export const GprCApprovalSQL = {
               AND s.INUSE = 1
             ORDER BY s.STEP_ORDER ASC
         `
+    sql = sql.replaceAll('dataItem.APPROVAL_STEP_STATUS_SQL', String(ApprovalMasterSqlSnippets.stepStatusCodeExpr('s')))
     sql = sql.replaceAll('dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID', GprCApprovalSQL.num(dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID).toString())
     return sql
   },
@@ -322,23 +391,26 @@ export const GprCApprovalSQL = {
     let sql = `
             SELECT
                 s.*,
+                dataItem.APPROVAL_STEP_STATUS_SQL AS STEP_STATUS,
                 f.REQUEST_REGISTER_VENDOR_ID
             FROM REQUEST_VENDOR_GPR_C_STEPS s
                 JOIN REQUEST_VENDOR_GPR_C_FLOWS f
                     ON f.REQUEST_VENDOR_GPR_C_FLOWS_ID = s.REQUEST_VENDOR_GPR_C_FLOWS_ID
             WHERE s.REQUEST_VENDOR_GPR_C_FLOWS_ID = dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID
-              AND s.STEP_STATUS = 'in_progress'
+              AND s.M_APPROVAL_STEP_STATUS_ID = dataItem.APPROVAL_STEP_IN_PROGRESS_STATUS_ID
               AND s.INUSE = 1
             ORDER BY s.STEP_ORDER ASC
             LIMIT 1
         `
+    sql = sql.replaceAll('dataItem.APPROVAL_STEP_STATUS_SQL', String(ApprovalMasterSqlSnippets.stepStatusCodeExpr('s')))
+    sql = sql.replaceAll('dataItem.APPROVAL_STEP_IN_PROGRESS_STATUS_ID', String(APPROVAL_STEP_STATUS_ID_SQL.IN_PROGRESS))
     sql = sql.replaceAll('dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID', GprCApprovalSQL.num(dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID).toString())
     return sql
   },
   updateStepAction: (dataItem: any) => {
     let sql = `
             UPDATE REQUEST_VENDOR_GPR_C_STEPS SET
-                STEP_STATUS = 'dataItem.STEP_STATUS',
+                M_APPROVAL_STEP_STATUS_ID = dataItem.M_APPROVAL_STEP_STATUS_ID,
                 ACTION_BY = 'dataItem.ACTION_BY',
                 ACTION_TYPE = 'dataItem.ACTION_TYPE',
                 DESCRIPTION = LEFT(COALESCE(NULLIF('dataItem.ACTION_REMARK', ''), 'dataItem.ACTION_TYPE'), 100),
@@ -346,7 +418,11 @@ export const GprCApprovalSQL = {
                 UPDATE_DATE = NOW()
             WHERE REQUEST_VENDOR_GPR_C_STEPS_ID = dataItem.REQUEST_VENDOR_GPR_C_STEPS_ID
         `
-    sql = sql.replaceAll('dataItem.STEP_STATUS', String(dataItem.STEP_STATUS || '').toLowerCase())
+    const approvalStatusId = requireStatusId(dataItem.M_APPROVAL_STEP_STATUS_ID, 'M_APPROVAL_STEP_STATUS_ID')
+    sql = sql.replaceAll(
+      'dataItem.M_APPROVAL_STEP_STATUS_ID',
+      approvalStatusId.toString()
+    )
     sql = sql.replaceAll('dataItem.ACTION_BY', dataItem.ACTION_BY)
     sql = sql.replaceAll('dataItem.ACTION_TYPE', dataItem.ACTION_TYPE)
     sql = sql.replaceAll('dataItem.ACTION_REMARK', dataItem.ACTION_REMARK)
@@ -358,11 +434,15 @@ export const GprCApprovalSQL = {
   activateStep: (dataItem: any) => {
     let sql = `
             UPDATE REQUEST_VENDOR_GPR_C_STEPS SET
-                STEP_STATUS = 'in_progress',
+                M_APPROVAL_STEP_STATUS_ID = dataItem.M_APPROVAL_STEP_STATUS_ID,
                 UPDATE_BY = 'dataItem.UPDATE_BY',
                 UPDATE_DATE = NOW()
             WHERE REQUEST_VENDOR_GPR_C_STEPS_ID = dataItem.REQUEST_VENDOR_GPR_C_STEPS_ID
         `
+    sql = sql.replaceAll(
+      'dataItem.M_APPROVAL_STEP_STATUS_ID',
+      requireStatusId(dataItem.M_APPROVAL_STEP_STATUS_ID, 'M_APPROVAL_STEP_STATUS_ID').toString()
+    )
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY || 'SYSTEM')
     sql = sql.replaceAll('dataItem.REQUEST_VENDOR_GPR_C_STEPS_ID', GprCApprovalSQL.num(dataItem.REQUEST_VENDOR_GPR_C_STEPS_ID).toString())
     return sql
@@ -371,13 +451,21 @@ export const GprCApprovalSQL = {
   skipPendingSteps: (dataItem: any) => {
     let sql = `
             UPDATE REQUEST_VENDOR_GPR_C_STEPS SET
-                STEP_STATUS = 'skipped',
+                M_APPROVAL_STEP_STATUS_ID = dataItem.M_APPROVAL_STEP_SKIPPED_STATUS_ID,
                 UPDATE_BY = 'dataItem.UPDATE_BY',
                 UPDATE_DATE = NOW()
             WHERE REQUEST_VENDOR_GPR_C_FLOWS_ID = dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID
-              AND STEP_STATUS = 'pending'
+              AND M_APPROVAL_STEP_STATUS_ID = dataItem.M_APPROVAL_STEP_PENDING_STATUS_ID
               AND INUSE = 1
         `
+    sql = sql.replaceAll(
+      'dataItem.M_APPROVAL_STEP_SKIPPED_STATUS_ID',
+      requireStatusId(dataItem.M_APPROVAL_STEP_SKIPPED_STATUS_ID, 'M_APPROVAL_STEP_SKIPPED_STATUS_ID').toString()
+    )
+    sql = sql.replaceAll(
+      'dataItem.M_APPROVAL_STEP_PENDING_STATUS_ID',
+      requireStatusId(dataItem.M_APPROVAL_STEP_PENDING_STATUS_ID, 'M_APPROVAL_STEP_PENDING_STATUS_ID').toString()
+    )
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY || 'SYSTEM')
     sql = sql.replaceAll('dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID', GprCApprovalSQL.num(dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID).toString())
     return sql
@@ -393,7 +481,7 @@ export const GprCApprovalSQL = {
                 PIC_NAME,
                 PIC_EMAIL,
                 REQUIRED_DETAIL,
-                RESULT_STATUS,
+                M_ACTION_RESULT_STATUS_ID,
                 SENT_AT,
                 DESCRIPTION,
                 CREATE_BY,
@@ -407,7 +495,7 @@ export const GprCApprovalSQL = {
                 'dataItem.PIC_NAME',
                 'dataItem.PIC_EMAIL',
                 'dataItem.REQUIRED_DETAIL',
-                'dataItem.RESULT_STATUS',
+                dataItem.M_ACTION_RESULT_STATUS_ID,
                 NOW(),
                 LEFT(COALESCE(NULLIF('dataItem.REQUIRED_DETAIL', ''), 'dataItem.STAGE_NAME'), 100),
                 'dataItem.CREATE_BY',
@@ -422,25 +510,45 @@ export const GprCApprovalSQL = {
     sql = sql.replaceAll('dataItem.PIC_NAME', dataItem.PIC_NAME)
     sql = sql.replaceAll('dataItem.PIC_EMAIL', dataItem.PIC_EMAIL)
     sql = sql.replaceAll('dataItem.REQUIRED_DETAIL', dataItem.REQUIRED_DETAIL)
-    sql = sql.replaceAll('dataItem.RESULT_STATUS', String(dataItem.RESULT_STATUS || 'pending').toLowerCase())
+    const actionResultStatusId = requireStatusId(dataItem.M_ACTION_RESULT_STATUS_ID, 'M_ACTION_RESULT_STATUS_ID')
+    sql = sql.replaceAll(
+      'dataItem.M_ACTION_RESULT_STATUS_ID',
+      actionResultStatusId.toString()
+    )
     sql = sql.replaceAll('dataItem.CREATE_BY', dataItem.CREATE_BY || 'SYSTEM')
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM')
     return sql
   },
   updateActionRequiredResult: (dataItem: any) => {
+    const actionResultStatusId = GprCApprovalSQL.num(dataItem.M_ACTION_RESULT_STATUS_ID)
+    if (!actionResultStatusId) throw new Error('Invalid action result status ID')
+
     let sql = `
             UPDATE REQUEST_VENDOR_GPR_C_ACTION_REQUIRED SET
-                RESULT_STATUS = 'dataItem.RESULT_STATUS',
+                M_ACTION_RESULT_STATUS_ID = dataItem.M_ACTION_RESULT_STATUS_ID,
                 RESULT_REMARK = 'dataItem.RESULT_REMARK',
                 RESULT_BY = 'dataItem.RESULT_BY',
                 RESULT_AT = NOW(),
-                DESCRIPTION = LEFT(COALESCE(NULLIF('dataItem.RESULT_REMARK', ''), 'dataItem.RESULT_STATUS'), 100),
+                DESCRIPTION = LEFT(COALESCE(
+                    NULLIF('dataItem.RESULT_REMARK', ''),
+                    (SELECT status_master.STATUS_LABEL_EN
+                     FROM m_action_result_status status_master
+                     WHERE status_master.M_ACTION_RESULT_STATUS_ID = dataItem.M_ACTION_RESULT_STATUS_ID
+                       AND status_master.INUSE = 1
+                     LIMIT 1)
+                ), 100),
                 UPDATE_BY = 'dataItem.UPDATE_BY',
                 UPDATE_DATE = NOW()
             WHERE REQUEST_VENDOR_GPR_C_ACTION_REQUIRED_ID = dataItem.REQUEST_VENDOR_GPR_C_ACTION_REQUIRED_ID
               AND INUSE = 1
+              AND EXISTS (
+                  SELECT 1
+                  FROM m_action_result_status status_master
+                  WHERE status_master.M_ACTION_RESULT_STATUS_ID = dataItem.M_ACTION_RESULT_STATUS_ID
+                    AND status_master.INUSE = 1
+              )
         `
-    sql = sql.replaceAll('dataItem.RESULT_STATUS', String(dataItem.RESULT_STATUS || 'completed').toLowerCase())
+    sql = sql.replaceAll('dataItem.M_ACTION_RESULT_STATUS_ID', actionResultStatusId.toString())
     sql = sql.replaceAll('dataItem.RESULT_REMARK', dataItem.RESULT_REMARK)
     sql = sql.replaceAll('dataItem.RESULT_BY', dataItem.RESULT_BY)
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY || dataItem.RESULT_BY || 'SYSTEM')
@@ -452,6 +560,7 @@ export const GprCApprovalSQL = {
     let sql = `
             SELECT
                 ar.*,
+                dataItem.ACTION_RESULT_STATUS_SQL AS RESULT_STATUS,
                 f.REQUEST_REGISTER_VENDOR_ID
             FROM REQUEST_VENDOR_GPR_C_ACTION_REQUIRED ar
                 JOIN REQUEST_VENDOR_GPR_C_FLOWS f
@@ -460,6 +569,7 @@ export const GprCApprovalSQL = {
               AND ar.INUSE = 1
             LIMIT 1
         `
+    sql = sql.replaceAll('dataItem.ACTION_RESULT_STATUS_SQL', String(GprStatusSqlSnippets.actionResultStatusCodeExpr('ar')))
     sql = sql.replaceAll('dataItem.REQUEST_VENDOR_GPR_C_ACTION_REQUIRED_ID', GprCApprovalSQL.num(dataItem.REQUEST_VENDOR_GPR_C_ACTION_REQUIRED_ID).toString())
     return sql
   },
@@ -467,11 +577,12 @@ export const GprCApprovalSQL = {
     let sql = `
             SELECT
                 ar.*,
-                f.FLOW_STATUS,
+                dataItem.ACTION_RESULT_STATUS_SQL AS RESULT_STATUS,
+                dataItem.GPR_C_FLOW_STATUS_SQL AS FLOW_STATUS,
                 f.CURRENT_STEP_CODE,
                 s.STEP_NAME,
                 rr.REQUEST_NUMBER,
-                ${RequestStatusSqlSnippets.requestStatusExpr('rr')} AS REQUEST_STATUS,
+                dataItem.REQUEST_STATUS_SQL AS REQUEST_STATUS,
                 v.COMPANY_NAME
             FROM REQUEST_VENDOR_GPR_C_ACTION_REQUIRED ar
                 JOIN REQUEST_VENDOR_GPR_C_FLOWS f
@@ -485,22 +596,36 @@ export const GprCApprovalSQL = {
                     ON v.VENDORS_ID = rr.VENDORS_ID
             WHERE ar.INUSE = 1
               AND LOWER(ar.PIC_EMAIL) = LOWER('dataItem.PIC_EMAIL')
-              AND ar.RESULT_STATUS IN ('pending', 'incomplete')
+              AND ar.M_ACTION_RESULT_STATUS_ID IN (
+                  dataItem.NON_TERMINAL_ACTION_RESULT_STATUS_IDS_SQL
+              )
             ORDER BY ar.SENT_AT DESC, ar.REQUEST_VENDOR_GPR_C_ACTION_REQUIRED_ID DESC
         `
+    sql = sql.replaceAll('dataItem.ACTION_RESULT_STATUS_SQL', String(GprStatusSqlSnippets.actionResultStatusCodeExpr('ar')))
+    sql = sql.replaceAll('dataItem.GPR_C_FLOW_STATUS_SQL', String(GprStatusSqlSnippets.flowStatusCodeExpr('f')))
+    sql = sql.replaceAll('dataItem.REQUEST_STATUS_SQL', String(RequestStatusSqlSnippets.requestStatusExpr('rr')))
+    sql = sql.replaceAll('dataItem.NON_TERMINAL_ACTION_RESULT_STATUS_IDS_SQL', String(GprStatusSqlSnippets.nonTerminalActionResultStatusIdsExpr()))
     sql = sql.replaceAll('dataItem.PIC_EMAIL', dataItem.PIC_EMAIL)
     return sql
   },
 
   getActionRequiredQueueByPicEmailPaginated: (dataItem: any) => {
+    let actionResultStatusSql = 't.M_ACTION_RESULT_STATUS_ID IN (dataItem.ACTION_RESULT_STATUS_IDS)'
+    actionResultStatusSql = actionResultStatusSql.replaceAll(
+      'dataItem.ACTION_RESULT_STATUS_IDS',
+      GprStatusSqlSnippets.nonTerminalActionResultStatusIdsExpr(),
+    )
+
     const conditions = [
       't.PIC_EMAIL_NORMALIZED = LOWER(\'dataItem.PIC_EMAIL\')',
-      't.RESULT_STATUS IN (\'pending\', \'incomplete\')',
+      actionResultStatusSql,
       ...GprCApprovalSQL.buildKeywordConditions(dataItem, {
         request_number: ['t.REQUEST_NUMBER', 'CAST(t.REQUEST_REGISTER_VENDOR_ID AS CHAR)'],
         vendor_name: ['t.COMPANY_NAME'],
         step_keyword: ['t.STAGE_NAME', 't.STAGE_CODE'],
-        status_keyword: ['t.RESULT_STATUS', 't.REQUEST_STATUS'],
+      }),
+      ...GprCApprovalSQL.buildIdConditions(dataItem, {
+        M_REQUEST_STATUS_ID: 't.M_REQUEST_STATUS_ID',
       }),
       ...GprCApprovalSQL.buildColumnFilterConditions(dataItem, {
         request_number: 't.REQUEST_NUMBER',
@@ -508,7 +633,7 @@ export const GprCApprovalSQL = {
         STAGE_NAME: 't.STAGE_NAME',
         STAGE_CODE: 't.STAGE_CODE',
         REQUIRED_DETAIL: 't.REQUIRED_DETAIL',
-        RESULT_STATUS: 't.RESULT_STATUS',
+        M_ACTION_RESULT_STATUS_ID: 't.M_ACTION_RESULT_STATUS_ID',
       }),
     ]
 
@@ -526,24 +651,26 @@ export const GprCApprovalSQL = {
         STAGE_NAME: 't.STAGE_NAME',
         STAGE_CODE: 't.STAGE_CODE',
         REQUIRED_DETAIL: 't.REQUIRED_DETAIL',
-        RESULT_STATUS: 't.RESULT_STATUS',
+        M_ACTION_RESULT_STATUS_ID: 't.M_ACTION_RESULT_STATUS_ID',
         SENT_AT: 't.SENT_AT',
       },
       't.SENT_AT DESC, t.REQUEST_VENDOR_GPR_C_ACTION_REQUIRED_ID DESC'
     )
     const offset = GprCApprovalSQL.num(dataItem.START)
     const limit = GprCApprovalSQL.num(dataItem.LIMIT) || 20
-    const innerQuery = `
+    let innerQuery = `
             (
                 SELECT
                     ar.*,
+                    dataItem.ACTION_RESULT_STATUS_SQL AS RESULT_STATUS,
                     f.REQUEST_REGISTER_VENDOR_ID,
                     LOWER(ar.PIC_EMAIL) AS PIC_EMAIL_NORMALIZED,
-                    f.FLOW_STATUS,
+                    dataItem.GPR_C_FLOW_STATUS_SQL AS FLOW_STATUS,
                     f.CURRENT_STEP_CODE,
                     s.STEP_NAME,
                     rr.REQUEST_NUMBER,
-                    ${RequestStatusSqlSnippets.requestStatusExpr('rr')} AS REQUEST_STATUS,
+                    rr.CURRENT_M_REQUEST_STATUS_ID AS M_REQUEST_STATUS_ID,
+                    dataItem.REQUEST_STATUS_SQL AS REQUEST_STATUS,
                     v.COMPANY_NAME
                 FROM REQUEST_VENDOR_GPR_C_ACTION_REQUIRED ar
                     JOIN REQUEST_VENDOR_GPR_C_FLOWS f
@@ -558,6 +685,9 @@ export const GprCApprovalSQL = {
                 WHERE ar.INUSE = 1
             ) t
         `
+    innerQuery = innerQuery.replaceAll('dataItem.ACTION_RESULT_STATUS_SQL', String(GprStatusSqlSnippets.actionResultStatusCodeExpr('ar')))
+    innerQuery = innerQuery.replaceAll('dataItem.GPR_C_FLOW_STATUS_SQL', String(GprStatusSqlSnippets.flowStatusCodeExpr('f')))
+    innerQuery = innerQuery.replaceAll('dataItem.REQUEST_STATUS_SQL', String(RequestStatusSqlSnippets.requestStatusExpr('rr')))
 
     let countSql = `
             SELECT COUNT(*) AS TOTAL_COUNT
@@ -589,6 +719,7 @@ export const GprCApprovalSQL = {
     let sql = `
             SELECT
                 f.*,
+                dataItem.GPR_C_FLOW_STATUS_SQL AS FLOW_STATUS,
                 s.REQUEST_VENDOR_GPR_C_STEPS_ID,
                 s.STEP_ORDER,
                 s.STEP_CODE,
@@ -596,9 +727,10 @@ export const GprCApprovalSQL = {
                 s.APPROVER_EMPCODE,
                 s.APPROVER_NAME,
                 s.APPROVER_EMAIL,
-                s.STEP_STATUS,
+                s.M_APPROVAL_STEP_STATUS_ID,
+                dataItem.APPROVAL_STEP_STATUS_SQL AS STEP_STATUS,
                 rr.REQUEST_NUMBER,
-                ${RequestStatusSqlSnippets.requestStatusExpr('rr')} AS REQUEST_STATUS,
+                dataItem.REQUEST_STATUS_SQL AS REQUEST_STATUS,
                 rr.SUPPORTPRODUCT_PROCESS,
                 rr.PURCHASE_FREQUENCY,
                 rr.REQUEST_BY_EMPLOYEECODE,
@@ -617,22 +749,37 @@ export const GprCApprovalSQL = {
                     ON s.REQUEST_VENDOR_GPR_C_FLOWS_ID = f.REQUEST_VENDOR_GPR_C_FLOWS_ID
                     -- Keep actionable steps plus this approver's action history (approved/rejected),
                     -- so a task stays visible after it has been actioned.
-                    AND s.STEP_STATUS IN ('in_progress', 'approved', 'rejected')
+                    AND s.M_APPROVAL_STEP_STATUS_ID IN (
+                        dataItem.APPROVAL_STEP_IN_PROGRESS_STATUS_ID,
+                        dataItem.APPROVAL_STEP_APPROVED_STATUS_ID,
+                        dataItem.APPROVAL_STEP_REJECTED_STATUS_ID
+                    )
                     AND s.INUSE = 1
                 JOIN request_register_vendor rr
                     ON rr.REQUEST_REGISTER_VENDOR_ID = f.REQUEST_REGISTER_VENDOR_ID
                 LEFT JOIN vendors v
                     ON v.VENDORS_ID = rr.VENDORS_ID
                 LEFT JOIN vendor_contacts vc_sel
-                    ON vc_sel.VENDOR_CONTACTS_ID = ${RequestVendorContactSqlSnippets.primaryVendorContactIdExpr('rr')}
+                    ON vc_sel.VENDOR_CONTACTS_ID = dataItem.PRIMARY_VENDOR_CONTACT_ID_SQL
                     AND vc_sel.INUSE = 1
                 LEFT JOIN vendor_contacts vc_fallback
-                    ON vc_fallback.VENDOR_CONTACTS_ID = ${RequestVendorContactSqlSnippets.firstActiveVendorContactIdExpr('v')}
+                    ON vc_fallback.VENDOR_CONTACTS_ID = dataItem.FIRST_ACTIVE_VENDOR_CONTACT_ID_SQL
                     AND vc_fallback.INUSE = 1
             WHERE f.INUSE = 1
               AND s.APPROVER_EMPCODE = 'dataItem.APPROVER_EMPCODE'
             ORDER BY f.REQUEST_VENDOR_GPR_C_FLOWS_ID DESC
         `
+    sql = sql.replaceAll('dataItem.GPR_C_FLOW_STATUS_SQL', String(GprStatusSqlSnippets.flowStatusCodeExpr('f')))
+    sql = sql.replaceAll('dataItem.APPROVAL_STEP_STATUS_SQL', String(ApprovalMasterSqlSnippets.stepStatusCodeExpr('s')))
+    sql = sql.replaceAll('dataItem.REQUEST_STATUS_SQL', String(RequestStatusSqlSnippets.requestStatusExpr('rr')))
+    sql = sql.replaceAll(
+      'dataItem.APPROVAL_STEP_IN_PROGRESS_STATUS_ID',
+      String(GprCApprovalSQL.num(dataItem.M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID) || APPROVAL_STEP_STATUS_ID_SQL.IN_PROGRESS)
+    )
+    sql = sql.replaceAll('dataItem.APPROVAL_STEP_APPROVED_STATUS_ID', String(APPROVAL_STEP_STATUS_ID_SQL.APPROVED))
+    sql = sql.replaceAll('dataItem.APPROVAL_STEP_REJECTED_STATUS_ID', String(APPROVAL_STEP_STATUS_ID_SQL.REJECTED))
+    sql = sql.replaceAll('dataItem.PRIMARY_VENDOR_CONTACT_ID_SQL', String(RequestVendorContactSqlSnippets.primaryVendorContactIdExpr('rr')))
+    sql = sql.replaceAll('dataItem.FIRST_ACTIVE_VENDOR_CONTACT_ID_SQL', String(RequestVendorContactSqlSnippets.firstActiveVendorContactIdExpr('v')))
     sql = sql.replaceAll('dataItem.APPROVER_EMPCODE', dataItem.APPROVER_EMPCODE)
     return sql
   },
@@ -644,7 +791,9 @@ export const GprCApprovalSQL = {
         request_number: ['t.REQUEST_NUMBER', 'CAST(t.REQUEST_REGISTER_VENDOR_ID AS CHAR)'],
         vendor_name: ['t.COMPANY_NAME'],
         step_keyword: ['t.STEP_NAME', 't.STEP_CODE'],
-        status_keyword: ['t.REQUEST_STATUS'],
+      }),
+      ...GprCApprovalSQL.buildIdConditions(dataItem, {
+        M_REQUEST_STATUS_ID: 't.M_REQUEST_STATUS_ID',
       }),
       ...GprCApprovalSQL.buildColumnFilterConditions(dataItem, {
         request_number: 't.REQUEST_NUMBER',
@@ -675,10 +824,11 @@ export const GprCApprovalSQL = {
     )
     const offset = GprCApprovalSQL.num(dataItem.START)
     const limit = GprCApprovalSQL.num(dataItem.LIMIT) || 20
-    const innerQuery = `
+    let innerQuery = `
             (
                 SELECT
                     f.*,
+                    dataItem.GPR_C_FLOW_STATUS_SQL AS FLOW_STATUS,
                     s.REQUEST_VENDOR_GPR_C_STEPS_ID,
                     s.STEP_ORDER,
                     s.STEP_CODE,
@@ -686,9 +836,11 @@ export const GprCApprovalSQL = {
                     s.APPROVER_EMPCODE,
                     s.APPROVER_NAME,
                     s.APPROVER_EMAIL,
-                    s.STEP_STATUS,
+                    s.M_APPROVAL_STEP_STATUS_ID,
+                    dataItem.APPROVAL_STEP_STATUS_SQL AS STEP_STATUS,
                     rr.REQUEST_NUMBER,
-                    ${RequestStatusSqlSnippets.requestStatusExpr('rr')} AS REQUEST_STATUS,
+                    rr.CURRENT_M_REQUEST_STATUS_ID AS M_REQUEST_STATUS_ID,
+                    dataItem.REQUEST_STATUS_SQL AS REQUEST_STATUS,
                     rr.SUPPORTPRODUCT_PROCESS,
                     rr.PURCHASE_FREQUENCY,
                     rr.REQUEST_BY_EMPLOYEECODE,
@@ -705,21 +857,33 @@ export const GprCApprovalSQL = {
                         -- Keep actionable steps plus this approver's action history (approved/rejected),
                         -- so a task stays visible after it has been actioned. The Approve/Reject/Action
                         -- Required buttons are hidden on the frontend when STEP_STATUS is not 'in_progress'.
-                        AND s.STEP_STATUS IN ('in_progress', 'approved', 'rejected')
+                        AND s.M_APPROVAL_STEP_STATUS_ID IN (
+                            dataItem.APPROVAL_STEP_IN_PROGRESS_STATUS_ID,
+                            dataItem.APPROVAL_STEP_APPROVED_STATUS_ID,
+                            dataItem.APPROVAL_STEP_REJECTED_STATUS_ID
+                        )
                         AND s.INUSE = 1
                     JOIN request_register_vendor rr
                         ON rr.REQUEST_REGISTER_VENDOR_ID = f.REQUEST_REGISTER_VENDOR_ID
                     LEFT JOIN vendors v
                         ON v.VENDORS_ID = rr.VENDORS_ID
                     LEFT JOIN vendor_contacts vc_sel
-                        ON vc_sel.VENDOR_CONTACTS_ID = ${RequestVendorContactSqlSnippets.primaryVendorContactIdExpr('rr')}
+                        ON vc_sel.VENDOR_CONTACTS_ID = dataItem.PRIMARY_VENDOR_CONTACT_ID_SQL
                         AND vc_sel.INUSE = 1
                     LEFT JOIN vendor_contacts vc_fallback
-                        ON vc_fallback.VENDOR_CONTACTS_ID = ${RequestVendorContactSqlSnippets.firstActiveVendorContactIdExpr('v')}
+                        ON vc_fallback.VENDOR_CONTACTS_ID = dataItem.FIRST_ACTIVE_VENDOR_CONTACT_ID_SQL
                         AND vc_fallback.INUSE = 1
                 WHERE f.INUSE = 1
             ) t
         `
+    innerQuery = innerQuery.replaceAll('dataItem.GPR_C_FLOW_STATUS_SQL', String(GprStatusSqlSnippets.flowStatusCodeExpr('f')))
+    innerQuery = innerQuery.replaceAll('dataItem.APPROVAL_STEP_STATUS_SQL', String(ApprovalMasterSqlSnippets.stepStatusCodeExpr('s')))
+    innerQuery = innerQuery.replaceAll('dataItem.REQUEST_STATUS_SQL', String(RequestStatusSqlSnippets.requestStatusExpr('rr')))
+    innerQuery = innerQuery.replaceAll('dataItem.APPROVAL_STEP_IN_PROGRESS_STATUS_ID', String(APPROVAL_STEP_STATUS_ID_SQL.IN_PROGRESS))
+    innerQuery = innerQuery.replaceAll('dataItem.APPROVAL_STEP_APPROVED_STATUS_ID', String(APPROVAL_STEP_STATUS_ID_SQL.APPROVED))
+    innerQuery = innerQuery.replaceAll('dataItem.APPROVAL_STEP_REJECTED_STATUS_ID', String(APPROVAL_STEP_STATUS_ID_SQL.REJECTED))
+    innerQuery = innerQuery.replaceAll('dataItem.PRIMARY_VENDOR_CONTACT_ID_SQL', String(RequestVendorContactSqlSnippets.primaryVendorContactIdExpr('rr')))
+    innerQuery = innerQuery.replaceAll('dataItem.FIRST_ACTIVE_VENDOR_CONTACT_ID_SQL', String(RequestVendorContactSqlSnippets.firstActiveVendorContactIdExpr('v')))
 
     let countSql = `
             SELECT COUNT(*) AS TOTAL_COUNT
@@ -748,11 +912,12 @@ export const GprCApprovalSQL = {
   },
 
   getTaskManagerQueue: () => {
-    return `
+    let sql = `
             SELECT
                 f.REQUEST_VENDOR_GPR_C_FLOWS_ID,
                 f.REQUEST_REGISTER_VENDOR_ID,
-                f.FLOW_STATUS,
+                f.M_GPR_C_FLOW_STATUS_ID,
+                dataItem.GPR_C_FLOW_STATUS_SQL AS FLOW_STATUS,
                 f.CURRENT_STEP_CODE,
                 s.REQUEST_VENDOR_GPR_C_STEPS_ID,
                 s.STEP_ORDER,
@@ -761,9 +926,10 @@ export const GprCApprovalSQL = {
                 s.APPROVER_EMPCODE,
                 s.APPROVER_NAME,
                 s.APPROVER_EMAIL,
-                s.STEP_STATUS,
+                s.M_APPROVAL_STEP_STATUS_ID,
+                dataItem.APPROVAL_STEP_STATUS_SQL AS STEP_STATUS,
                 rr.REQUEST_NUMBER,
-                ${RequestStatusSqlSnippets.requestStatusExpr('rr')} AS REQUEST_STATUS,
+                dataItem.REQUEST_STATUS_SQL AS REQUEST_STATUS,
                 rr.SUPPORTPRODUCT_PROCESS,
                 rr.PURCHASE_FREQUENCY,
                 rr.REQUEST_BY_EMPLOYEECODE,
@@ -773,7 +939,7 @@ export const GprCApprovalSQL = {
             FROM REQUEST_VENDOR_GPR_C_FLOWS f
                 JOIN REQUEST_VENDOR_GPR_C_STEPS s
                     ON s.REQUEST_VENDOR_GPR_C_FLOWS_ID = f.REQUEST_VENDOR_GPR_C_FLOWS_ID
-                    AND s.STEP_STATUS = 'in_progress'
+                    AND s.M_APPROVAL_STEP_STATUS_ID = dataItem.APPROVAL_STEP_IN_PROGRESS_STATUS_ID
                     AND s.INUSE = 1
                 JOIN request_register_vendor rr
                     ON rr.REQUEST_REGISTER_VENDOR_ID = f.REQUEST_REGISTER_VENDOR_ID
@@ -781,15 +947,22 @@ export const GprCApprovalSQL = {
                 LEFT JOIN vendors v
                     ON v.VENDORS_ID = rr.VENDORS_ID
             WHERE f.INUSE = 1
-              AND f.FLOW_STATUS = 'in_progress'
+              AND f.M_GPR_C_FLOW_STATUS_ID = dataItem.GPR_C_FLOW_IN_PROGRESS_STATUS_ID
             ORDER BY f.REQUEST_VENDOR_GPR_C_FLOWS_ID DESC
         `
+    sql = sql.replaceAll('dataItem.GPR_C_FLOW_STATUS_SQL', String(GprStatusSqlSnippets.flowStatusCodeExpr('f')))
+    sql = sql.replaceAll('dataItem.APPROVAL_STEP_STATUS_SQL', String(ApprovalMasterSqlSnippets.stepStatusCodeExpr('s')))
+    sql = sql.replaceAll('dataItem.REQUEST_STATUS_SQL', String(RequestStatusSqlSnippets.requestStatusExpr('rr')))
+    sql = sql.replaceAll('dataItem.APPROVAL_STEP_IN_PROGRESS_STATUS_ID', String(APPROVAL_STEP_STATUS_ID_SQL.IN_PROGRESS))
+    sql = sql.replaceAll('dataItem.GPR_C_FLOW_IN_PROGRESS_STATUS_ID', String(GPR_C_FLOW_STATUS_ID_SQL.IN_PROGRESS))
+    return sql
   },
 
   getStepById: (dataItem: any) => {
     let sql = `
             SELECT
                 s.*,
+                dataItem.APPROVAL_STEP_STATUS_SQL AS STEP_STATUS,
                 f.REQUEST_REGISTER_VENDOR_ID
             FROM REQUEST_VENDOR_GPR_C_STEPS s
                 JOIN REQUEST_VENDOR_GPR_C_FLOWS f
@@ -798,6 +971,7 @@ export const GprCApprovalSQL = {
               AND s.INUSE = 1
             LIMIT 1
         `
+    sql = sql.replaceAll('dataItem.APPROVAL_STEP_STATUS_SQL', String(ApprovalMasterSqlSnippets.stepStatusCodeExpr('s')))
     sql = sql.replaceAll('dataItem.REQUEST_VENDOR_GPR_C_STEPS_ID', GprCApprovalSQL.num(dataItem.REQUEST_VENDOR_GPR_C_STEPS_ID).toString())
     return sql
   },
@@ -825,7 +999,7 @@ export const GprCApprovalSQL = {
             SELECT
                 rr.REQUEST_REGISTER_VENDOR_ID,
                 rr.REQUEST_NUMBER,
-                ${RequestStatusSqlSnippets.requestStatusExpr('rr')} AS REQUEST_STATUS,
+                dataItem.REQUEST_STATUS_SQL AS REQUEST_STATUS,
                 rr.ASSIGN_TO,
                 rr.REQUEST_BY_EMPLOYEECODE,
                 rr.SUPPORTPRODUCT_PROCESS,
@@ -844,10 +1018,12 @@ export const GprCApprovalSQL = {
                 vc.TEL_PHONE
             FROM request_register_vendor rr
                 LEFT JOIN vendors v ON v.VENDORS_ID = rr.VENDORS_ID
-                LEFT JOIN vendor_contacts vc ON vc.VENDOR_CONTACTS_ID = ${RequestVendorContactSqlSnippets.primaryVendorContactIdExpr('rr')}
+                LEFT JOIN vendor_contacts vc ON vc.VENDOR_CONTACTS_ID = dataItem.PRIMARY_VENDOR_CONTACT_ID_SQL
             WHERE rr.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
             LIMIT 1
         `
+    sql = sql.replaceAll('dataItem.REQUEST_STATUS_SQL', String(RequestStatusSqlSnippets.requestStatusExpr('rr')))
+    sql = sql.replaceAll('dataItem.PRIMARY_VENDOR_CONTACT_ID_SQL', String(RequestVendorContactSqlSnippets.primaryVendorContactIdExpr('rr')))
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', GprCApprovalSQL.num(dataItem.REQUEST_REGISTER_VENDOR_ID).toString())
     return sql
   },
@@ -859,12 +1035,13 @@ export const GprCApprovalSQL = {
                                      , EMPSURNAME
                                      , EMPEMAIL
                             FROM
-                                       person.member_fed
+                                       dataItem.MEMBER_TABLE
                             WHERE
                                        EMPCODE = 'dataItem.EMPCODE'
                             LIMIT
                                        1
         `
+    sql = sql.replaceAll('dataItem.MEMBER_TABLE', String(PersonSqlSnippets.memberTable()))
 
     sql = sql.replaceAll('dataItem.EMPCODE', dataItem['EMPCODE'] || '')
 
@@ -877,9 +1054,10 @@ export const GprCApprovalSQL = {
                                        EMPNAME
                                      , EMPEMAIL
                             FROM
-                                       assignees_to
+                                       approval_group_member
                             WHERE
                                        EMPCODE = 'dataItem.EMPCODE'
+                                       AND INUSE = 1
                             LIMIT
                                        1
         `
@@ -892,33 +1070,28 @@ export const GprCApprovalSQL = {
   getPeerCcRowsByNormalizedGroup: async (dataItem: any) => {
     let sql = `
                             SELECT
-                                       EMPCODE
-                                     , EMPNAME
-                                     , EMPEMAIL
-                                     , GROUP_CODE
-                                     , GROUP_NAME
+                                       agm.EMPCODE
+                                     , agm.EMPNAME
+                                     , agm.EMPEMAIL
+                                     , ag.GROUP_CODE
+                                     , ag.GROUP_NAME
+                                     , ag.APPROVAL_GROUP_ID
+                                     , agm.APPROVAL_GROUP_MEMBER_ID
                             FROM
-                                       assignees_to
+                                       approval_group_member agm
+                                            JOIN
+                                       approval_group ag ON ag.APPROVAL_GROUP_ID = agm.APPROVAL_GROUP_ID
                             WHERE
-                                       (
-                                           UPPER(TRIM(COALESCE(GROUP_CODE, ''))) = 'dataItem.TARGET_GROUP'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(GROUP_NAME, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_')
-                                               = 'dataItem.TARGET_GROUP'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-                                               UPPER(TRIM(COALESCE(GROUP_CODE, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '')
-                                               = 'dataItem.TARGET_COMPACT'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-                                               UPPER(TRIM(COALESCE(GROUP_NAME, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '')
-                                               = 'dataItem.TARGET_COMPACT'
-                                       )
-                                       AND INUSE = 1
+                                       ag.GROUP_CODE = 'dataItem.TARGET_GROUP'
+                                       AND ag.INUSE = 1
+                                       AND agm.INUSE = 1
                             ORDER BY
-                                       ASSIGNEES_TO_ID ASC
+                                       agm.IS_PRIMARY DESC
+                                     , agm.PRIORITY_NO ASC
+                                     , agm.APPROVAL_GROUP_MEMBER_ID ASC
         `
 
     sql = sql.replaceAll('dataItem.TARGET_GROUP', dataItem['TARGET_GROUP'] || '')
-    sql = sql.replaceAll('dataItem.TARGET_COMPACT', dataItem['TARGET_COMPACT'] || '')
-
     return sql
   },
 
@@ -931,11 +1104,15 @@ export const GprCApprovalSQL = {
                                      , wsm.M_REQUEST_STATUS_ID AS M_REQUEST_STATUS_ID
                                      , ras.STEP_ORDER
                                      , ras.APPROVER_EMPCODE
-                                     , ras.STEP_STATUS
+                                     , ras.APPROVAL_GROUP_MEMBER_ID
+                                     , ras.M_APPROVAL_STEP_STATUS_ID
+                                     , LOWER(task_status.STATUS_CODE) AS STEP_STATUS
                                      , mrs.STATUS_VALUE AS DESCRIPTION
                                      , wsm.STEP_CODE
                                      , wsm.ACTOR_TYPE
-                                     , ras.GROUP_CODE
+                                     , ras.APPROVAL_GROUP_ID
+                                     , task_group.GROUP_CODE
+                                     , task_group.GROUP_NAME
                                      , ras.ASSIGNMENT_MODE
                                      , ras.CREATE_BY
                                      , ras.CREATE_DATE
@@ -943,15 +1120,22 @@ export const GprCApprovalSQL = {
                                      , ras.UPDATE_DATE
                                      , mrs.STATUS_VALUE AS MASTER_STATUS_VALUE
                                      , mrs.STATUS_VALUE AS MASTER_STATUS_LABEL
-                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS APPROVER_NAME
+                                     , COALESCE(task_member.EMPNAME, ras.APPROVER_EMPCODE) AS APPROVER_NAME
                             FROM
                                        request_approval_step ras
                                             INNER JOIN
                                        workflow_step_master wsm ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID
                                                                            INNER JOIN
-                                                                      m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID
+                                                                       m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID
+                                            INNER JOIN
+                                       m_approval_step_status task_status
+                                         ON task_status.M_APPROVAL_STEP_STATUS_ID = ras.M_APPROVAL_STEP_STATUS_ID
                                             LEFT JOIN
-                                       person.member_fed m ON m.EMPCODE = ras.APPROVER_EMPCODE
+                                       approval_group task_group
+                                         ON task_group.APPROVAL_GROUP_ID = ras.APPROVAL_GROUP_ID
+                                            LEFT JOIN
+                                       approval_group_member task_member
+                                         ON task_member.APPROVAL_GROUP_MEMBER_ID = ras.APPROVAL_GROUP_MEMBER_ID
                             WHERE
                                        ras.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
                                        AND ras.INUSE = 1
@@ -964,10 +1148,111 @@ export const GprCApprovalSQL = {
     return sql
   },
 
+  getMainWorkflowTransition: async (dataItem: any) => {
+    let sql = `
+                            SELECT
+                                       wt.WORKFLOW_TRANSITION_ID
+                                     , wt.ACTION_CODE
+                                     , wt.TO_WORKFLOW_STEP_MASTER_ID
+                                     , wt.M_REQUEST_STATE_ID AS TERMINAL_REQUEST_STATE_ID
+                                     , dataItem.TERMINAL_REQUEST_STATE_CODE_SQL AS TERMINAL_STATE
+                                     , dataItem.TERMINAL_REQUEST_STATE_FLAG_SQL AS TERMINAL_IS_TERMINAL
+                                     , wt.CONDITION_KEY
+                                     , target_task.REQUEST_APPROVAL_STEP_ID AS NEXT_REQUEST_APPROVAL_STEP_ID
+                                     , target_task.STEP_ORDER AS NEXT_STEP_ORDER
+                                     , target_task.APPROVER_EMPCODE AS NEXT_APPROVER_EMPCODE
+                                     , target_task.APPROVAL_GROUP_MEMBER_ID AS NEXT_APPROVAL_GROUP_MEMBER_ID
+                                     , target_task.M_APPROVAL_STEP_STATUS_ID AS NEXT_STEP_STATUS_ID
+                                     , LOWER(target_task_status.STATUS_CODE) AS NEXT_STEP_STATUS
+                                     , target_wsm.M_REQUEST_STATUS_ID AS NEXT_M_REQUEST_STATUS_ID
+                                     , target_wsm.STEP_CODE AS NEXT_STEP_CODE
+                                     , target_wsm.ACTOR_TYPE AS NEXT_ACTOR_TYPE
+                                     , target_status.STATUS_VALUE AS NEXT_STATUS_VALUE
+                            FROM request_register_vendor rr
+                            INNER JOIN workflow_transition wt
+                              ON wt.WORKFLOW_DEFINITION_ID = rr.WORKFLOW_DEFINITION_ID
+                             AND wt.FROM_WORKFLOW_STEP_MASTER_ID = dataItem.CURRENT_WORKFLOW_STEP_MASTER_ID
+                             AND dataItem.TRANSITION_IDENTITY_CONDITION
+                             AND wt.INUSE = 1
+                            LEFT JOIN workflow_step_master target_wsm
+                              ON target_wsm.WORKFLOW_STEP_MASTER_ID = wt.TO_WORKFLOW_STEP_MASTER_ID
+                            LEFT JOIN m_request_status target_status
+                              ON target_status.M_REQUEST_STATUS_ID = target_wsm.M_REQUEST_STATUS_ID
+                            LEFT JOIN request_approval_step target_task
+                              ON target_task.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID
+                             AND target_task.WORKFLOW_STEP_MASTER_ID = wt.TO_WORKFLOW_STEP_MASTER_ID
+                             AND target_task.INUSE = 1
+                            LEFT JOIN m_approval_step_status target_task_status
+                              ON target_task_status.M_APPROVAL_STEP_STATUS_ID = target_task.M_APPROVAL_STEP_STATUS_ID
+                            WHERE rr.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
+                              AND rr.M_REQUEST_STATE_ID = dataItem.REQUEST_IN_PROGRESS_STATE_ID
+                              AND rr.INUSE = 1
+                            ORDER BY wt.PRIORITY_NO, wt.WORKFLOW_TRANSITION_ID
+                            LIMIT 1
+        `
+    sql = sql.replaceAll('dataItem.TERMINAL_REQUEST_STATE_CODE_SQL', String(RequestStateSqlSnippets.requestStateCodeByIdExpr('wt.M_REQUEST_STATE_ID')))
+    sql = sql.replaceAll('dataItem.TERMINAL_REQUEST_STATE_FLAG_SQL', String(RequestStateSqlSnippets.requestStateIsTerminalByIdExpr('wt.M_REQUEST_STATE_ID')))
+    sql = sql.replaceAll(
+      'dataItem.REQUEST_IN_PROGRESS_STATE_ID',
+      requireStatusId(dataItem.M_REQUEST_IN_PROGRESS_STATE_ID, 'M_REQUEST_IN_PROGRESS_STATE_ID').toString()
+    )
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.CURRENT_WORKFLOW_STEP_MASTER_ID', (dataItem['CURRENT_WORKFLOW_STEP_MASTER_ID'] || 0).toString())
+    const targetWorkflowStepMasterId = GprCApprovalSQL.num(dataItem.TARGET_WORKFLOW_STEP_MASTER_ID)
+    const terminalRequestStateId = GprCApprovalSQL.num(dataItem.TERMINAL_REQUEST_STATE_ID)
+    let transitionIdentityCondition = targetWorkflowStepMasterId
+      ? 'wt.TO_WORKFLOW_STEP_MASTER_ID = dataItem.TARGET_WORKFLOW_STEP_MASTER_ID'
+      : terminalRequestStateId
+        ? 'wt.TO_WORKFLOW_STEP_MASTER_ID IS NULL AND wt.M_REQUEST_STATE_ID = dataItem.TERMINAL_REQUEST_STATE_ID'
+        : '1 = 0'
+    transitionIdentityCondition = transitionIdentityCondition.replaceAll(
+      'dataItem.TARGET_WORKFLOW_STEP_MASTER_ID',
+      targetWorkflowStepMasterId.toString()
+    )
+    transitionIdentityCondition = transitionIdentityCondition.replaceAll(
+      'dataItem.TERMINAL_REQUEST_STATE_ID',
+      terminalRequestStateId.toString()
+    )
+    sql = sql.replaceAll('dataItem.TRANSITION_IDENTITY_CONDITION', transitionIdentityCondition)
+    return sql
+  },
+
   updateApprovalStep: async (dataItem: any) => {
+    const stepStatusId = requireStatusId(dataItem['M_APPROVAL_STEP_STATUS_ID'], 'M_APPROVAL_STEP_STATUS_ID')
+    const inProgressStatusId = requireStatusId(
+      dataItem.M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID,
+      'M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID'
+    )
+    const rejectedApprovalStatusId = requireStatusId(
+      dataItem.M_APPROVAL_STEP_REJECTED_STATUS_ID,
+      'M_APPROVAL_STEP_REJECTED_STATUS_ID'
+    )
+    const rejectedRequestStateId = requireStatusId(
+      dataItem.M_REQUEST_REJECTED_STATE_ID,
+      'M_REQUEST_REJECTED_STATE_ID'
+    )
+    const inProgressRequestStateId = requireStatusId(
+      dataItem.M_REQUEST_IN_PROGRESS_STATE_ID,
+      'M_REQUEST_IN_PROGRESS_STATE_ID'
+    )
+    const rejectedRequestStatusId = requireStatusId(
+      dataItem.M_REQUEST_REJECTED_STATUS_ID,
+      'M_REQUEST_REJECTED_STATUS_ID'
+    )
     let sql = `
                             UPDATE request_approval_step SET
-                                       STEP_STATUS = LOWER('dataItem.STEP_STATUS')
+                                       M_APPROVAL_STEP_STATUS_ID = dataItem.M_APPROVAL_STEP_STATUS_ID
+                                     , ASSIGNED_DATE = CASE
+                                           WHEN dataItem.M_APPROVAL_STEP_STATUS_ID = dataItem.APPROVAL_STEP_IN_PROGRESS_STATUS_ID
+                                             THEN COALESCE(ASSIGNED_DATE, NOW())
+                                           ELSE ASSIGNED_DATE
+                                       END
+                                     , COMPLETED_DATE = CASE
+                                           WHEN dataItem.M_APPROVAL_STEP_STATUS_ID IN (
+                                               dataItem.TERMINAL_APPROVAL_STEP_STATUS_IDS_SQL
+                                           ) THEN COALESCE(COMPLETED_DATE, NOW())
+                                           ELSE NULL
+                                       END
                                      , UPDATE_BY = 'dataItem.UPDATE_BY'
                                      , UPDATE_DATE = NOW()
                             WHERE
@@ -978,28 +1263,25 @@ export const GprCApprovalSQL = {
                               ON changed_step.REQUEST_APPROVAL_STEP_ID = dataItem.REQUEST_APPROVAL_STEP_ID
                             LEFT JOIN request_approval_step active_step
                               ON active_step.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID
-                             AND active_step.STEP_STATUS = 'in_progress'
+                             AND active_step.M_APPROVAL_STEP_STATUS_ID = dataItem.APPROVAL_STEP_IN_PROGRESS_STATUS_ID
                              AND active_step.INUSE = 1
                             LEFT JOIN workflow_step_master active_wsm
                               ON active_wsm.WORKFLOW_STEP_MASTER_ID = active_step.WORKFLOW_STEP_MASTER_ID
-                            LEFT JOIN m_request_status active_status
-                              ON active_status.M_REQUEST_STATUS_ID = active_wsm.M_REQUEST_STATUS_ID
-                            LEFT JOIN m_request_status rejected_status
-                              ON rejected_status.STATUS_VALUE = 'Rejected'
-                              OR rejected_status.STATUS_VALUE = 'Rejected'
                             SET
-                                       rr.REQUEST_STATE = CASE
-                                           WHEN LOWER('dataItem.STEP_STATUS') = 'rejected' THEN 'rejected'
-                                           WHEN active_step.REQUEST_APPROVAL_STEP_ID IS NOT NULL THEN 'in_progress'
-                                           ELSE rr.REQUEST_STATE
+                                       rr.M_REQUEST_STATE_ID = CASE
+                                           WHEN dataItem.M_APPROVAL_STEP_STATUS_ID = dataItem.APPROVAL_STEP_REJECTED_STATUS_ID THEN dataItem.REQUEST_REJECTED_STATE_ID
+                                           WHEN active_step.REQUEST_APPROVAL_STEP_ID IS NOT NULL THEN dataItem.REQUEST_IN_PROGRESS_STATE_ID
+                                           ELSE rr.M_REQUEST_STATE_ID
                                        END
                                      , rr.CURRENT_REQUEST_APPROVAL_STEP_ID = CASE
-                                           WHEN LOWER('dataItem.STEP_STATUS') = 'rejected' THEN changed_step.REQUEST_APPROVAL_STEP_ID
+                                           WHEN dataItem.M_APPROVAL_STEP_STATUS_ID = dataItem.APPROVAL_STEP_REJECTED_STATUS_ID
+                                             THEN changed_step.REQUEST_APPROVAL_STEP_ID
                                            WHEN active_step.REQUEST_APPROVAL_STEP_ID IS NOT NULL THEN active_step.REQUEST_APPROVAL_STEP_ID
                                            ELSE rr.CURRENT_REQUEST_APPROVAL_STEP_ID
                                        END
                                      , rr.CURRENT_M_REQUEST_STATUS_ID = CASE
-                                           WHEN LOWER('dataItem.STEP_STATUS') = 'rejected' THEN rejected_status.M_REQUEST_STATUS_ID
+                                           WHEN dataItem.M_APPROVAL_STEP_STATUS_ID = dataItem.APPROVAL_STEP_REJECTED_STATUS_ID
+                                             THEN dataItem.REQUEST_REJECTED_STATUS_ID
                                            WHEN active_step.REQUEST_APPROVAL_STEP_ID IS NOT NULL THEN active_wsm.M_REQUEST_STATUS_ID
                                            ELSE rr.CURRENT_M_REQUEST_STATUS_ID
                                        END
@@ -1008,9 +1290,24 @@ export const GprCApprovalSQL = {
                             WHERE
                                        rr.REQUEST_REGISTER_VENDOR_ID = changed_step.REQUEST_REGISTER_VENDOR_ID
         `
+    sql = sql.replaceAll('dataItem.APPROVAL_STEP_IN_PROGRESS_STATUS_ID', inProgressStatusId.toString())
+    sql = sql.replaceAll('dataItem.TERMINAL_APPROVAL_STEP_STATUS_IDS_SQL', String(ApprovalMasterSqlSnippets.terminalStepStatusIdsExpr()))
+    sql = sql.replaceAll(
+      'dataItem.APPROVAL_STEP_REJECTED_STATUS_ID',
+      rejectedApprovalStatusId.toString()
+    )
+    sql = sql.replaceAll(
+      'dataItem.REQUEST_REJECTED_STATE_ID',
+      rejectedRequestStateId.toString()
+    )
+    sql = sql.replaceAll(
+      'dataItem.REQUEST_IN_PROGRESS_STATE_ID',
+      inProgressRequestStateId.toString()
+    )
+    sql = sql.replaceAll('dataItem.REQUEST_REJECTED_STATUS_ID', rejectedRequestStatusId.toString())
 
     sql = sql.replaceAll('dataItem.REQUEST_APPROVAL_STEP_ID', (dataItem['REQUEST_APPROVAL_STEP_ID'] || 0).toString())
-    sql = sql.replaceAll('dataItem.STEP_STATUS', dataItem['STEP_STATUS'] || '')
+    sql = sql.replaceAll('dataItem.M_APPROVAL_STEP_STATUS_ID', stepStatusId.toString())
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
 
     return sql
@@ -1021,9 +1318,13 @@ export const GprCApprovalSQL = {
                             INSERT INTO request_approval_log (
                                        REQUEST_REGISTER_VENDOR_ID
                                      , REQUEST_APPROVAL_STEP_ID
+                                     , WORKFLOW_STEP_MASTER_ID
                                      , ACTION_BY
                                      , ACTION_BY_NAME
                                      , ACTION_TYPE
+                                     , ACTION_CODE
+                                     , STEP_CODE_SNAPSHOT
+                                     , STATUS_LABEL_SNAPSHOT
                                      , DESCRIPTION
                                      , REJECT_REASON
                                      , CREATE_BY
@@ -1034,15 +1335,36 @@ export const GprCApprovalSQL = {
                             ) VALUES (
                                         dataItem.REQUEST_REGISTER_VENDOR_ID
                                      ,  dataItem.REQUEST_APPROVAL_STEP_ID
+                                     , (SELECT ras.WORKFLOW_STEP_MASTER_ID
+                                        FROM request_approval_step ras
+                                        WHERE ras.REQUEST_APPROVAL_STEP_ID = dataItem.REQUEST_APPROVAL_STEP_ID
+                                          AND ras.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
+                                        LIMIT 1)
                                      , 'dataItem.ACTION_BY'
                                      , COALESCE(
-                                           (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME)
-                                            FROM person.member_fed pm
-                                            WHERE pm.EMPCODE = 'dataItem.ACTION_BY'
+                                           (SELECT agm.EMPNAME
+                                            FROM approval_group_member agm
+                                            WHERE agm.EMPCODE = 'dataItem.ACTION_BY'
+                                              AND agm.INUSE = 1
+                                            ORDER BY agm.IS_PRIMARY DESC, agm.PRIORITY_NO ASC
                                             LIMIT 1),
                                            'dataItem.ACTION_BY'
                                        )
                                      , 'dataItem.ACTION_TYPE'
+                                     , 'dataItem.ACTION_CODE'
+                                     , (SELECT wsm.STEP_CODE
+                                        FROM request_approval_step ras
+                                        JOIN workflow_step_master wsm ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID
+                                        WHERE ras.REQUEST_APPROVAL_STEP_ID = dataItem.REQUEST_APPROVAL_STEP_ID
+                                          AND ras.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
+                                        LIMIT 1)
+                                     , (SELECT COALESCE(mrs.STATUS_LABEL_EN, mrs.STATUS_VALUE)
+                                        FROM request_approval_step ras
+                                        JOIN workflow_step_master wsm ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID
+                                        JOIN m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID
+                                        WHERE ras.REQUEST_APPROVAL_STEP_ID = dataItem.REQUEST_APPROVAL_STEP_ID
+                                          AND ras.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
+                                        LIMIT 1)
                                      , LEFT('dataItem.REMARK', 100)
                                      , CASE
                                            WHEN LOWER('dataItem.ACTION_TYPE') IN ('rejected', 'vendor_disagreed') THEN LEFT('dataItem.REJECT_REASON', 500)
@@ -1060,55 +1382,9 @@ export const GprCApprovalSQL = {
     sql = sql.replaceAll('dataItem.REQUEST_APPROVAL_STEP_ID', dataItem['REQUEST_APPROVAL_STEP_ID'] ? dataItem['REQUEST_APPROVAL_STEP_ID'].toString() : 'NULL')
     sql = sql.replaceAll('dataItem.ACTION_BY', dataItem['ACTION_BY'] || '')
     sql = sql.replaceAll('dataItem.ACTION_TYPE', dataItem['ACTION_TYPE'] || '')
+    sql = sql.replaceAll('dataItem.ACTION_CODE', String(dataItem['ACTION_CODE'] || dataItem['ACTION_TYPE'] || '').trim().toUpperCase())
     sql = sql.replaceAll('dataItem.REMARK', dataItem['REMARK'] || '')
     sql = sql.replaceAll('dataItem.REJECT_REASON', dataItem['REJECT_REASON'] ?? dataItem['REMARK'] ?? '')
-
-    return sql
-  },
-
-  updateStatus: async (dataItem: any) => {
-    let sql = `
-                            UPDATE request_register_vendor SET
-                                       CURRENT_M_REQUEST_STATUS_ID = COALESCE(
-                                           ${RequestStatusSqlSnippets.requestStatusIdByValueExpr("'dataItem.REQUEST_STATUS'")}
-                                           , CURRENT_M_REQUEST_STATUS_ID)
-                                     , REQUEST_STATE = CASE
-                                           WHEN LOWER('dataItem.REQUEST_STATUS') = 'completed' THEN 'completed'
-                                           WHEN LOWER('dataItem.REQUEST_STATUS') IN ('rejected', 'vendor disagreed') THEN 'rejected'
-                                           ELSE REQUEST_STATE
-                                       END
-                                     , UPDATE_BY = 'dataItem.UPDATE_BY'
-                                     , UPDATE_DATE = NOW()
-                            WHERE
-                                       REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
-        `
-
-    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
-    sql = sql.replaceAll('dataItem.REQUEST_STATUS', dataItem['REQUEST_STATUS'] || '')
-    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || '')
-
-    return sql
-  },
-
-  markRequestCompleted: async (dataItem: any) => {
-    let sql = `
-                            UPDATE request_register_vendor SET
-                                       REQUEST_STATE = 'completed'
-                                     , CURRENT_M_REQUEST_STATUS_ID = (
-                                           SELECT M_REQUEST_STATUS_ID FROM workflow_step_master
-                                           WHERE STEP_CODE = 'ACCOUNT_REGISTERED'
-                                             AND INUSE = 1
-                                           LIMIT 1
-                                       )
-                                     , CURRENT_REQUEST_APPROVAL_STEP_ID = NULL
-                                     , UPDATE_BY = 'dataItem.UPDATE_BY'
-                                     , UPDATE_DATE = NOW()
-                            WHERE
-                                       REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
-        `
-
-    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
-    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
 
     return sql
   },
@@ -1118,8 +1394,13 @@ export const GprCApprovalSQL = {
                             SELECT
                                        rr.VENDORS_ID
                                      , rr.ASSIGN_TO
+                                     , rr.M_REQUEST_STATE_ID
+                                     , dataItem.REQUEST_STATE_SQL AS REQUEST_STATE
+                                     , rr.WORKFLOW_DEFINITION_ID
+                                     , rr.CURRENT_REQUEST_APPROVAL_STEP_ID
+                                     , rr.LOCK_VERSION
                                      , rvs.PROPOSED_VENDOR_CODE AS VENDOR_CODE_SELECTOR
-                                      ${GprCSelectionSqlSnippets.gprCSelectionFields('rvs', 'rr')}
+                                      dataItem.GPR_C_SELECTION_FIELDS_SQL
                                       , rvs.GPR_43_ACCEPTANCE_STATUS
                                       , v.VENDOR_REGION
                             FROM
@@ -1135,22 +1416,48 @@ export const GprCApprovalSQL = {
                             LIMIT
                                        1
         `
+    sql = sql.replaceAll('dataItem.REQUEST_STATE_SQL', String(RequestStateSqlSnippets.requestStateCodeExpr('rr')))
+    sql = sql.replaceAll('dataItem.GPR_C_SELECTION_FIELDS_SQL', String(GprCSelectionSqlSnippets.gprCSelectionFields('rvs', 'rr')))
 
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
 
     return sql
   },
 
+  acquireWorkflowLock: async (dataItem: any) => {
+    let sql = `
+                            UPDATE request_register_vendor
+                            SET LOCK_VERSION = LOCK_VERSION + 1,
+                                UPDATE_BY = 'dataItem.UPDATE_BY',
+                                UPDATE_DATE = NOW()
+                            WHERE REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
+                              AND CURRENT_REQUEST_APPROVAL_STEP_ID = dataItem.CURRENT_TASK_ID
+                              AND LOCK_VERSION = dataItem.LOCK_VERSION
+                              AND M_REQUEST_STATE_ID = dataItem.REQUEST_IN_PROGRESS_STATE_ID
+                              AND INUSE = 1
+        `
+    sql = sql.replaceAll(
+      'dataItem.REQUEST_IN_PROGRESS_STATE_ID',
+      requireStatusId(dataItem.M_REQUEST_IN_PROGRESS_STATE_ID, 'M_REQUEST_IN_PROGRESS_STATE_ID').toString()
+    )
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.CURRENT_TASK_ID', (dataItem['CURRENT_TASK_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.LOCK_VERSION', Number(dataItem['LOCK_VERSION'] || 0).toString())
+    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
+    return sql
+  },
+
   updateVendorFftStatus: async (dataItem: any) => {
+    const vendorStatusId = requireVendorStatusId(dataItem['M_VENDOR_STATUS_ID'], 'M_VENDOR_STATUS_ID')
     let sql = `
                             UPDATE vendors SET
-                                       FFT_STATUS = dataItem.FFT_STATUS
+                                       FFT_STATUS = dataItem.FFT_STATUS_ID
                             WHERE
                                        VENDORS_ID = dataItem.VENDORS_ID
         `
 
     sql = sql.replaceAll('dataItem.VENDORS_ID', (dataItem['VENDORS_ID'] || 0).toString())
-    sql = sql.replaceAll('dataItem.FFT_STATUS', (dataItem['FFT_STATUS'] || 0).toString())
+    sql = sql.replaceAll('dataItem.FFT_STATUS_ID', vendorStatusId.toString())
 
     return sql
   },
@@ -1158,37 +1465,30 @@ export const GprCApprovalSQL = {
   getActiveAssigneeByEmpCodeAndGroupCode: async (dataItem: any) => {
     let sql = `
                             SELECT
-                                       ASSIGNEES_TO_ID
-                                     , EMPCODE
-                                     , EMPNAME
-                                     , EMPEMAIL
-                                     , GROUP_CODE
-                                     , GROUP_NAME
-                                     , INUSE
+                                       agm.APPROVAL_GROUP_MEMBER_ID AS ASSIGNEES_TO_ID
+                                     , agm.APPROVAL_GROUP_MEMBER_ID
+                                     , ag.APPROVAL_GROUP_ID
+                                     , agm.EMPCODE
+                                     , agm.EMPNAME
+                                     , agm.EMPEMAIL
+                                     , ag.GROUP_CODE
+                                     , ag.GROUP_NAME
+                                     , agm.INUSE
                             FROM
-                                       assignees_to
+                                       approval_group_member agm
+                                            JOIN
+                                       approval_group ag ON ag.APPROVAL_GROUP_ID = agm.APPROVAL_GROUP_ID
                             WHERE
-                                       EMPCODE = 'dataItem.EMPCODE'
-                                       AND (
-                                           UPPER(TRIM(COALESCE(GROUP_CODE, ''))) = 'dataItem.GROUP_CODE'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(GROUP_NAME, ''))), ' ', '_'), '(', ''), ')', ''), '-', '_')
-                                               = 'dataItem.GROUP_CODE'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-                                               UPPER(TRIM(COALESCE(GROUP_CODE, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '')
-                                               = 'dataItem.GROUP_COMPACT'
-                                           OR REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(
-                                               UPPER(TRIM(COALESCE(GROUP_NAME, ''))), ' ', ''), '_', ''), '-', ''), '(', ''), ')', ''), '.', '')
-                                               = 'dataItem.GROUP_COMPACT'
-                                       )
-                                       AND INUSE = 1
+                                       agm.EMPCODE = 'dataItem.EMPCODE'
+                                       AND ag.GROUP_CODE = 'dataItem.GROUP_CODE'
+                                       AND ag.INUSE = 1
+                                       AND agm.INUSE = 1
                             LIMIT
                                        1
         `
 
     sql = sql.replaceAll('dataItem.EMPCODE', dataItem['EMPCODE'] || '')
     sql = sql.replaceAll('dataItem.GROUP_CODE', dataItem['GROUP_CODE'] || '')
-    sql = sql.replaceAll('dataItem.GROUP_COMPACT', dataItem['GROUP_COMPACT'] || '')
-
     return sql
   },
 }

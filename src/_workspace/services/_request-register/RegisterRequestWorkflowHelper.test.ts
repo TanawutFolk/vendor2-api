@@ -2,20 +2,26 @@ import { describe, expect, test } from 'bun:test'
 import {
   inferActorType,
   inferStepCode,
+  getVendorCodePrefix,
+  isVendorCodeComplete,
   requiresVendorReply,
+  resolveWorkflowAction,
+  WORKFLOW_ACTION,
   WORKFLOW_STEP_CODE,
 } from './RegisterRequestWorkflowHelper'
 
 describe('RegisterRequestWorkflowHelper', () => {
-  test('separates the submitted step from the PO PIC review step in legacy data', () => {
+  test('uses only configured step and actor identity, never display-label inference', () => {
     const submittedStep = {
       DESCRIPTION: 'Sent To PO & SCM (PIC)',
-      STEP_CODE: 'PIC_REVIEW',
+      STEP_CODE: 'REQUEST_SUBMITTED',
+      ACTOR_TYPE: 'REQUESTER',
       REQUIRES_VENDOR_REPLY: 1,
     }
     const picReviewStep = {
       DESCRIPTION: 'PO & SCM approve (PIC)',
       STEP_CODE: 'PIC_REVIEW',
+      ACTOR_TYPE: 'PIC',
       REQUIRES_VENDOR_REPLY: 1,
     }
 
@@ -29,6 +35,7 @@ describe('RegisterRequestWorkflowHelper', () => {
     const renamedStep = {
       DESCRIPTION: 'A renamed display label',
       STEP_CODE: WORKFLOW_STEP_CODE.PO_MGR_APPROVAL,
+      ACTOR_TYPE: 'APPROVER',
     }
 
     expect(inferStepCode(renamedStep)).toBe(WORKFLOW_STEP_CODE.PO_MGR_APPROVAL)
@@ -44,8 +51,27 @@ describe('RegisterRequestWorkflowHelper', () => {
     ).toBe(WORKFLOW_STEP_CODE.DOC_CHECK)
   })
 
-  test('requires a vendor reply only for the PO PIC review step by default', () => {
-    expect(requiresVendorReply({ STEP_CODE: WORKFLOW_STEP_CODE.PIC_REVIEW })).toBe(true)
-    expect(requiresVendorReply({ STEP_CODE: WORKFLOW_STEP_CODE.PENDING_AGREEMENT })).toBe(false)
+  test('uses the configured vendor-reply flag instead of a step-code default', () => {
+    expect(requiresVendorReply({ STEP_CODE: WORKFLOW_STEP_CODE.PIC_REVIEW, REQUIRES_VENDOR_REPLY: 1 })).toBe(true)
+    expect(requiresVendorReply({ STEP_CODE: WORKFLOW_STEP_CODE.PIC_REVIEW, REQUIRES_VENDOR_REPLY: 0 })).toBe(false)
+  })
+
+  test('does not alias a legacy code into a different workflow identity', () => {
+    expect(inferStepCode({ STEP_CODE: 'PENDING_AGREEMENT' })).toBe('PENDING_AGREEMENT')
+  })
+
+  test('resolves RETURN as a separate workflow action', () => {
+    expect(resolveWorkflowAction({ ACTION_CODE: 'RETURN' })).toBe(WORKFLOW_ACTION.RETURN)
+  })
+
+  test('does not treat the local or oversea prefix as a completed vendor code', () => {
+    expect(getVendorCodePrefix(false)).toBe('20030')
+    expect(getVendorCodePrefix(true)).toBe('20031')
+    expect(isVendorCodeComplete('20030', false)).toBe(false)
+    expect(isVendorCodeComplete('20031', true)).toBe(false)
+    expect(isVendorCodeComplete('20030FEC01', false)).toBe(true)
+    expect(isVendorCodeComplete('20031ABC01', true)).toBe(true)
+    expect(isVendorCodeComplete('20031ABC01', false)).toBe(false)
+    expect(isVendorCodeComplete('20031ABC-01', true)).toBe(false)
   })
 })

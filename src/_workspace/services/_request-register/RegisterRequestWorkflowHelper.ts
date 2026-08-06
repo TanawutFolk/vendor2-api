@@ -16,12 +16,13 @@ export const WORKFLOW_ACTION = {
   DISAGREE: 'DISAGREE',
   ACTION_REQUIRED: 'ACTION_REQUIRED',
   REJECT: 'REJECT',
+  RETURN: 'RETURN',
 } as const
 
 export const WORKFLOW_STEP_CODE = {
   REQUEST_SUBMITTED: 'REQUEST_SUBMITTED',
   PIC_REVIEW: 'PIC_REVIEW',
-  PENDING_AGREEMENT: 'PENDING_AGREEMENT',
+  PO_PIC_IN_PROGRESS: 'PO_PIC_IN_PROGRESS',
   DOC_CHECK: 'DOC_CHECK',
   PO_MGR_APPROVAL: 'PO_MGR_APPROVAL',
   PO_GM_APPROVAL: 'PO_GM_APPROVAL',
@@ -33,46 +34,37 @@ export const WORKFLOW_STEP_CODE = {
   ISSUE_GPR_C: 'ISSUE_GPR_C',
 } as const
 
+export const VENDOR_CODE_PREFIX = {
+  LOCAL: '20030',
+  OVERSEA: '20031',
+} as const
+
+export const getVendorCodePrefix = (isOversea: boolean) =>
+  isOversea ? VENDOR_CODE_PREFIX.OVERSEA : VENDOR_CODE_PREFIX.LOCAL
+
+export const isVendorCodeComplete = (vendorCode: any, isOversea: boolean) => {
+  const normalizedVendorCode = String(vendorCode || '').trim().toUpperCase()
+  const expectedPrefix = getVendorCodePrefix(isOversea)
+
+  return (
+    normalizedVendorCode.startsWith(expectedPrefix) &&
+    normalizedVendorCode.length > expectedPrefix.length &&
+    /^[A-Z0-9]+$/.test(normalizedVendorCode)
+  )
+}
+
 export const normalizeText = (value: any) =>
   String(value || '')
     .trim()
     .toLowerCase()
 
-const LEGACY_STEP_CODE_BY_LABEL: Record<string, string> = {
-  'sent to po & scm (pic)': WORKFLOW_STEP_CODE.REQUEST_SUBMITTED,
-  'po & scm approved (pic)': WORKFLOW_STEP_CODE.PIC_REVIEW,
-  'po & scm approve (pic)': WORKFLOW_STEP_CODE.PIC_REVIEW,
-  'pending agreement to vendor': WORKFLOW_STEP_CODE.PENDING_AGREEMENT,
-  'po & scm check all document': WORKFLOW_STEP_CODE.DOC_CHECK,
-  'po mgr approve': WORKFLOW_STEP_CODE.PO_MGR_APPROVAL,
-  'po gm approve': WORKFLOW_STEP_CODE.PO_GM_APPROVAL,
-  'md approval': WORKFLOW_STEP_CODE.MD_APPROVAL,
-  'account registered': WORKFLOW_STEP_CODE.ACCOUNT_REGISTERED,
-  rejected: WORKFLOW_STEP_CODE.REJECTED,
-  'vendor disagreed': WORKFLOW_STEP_CODE.VENDOR_DISAGREED,
-  'issue gpr b': WORKFLOW_STEP_CODE.ISSUE_GPR_B,
-  'issue gpr c': WORKFLOW_STEP_CODE.ISSUE_GPR_C,
-}
-
-const PIC_STEP_CODES = new Set<string>([
-  WORKFLOW_STEP_CODE.PIC_REVIEW,
-  WORKFLOW_STEP_CODE.PENDING_AGREEMENT,
-  WORKFLOW_STEP_CODE.VENDOR_DISAGREED,
-  WORKFLOW_STEP_CODE.ISSUE_GPR_B,
-])
-
-const APPROVER_STEP_CODES = new Set<string>([
-  WORKFLOW_STEP_CODE.DOC_CHECK,
-  WORKFLOW_STEP_CODE.MD_APPROVAL,
-  WORKFLOW_STEP_CODE.PO_MGR_APPROVAL,
-  WORKFLOW_STEP_CODE.PO_GM_APPROVAL,
-])
-
 const normalizeActionToken = (value: any) => normalizeText(String(value || '').replace(/[-\s]+/g, '_'))
 
 export const resolveWorkflowAction = (dataItem: any) => {
   const token = normalizeActionToken(
-    dataItem?.workflow_action ||
+    dataItem?.action_code ||
+      dataItem?.ACTION_CODE ||
+      dataItem?.workflow_action ||
       dataItem?.WORKFLOW_ACTION ||
       dataItem?.action_type ||
       dataItem?.ACTION_TYPE ||
@@ -94,91 +86,32 @@ export const resolveWorkflowAction = (dataItem: any) => {
   if (['reject', 'rejected'].includes(token)) {
     return WORKFLOW_ACTION.REJECT
   }
+  if (['return', 'returned', 'return_to_document_check'].includes(token)) {
+    return WORKFLOW_ACTION.RETURN
+  }
 
   return ''
 }
 
 export const inferStepCode = (step: any) => {
-  const configuredStepCode = String(step?.step_code || step?.STEP_CODE || '').trim().toUpperCase()
-  const source = normalizeText(step?.DESCRIPTION || step?.description || step?.label || step?.value)
-
-  // Compatibility for records created before the submitted and PIC-review
-  // steps received distinct codes.
-  if (
-    configuredStepCode === WORKFLOW_STEP_CODE.PIC_REVIEW &&
-    source === 'sent to po & scm (pic)'
-  ) {
-    return WORKFLOW_STEP_CODE.REQUEST_SUBMITTED
-  }
-
-  if (configuredStepCode) return configuredStepCode
-
-  const legacyStepCode = LEGACY_STEP_CODE_BY_LABEL[source]
-  if (legacyStepCode) return legacyStepCode
-
-  return ''
+  return String(step?.step_code || step?.STEP_CODE || '').trim().toUpperCase()
 }
 
-export const inferActorType = (step: any) => {
-  if (step?.actor_type || step?.ACTOR_TYPE) return String(step.actor_type || step.ACTOR_TYPE).trim().toUpperCase()
+export const inferActorType = (step: any) =>
+  String(step?.actor_type || step?.ACTOR_TYPE || '').trim().toUpperCase()
 
-  const stepCode = inferStepCode(step)
-  if (PIC_STEP_CODES.has(stepCode)) return 'PIC'
-  if (stepCode === WORKFLOW_STEP_CODE.REQUEST_SUBMITTED) return 'REQUESTER'
-  if (stepCode === WORKFLOW_STEP_CODE.ISSUE_GPR_C) return 'REQUESTER'
-  if (stepCode === WORKFLOW_STEP_CODE.ACCOUNT_REGISTERED) return 'ACCOUNT'
-  if (APPROVER_STEP_CODES.has(stepCode)) return 'APPROVER'
-
-  return ''
-}
-
-export const resolveGroupCodeForStep = (step: any, isOversea: boolean) => {
-  if (step?.group_code || step?.GROUP_CODE) return String(step.group_code || step.GROUP_CODE).trim().toUpperCase()
-
-  switch (inferStepCode(step)) {
-    case WORKFLOW_STEP_CODE.PIC_REVIEW:
-    case WORKFLOW_STEP_CODE.PENDING_AGREEMENT:
-    case WORKFLOW_STEP_CODE.VENDOR_DISAGREED:
-    case WORKFLOW_STEP_CODE.ISSUE_GPR_B:
-      return isOversea ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
-    case WORKFLOW_STEP_CODE.DOC_CHECK:
-      return GROUP_CODE.PO_CHECKER_MAIN
-    case WORKFLOW_STEP_CODE.MD_APPROVAL:
-      return GROUP_CODE.MD
-    case WORKFLOW_STEP_CODE.PO_MGR_APPROVAL:
-      return GROUP_CODE.PO_MGR
-    case WORKFLOW_STEP_CODE.PO_GM_APPROVAL:
-      return GROUP_CODE.PO_GM
-    case WORKFLOW_STEP_CODE.ACCOUNT_REGISTERED:
-      return isOversea ? GROUP_CODE.ACC_OVERSEA_MAIN : GROUP_CODE.ACC_LOCAL_MAIN
-    default:
-      return ''
-  }
-}
+export const resolveGroupCodeForStep = (step: any, _isOversea: boolean) =>
+  String(step?.group_code || step?.GROUP_CODE || '').trim().toUpperCase()
 
 export const isPicStep = (step: any) => inferActorType(step) === 'PIC'
 
-export const isAccountStep = (step: any) => inferActorType(step) === 'ACCOUNT'
-
 export const requiresVendorReply = (step: any) => {
-  const requiresVendorReplyValue = step?.REQUIRES_VENDOR_REPLY
-  if (requiresVendorReplyValue !== undefined && requiresVendorReplyValue !== null) {
-    return Number(requiresVendorReplyValue) === 1
-  }
-
-  return inferStepCode(step) === WORKFLOW_STEP_CODE.PIC_REVIEW
+  return Number(step?.requires_vendor_reply ?? step?.REQUIRES_VENDOR_REPLY ?? 0) === 1
 }
 
 export const requiresVendorCode = (step: any) => {
-  const requiresVendorCodeValue = step?.REQUIRES_VENDOR_CODE
-  if (requiresVendorCodeValue !== undefined && requiresVendorCodeValue !== null) {
-    return Number(requiresVendorCodeValue) === 1
-  }
-
-  return inferStepCode(step) === WORKFLOW_STEP_CODE.ACCOUNT_REGISTERED
+  return Number(step?.requires_vendor_code ?? step?.REQUIRES_VENDOR_CODE ?? 0) === 1
 }
-
-export const isRejectedStatus = (value: any) => normalizeText(value) === 'rejected'
 
 export const formatRequestNumber = (requestId: number | string, baseDate?: string | Date, prefix: 'N' | 'R' = 'N') => {
   const date = baseDate ? new Date(baseDate) : new Date()

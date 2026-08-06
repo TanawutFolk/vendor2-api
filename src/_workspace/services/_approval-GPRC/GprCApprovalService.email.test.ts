@@ -17,13 +17,14 @@ async function setup() {
       return [{ REQUEST_VENDOR_GPR_C_FLOWS_ID: 11, REQUEST_REGISTER_VENDOR_ID: 101 }]
     }
     // Current in-progress GPR C step (the last one, so approving finishes the sub-flow).
-    if (query.includes('REQUEST_VENDOR_GPR_C_STEPS s') && query.includes("s.STEP_STATUS = 'in_progress'")) {
+    if (query.includes('REQUEST_VENDOR_GPR_C_STEPS s') && query.includes("status_master.STATUS_CODE = 'IN_PROGRESS'")) {
       return [{
         REQUEST_VENDOR_GPR_C_STEPS_ID: 66,
         REQUEST_VENDOR_GPR_C_FLOWS_ID: 11,
         STEP_ORDER: 6,
         STEP_CODE: 'PM_MANAGER_APPROVER',
         APPROVER_EMPCODE: 'S00001',
+        M_APPROVAL_STEP_STATUS_ID: 2,
         STEP_STATUS: 'in_progress',
       }]
     }
@@ -34,6 +35,7 @@ async function setup() {
         STEP_ORDER: 6,
         STEP_CODE: 'PM_MANAGER_APPROVER',
         APPROVER_EMPCODE: 'S00001',
+        M_APPROVAL_STEP_STATUS_ID: 2,
         STEP_STATUS: 'in_progress',
       }]
     }
@@ -43,6 +45,8 @@ async function setup() {
         {
           REQUEST_APPROVAL_STEP_ID: 201,
           REQUEST_REGISTER_VENDOR_ID: 101,
+          WORKFLOW_STEP_MASTER_ID: 302,
+          M_APPROVAL_STEP_STATUS_ID: 2,
           STEP_ORDER: 4,
           STEP_STATUS: 'in_progress',
           DESCRIPTION: 'Issue GPR C',
@@ -52,6 +56,8 @@ async function setup() {
         {
           REQUEST_APPROVAL_STEP_ID: 202,
           REQUEST_REGISTER_VENDOR_ID: 101,
+          WORKFLOW_STEP_MASTER_ID: 303,
+          M_APPROVAL_STEP_STATUS_ID: 1,
           STEP_ORDER: 5,
           STEP_STATUS: 'pending',
           DESCRIPTION: 'PO & SCM Check All Document',
@@ -60,8 +66,34 @@ async function setup() {
         },
       ]
     }
+    if (query.includes('INNER JOIN workflow_transition wt')) {
+      const isReject = query.includes('wt.M_REQUEST_STATE_ID = 3')
+      return [{
+        WORKFLOW_TRANSITION_ID: isReject ? 2 : 1,
+        ACTION_CODE: isReject ? 'REJECT' : 'APPROVE',
+        TO_WORKFLOW_STEP_MASTER_ID: isReject ? null : 303,
+        TERMINAL_REQUEST_STATE_ID: isReject ? 3 : null,
+        TERMINAL_STATE: isReject ? 'rejected' : null,
+        TERMINAL_IS_TERMINAL: isReject ? 1 : 0,
+        NEXT_REQUEST_APPROVAL_STEP_ID: isReject ? null : 202,
+        NEXT_STEP_ORDER: isReject ? null : 5,
+        NEXT_APPROVER_EMPCODE: isReject ? null : 'S00002',
+        NEXT_STEP_STATUS_ID: isReject ? null : 1,
+        NEXT_STEP_STATUS: isReject ? null : 'pending',
+        NEXT_STEP_CODE: isReject ? null : 'DOC_CHECK',
+        NEXT_STATUS_VALUE: isReject ? null : 'PO & SCM Check All Document',
+      }]
+    }
     if (query.includes('VENDOR_CODE_SELECTOR') || query.includes('GPR_43_ACCEPTANCE_STATUS')) {
-      return [{ VENDORS_ID: 55, ASSIGN_TO: 'S00007', VENDOR_REGION: 'Local', REQUEST_NUMBER: 'Selection-26-N101' }]
+      return [{
+        VENDORS_ID: 55,
+        ASSIGN_TO: 'S00007',
+        VENDOR_REGION: 'Local',
+        REQUEST_NUMBER: 'Selection-26-N101',
+        CURRENT_REQUEST_APPROVAL_STEP_ID: 201,
+        M_REQUEST_STATE_ID: 1,
+        LOCK_VERSION: 0,
+      }]
     }
     return []
   }) as any
@@ -70,6 +102,7 @@ async function setup() {
     MySQLExecute: {
       search,
       executeList: mock(async () => []),
+      executeGuardedList: mock(async () => []),
       execute: mock(async () => ({ insertId: 1 })),
       searchList: mock(async () => []),
     },
@@ -85,7 +118,42 @@ async function setup() {
     sendMail_ToRequester_RegistrationCompleted: mock(async () => undefined),
     sendMail_ToRequester_RegistrationIncomplete: mock(async () => undefined),
     sendMail_NegotiationStageDispatch: mock(async () => undefined),
+    sendMail_ToDocumentChecker_ReturnedByPoMgr: mock(async () => undefined),
   }))
+
+  mock.module('../_status-master/StatusIdentityService', () => {
+    const identity = {
+      workflowStep: {
+        requestSubmitted: 297,
+        picReview: 298,
+        poPicInProgress: 299,
+        vendorDisagreed: 300,
+        issueGprB: 301,
+        issueGprC: 302,
+        docCheck: 303,
+        poMgrApproval: 304,
+        poGmApproval: 305,
+        mdApproval: 306,
+        accountRegistered: 307,
+      },
+      approvalStep: { pending: 1, inProgress: 2, approved: 3, rejected: 4, skipped: 5 },
+      requestState: { inProgress: 1, completed: 2, rejected: 3, cancelled: 4 },
+      requestStatus: { rejected: 99 },
+      vendor: { notRegistered: 1, registered: 2, inProgress: 3, cannotRegister: 4 },
+      gprCFlow: { draft: 1, requesterSetup: 2, inProgress: 3, approved: 4, rejected: 5 },
+      actionResult: { pending: 1, incomplete: 2, completed: 3 },
+    }
+
+    return {
+      getWorkflowStepIdentity: mock(async () => identity.workflowStep),
+      getApprovalStepStatusIdentity: mock(async () => identity.approvalStep),
+      getRequestStateIdentity: mock(async () => identity.requestState),
+      getRequestStatusIdentity: mock(async () => identity.requestStatus),
+      getVendorStatusIdentity: mock(async () => identity.vendor),
+      getGprCFlowStatusIdentity: mock(async () => identity.gprCFlow),
+      getActionResultStatusIdentity: mock(async () => identity.actionResult),
+    }
+  })
 
   mock.module('@src/config/sendEmail', () => ({ default: mock(async () => ({ success: true })) }))
 

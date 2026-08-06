@@ -15,6 +15,7 @@ import {
   email_ToPic_RequestRegisterVendor,
   email_ToAccount_RegisterRequired,
   email_ToChecker_CheckRequired,
+  email_ToChecker_ReturnedByPoMgr,
   email_ToMd_ApproveRequired,
   email_ToPoGm_ApproveRequired,
   email_ToPoManager_ApproveRequired,
@@ -22,6 +23,7 @@ import {
   type MailTemplateData,
 } from '@src/config/mailTemplate'
 import { SelectionFileService } from './SelectionFileService'
+import { buildPoMgrReturnTestMailRoute, PO_MGR_RETURN_TEST_EMP_CODE } from './PoMgrReturnNotificationRoute'
 import {
   excludeEmails,
   GROUP_CODE,
@@ -32,14 +34,17 @@ import {
   resolveGroupCodeForStep,
   resolveRequestNumber,
 } from './RegisterRequestWorkflowHelper'
+import {
+  getWorkflowStepIdentity,
+  type WorkflowStepIdentity,
+} from '../_status-master/StatusIdentityService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SYSTEM_ORIGIN = process.env.VENDOR_SYSTEM_ORIGIN || 'http://localhost:5173'
 
 // POSIX paths: the c01_qms share is mounted at /mnt/c01_qms on the host. See SelectionFileService.
-const DEFAULT_VENDOR_DOCUMENT_BASE =
-  '/mnt/c01_qms/PM/02_Record/FM-PM-303 Selection Supplier/FM-PM-303 Selection Supplier Test/00.DocumentSet'
+const DEFAULT_VENDOR_DOCUMENT_BASE = '/mnt/c01_qms/PM/02_Record/FM-PM-303 Selection Supplier/FM-PM-303 Selection Supplier Test/00.DocumentSet'
 const DEFAULT_VENDOR_DOCUMENT_LOCAL_PATH = `${DEFAULT_VENDOR_DOCUMENT_BASE}/01.New (Full)/Local/00.Sending`
 const DEFAULT_VENDOR_DOCUMENT_OVERSEA_PATH = `${DEFAULT_VENDOR_DOCUMENT_BASE}/01.New (Full)/Oversea/00.Sending`
 const DEFAULT_VENDOR_DOCUMENT_FORM_B_PATH = `${DEFAULT_VENDOR_DOCUMENT_BASE}/00.Purchase Form/FORM B.xlsx`
@@ -121,9 +126,7 @@ const assigneeProfileCache = new Map<string, EmployeeProfile | null>()
 // ─── Employee helpers ─────────────────────────────────────────────────────────
 
 const buildFullName = (row: any) =>
-  [String(getValue(row, 'empName', 'EMPNAME') || '').trim(), String(getValue(row, 'empSurname', 'EMPSURNAME') || '').trim()]
-    .filter(Boolean)
-    .join(' ')
+  [String(getValue(row, 'empName', 'EMPNAME') || '').trim(), String(getValue(row, 'empSurname', 'EMPSURNAME') || '').trim()].filter(Boolean).join(' ')
 
 const resolveEmployeeProfile = async (empCodeRaw: unknown): Promise<EmployeeProfile | null> => {
   const empCode = String(empCodeRaw || '').trim()
@@ -189,11 +192,7 @@ const resolveAssigneeProfile = async (empCodeRaw: unknown): Promise<EmployeeProf
 
 // ─── Group / peer email helpers ───────────────────────────────────────────────
 
-const getPeerCcEmailsByExactGroupCode = async (
-  groupCode: string,
-  excludeEmpCode?: string,
-  excludeEmail?: string
-): Promise<string[]> => {
+const getPeerCcEmailsByExactGroupCode = async (groupCode: string, excludeEmpCode?: string, excludeEmail?: string): Promise<string[]> => {
   const safeGroupCode = String(groupCode || '').trim()
   if (!safeGroupCode) return []
 
@@ -211,11 +210,7 @@ const getPeerCcEmailsByExactGroupCode = async (
   )
 }
 
-const inspectGroupRecipients = async (
-  groupCode: string,
-  excludeEmpCode?: string,
-  excludeEmail?: string
-) => {
+const inspectGroupRecipients = async (groupCode: string, excludeEmpCode?: string, excludeEmail?: string) => {
   const safeGroupCode = String(groupCode || '').trim()
   if (!safeGroupCode) return []
 
@@ -243,11 +238,7 @@ const inspectGroupRecipients = async (
   })
 }
 
-export const getPeerCcEmailsByGroupCode = async (
-  groupCode: string,
-  excludeEmpCode?: string,
-  excludeEmail?: string
-): Promise<string[]> => {
+export const getPeerCcEmailsByGroupCode = async (groupCode: string, excludeEmpCode?: string, excludeEmail?: string): Promise<string[]> => {
   if (!groupCode) return []
 
   const targetGroup = String(groupCode)
@@ -344,11 +335,7 @@ const fetchVendorContactEmails = async (requestId: number): Promise<string[]> =>
 
 const isOverseaRegion = (vendorRegion: any) => normalizeText(vendorRegion) === 'oversea'
 
-const getPoPicAndSubPicCc = async (
-  vendorRegion: any,
-  assignedPicEmpCode: any,
-  assignedPicEmail?: string
-) => {
+const getPoPicAndSubPicCc = async (vendorRegion: any, assignedPicEmpCode: any, assignedPicEmail?: string) => {
   const picEmail = normalizeEmail(assignedPicEmail) || (await resolveAssignedEmail(assignedPicEmpCode))
   const picGroupCode = isOverseaRegion(vendorRegion) ? GROUP_CODE.OVERSEA_PO_PIC : GROUP_CODE.LOCAL_PO_PIC
   const peerPicCc = await getPeerCcEmailsByGroupCode(picGroupCode, assignedPicEmpCode, picEmail)
@@ -363,21 +350,14 @@ const getPoPicAndSubPicCc = async (
 
 const getPoCheckerMainEmails = () => getPeerCcEmailsByGroupCode(GROUP_CODE.PO_CHECKER_MAIN)
 const getPoMgrEmails = () => getPeerCcEmailsByGroupCode(GROUP_CODE.PO_MGR)
-const getAccountCcByRegion = (vendorRegion: any) =>
-  getPeerCcEmailsByGroupCode(
-    isOverseaRegion(vendorRegion) ? GROUP_CODE.ACC_OVERSEA_CC : GROUP_CODE.ACC_LOCAL_CC
-  )
+const getAccountCcByRegion = (vendorRegion: any) => getPeerCcEmailsByGroupCode(isOverseaRegion(vendorRegion) ? GROUP_CODE.ACC_OVERSEA_CC : GROUP_CODE.ACC_LOCAL_CC)
 // The actual ACCPIC group (who processes account registration), distinct from the ACC_*_CC notify-only group above.
-const getAccountPicByRegion = (vendorRegion: any) =>
-  getPeerCcEmailsByGroupCode(
-    isOverseaRegion(vendorRegion) ? GROUP_CODE.ACC_OVERSEA_MAIN : GROUP_CODE.ACC_LOCAL_MAIN
-  )
+const getAccountPicByRegion = (vendorRegion: any) => getPeerCcEmailsByGroupCode(isOverseaRegion(vendorRegion) ? GROUP_CODE.ACC_OVERSEA_MAIN : GROUP_CODE.ACC_LOCAL_MAIN)
 
 // ─── Requester profile helper ─────────────────────────────────────────────────
 
 const resolveRequesterMailProfile = async (vd: VendorContext) => {
-  const requesterEmpCode =
-    String(vd.REQUEST_BY_EMPLOYEECODE || vd.Request_By_EmployeeCode || vd.request_by_employeecode || '').trim()
+  const requesterEmpCode = String(vd.REQUEST_BY_EMPLOYEECODE || vd.Request_By_EmployeeCode || vd.request_by_employeecode || '').trim()
   const directRequesterEmail = normalizeEmail(vd.REQUEST_BY_EMAIL || vd.request_by_email)
   const profile = requesterEmpCode ? await resolveEmployeeProfile(requesterEmpCode) : null
   return {
@@ -444,7 +424,9 @@ const isEmployeeCodeLike = (value: unknown) => /^[A-Z]\d{3,}$/i.test(String(valu
 const isEmailLike = (value: unknown) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
 
 const isRoleFallbackName = (value: unknown) => {
-  const normalized = String(value || '').trim().toLowerCase()
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
   return ['pic', 'po pic', 'po checker', 'account pic', 'approver', 'requester'].includes(normalized)
 }
 
@@ -495,9 +477,7 @@ const parseStoredCircularMembers = (raw: any) => {
 
     return parsed
       .map((item) =>
-        typeof item === 'string'
-          ? { empcode: '', email: normalizeEmail(item) }
-          : { empcode: String(item?.empcode || '').trim(), email: normalizeEmail(item?.email) }
+        typeof item === 'string' ? { empcode: '', email: normalizeEmail(item) } : { empcode: String(item?.empcode || '').trim(), email: normalizeEmail(item?.email) }
       )
       .filter((item) => item.empcode || item.email)
       .slice(0, 6)
@@ -510,9 +490,7 @@ const resolveCircularAssignedEmails = async (raw: any): Promise<string[]> => {
   const members = parseStoredCircularMembers(raw)
   if (!members.length) return []
 
-  const resolved = await Promise.all(
-    members.map((member) => (member.empcode ? resolveAssignedEmail(member.empcode) : ''))
-  )
+  const resolved = await Promise.all(members.map((member) => (member.empcode ? resolveAssignedEmail(member.empcode) : '')))
   return mergeUniqueEmails(resolved)
 }
 
@@ -524,8 +502,7 @@ const previewRecipientList = (emails: string[] = []) =>
     .filter(Boolean)
     .slice(0, 10)
 
-const systemLink = (page: 'request-register' | 'request-register-history') =>
-  `${SYSTEM_ORIGIN}/en/${page}`
+const systemLink = (page: 'request-register' | 'request-register-history') => `${SYSTEM_ORIGIN}/en/${page}`
 
 // ─── Email send & log ─────────────────────────────────────────────────────────
 
@@ -620,11 +597,12 @@ const sendTemplatedEmail = async (payload: {
 export const selectApprovalNotificationByStep = (
   step: any,
   baseEmailData: MailTemplateData,
-  requestNumber: string
+  requestNumber: string,
+  workflowStepIds: WorkflowStepIdentity
 ): { templateName: string; emailHtml: string; emailSubject: string } => {
-  const stepCode = inferStepCode(step)
+  const workflowStepMasterId = Number(getValue(step, 'workflow_step_id', 'WORKFLOW_STEP_MASTER_ID') || 0)
 
-  if (stepCode === 'PO_GM_APPROVAL') {
+  if (workflowStepMasterId === workflowStepIds.poGmApproval) {
     return {
       templateName: 'email_ToPoGm_ApproveRequired',
       emailHtml: email_ToPoGm_ApproveRequired({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'PO GM' }),
@@ -632,7 +610,7 @@ export const selectApprovalNotificationByStep = (
     }
   }
 
-  if (stepCode === 'PO_MGR_APPROVAL') {
+  if (workflowStepMasterId === workflowStepIds.poMgrApproval) {
     return {
       templateName: 'email_ToPoManager_ApproveRequired',
       emailHtml: email_ToPoManager_ApproveRequired({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'PO Mgr' }),
@@ -640,7 +618,7 @@ export const selectApprovalNotificationByStep = (
     }
   }
 
-  if (stepCode === 'MD_APPROVAL') {
+  if (workflowStepMasterId === workflowStepIds.mdApproval) {
     return {
       templateName: 'email_ToMd_ApproveRequired',
       emailHtml: email_ToMd_ApproveRequired({ ...baseEmailData, recipientName: baseEmailData.recipientName || 'MD' }),
@@ -648,7 +626,7 @@ export const selectApprovalNotificationByStep = (
     }
   }
 
-  if (stepCode === 'ACCOUNT_REGISTERED') {
+  if (workflowStepMasterId === workflowStepIds.accountRegistered) {
     return {
       templateName: 'email_ToAccount_RegisterRequired',
       emailHtml: email_ToAccount_RegisterRequired({
@@ -659,7 +637,7 @@ export const selectApprovalNotificationByStep = (
     }
   }
 
-  if (stepCode === 'DOC_CHECK') {
+  if (workflowStepMasterId === workflowStepIds.docCheck) {
     return {
       templateName: 'email_ToChecker_CheckRequired',
       emailHtml: email_ToChecker_CheckRequired({
@@ -696,19 +674,9 @@ export const sendMail_ToPic_NewRequest = async (
 
   if (!nextAssigneeEmail) return
 
-  const groupRecipientInspection = await inspectGroupRecipients(
-    assigneeGroupCode || '',
-    nextAssignee.empCode,
-    nextAssigneeEmail
-  )
-  const peerCc = await getPeerCcEmailsByExactGroupCode(
-    assigneeGroupCode || '',
-    nextAssignee.empCode,
-    nextAssigneeEmail
-  )
-  const ccEmails = mergeUniqueEmails(requester.email ? [requester.email] : [], peerCc).filter(
-    (email) => email !== nextAssigneeEmail
-  )
+  const groupRecipientInspection = await inspectGroupRecipients(assigneeGroupCode || '', nextAssignee.empCode, nextAssigneeEmail)
+  const peerCc = await getPeerCcEmailsByExactGroupCode(assigneeGroupCode || '', nextAssignee.empCode, nextAssigneeEmail)
+  const ccEmails = mergeUniqueEmails(requester.email ? [requester.email] : [], peerCc).filter((email) => email !== nextAssigneeEmail)
 
   const emailHtml = email_ToPic_RequestRegisterVendor({
     requestNumber,
@@ -754,13 +722,7 @@ export const sendMail_ToSupplier_RequestFormA = async (dataItem: any) => {
     selectedContactEmails = await fetchVendorContactEmails(Number(dataItem.REQUEST_REGISTER_VENDOR_ID))
   }
 
-  const recipientEmails = mergeUniqueEmails(selectedContactEmails, [
-    dataItem.EMAILMAIN,
-    vd.selected_vendor_email,
-    vd.vendor_email,
-    vd.vendor_main_email,
-    vd.emailmain,
-  ])
+  const recipientEmails = mergeUniqueEmails(selectedContactEmails, [dataItem.EMAILMAIN, vd.selected_vendor_email, vd.vendor_email, vd.vendor_main_email, vd.emailmain])
   if (!recipientEmails.length) throw new Error('Vendor email is required')
 
   const recipientEmail = recipientEmails.join(';')
@@ -771,15 +733,9 @@ export const sendMail_ToSupplier_RequestFormA = async (dataItem: any) => {
     const picEmail = await resolveAssignedEmail(vd.assign_to)
     const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
 
-    ccEmails = excludeEmails(mergeUniqueEmails(poPicContext.allPoPicEmails), [
-      ...recipientEmails,
-      vd.emailmain,
-      vd.vendor_email,
-      vd.vendor_main_email,
-    ])
+    ccEmails = excludeEmails(mergeUniqueEmails(poPicContext.allPoPicEmails), [...recipientEmails, vd.emailmain, vd.vendor_email, vd.vendor_main_email])
 
-    dataItem.PIC_NAME =
-      dataItem.PIC_NAME || resolveMailRecipientName([picProfile?.fullName, vd.assign_to, picEmail], 'Vendor Registration System')
+    dataItem.PIC_NAME = dataItem.PIC_NAME || resolveMailRecipientName([picProfile?.fullName, vd.assign_to, picEmail], 'Vendor Registration System')
   }
 
   const resolvedRequestNumber = String(dataItem.REQUEST_NUMBER || vd.request_number || '').trim()
@@ -791,10 +747,7 @@ export const sendMail_ToSupplier_RequestFormA = async (dataItem: any) => {
   // folder must not stop the request's own folders from being provisioned.
   SelectionFileService.createFolderStructure(resolvedRequestNumber)
 
-  const attachments = buildVendorDocumentAttachments(
-    vd.vendor_region || dataItem.VENDOR_REGION,
-    false
-  )
+  const attachments = buildVendorDocumentAttachments(vd.vendor_region || dataItem.VENDOR_REGION, false)
 
   if (attachments.length > 0) {
     SelectionFileService.copyAttachmentsToSending(resolvedRequestNumber, attachments)
@@ -829,12 +782,7 @@ export const sendMail_NegotiationStageDispatch = async (requestId: number, stage
     const vd = await fetchVendorContext(requestId)
     const selectedContactEmails = await fetchVendorContactEmails(requestId)
 
-    const vendorEmails = mergeUniqueEmails(selectedContactEmails, [
-      vd.selected_vendor_email,
-      vd.vendor_email,
-      vd.vendor_main_email,
-      vd.emailmain,
-    ])
+    const vendorEmails = mergeUniqueEmails(selectedContactEmails, [vd.selected_vendor_email, vd.vendor_email, vd.vendor_main_email, vd.emailmain])
     const vendorEmail = vendorEmails.join(';')
     const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
 
@@ -844,12 +792,11 @@ export const sendMail_NegotiationStageDispatch = async (requestId: number, stage
     const picTel = picProfile?.tel || ''
 
     const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
-    const ccEmails = excludeEmails(mergeUniqueEmails(poPicContext.allPoPicEmails), [
-      ...vendorEmails,
-      vd.emailmain,
-    ])
+    const ccEmails = excludeEmails(mergeUniqueEmails(poPicContext.allPoPicEmails), [...vendorEmails, vd.emailmain])
 
-    const stageHintNorm = String(stageHint || '').trim().toLowerCase()
+    const stageHintNorm = String(stageHint || '')
+      .trim()
+      .toLowerCase()
     const isGprBStage = stageHintNorm.includes('gpr b')
     const isGprCStage = stageHintNorm.includes('gpr c')
 
@@ -969,20 +916,22 @@ export const sendMail_ToApprover_NextStep = async (dataItem: any, nextStep: any,
     const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
     const requester = await resolveRequesterMailProfile(vd)
 
-    const nextStepCode = inferStepCode(nextStep)
-    const isDocumentCheckerStep = nextStepCode === 'DOC_CHECK'
-    const isPmMgrAndAbove = ['PO_MGR_APPROVAL', 'PO_GM_APPROVAL', 'MD_APPROVAL'].includes(nextStepCode)
-    const isAccountStep = nextStepCode === 'ACCOUNT_REGISTERED'
+    const workflowStep = await getWorkflowStepIdentity()
+    const nextWorkflowStepMasterId = Number(getValue(nextStep, 'workflow_step_id', 'WORKFLOW_STEP_MASTER_ID') || 0)
+    const isDocumentCheckerStep = nextWorkflowStepMasterId === workflowStep.docCheck
+    const isPmMgrAndAbove = [
+      workflowStep.poMgrApproval,
+      workflowStep.poGmApproval,
+      workflowStep.mdApproval,
+    ].includes(nextWorkflowStepMasterId)
+    const isAccountStep = nextWorkflowStepMasterId === workflowStep.accountRegistered
 
     const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
     const checkerPicCc = await getPoCheckerMainEmails()
     const poMgrCc = await getPoMgrEmails()
     const accPicCc = await getAccountCcByRegion(vd.vendor_region)
 
-    const nextGroupCode =
-      isDocumentCheckerStep
-        ? GROUP_CODE.PO_CHECKER_MAIN
-        : nextStep?.group_code || resolveGroupCodeForStep(nextStep, isOverseaRegion(vd.vendor_region))
+    const nextGroupCode = isDocumentCheckerStep ? GROUP_CODE.PO_CHECKER_MAIN : nextStep?.group_code || resolveGroupCodeForStep(nextStep, isOverseaRegion(vd.vendor_region))
 
     if (!approverEmail && nextGroupCode) {
       const primaryAssignee = await resolvePrimaryAssigneeByGroupCode(nextGroupCode)
@@ -999,10 +948,10 @@ export const sendMail_ToApprover_NextStep = async (dataItem: any, nextStep: any,
     const ccSources: string[][] = isDocumentCheckerStep
       ? [requester.email ? [requester.email] : [], poPicContext.allPoPicEmails, poMgrCc]
       : isPmMgrAndAbove
-      ? [checkerPicCc, requester.email ? [requester.email] : [], poPicContext.allPoPicEmails]
-      : isAccountStep
-      ? [accPicCc, checkerPicCc, requester.email ? [requester.email] : [], poPicContext.allPoPicEmails]
-      : [poPicContext.allPoPicEmails, peerApproverCc] // isDefaultStep
+        ? [checkerPicCc, requester.email ? [requester.email] : [], poPicContext.allPoPicEmails]
+        : isAccountStep
+          ? [accPicCc, checkerPicCc, requester.email ? [requester.email] : [], poPicContext.allPoPicEmails]
+          : [poPicContext.allPoPicEmails, peerApproverCc] // isDefaultStep
 
     const ccEmails = excludeEmails(
       mergeUniqueEmails(...ccSources).filter((email) => email !== normalizeEmail(approverEmail)),
@@ -1031,7 +980,8 @@ export const sendMail_ToApprover_NextStep = async (dataItem: any, nextStep: any,
     const { templateName, emailHtml, emailSubject } = selectApprovalNotificationByStep(
       nextStep,
       baseEmailData,
-      requestNumber
+      requestNumber,
+      workflowStep
     )
 
     await sendTemplatedEmail({
@@ -1050,6 +1000,61 @@ export const sendMail_ToApprover_NextStep = async (dataItem: any, nextStep: any,
     })
   } catch (err: any) {
     console.error('[triggerApprovalEmails] Failed:', err?.message)
+  }
+}
+
+export const sendMail_ToDocumentChecker_ReturnedByPoMgr = async (dataItem: any) => {
+  try {
+    const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID || 0)
+    const testRecipient = await resolveEmployeeProfile(PO_MGR_RETURN_TEST_EMP_CODE)
+    const testEmail = normalizeEmail(testRecipient?.email)
+    const mailRoute = buildPoMgrReturnTestMailRoute(testEmail)
+
+    // Temporary safe test routing: both business roles resolve only to S00823.
+    // Do not fall back to the real checker/PIC groups, otherwise a test Return could leak externally.
+    if (!mailRoute.toEmail) {
+      console.error('[poMgrReturnToDocumentCheck] Email skipped: S00823 has no valid email address.')
+      return
+    }
+
+    const vd = await fetchVendorContext(requestId)
+    const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
+    const recipientName = resolveMailRecipientName([testRecipient?.fullName, PO_MGR_RETURN_TEST_EMP_CODE], 'PO CHECKER')
+    const emailData: MailTemplateData = {
+      toEmail: mailRoute.toEmail,
+      ccEmail: mailRoute.ccEmails.join('; '),
+      requestNumber,
+      recipientName,
+      vendorName: vd.company_name || 'N/A',
+      address: vd.address || 'N/A',
+      contactPic: vd.contact_name || 'N/A',
+      email: vd.vendor_email || 'N/A',
+      tel: vd.tel_phone || 'N/A',
+      supportProduct: vd.supportProduct_Process || 'N/A',
+      purchaseFrequency: vd.purchase_frequency || 'N/A',
+      systemLink: systemLink('request-register'),
+      remarkEN: dataItem.APPROVER_REMARK || '',
+      remarkTH: dataItem.APPROVER_REMARK || '',
+    }
+
+    await sendTemplatedEmail({
+      templateName: 'email_ToChecker_ReturnedByPoMgr',
+      emailHtml: email_ToChecker_ReturnedByPoMgr(emailData),
+      toEmail: mailRoute.toEmail,
+      subject: `[Return for Recheck] PO Mgr returned vendor request "${requestNumber}" - Document Check`,
+      ccEmails: mailRoute.ccEmails,
+      requestId,
+      requestNumber,
+      extra: {
+        flow: 'poMgrReturnToDocumentCheck',
+        toRole: 'PO & SCM Check All Document',
+        ccRole: 'PO PIC',
+        testToEmpCode: mailRoute.toEmpCode,
+        testCcEmpCode: mailRoute.ccEmpCodes.join(';'),
+      },
+    })
+  } catch (err: any) {
+    console.error('[poMgrReturnToDocumentCheck] Failed:', err?.message)
   }
 }
 
@@ -1131,19 +1136,14 @@ export const sendMail_ToRequester_GprCApproved = async (dataItem: any) => {
     const picTel = picProfile?.tel || ''
 
     const gprCMeta = getGprCSetupMeta(vd.action_required_json)
-    const gprCApproverEmail = await resolveAssignedEmail(
-      String(gprCMeta?.gpr_c_approver_empcode || '').trim()
-    )
+    const gprCApproverEmail = await resolveAssignedEmail(String(gprCMeta?.gpr_c_approver_empcode || '').trim())
     const gprCPcPicEmail = normalizeEmail(vd.gpr_c_pc_pic_email)
     const circularEmails = await resolveCircularAssignedEmails(vd.gpr_c_circular_json)
 
     const ccEmails = excludeEmails(
-      mergeUniqueEmails(
-        picEmail ? [picEmail] : [],
-        gprCApproverEmail ? [gprCApproverEmail] : [],
-        gprCPcPicEmail ? [gprCPcPicEmail] : [],
-        circularEmails
-      ).filter((email) => email !== requester.email),
+      mergeUniqueEmails(picEmail ? [picEmail] : [], gprCApproverEmail ? [gprCApproverEmail] : [], gprCPcPicEmail ? [gprCPcPicEmail] : [], circularEmails).filter(
+        (email) => email !== requester.email
+      ),
       [vd.vendor_email, vd.vendor_main_email]
     )
 
@@ -1196,10 +1196,13 @@ export const sendMail_ToPic_RequestRejected = async (dataItem: any, currentStep:
     const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
     const checkerPicCc = await getPoCheckerMainEmails()
 
-    const currentStepCode = inferStepCode(currentStep)
-    const isCheckerReject = currentStepCode === 'DOC_CHECK'
+    const workflowStep = await getWorkflowStepIdentity()
+    const currentWorkflowStepMasterId = Number(
+      getValue(currentStep, 'workflow_step_id', 'WORKFLOW_STEP_MASTER_ID') || 0
+    )
+    const isCheckerReject = currentWorkflowStepMasterId === workflowStep.docCheck
 
-    const isPicReject = currentStepCode === 'PIC_REVIEW'
+    const isPicReject = currentWorkflowStepMasterId === workflowStep.picReview
 
     const ccSources = isCheckerReject
       ? [checkerPicCc, requester.email ? [requester.email] : [], poPicContext.peerPicCc]
@@ -1255,7 +1258,7 @@ export const sendMail_ToPic_RequestRejected = async (dataItem: any, currentStep:
       extra: {
         flow: 'triggerRejectionEmail',
         approverEmpCode: currentStep?.approver_id || '',
-        stepCode: currentStepCode,
+        stepCode: inferStepCode(currentStep),
       },
     })
   } catch (err: any) {
@@ -1284,9 +1287,7 @@ export const sendMail_ToRequester_RegistrationCompleted = async (dataItem: any) 
     const accPicCc = await getAccountCcByRegion(vd.vendor_region)
 
     const ccEmails = excludeEmails(
-      mergeUniqueEmails(accPicMain, accPicCc, checkerPicCc, poPicContext.allPoPicEmails).filter(
-        (email) => email !== requester.email
-      ),
+      mergeUniqueEmails(accPicMain, accPicCc, checkerPicCc, poPicContext.allPoPicEmails).filter((email) => email !== requester.email),
       [vd.vendor_email, vd.vendor_main_email]
     )
 
@@ -1312,7 +1313,7 @@ export const sendMail_ToRequester_RegistrationCompleted = async (dataItem: any) 
       templateName: 'email_ToRequester_RegistrationCompleted',
       emailHtml,
       toEmail: requester.email,
-      subject: `[Complete] Register vendor "${requestNumber}" is now completed`,
+      subject: `[Complete] Register vendor "${requestNumber}" has been completed.`,
       ccEmails,
       requestId,
       requestNumber,
@@ -1345,9 +1346,7 @@ export const sendMail_ToRequester_RegistrationIncomplete = async (dataItem: any)
     const accPicCc = await getAccountCcByRegion(vd.vendor_region)
 
     const ccEmails = excludeEmails(
-      mergeUniqueEmails(accPicMain, accPicCc, checkerPicCc, poPicContext.allPoPicEmails).filter(
-        (email) => email !== requester.email
-      ),
+      mergeUniqueEmails(accPicMain, accPicCc, checkerPicCc, poPicContext.allPoPicEmails).filter((email) => email !== requester.email),
       [vd.vendor_email, vd.vendor_main_email]
     )
 

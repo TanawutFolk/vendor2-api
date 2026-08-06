@@ -35,7 +35,7 @@ const validateVendorLocation = (data: Record<string, unknown>, ctx: z.Refinement
   }
 
   if (!['local', 'oversea'].includes(vendorRegion.toLowerCase())) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['VENDOR_REGION'], message: 'Vendor Region must be Local or Oversea' })
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['VENDOR_REGION'], message: 'Trade Term must be Local or Oversea' })
   }
 
   if (isOversea) {
@@ -59,6 +59,9 @@ const validateCreateVendor = (data: Record<string, unknown>, ctx: z.RefinementCt
 
   if (!getPayloadString(data, 'tel_center', 'TEL_CENTER')) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['TEL_CENTER'], message: 'Tel Center is required' })
+  }
+  if (!getPayloadString(data, 'emailmain', 'EMAILMAIN')) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['EMAILMAIN'], message: 'Email (Main) is required' })
   }
   if (!getPayloadString(data, 'address', 'ADDRESS')) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['ADDRESS'], message: 'Address is required' })
@@ -97,7 +100,7 @@ export const CheckBlacklistSchema = z.object({
   }
 })
 
-// Contact Schema (contact_name + email required; tel_phone + position optional, same bounds as the frontend)
+// Contact Schema (contact_name + tel_phone + email required; only position is optional)
 const ContactSchema = z.object({
   contact_name: boundedString('Contact Name', 100, 2),
   CONTACT_NAME: boundedString('Contact Name', 100, 2),
@@ -111,12 +114,16 @@ const ContactSchema = z.object({
   if (!getPayloadString(contact, 'contact_name', 'CONTACT_NAME')) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['CONTACT_NAME'], message: 'Contact Name is required' })
   }
+  if (!getPayloadString(contact, 'tel_phone', 'TEL_PHONE')) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['TEL_PHONE'], message: 'Phone is required' })
+  }
   if (!getPayloadString(contact, 'email', 'EMAIL')) {
     ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['EMAIL'], message: 'Email is required' })
   }
 })
 
-// Product Schema (maker_name + product_name required; product_group + model_list optional)
+// Product Schema — every field is optional (product_group, maker_name, product_name, model_list).
+// Values are still bounded when present; nothing is required.
 const optionalProductGroupId = z.number().int().nonnegative().optional().nullable()
 
 const ProductSchema = z.object({
@@ -128,13 +135,6 @@ const ProductSchema = z.object({
   PRODUCT_NAME: boundedString('Product Name', 150, 2),
   model_list: optionalString(),
   MODEL_LIST: optionalString(),
-}).superRefine((product, ctx) => {
-  if (!getPayloadString(product, 'maker_name', 'MAKER_NAME')) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['MAKER_NAME'], message: 'Maker Name is required' })
-  }
-  if (!getPayloadString(product, 'product_name', 'PRODUCT_NAME')) {
-    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['PRODUCT_NAME'], message: 'Product Name is required' })
-  }
 })
 
 // Create Vendor Schema (email removed from vendors table)

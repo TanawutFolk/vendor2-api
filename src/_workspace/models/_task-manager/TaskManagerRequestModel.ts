@@ -2,5 +2,5 @@ import { TaskManagerRequestService } from '../../services/_task-manager/TaskMana
 
 export const TaskManagerRequestModel = {
   searchAllTask: async (dataItem: any) => TaskManagerRequestService.searchAllTask(dataItem),
-  gprCTaskManagerQueue: async () => TaskManagerRequestService.gprCTaskManagerQueue(),
+  getGprCTaskManagerQueue: async () => TaskManagerRequestService.getGprCTaskManagerQueue(),
 }

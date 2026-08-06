@@ -15,16 +15,19 @@ export const AccRegisterController = {
     try {
       const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Complete Registration',
           Message: 'Invalid request_id',
         } as ResponseI)
+        return
       }
       const result = await AccRegisterModel.completeRegistration({
         REQUEST_REGISTER_VENDOR_ID: request_id,
+        CURRENT_TASK_ID: Number(dataItem.CURRENT_TASK_ID ?? dataItem.current_task_id ?? 0),
+        LOCK_VERSION: Number(dataItem.LOCK_VERSION ?? dataItem.lock_version),
         VENDOR_CODE: dataItem.VENDOR_CODE || '',
         UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
       })

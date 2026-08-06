@@ -8,7 +8,6 @@ import { loadEnvironmentVariables } from './config/env'
 
 import { errorHandler } from './middlewares/errorHandler'
 import { notFoundHandler } from './middlewares/notFoundHandler'
-import { startPronesSyncScheduler } from './cron/pronesSync'
 
 // * Load environment variables
 loadEnvironmentVariables()
@@ -71,7 +70,4 @@ app.listen(PORT, () => {
   - DB SCT            : ${process.env.STANDARD_COST_DB}
   - DB Cycle Time     : ${process.env.CYCLE_TIME_DB}
   `)
-
-  // Start Prones auto-sync (every 24 hours)
-  startPronesSyncScheduler()
 })

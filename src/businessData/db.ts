@@ -29,10 +29,8 @@ import oracledb from 'oracledb'
 
 try {
   oracledb.initOracleClient()
-} catch (err) {
-  console.error('Whoops! You need to have the Oracle Instant Client installed for this to work.')
-  console.error(err)
-  throw err
+} catch {
+  console.warn('Oracle Instant Client is unavailable; continuing without Thick mode.')
 }
 
 const oraclePools = new Map<string, oracledb.Pool>()
@@ -70,6 +68,7 @@ const connection = async (configDb: string = ''): Promise<PoolConnection> => {
       user: process.env[`${configDb ? `${configDb}_` : ''}USER_NAME`],
       password: process.env[`${configDb ? `${configDb}_` : ''}PASSWORD`],
       database: process.env[`${configDb ? `${configDb}_` : ''}DB`],
+      port: Number(process.env[`${configDb ? `${configDb}_` : ''}DB_PORT`] || 3306),
 
       decimalNumbers: true,
 

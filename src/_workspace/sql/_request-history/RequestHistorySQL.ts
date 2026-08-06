@@ -1,7 +1,10 @@
-import { GprCSelectionSqlSnippets } from '../_request-register/GprCSelectionSqlSnippets'
-import { RequestVendorContactSqlSnippets } from '../_request-register/RequestVendorContactSqlSnippets'
-import { RequestApprovalSummarySqlSnippets } from '../_request-register/RequestApprovalSummarySqlSnippets'
-import { RequestStatusSqlSnippets } from '../_request-register/RequestStatusSqlSnippets'
+import { GprCSelectionSqlSnippets } from '../common/GprCSelectionSqlSnippets'
+import { RequestVendorContactSqlSnippets } from '../common/RequestVendorContactSqlSnippets'
+import { RequestApprovalSummarySqlSnippets } from '../common/RequestApprovalSummarySqlSnippets'
+import { RequestStatusSqlSnippets } from '../common/RequestStatusSqlSnippets'
+import { PersonSqlSnippets } from '../common/PersonSqlSnippets'
+import { MesProductSqlSnippets } from '../common/MesProductSqlSnippets'
+import { RequestStateSqlSnippets } from '../_status-master/StatusMasterSQL'
 
 
 export const RequestHistorySQL = {
@@ -11,25 +14,28 @@ export const RequestHistorySQL = {
                                        rr.REQUEST_REGISTER_VENDOR_ID
                                                                          , rr.REQUEST_NUMBER
                                      , rr.VENDORS_ID
-                                     , ${RequestStatusSqlSnippets.requestStatusExpr('rr')} AS REQUEST_STATUS
-                                     , rr.REQUEST_STATE
+                                     , dataItem.REQUEST_STATUS_SQL AS REQUEST_STATUS
+                                     , rr.M_REQUEST_STATE_ID
+                                     , dataItem.REQUEST_STATE_SQL AS REQUEST_STATE
                                      , rr.CURRENT_M_REQUEST_STATUS_ID
                                      , rr.CURRENT_REQUEST_APPROVAL_STEP_ID
                                      , rr.SUPPORTPRODUCT_PROCESS
                                      , rr.PURCHASE_FREQUENCY
                                      , rr.REQUESTER_REMARK
-                                     , ${RequestApprovalSummarySqlSnippets.latestApprovalRemarkExpr('rr.REQUEST_REGISTER_VENDOR_ID')} AS APPROVER_REMARK
-                                     , (${RequestApprovalSummarySqlSnippets.latestRejectReasonExpr('rr.REQUEST_REGISTER_VENDOR_ID')}) AS REJECT_REASON
-                                     , ${RequestApprovalSummarySqlSnippets.latestApprovalDateExpr('rr.REQUEST_REGISTER_VENDOR_ID')} AS APPROVE_DATE
+                                     , dataItem.LATEST_APPROVAL_REMARK_SQL AS APPROVER_REMARK
+                                     , (dataItem.LATEST_REJECT_REASON_SQL) AS REJECT_REASON
+                                     , dataItem.LATEST_APPROVAL_DATE_SQL AS APPROVE_DATE
                                      , rr.APPROVED_VENDOR_CODE AS VENDOR_CODE
                                      , rr.ASSIGN_TO
                                      , rr.PIC_EMAIL
-                                     , ${RequestVendorContactSqlSnippets.primaryVendorContactIdExpr('rr')} AS VENDOR_CONTACTS_ID
+                                     , dataItem.PRIMARY_VENDOR_CONTACT_ID_SQL AS VENDOR_CONTACTS_ID
                                      , rr.REQUEST_BY_EMPLOYEECODE AS EMPLOYEE_CODE
                                      , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS FULL_NAME
                                      , m.EMPDEPT AS EMPLOYEE_DEPT
+                                     , rr.REQUESTER_SECTION
                                      , rr.CREATE_DATE
-                                     ${GprCSelectionSqlSnippets.gprCSelectionFields('rvs', 'rr')}
+                                     , YEAR(rr.CREATE_DATE) AS REQUEST_YEAR
+                                     dataItem.GPR_C_SELECTION_FIELDS_SQL
                                      , rvs.GPR_43_ACCEPTANCE_STATUS
 
                                      -- Vendor Info
@@ -117,15 +123,23 @@ export const RequestHistorySQL = {
                                                                            JSON_OBJECT(
                                                                                'REQUEST_APPROVAL_STEP_ID', ras.REQUEST_APPROVAL_STEP_ID,
                                                                                'M_REQUEST_STATUS_ID', wsm.M_REQUEST_STATUS_ID,
-                                                                               'STEP_ORDER', ras.STEP_ORDER,
-                                                                               'APPROVER_EMPCODE', ras.APPROVER_EMPCODE,
-                                                                               'APPROVER_NAME', (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME)
-                                                                               FROM person.member_fed pm WHERE pm.EMPCODE = ras.APPROVER_EMPCODE LIMIT 1),
-                                                                               'STEP_STATUS', ras.STEP_STATUS,
+                                                                                'STEP_ORDER', ras.STEP_ORDER,
+                                                                                'APPROVER_EMPCODE', ras.APPROVER_EMPCODE,
+                                                                                'APPROVAL_GROUP_MEMBER_ID', ras.APPROVAL_GROUP_MEMBER_ID,
+                                                                               'APPROVER_NAME', COALESCE(
+                                                                                 (SELECT agm.EMPNAME
+                                                                                  FROM approval_group_member agm
+                                                                                  WHERE agm.APPROVAL_GROUP_MEMBER_ID = ras.APPROVAL_GROUP_MEMBER_ID
+                                                                                  LIMIT 1),
+                                                                                 ras.APPROVER_EMPCODE
+                                                                               ),
+                                                                                'M_APPROVAL_STEP_STATUS_ID', ras.M_APPROVAL_STEP_STATUS_ID,
+                                                                                'STEP_STATUS', LOWER(task_status.STATUS_CODE),
                                                                                'DESCRIPTION', mrs.STATUS_VALUE,
                                                                                'STEP_CODE', wsm.STEP_CODE,
                                                                                'ACTOR_TYPE', wsm.ACTOR_TYPE,
-                                                                               'GROUP_CODE', ras.GROUP_CODE,
+                                                                                'APPROVAL_GROUP_ID', ras.APPROVAL_GROUP_ID,
+                                                                                'GROUP_CODE', task_group.GROUP_CODE,
                                                                                'ASSIGNMENT_MODE', ras.ASSIGNMENT_MODE,
                                                                                'MASTER_STATUS_VALUE', mrs.STATUS_VALUE,
                                                                                'MASTER_STATUS_LABEL', mrs.STATUS_VALUE,
@@ -139,7 +153,13 @@ export const RequestHistorySQL = {
                                                                            INNER JOIN
                                                                       workflow_step_master wsm ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID
                                                                            INNER JOIN
-                                                                      m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID
+                                                                       m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID
+                                                                            INNER JOIN
+                                                                       m_approval_step_status task_status
+                                                                         ON task_status.M_APPROVAL_STEP_STATUS_ID = ras.M_APPROVAL_STEP_STATUS_ID
+                                                                            LEFT JOIN
+                                                                       approval_group task_group
+                                                                         ON task_group.APPROVAL_GROUP_ID = ras.APPROVAL_GROUP_ID
                                                            WHERE
                                                                       ras.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID AND ras.INUSE = 1
                                                 ),
@@ -155,9 +175,7 @@ export const RequestHistorySQL = {
                                                                                'REQUEST_APPROVAL_LOG_ID', ral.REQUEST_APPROVAL_LOG_ID,
                                                                                'REQUEST_APPROVAL_STEP_ID', ral.REQUEST_APPROVAL_STEP_ID,
                                                                                'ACTION_BY', ral.ACTION_BY,
-                                                                               'ACTION_BY_NAME', COALESCE(NULLIF(ral.ACTION_BY_NAME, ''),
-                                                                               (SELECT CONCAT(pm.EMPNAME, ' ', pm.EMPSURNAME)
-                                                                               FROM person.member_fed pm WHERE pm.EMPCODE = ral.ACTION_BY LIMIT 1)),
+                                                                               'ACTION_BY_NAME', COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), ral.ACTION_BY),
                                                                                'ACTION_TYPE', ral.ACTION_TYPE,
                                                                                'DESCRIPTION', ral.DESCRIPTION,
                                                                                'REJECT_REASON', ral.REJECT_REASON,
@@ -185,8 +203,38 @@ export const RequestHistorySQL = {
                                                                            JSON_OBJECT(
                                                                                'NO', vsc.CRITERIA_NO,
                                                                                'CRITERIA', vsc.CRITERIA_VALUE,
-                                                                               'UPLOADED_FILE', vsc.UPLOADED_FILE_PATH,
-                                                                               'UPLOADED_NAME', vsc.UPLOADED_FILE_NAME
+                                                                               'UPLOADED_FILE', (
+                                                                                   SELECT vscf.FILE_PATH
+                                                                                   FROM vendor_selection_criteria_files vscf
+                                                                                   WHERE vscf.VENDOR_SELECTION_CRITERIA_ID = vsc.VENDOR_SELECTION_CRITERIA_ID
+                                                                                     AND vscf.INUSE = 1
+                                                                                   ORDER BY vscf.FILE_ORDER ASC
+                                                                                   LIMIT 1
+                                                                               ),
+                                                                               'UPLOADED_NAME', (
+                                                                                   SELECT vscf.FILE_NAME
+                                                                                   FROM vendor_selection_criteria_files vscf
+                                                                                   WHERE vscf.VENDOR_SELECTION_CRITERIA_ID = vsc.VENDOR_SELECTION_CRITERIA_ID
+                                                                                     AND vscf.INUSE = 1
+                                                                                   ORDER BY vscf.FILE_ORDER ASC
+                                                                                   LIMIT 1
+                                                                               ),
+                                                                               'FILES', (
+                                                                                   SELECT COALESCE(
+                                                                                       JSON_ARRAYAGG(JSON_OBJECT(
+                                                                                           'CRITERIA_FILE_ID', vscf.VENDOR_SELECTION_CRITERIA_FILE_ID,
+                                                                                           'FILE_ORDER', vscf.FILE_ORDER,
+                                                                                           'FILE_PATH', vscf.FILE_PATH,
+                                                                                           'FILE_NAME', vscf.FILE_NAME,
+                                                                                           'FILE_SIZE', vscf.FILE_SIZE,
+                                                                                           'FILE_TYPE', vscf.FILE_TYPE
+                                                                                       )),
+                                                                                       JSON_ARRAY()
+                                                                                   )
+                                                                                   FROM vendor_selection_criteria_files vscf
+                                                                                   WHERE vscf.VENDOR_SELECTION_CRITERIA_ID = vsc.VENDOR_SELECTION_CRITERIA_ID
+                                                                                     AND vscf.INUSE = 1
+                                                                               )
                                                                            )
                                                                       )
                                                            FROM
@@ -210,13 +258,21 @@ export const RequestHistorySQL = {
                                             LEFT JOIN
                                        info_business_category vt ON vt.BUSINESS_CATEGORY_ID = v.BUSINESS_CATEGORY_ID
                                             LEFT JOIN
-                                       person.member_fed m ON m.EMPCODE = rr.REQUEST_BY_EMPLOYEECODE
+                                       dataItem.MEMBER_TABLE m ON m.EMPCODE = rr.REQUEST_BY_EMPLOYEECODE
                             WHERE
                                        rr.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
                                        AND rr.INUSE = 1
                             LIMIT
                                        1
         `
+    sql = sql.replaceAll('dataItem.REQUEST_STATUS_SQL', String(RequestStatusSqlSnippets.requestStatusExpr('rr')))
+    sql = sql.replaceAll('dataItem.REQUEST_STATE_SQL', String(RequestStateSqlSnippets.requestStateCodeExpr('rr')))
+    sql = sql.replaceAll('dataItem.LATEST_APPROVAL_REMARK_SQL', String(RequestApprovalSummarySqlSnippets.latestApprovalRemarkExpr('rr.REQUEST_REGISTER_VENDOR_ID')))
+    sql = sql.replaceAll('dataItem.LATEST_REJECT_REASON_SQL', String(RequestApprovalSummarySqlSnippets.latestRejectReasonExpr('rr.REQUEST_REGISTER_VENDOR_ID')))
+    sql = sql.replaceAll('dataItem.LATEST_APPROVAL_DATE_SQL', String(RequestApprovalSummarySqlSnippets.latestApprovalDateExpr('rr.REQUEST_REGISTER_VENDOR_ID')))
+    sql = sql.replaceAll('dataItem.PRIMARY_VENDOR_CONTACT_ID_SQL', String(RequestVendorContactSqlSnippets.primaryVendorContactIdExpr('rr')))
+    sql = sql.replaceAll('dataItem.GPR_C_SELECTION_FIELDS_SQL', String(GprCSelectionSqlSnippets.gprCSelectionFields('rvs', 'rr')))
+    sql = sql.replaceAll('dataItem.MEMBER_TABLE', String(PersonSqlSnippets.memberTable()))
 
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
 
@@ -232,11 +288,15 @@ export const RequestHistorySQL = {
                                      , wsm.M_REQUEST_STATUS_ID AS M_REQUEST_STATUS_ID
                                      , ras.STEP_ORDER
                                      , ras.APPROVER_EMPCODE
-                                     , ras.STEP_STATUS
+                                     , ras.APPROVAL_GROUP_MEMBER_ID
+                                     , ras.M_APPROVAL_STEP_STATUS_ID
+                                     , LOWER(task_status.STATUS_CODE) AS STEP_STATUS
                                      , mrs.STATUS_VALUE AS DESCRIPTION
                                      , wsm.STEP_CODE
                                      , wsm.ACTOR_TYPE
-                                     , ras.GROUP_CODE
+                                     , ras.APPROVAL_GROUP_ID
+                                     , task_group.GROUP_CODE
+                                     , task_group.GROUP_NAME
                                      , ras.ASSIGNMENT_MODE
                                      , ras.CREATE_BY
                                      , ras.CREATE_DATE
@@ -245,15 +305,22 @@ export const RequestHistorySQL = {
                                      , ras.INUSE
                                      , mrs.STATUS_VALUE AS MASTER_STATUS_VALUE
                                      , mrs.STATUS_VALUE AS MASTER_STATUS_LABEL
-                                     , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS APPROVER_NAME
+                                     , COALESCE(task_member.EMPNAME, ras.APPROVER_EMPCODE) AS APPROVER_NAME
                             FROM
                                        request_approval_step ras
                                             INNER JOIN
                                        workflow_step_master wsm ON wsm.WORKFLOW_STEP_MASTER_ID = ras.WORKFLOW_STEP_MASTER_ID
                                                                            INNER JOIN
-                                                                      m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID
+                                                                       m_request_status mrs ON mrs.M_REQUEST_STATUS_ID = wsm.M_REQUEST_STATUS_ID
+                                            INNER JOIN
+                                       m_approval_step_status task_status
+                                         ON task_status.M_APPROVAL_STEP_STATUS_ID = ras.M_APPROVAL_STEP_STATUS_ID
                                             LEFT JOIN
-                                       person.member_fed m ON m.EMPCODE = ras.APPROVER_EMPCODE
+                                       approval_group task_group
+                                         ON task_group.APPROVAL_GROUP_ID = ras.APPROVAL_GROUP_ID
+                                            LEFT JOIN
+                                       approval_group_member task_member
+                                         ON task_member.APPROVAL_GROUP_MEMBER_ID = ras.APPROVAL_GROUP_MEMBER_ID
                             WHERE
                                        ras.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
                                        AND ras.INUSE = 1
@@ -283,11 +350,9 @@ export const RequestHistorySQL = {
                                      , ral.CREATE_DATE
                                      , ral.UPDATE_DATE
                                      , ral.INUSE
-                                     , COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), CONCAT(m.EMPNAME, ' ', m.EMPSURNAME)) AS ACTION_BY_NAME
+                                     , COALESCE(NULLIF(ral.ACTION_BY_NAME, ''), ral.ACTION_BY) AS ACTION_BY_NAME
                             FROM
                                        request_approval_log ral
-                                            LEFT JOIN
-                                       person.member_fed m ON m.EMPCODE = ral.ACTION_BY
                             WHERE
                                        ral.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
                                        AND ral.INUSE = 1
@@ -297,6 +362,44 @@ export const RequestHistorySQL = {
 
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
 
+    return sql
+  },
+
+  getGprCProducts: (dataItem: any) => {
+    let sql = `
+                            SELECT
+                                       pm.PRODUCT_MAIN_ID AS value
+                                     , CONCAT(
+                                           TRIM(pm.PRODUCT_MAIN_NAME),
+                                           ' (',
+                                           TRIM(pm.PRODUCT_MAIN_ALPHABET),
+                                           ')'
+                                       ) AS label
+                                     , pm.PRODUCT_MAIN_ID
+                                     , pm.PRODUCT_MAIN_NAME
+                                     , pm.PRODUCT_MAIN_ALPHABET
+                            FROM
+                                       dataItem.PRODUCT_MAIN_TABLE pm
+                            WHERE
+                                       pm.INUSE = 1
+                                       AND (
+                                              'dataItem.SEARCH_TEXT' = ''
+                                              OR pm.PRODUCT_MAIN_NAME LIKE '%dataItem.SEARCH_TEXT%'
+                                              OR pm.PRODUCT_MAIN_ALPHABET LIKE '%dataItem.SEARCH_TEXT%'
+                                              OR CONCAT(
+                                                    TRIM(pm.PRODUCT_MAIN_NAME),
+                                                    ' (',
+                                                    TRIM(pm.PRODUCT_MAIN_ALPHABET),
+                                                    ')'
+                                                 ) LIKE '%dataItem.SEARCH_TEXT%'
+                                       )
+                            ORDER BY
+                                       pm.PRODUCT_MAIN_NAME ASC
+                                     , pm.PRODUCT_MAIN_ALPHABET ASC
+                            LIMIT 100
+        `
+    sql = sql.replaceAll('dataItem.PRODUCT_MAIN_TABLE', MesProductSqlSnippets.productMainTable())
+    sql = sql.replaceAll('dataItem.SEARCH_TEXT', String(dataItem.SEARCH_TEXT || '').trim().replaceAll("'", "''"))
     return sql
   },
 
@@ -315,4 +418,3 @@ export const RequestHistorySQL = {
     return sql
   },
 }
-

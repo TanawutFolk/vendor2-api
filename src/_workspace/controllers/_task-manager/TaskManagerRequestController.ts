@@ -21,28 +21,30 @@ export const TaskManagerRequestController = {
       dataItem.LIMIT = dataItem.LIMIT || 50
 
       const { data, totalCount } = await TaskManagerRequestModel.searchAllTask(dataItem)
-      return res.status(200).json({
+      res.status(200).json({
         Status: true,
         ResultOnDb: data,
         TotalCountOnDb: totalCount,
         MethodOnDb: 'SearchAllTask',
         Message: 'Get Data Success',
       } as ResponseI)
+      return
     } catch (error: any) {
       // console.error('SearchAllTask Error:', error)
-      return res.status(200).json({
+      res.status(200).json({
         Status: false,
         ResultOnDb: [],
         TotalCountOnDb: 0,
         MethodOnDb: 'SearchAllTask',
         Message: error?.message || 'Failed to search task queue',
       } as ResponseI)
+      return
     }
   },
 
-  gprCTaskManagerQueue: async (_req: Request, res: Response) => {
+  getGprCTaskManagerQueue: async (_req: Request, res: Response) => {
     try {
-      const result = await TaskManagerRequestModel.gprCTaskManagerQueue()
+      const result = await TaskManagerRequestModel.getGprCTaskManagerQueue()
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
       // console.error('Get GPR C Task Manager Queue Error:', error)

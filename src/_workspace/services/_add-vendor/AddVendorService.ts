@@ -1,14 +1,22 @@
 import { MySQLExecute } from '@businessData/dbExecute'
 import { AddVendorSQL } from '@src/_workspace/sql/_add-vendor/AddVendorSQL'
-import { BlacklistSQL } from '@src/_workspace/sql/_black-list/BlacklistSQL'
-import { normalizeName } from '@src/_workspace/services/_black-list/BlacklistUtils'
 import { RowDataPacket, ResultSetHeader } from 'mysql2'
+
+const normalizeVendorName = (value: unknown) =>
+  String(value ?? '')
+    .replace(/\r/g, '\n')
+    .trim()
+    .toUpperCase()
+    .replace(/_/g, ' ')
+    .replace(/[.,()\/\\-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 
 export const AddVendorService = {
   checkBlacklist: async (dataItem: any) => {
     const companyName = String(dataItem.COMPANY_NAME || dataItem.company_name || '').trim()
-    const normalizedName = normalizeName(companyName)
-    const blacklistResult = normalizedName ? ((await MySQLExecute.search(BlacklistSQL.checkBlacklist(normalizedName))) as RowDataPacket[]) : []
+    const normalizedName = normalizeVendorName(companyName)
+    const blacklistResult = normalizedName ? ((await MySQLExecute.search(await AddVendorSQL.checkBlacklist(normalizedName))) as RowDataPacket[]) : []
 
     return {
       Status: true,
@@ -23,12 +31,12 @@ export const AddVendorService = {
   // Check if vendor already exists + check against blacklist
   checkDuplicateVendor: async (dataItem: any) => {
     const companyName = String(dataItem.COMPANY_NAME || '').trim()
-    const normalizedName = normalizeName(companyName)
+    const normalizedName = normalizeVendorName(companyName)
 
     // Run both checks in parallel
     const [duplicateResult, blacklistResult] = await Promise.all([
       MySQLExecute.search(await AddVendorSQL.checkDuplicateVendor(dataItem)) as Promise<RowDataPacket[]>,
-      normalizedName ? (MySQLExecute.search(BlacklistSQL.checkBlacklist(normalizedName)) as Promise<RowDataPacket[]>) : Promise.resolve([] as RowDataPacket[]),
+      normalizedName ? (MySQLExecute.search(await AddVendorSQL.checkBlacklist(normalizedName)) as Promise<RowDataPacket[]>) : Promise.resolve([] as RowDataPacket[]),
     ])
 
     const isDuplicate = duplicateResult.length > 0
@@ -111,8 +119,17 @@ export const AddVendorService = {
       }
 
       // Step 4: Prepare products
+      // All product fields are optional, so an untouched row passes validation. Skip rows
+      // where nothing was filled in rather than inserting an empty vendor_products record.
       if (dataItem.PRODUCTS && Array.isArray(dataItem.PRODUCTS)) {
-        for (const product of dataItem.PRODUCTS) {
+        const hasProductValue = (product: any) => Boolean(
+          Number(product?.MASTER_PRODUCT_GROUPS_ID ?? product?.product_group_id ?? 0)
+          || String(product?.MAKER_NAME ?? product?.maker_name ?? '').trim()
+          || String(product?.PRODUCT_NAME ?? product?.product_name ?? '').trim()
+          || String(product?.MODEL_LIST ?? product?.model_list ?? '').trim()
+        )
+
+        for (const product of dataItem.PRODUCTS.filter(hasProductValue)) {
           const productData = {
             ...product,
             VENDORS_ID: '@vendor_id',

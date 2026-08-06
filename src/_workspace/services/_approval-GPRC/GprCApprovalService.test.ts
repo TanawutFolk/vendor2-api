@@ -55,11 +55,44 @@ describe('GprCApprovalService mail data', () => {
 describe('GprCApprovalService approval flow transitions', () => {
   test('moves the main workflow from Issue GPR C to Doc Check when the GPR C sub-flow finishes', async () => {
     const executedSqlLists: string[][] = []
+    mock.module('../_status-master/StatusIdentityService', () => {
+      const identity = {
+        workflowStep: {
+          requestSubmitted: 297,
+          picReview: 298,
+          poPicInProgress: 299,
+          vendorDisagreed: 300,
+          issueGprB: 304,
+          issueGprC: 301,
+          docCheck: 302,
+          poMgrApproval: 303,
+          poGmApproval: 305,
+          mdApproval: 306,
+          accountRegistered: 307,
+        },
+        approvalStep: { pending: 1, inProgress: 2, approved: 3, rejected: 4, skipped: 5 },
+        requestState: { inProgress: 1, completed: 2, rejected: 3, cancelled: 4 },
+        requestStatus: { rejected: 99 },
+        vendor: { notRegistered: 1, registered: 2, inProgress: 3, cannotRegister: 4 },
+        gprCFlow: { draft: 1, requesterSetup: 2, inProgress: 3, approved: 4, rejected: 5 },
+        actionResult: { pending: 1, incomplete: 2, completed: 3 },
+      }
+
+      return {
+        getWorkflowStepIdentity: mock(async () => identity.workflowStep),
+        getApprovalStepStatusIdentity: mock(async () => identity.approvalStep),
+        getRequestStateIdentity: mock(async () => identity.requestState),
+        getRequestStatusIdentity: mock(async () => identity.requestStatus),
+        getVendorStatusIdentity: mock(async () => identity.vendor),
+        getGprCFlowStatusIdentity: mock(async () => identity.gprCFlow),
+        getActionResultStatusIdentity: mock(async () => identity.actionResult),
+      }
+    })
     const search = mock(async (query: string) => {
       if (query.includes('FROM REQUEST_VENDOR_GPR_C_FLOWS')) {
         return [{ REQUEST_VENDOR_GPR_C_FLOWS_ID: 11, REQUEST_REGISTER_VENDOR_ID: 101 }]
       }
-      if (query.includes('FROM REQUEST_VENDOR_GPR_C_STEPS s') && query.includes("s.STEP_STATUS = 'in_progress'")) {
+      if (query.includes('FROM REQUEST_VENDOR_GPR_C_STEPS s') && query.includes("status_master.STATUS_CODE = 'IN_PROGRESS'")) {
         return [{
           REQUEST_VENDOR_GPR_C_STEPS_ID: 66,
           REQUEST_VENDOR_GPR_C_FLOWS_ID: 11,
@@ -84,6 +117,8 @@ describe('GprCApprovalService approval flow transitions', () => {
           {
             REQUEST_APPROVAL_STEP_ID: 201,
             REQUEST_REGISTER_VENDOR_ID: 101,
+            WORKFLOW_STEP_MASTER_ID: 301,
+            M_APPROVAL_STEP_STATUS_ID: 2,
             STEP_ORDER: 4,
             STEP_STATUS: 'in_progress',
             DESCRIPTION: 'Issue GPR C',
@@ -93,6 +128,8 @@ describe('GprCApprovalService approval flow transitions', () => {
           {
             REQUEST_APPROVAL_STEP_ID: 202,
             REQUEST_REGISTER_VENDOR_ID: 101,
+            WORKFLOW_STEP_MASTER_ID: 302,
+            M_APPROVAL_STEP_STATUS_ID: 1,
             STEP_ORDER: 5,
             STEP_STATUS: 'pending',
             DESCRIPTION: 'PO & SCM Check All Document',
@@ -102,6 +139,8 @@ describe('GprCApprovalService approval flow transitions', () => {
           {
             REQUEST_APPROVAL_STEP_ID: 203,
             REQUEST_REGISTER_VENDOR_ID: 101,
+            WORKFLOW_STEP_MASTER_ID: 303,
+            M_APPROVAL_STEP_STATUS_ID: 1,
             STEP_ORDER: 6,
             STEP_STATUS: 'pending',
             DESCRIPTION: 'PO MGR Approve',
@@ -110,10 +149,41 @@ describe('GprCApprovalService approval flow transitions', () => {
           },
         ]
       }
+      if (query.includes('rr.CURRENT_REQUEST_APPROVAL_STEP_ID') && query.includes('rr.LOCK_VERSION')) {
+        return [{
+          VENDORS_ID: 55,
+          M_REQUEST_STATE_ID: 1,
+          WORKFLOW_DEFINITION_ID: 1,
+          CURRENT_REQUEST_APPROVAL_STEP_ID: 201,
+          LOCK_VERSION: 0,
+        }]
+      }
+      if (query.includes('workflow_transition wt')) {
+        return [{
+          WORKFLOW_TRANSITION_ID: 1,
+          ACTION_CODE: 'APPROVE',
+          TO_WORKFLOW_STEP_MASTER_ID: 302,
+          TERMINAL_REQUEST_STATE_ID: null,
+          TERMINAL_STATE: null,
+          CONDITION_KEY: null,
+          NEXT_REQUEST_APPROVAL_STEP_ID: 202,
+          NEXT_STEP_ORDER: 5,
+          NEXT_APPROVER_EMPCODE: 'S00002',
+           NEXT_STEP_STATUS: 'pending',
+           NEXT_STEP_STATUS_ID: 1,
+          NEXT_STEP_CODE: 'DOC_CHECK',
+          NEXT_ACTOR_TYPE: 'APPROVER',
+          NEXT_STATUS_VALUE: 'PO & SCM Check All Document',
+        }]
+      }
       return []
     }) as any
 
     const executeList = mock(async (sqlList: string[]) => {
+      executedSqlLists.push(sqlList)
+      return []
+    })
+    const executeGuardedList = mock(async (_guardSql: string, sqlList: string[]) => {
       executedSqlLists.push(sqlList)
       return []
     })
@@ -122,6 +192,7 @@ describe('GprCApprovalService approval flow transitions', () => {
       MySQLExecute: {
         search,
         executeList,
+        executeGuardedList,
         execute: mock(async () => ({ insertId: 1 })),
         searchList: mock(async () => []),
       },
@@ -153,10 +224,12 @@ describe('GprCApprovalService approval flow transitions', () => {
     const mainWorkflowSql = executedSqlLists[1].join('\n')
 
     expect(mainWorkflowSql).toContain('REQUEST_APPROVAL_STEP_ID = 201')
-    expect(mainWorkflowSql).toContain("STEP_STATUS = LOWER('approved')")
+    expect(mainWorkflowSql).toContain('M_APPROVAL_STEP_STATUS_ID = 3')
+    expect(mainWorkflowSql).not.toContain("STEP_STATUS = LOWER('approved')")
     expect(mainWorkflowSql).toContain('REQUEST_APPROVAL_STEP_ID = 202')
-    expect(mainWorkflowSql).toContain("STEP_STATUS = LOWER('in_progress')")
+    expect(mainWorkflowSql).toContain('M_APPROVAL_STEP_STATUS_ID = 2')
+    expect(mainWorkflowSql).not.toContain("STEP_STATUS = LOWER('in_progress')")
     expect(mainWorkflowSql).not.toContain('REQUEST_APPROVAL_STEP_ID = 203')
-    expect(mainWorkflowSql).not.toContain("REQUEST_STATE = 'completed'")
+    expect(mainWorkflowSql).not.toContain("request_state_master.STATE_CODE = 'COMPLETED'")
   })
 })

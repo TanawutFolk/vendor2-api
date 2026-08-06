@@ -6,17 +6,29 @@ import {
   formatRequestNumber,
   GROUP_CODE,
   inferActorType,
-  inferStepCode,
-  isPicStep,
-  isRejectedStatus,
   requiresVendorReply,
   resolveGroupCodeForStep,
-  WORKFLOW_STEP_CODE,
 } from './RegisterRequestWorkflowHelper'
 import { sendMail_ToSupplier_RequestFormA, sendMail_ToPic_NewRequest, sendMail_NegotiationStageDispatch } from './RegisterRequestNotificationHelper'
 import { RequestRegisterGprService } from './RequestRegisterGprService'
 import { GprCApprovalService } from '../_approval-GPRC/GprCApprovalService'
 import { SelectionFileService } from './SelectionFileService'
+import { CriteriaFileService } from './CriteriaFileService'
+import {
+  getApprovalStepStatusIdentity,
+  getRequestStateIdentity,
+  getWorkflowStepIdentity,
+} from '../_status-master/StatusIdentityService'
+
+const getRequestRegisterIdentity = async () => {
+  const [workflowStep, approvalStep, requestState] = await Promise.all([
+    getWorkflowStepIdentity(),
+    getApprovalStepStatusIdentity(),
+    getRequestStateIdentity(),
+  ])
+
+  return { workflowStep, approvalStep, requestState }
+}
 
 const normalizeVendorContactIds = (dataItem: any): string[] => {
   const rawValue = dataItem.VENDOR_CONTACT_IDS || dataItem['VENDOR_CONTACT_IDS[]'] || dataItem.VENDOR_CONTACTS_ID || []
@@ -37,7 +49,9 @@ export const RequestRegisterPageService = {
   createRequest: async (dataItem: any) => {
     let conn: any = null
     let duplicateGuardLockKey = ''
+    let requestsAhead = 0
     try {
+      const statusIdentity = await getRequestRegisterIdentity()
       conn = await connection()
       await conn.beginTransaction()
 
@@ -89,9 +103,25 @@ export const RequestRegisterPageService = {
         throw new Error('Requester employee code is required')
       }
       dataItem.REQUEST_BY_EMPLOYEECODE = requesterEmpCode
+
+      const requesterProfileSql = await RequestRegisterPageSQL.getMemberByEmpCode({
+        EMPCODE: requesterEmpCode,
+      })
+      const requesterProfileRows = await queryRows(requesterProfileSql)
+      const requesterSection = String(
+        requesterProfileRows[0]?.REQUESTER_SECTION || requesterProfileRows[0]?.requester_section || ''
+      ).trim()
+      if (!requesterSection) {
+        throw new Error(`Requester section was not found for employee ${requesterEmpCode}`)
+      }
+      dataItem.REQUESTER_SECTION = requesterSection
+
       duplicateGuardLockKey = `request-create:${Number(dataItem.VENDORS_ID) || 0}:${requesterEmpCode}`
 
-      const [lockRows] = await conn.query('SELECT GET_LOCK(?, 10) AS lock_status', [duplicateGuardLockKey])
+      const acquireLockSql = RequestRegisterPageSQL.acquireRequestCreateLock({
+        LOCK_KEY: duplicateGuardLockKey,
+      })
+      const [lockRows] = await conn.query(acquireLockSql)
       const lockStatus = Number((lockRows as RowDataPacket[])[0]?.lock_status || 0)
       if (lockStatus !== 1) {
         throw new Error('Another create request is in progress for this vendor and requester')
@@ -100,6 +130,7 @@ export const RequestRegisterPageService = {
       const duplicateRequestSql = await RequestRegisterPageSQL.checkExistingActiveRequestByVendorRequester({
         VENDORS_ID: Number(dataItem.VENDORS_ID) || 0,
         REQUEST_BY_EMPLOYEECODE: requesterEmpCode,
+        M_REQUEST_IN_PROGRESS_STATE_ID: statusIdentity.requestState.inProgress,
       })
       const duplicateRequestRows = await queryRows(duplicateRequestSql)
       const existingActiveRequest = duplicateRequestRows[0]
@@ -115,16 +146,23 @@ export const RequestRegisterPageService = {
 
       const statusSql = await RequestRegisterPageSQL.getStatusOptions()
       const statusRows = await queryRows(statusSql)
-      const workflowStatuses = statusRows.filter((s: any) => !isRejectedStatus(s.value))
-      const getConfiguredStepCode = (status: any) =>
-        inferStepCode({
-          step_code: status.STEP_CODE,
-          DESCRIPTION: status.label || status.value,
-        })
-      const pendingAgreementStatus = workflowStatuses.find(
-        (status: any) => getConfiguredStepCode(status) === WORKFLOW_STEP_CODE.PENDING_AGREEMENT
+      const workflowStatuses = statusRows
+      const poPicInProgressStatus = workflowStatuses.find(
+        (status: any) => Number(status.WORKFLOW_STEP_MASTER_ID) === statusIdentity.workflowStep.poPicInProgress
       )
-      const reRegisterInitialStatus = pendingAgreementStatus?.value || pendingAgreementStatus?.label || 'Pending Agreement'
+      const requestSubmittedStatus = workflowStatuses.find(
+        (status: any) => Number(status.WORKFLOW_STEP_MASTER_ID) === statusIdentity.workflowStep.requestSubmitted
+      )
+      const initialWorkflowStatus = isReRegisterRequest ? poPicInProgressStatus : requestSubmittedStatus
+      const workflowDefinitionIds = [...new Set(workflowStatuses.map((status: any) => Number(status.WORKFLOW_DEFINITION_ID || 0)).filter(Boolean))]
+
+      if (workflowDefinitionIds.length !== 1 || !initialWorkflowStatus?.M_REQUEST_STATUS_ID) {
+        throw new Error('Published vendor-registration workflow is incomplete or inconsistent')
+      }
+
+      dataItem.WORKFLOW_DEFINITION_ID = workflowDefinitionIds[0]
+      dataItem.CURRENT_M_REQUEST_STATUS_ID = Number(initialWorkflowStatus.M_REQUEST_STATUS_ID)
+      dataItem.M_REQUEST_IN_PROGRESS_STATE_ID = statusIdentity.requestState.inProgress
 
       const fetchAssigneesSql = await RequestRegisterPageSQL.getActiveAssigneesByGroupCode({
         GROUP_CODE: assignmentGroupCode,
@@ -158,10 +196,6 @@ export const RequestRegisterPageService = {
 
       dataItem.ASSIGN_TO = nextAssignee.empCode || ''
       dataItem.PIC_EMAIL = nextAssignee.empEmail || ''
-      if (isReRegisterRequest) {
-        dataItem.REQUEST_STATUS = reRegisterInitialStatus
-      }
-
       const groupAssigneeCache = new Map<string, string>()
       const resolvePrimaryAssigneeByGroupCode = async (groupCodeRaw: string) => {
         const groupCode = String(groupCodeRaw || '').trim().toUpperCase()
@@ -247,12 +281,10 @@ export const RequestRegisterPageService = {
 
       for (const [idx, ws] of workflowStatuses.entries()) {
         const stepOrder = idx + 1
-        let initialStatus = 'pending'
+        let initialStatusId = statusIdentity.approvalStep.pending
 
-        const stepCode = inferStepCode({
-          step_code: ws.STEP_CODE,
-          DESCRIPTION: ws.label || ws.value,
-        })
+        const workflowStepMasterId = Number(ws.WORKFLOW_STEP_MASTER_ID || 0)
+        const stepCode = String(ws.STEP_CODE || '').trim().toUpperCase()
         const actorType = inferActorType({
           actor_type: ws.ACTOR_TYPE,
           step_code: stepCode,
@@ -262,9 +294,9 @@ export const RequestRegisterPageService = {
           (isOversea ? ws.DEFAULT_GROUP_CODE_OVERSEA : ws.DEFAULT_GROUP_CODE_LOCAL) ||
           resolveGroupCodeForStep({ step_code: stepCode, actor_type: actorType }, isOversea)
         const isPicOwnedStep = actorType === 'PIC'
-        const isRequestSubmittedStep = stepCode === WORKFLOW_STEP_CODE.REQUEST_SUBMITTED
-        const isPicReviewStep = stepCode === WORKFLOW_STEP_CODE.PIC_REVIEW
-        const isPendingAgreementStep = stepCode === WORKFLOW_STEP_CODE.PENDING_AGREEMENT
+        const isRequestSubmittedStep = workflowStepMasterId === statusIdentity.workflowStep.requestSubmitted
+        const isPicReviewStep = workflowStepMasterId === statusIdentity.workflowStep.picReview
+        const isPoPicInProgressStep = workflowStepMasterId === statusIdentity.workflowStep.poPicInProgress
         const isVendorRequestStep = requiresVendorReply({ ...ws, step_code: stepCode, actor_type: actorType })
         const approverId = (stepOrder <= 2 || isPicOwnedStep)
           ? nextAssignee.empCode
@@ -274,19 +306,19 @@ export const RequestRegisterPageService = {
 
         if (isReRegisterRequest) {
           // Re-register is raised by the PO PIC, so submission and PIC review are already done.
-          // The request stops at Pending Agreement To Vendor, waiting for the vendor's reply.
-          if (isPendingAgreementStep && !reRegisterInProgressAssigned) {
-            initialStatus = 'in_progress'
+          // The request resumes with the PO PIC before it can return to document checking.
+          if (isPoPicInProgressStep && !reRegisterInProgressAssigned) {
+            initialStatusId = statusIdentity.approvalStep.inProgress
             reRegisterInProgressAssigned = true
           } else if (
             !reRegisterInProgressAssigned &&
             (isRequestSubmittedStep || isPicReviewStep || isVendorRequestStep)
           ) {
-            initialStatus = 'approved'
+            initialStatusId = statusIdentity.approvalStep.approved
           }
         } else {
-          if (isRequestSubmittedStep) initialStatus = 'approved'
-          else if (isPicReviewStep) initialStatus = 'in_progress'
+          if (isRequestSubmittedStep) initialStatusId = statusIdentity.approvalStep.approved
+          else if (isPicReviewStep) initialStatusId = statusIdentity.approvalStep.inProgress
         }
 
         sqlList.push(
@@ -296,7 +328,13 @@ export const RequestRegisterPageService = {
             M_REQUEST_STATUS_ID: ws.M_REQUEST_STATUS_ID,
             STEP_ORDER: stepOrder,
             APPROVER_EMPCODE: approverId,
-            STEP_STATUS: initialStatus,
+            M_APPROVAL_STEP_STATUS_ID: initialStatusId,
+            M_APPROVAL_STEP_PENDING_STATUS_ID: statusIdentity.approvalStep.pending,
+            M_APPROVAL_STEP_TERMINAL_STATUS_IDS: [
+              statusIdentity.approvalStep.approved,
+              statusIdentity.approvalStep.rejected,
+              statusIdentity.approvalStep.skipped,
+            ],
             DESCRIPTION: ws.label,
             STEP_CODE: stepCode,
             ACTOR_TYPE: actorType,
@@ -311,6 +349,8 @@ export const RequestRegisterPageService = {
       await executeSql(
         await RequestRegisterPageSQL.syncRequestWorkflowState({
           REQUEST_REGISTER_VENDOR_ID: insertedId,
+          M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID: statusIdentity.approvalStep.inProgress,
+          M_REQUEST_IN_PROGRESS_STATE_ID: statusIdentity.requestState.inProgress,
           UPDATE_BY: dataItem.CREATE_BY || 'SYSTEM',
         })
       )
@@ -350,11 +390,25 @@ export const RequestRegisterPageService = {
 
       await conn.commit()
       if (duplicateGuardLockKey) {
-        await conn.query('DO RELEASE_LOCK(?)', [duplicateGuardLockKey])
+        const releaseLockSql = RequestRegisterPageSQL.releaseRequestCreateLock({
+          LOCK_KEY: duplicateGuardLockKey,
+        })
+        await conn.query(releaseLockSql)
         duplicateGuardLockKey = ''
       }
       conn.release()
       conn = null
+
+      try {
+        const requestsAheadSql = await RequestRegisterPageSQL.getRequestsAheadCount({
+          REQUEST_REGISTER_VENDOR_ID: insertedId,
+          M_REQUEST_IN_PROGRESS_STATE_ID: statusIdentity.requestState.inProgress,
+        })
+        const requestsAheadRows = (await MySQLExecute.search(requestsAheadSql)) as RowDataPacket[]
+        requestsAhead = Number(requestsAheadRows[0]?.REQUESTS_AHEAD || requestsAheadRows[0]?.requests_ahead || 0)
+      } catch (queueCountError: any) {
+        console.warn('[RequestQueue] Failed to count requests ahead:', queueCountError?.message)
+      }
 
       // Always provision the request's folder structure ({year}/{requestNumber}/00.Sending,
       // 01.Receiving, 02.Request Documents) as soon as the request is created — even with no
@@ -402,7 +456,7 @@ export const RequestRegisterPageService = {
       return {
         Status: true,
         Message: message,
-        ResultOnDb: { insertedId, request_number: requestNumber },
+        ResultOnDb: { insertedId, request_number: requestNumber, requests_ahead: requestsAhead },
         MethodOnDb: 'Create Request Success',
         TotalCountOnDb: 1,
       }
@@ -410,7 +464,10 @@ export const RequestRegisterPageService = {
       if (conn) {
         await conn.rollback()
         if (duplicateGuardLockKey) {
-          await conn.query('DO RELEASE_LOCK(?)', [duplicateGuardLockKey])
+          const releaseLockSql = RequestRegisterPageSQL.releaseRequestCreateLock({
+            LOCK_KEY: duplicateGuardLockKey,
+          })
+          await conn.query(releaseLockSql)
           duplicateGuardLockKey = ''
         }
         conn.release()
@@ -489,34 +546,27 @@ export const RequestRegisterPageService = {
     }
   },
 
-  getCriteriaFileForDelete: async (dataItem: any) => {
-    const sql = await RequestRegisterPageSQL.getCriteriaFileForDelete(dataItem)
-    const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
-    return resultData
-  },
-
-  clearCriteriaUploadedFile: async (dataItem: any) => {
-    const sql = await RequestRegisterPageSQL.clearCriteriaUploadedFile(dataItem)
-    return await MySQLExecute.execute(sql)
-  },
-
   sendMail_ToSupplier_RequestFormA: async (dataItem: any) => {
     return sendMail_ToSupplier_RequestFormA(dataItem)
   },
 
   createApprovalStep: async (dataItem: any) => {
-    const stepCode = String(dataItem.STEP_CODE || '').trim().toUpperCase()
-    if (!stepCode) throw new Error('STEP_CODE is required')
-    if (!/^[A-Z0-9_]+$/.test(stepCode)) throw new Error('Invalid STEP_CODE format')
+    const workflowStepMasterId = Number(dataItem.WORKFLOW_STEP_MASTER_ID || 0)
+    const approvalStepStatusId = Number(dataItem.M_APPROVAL_STEP_STATUS_ID || 0)
+    if (!workflowStepMasterId) throw new Error('WORKFLOW_STEP_MASTER_ID is required')
+    if (!approvalStepStatusId) throw new Error('M_APPROVAL_STEP_STATUS_ID is required')
+    const approvalStep = await getApprovalStepStatusIdentity()
 
     const [statusRows, requestRows] = await Promise.all([
-      MySQLExecute.search(await RequestRegisterPageSQL.getStatusByStepCode({ STEP_CODE: stepCode })) as Promise<RowDataPacket[]>,
+      MySQLExecute.search(await RequestRegisterPageSQL.getStatusOptions()) as Promise<RowDataPacket[]>,
       MySQLExecute.search(
         await RequestRegisterPageSQL.getRequestVendorRegion({ REQUEST_REGISTER_VENDOR_ID: dataItem.REQUEST_REGISTER_VENDOR_ID })
       ) as Promise<RowDataPacket[]>,
     ])
-    const status = statusRows[0]
-    if (!status) throw new Error(`Unknown or inactive STEP_CODE: ${stepCode}`)
+    const status = statusRows.find(
+      (row: any) => Number(row.WORKFLOW_STEP_MASTER_ID || 0) === workflowStepMasterId
+    )
+    if (!status) throw new Error(`Unknown or inactive WORKFLOW_STEP_MASTER_ID: ${workflowStepMasterId}`)
     const request = requestRows[0]
     if (!request) throw new Error('Request not found')
 
@@ -537,6 +587,13 @@ export const RequestRegisterPageService = {
       ...dataItem,
       WORKFLOW_STEP_MASTER_ID: status.WORKFLOW_STEP_MASTER_ID,
       M_REQUEST_STATUS_ID: status.M_REQUEST_STATUS_ID,
+      M_APPROVAL_STEP_STATUS_ID: approvalStepStatusId,
+      M_APPROVAL_STEP_PENDING_STATUS_ID: approvalStep.pending,
+      M_APPROVAL_STEP_TERMINAL_STATUS_IDS: [
+        approvalStep.approved,
+        approvalStep.rejected,
+        approvalStep.skipped,
+      ],
       APPROVER_EMPCODE: approverId,
       STEP_CODE: status.STEP_CODE,
       ACTOR_TYPE: status.ACTOR_TYPE || '',
@@ -548,7 +605,21 @@ export const RequestRegisterPageService = {
   },
 
   updateApprovalStep: async (dataItem: any) => {
-    const sql = await RequestRegisterPageSQL.updateApprovalStep(dataItem)
+    const [approvalStep, requestState] = await Promise.all([
+      getApprovalStepStatusIdentity(),
+      getRequestStateIdentity(),
+    ])
+    const approvalStepStatusId = Number(dataItem.M_APPROVAL_STEP_STATUS_ID || 0)
+    const allowedStatusIds = new Set(Object.values(approvalStep))
+    if (!allowedStatusIds.has(approvalStepStatusId)) {
+      throw new Error('A valid M_APPROVAL_STEP_STATUS_ID is required')
+    }
+    const sql = await RequestRegisterPageSQL.updateApprovalStep({
+      ...dataItem,
+      M_APPROVAL_STEP_STATUS_ID: approvalStepStatusId,
+      M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID: approvalStep.inProgress,
+      M_REQUEST_IN_PROGRESS_STATE_ID: requestState.inProgress,
+    })
     return await MySQLExecute.execute(sql)
   },
 
@@ -575,9 +646,24 @@ export const RequestRegisterPageService = {
 
       const stepsSql = await RequestRegisterPageSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId })
       const steps = (await MySQLExecute.search(stepsSql)) as RowDataPacket[]
-      const currentStep = steps.find((s: any) => s.step_status === 'in_progress')
+      const [workflowStep, approvalStep] = await Promise.all([
+        getWorkflowStepIdentity(),
+        getApprovalStepStatusIdentity(),
+      ])
+      const currentStep = steps.find(
+        (s: any) =>
+          Number(s.REQUEST_APPROVAL_STEP_ID || s.step_id || 0) === Number(request.CURRENT_REQUEST_APPROVAL_STEP_ID || 0) &&
+          Number(s.M_APPROVAL_STEP_STATUS_ID || 0) === approvalStep.inProgress,
+      )
 
-      if (!currentStep || !isPicStep(currentStep)) {
+      const currentWorkflowStepMasterId = Number(currentStep?.WORKFLOW_STEP_MASTER_ID || 0)
+      if (
+        !currentStep ||
+        ![
+          workflowStep.picReview,
+          workflowStep.poPicInProgress,
+        ].includes(currentWorkflowStepMasterId)
+      ) {
         throw new Error('Request can only be edited when it is in the PIC checking step')
       }
 
@@ -616,8 +702,12 @@ export const RequestRegisterPageService = {
     }
   },
 
-  saveGprForm: async (dataItem: any) => {
-    return RequestRegisterGprService.saveGprForm(dataItem)
+  saveSelectionForm: async (dataItem: any) => {
+    return RequestRegisterGprService.saveSelectionForm(dataItem)
+  },
+
+  saveAccountVendorCode: async (dataItem: any) => {
+    return RequestRegisterGprService.saveAccountVendorCode(dataItem)
   },
 
   assertSelectionSheetEditable: async (requestId: number) => {
@@ -635,4 +725,54 @@ export const RequestRegisterPageService = {
   gprCSubmitSetup: async (dataItem: any) => {
     return GprCApprovalService.submitSetup(dataItem)
   },
+
+  saveSelectionFileToReceiving: (
+    requestNumber: string,
+    sourcePath: string,
+    criteriaNo: string,
+    criteriaDetail: string,
+    originalFileName: string,
+  ) =>
+    SelectionFileService.saveToReceiving(
+      requestNumber,
+      sourcePath,
+      criteriaNo,
+      criteriaDetail,
+      originalFileName,
+    ),
+
+  saveSelectionFileToSending: (
+    requestNumber: string,
+    sourcePath: string,
+    originalFileName: string,
+  ) => SelectionFileService.saveToSending(requestNumber, sourcePath, originalFileName),
+
+  saveGprBFileToReceiving: (
+    requestNumber: string,
+    sourcePath: string,
+    originalFileName: string,
+  ) => SelectionFileService.saveGprBToReceiving(requestNumber, sourcePath, originalFileName),
+
+  deleteSelectionFile: (
+    filePath: string,
+    fileName: string,
+    requestNumber: string,
+  ) => SelectionFileService.deleteSelectionFile(filePath, fileName, requestNumber),
+
+  resolveSelectionDownloadPath: (
+    filePath: string,
+    fileName: string,
+    requestNumber: string,
+  ) =>
+    SelectionFileService.resolveDownloadPath(filePath, fileName, requestNumber, {
+      allowUploadedFallback: true,
+    }),
+
+  createCriteriaFile: (dataItem: any) => CriteriaFileService.create(dataItem),
+
+  getCriteriaFileForDelete: (requestId: number, criteriaFileId: number) =>
+    CriteriaFileService.getForDelete(requestId, criteriaFileId),
+
+  softDeleteCriteriaFile: (criteriaFileId: number, updateBy: string) =>
+    CriteriaFileService.softDelete(criteriaFileId, updateBy),
 }

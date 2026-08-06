@@ -9,7 +9,7 @@ export const AddVendorController = {
     try {
       const result = (await AddVendorModel.checkBlacklist(dataItem)) as any
 
-      return res.status(200).json({
+      res.status(200).json({
         Status: result?.Status ?? true,
         isBlacklisted: result?.isBlacklisted ?? false,
         blacklistMatches: result?.blacklistMatches ?? [],
@@ -18,10 +18,11 @@ export const AddVendorController = {
         MethodOnDb: 'Check Blacklist',
         Message: result?.Message || 'Success',
       } as ResponseI)
+      return
     } catch (error: any) {
       // console.error('Check Blacklist Error:', error)
 
-      return res.status(200).json({
+      res.status(200).json({
         Status: false,
         isBlacklisted: false,
         blacklistMatches: [],
@@ -30,6 +31,7 @@ export const AddVendorController = {
         MethodOnDb: 'Check Blacklist',
         Message: error?.message || 'Failed to check blacklist',
       } as ResponseI)
+      return
     }
   },
 
@@ -45,7 +47,7 @@ export const AddVendorController = {
 
     try {
       const result = (await AddVendorModel.checkDuplicateVendor(dataItem)) as any
-      return res.status(200).json({
+      res.status(200).json({
         Status: result?.Status ?? true,
         isDuplicate: result?.isDuplicate ?? false,
         existingVendorId: result?.existingVendorId ?? null,
@@ -56,9 +58,10 @@ export const AddVendorController = {
         MethodOnDb: 'Check Duplicate Vendor',
         Message: result?.Message || 'Success',
       } as ResponseI)
+      return
     } catch (error: any) {
       // console.error('Check Duplicate Vendor Error:', error)
-      return res.status(200).json({
+      res.status(200).json({
         Status: false,
         isDuplicate: false,
         existingVendorId: null,
@@ -69,6 +72,7 @@ export const AddVendorController = {
         MethodOnDb: 'Check Duplicate Vendor',
         Message: error?.message || 'Failed to check duplicate',
       } as ResponseI)
+      return
     }
   },
 
@@ -92,16 +96,18 @@ export const AddVendorController = {
       }
 
       const result = await AddVendorModel.createVendor(dataItem)
-      return res.status(200).json(result as ResponseI)
+      res.status(200).json(result as ResponseI)
+      return
     } catch (error: any) {
       // console.error('Create Vendor Error:', error)
-      return res.status(200).json({
+      res.status(200).json({
         Status: false,
         Message: error?.message || 'Failed to create vendor',
         ResultOnDb: [],
         MethodOnDb: 'Create Vendor',
         TotalCountOnDb: 0,
       } as ResponseI)
+      return
     }
   },
 
@@ -110,22 +116,24 @@ export const AddVendorController = {
     try {
       const result = await AddVendorModel.getVendorTypes()
 
-      return res.status(200).json({
+      res.status(200).json({
         Status: true,
         ResultOnDb: result,
         TotalCountOnDb: result.length,
         MethodOnDb: 'Get Vendor Types',
         Message: 'Search Data Success',
       } as ResponseI)
+      return
     } catch (error: any) {
       // console.error('Get Vendor Types Error:', error)
-      return res.status(200).json({
+      res.status(200).json({
         Status: false,
         ResultOnDb: [],
         TotalCountOnDb: 0,
         MethodOnDb: 'Get Vendor Types',
         Message: error?.message || 'Failed to get vendor types',
       } as ResponseI)
+      return
     }
   },
 

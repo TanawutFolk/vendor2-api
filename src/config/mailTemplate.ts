@@ -57,7 +57,9 @@ const isEmployeeCodeLike = (value: unknown) => /^[A-Z]\d{3,}$/i.test(String(valu
 const isEmailLike = (value: unknown) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || '').trim())
 
 const isRoleFallbackName = (value: unknown) => {
-  const normalized = String(value || '').trim().toLowerCase()
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
   return ['pic', 'po pic', 'po checker', 'account pic', 'approver', 'requester'].includes(normalized)
 }
 
@@ -166,20 +168,12 @@ const renderCompanyFooter = () => `
   </table>
 `
 
-const renderMailLayout = ({
-  recipient,
-  content,
-  signerName,
-  signerTel,
-  signerRole = 'PO & SCM PIC',
-}: MailLayoutOptions) => `
+const renderMailLayout = ({ recipient, content, signerName, signerTel, signerRole = 'PO & SCM PIC' }: MailLayoutOptions) => `
   <!doctype html>
   <html>
-    <body style="margin: 0; padding: 0; background-color: #ffffff;
-      background-image: linear-gradient(to bottom, #F02016 0%, #F02016 40%, #ffffff 40%, #ffffff 100%); background-repeat: no-repeat;">
+    <body style="margin: 0; padding: 0; background-color: #ffffff;">
       <table role="presentation" width="100%" height="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff"
-        style="width: 100%; min-height: 100%; border-collapse: collapse; background-color: #ffffff;
-        background-image: linear-gradient(to bottom, #F02016 0%, #F02016 40%, #ffffff 40%, #ffffff 100%); background-repeat: no-repeat;">
+        style="width: 100%; min-height: 100%; border-collapse: collapse; background-color: #ffffff;">
         <tr>
           <td align="center" valign="top" style="padding: 28px 12px 40px 12px; background-color: transparent;">
             <table role="presentation" width="820" cellspacing="0" cellpadding="0" border="0"
@@ -369,8 +363,7 @@ export const email_ToGprCApprover_FirstStep = (data: MailTemplateData) =>
     signerRole: 'Requester',
   })
 
-export const email_ToGprCApprover_NextStep = (data: MailTemplateData) =>
-  email_ToGprCApprover_FirstStep({ ...data, userName: data.picNextStepName })
+export const email_ToGprCApprover_NextStep = (data: MailTemplateData) => email_ToGprCApprover_FirstStep({ ...data, userName: data.picNextStepName })
 
 export const email_ToPic_RejectedByApprover = (data: MailTemplateData) =>
   renderStandardWorkflowMail(data, {
@@ -390,6 +383,17 @@ export const email_ToChecker_CheckRequired = (data: MailTemplateData) =>
     message: `Please check vendor request <strong>"${text(data.requestNumber)}"</strong>.`,
     thaiStatus: 'อยู่ระหว่างการตรวจสอบการลงทะเบียนผู้ขาย',
     thaiMessage: `กรุณาตรวจสอบคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong>`,
+  })
+
+export const email_ToChecker_ReturnedByPoMgr = (data: MailTemplateData) =>
+  renderStandardWorkflowMail(data, {
+    recipient: data.recipientName || 'PO CHECKER',
+    status: 'Returned by PO Mgr for document recheck',
+    message: `PO Mgr returned vendor request <strong>"${text(data.requestNumber)}"</strong> to PO &amp; SCM Check All Document.`,
+    detail: `Return remark: ${text(data.remarkEN)}`,
+    thaiStatus: 'PO Mgr ส่งกลับให้ตรวจสอบเอกสารอีกครั้ง',
+    thaiMessage: `PO Mgr ส่งคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong> กลับมายังขั้นตอน PO &amp; SCM Check All Document`,
+    thaiDetail: `หมายเหตุการส่งกลับ: ${text(data.remarkTH || data.remarkEN)}`,
   })
 
 export const email_ToPic_RejectedByChecker = (data: MailTemplateData) =>
@@ -412,14 +416,11 @@ export const email_ToPoManager_ApproveRequired = (data: MailTemplateData) =>
     thaiMessage: `กรุณาอนุมัติคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong>`,
   })
 
-export const email_ToPoGm_ApproveRequired = (data: MailTemplateData) =>
-  email_ToPoManager_ApproveRequired({ ...data, recipientName: data.recipientName || 'PO GM' })
+export const email_ToPoGm_ApproveRequired = (data: MailTemplateData) => email_ToPoManager_ApproveRequired({ ...data, recipientName: data.recipientName || 'PO GM' })
 
-export const email_ToMd_ApproveRequired = (data: MailTemplateData) =>
-  email_ToPoManager_ApproveRequired({ ...data, recipientName: data.recipientName || 'MD' })
+export const email_ToMd_ApproveRequired = (data: MailTemplateData) => email_ToPoManager_ApproveRequired({ ...data, recipientName: data.recipientName || 'MD' })
 
-export const email_ToAccount_RegisterRequired = (data: MailTemplateData) =>
-  email_ToPoManager_ApproveRequired({ ...data, recipientName: data.recipientName || 'Account PIC' })
+export const email_ToAccount_RegisterRequired = (data: MailTemplateData) => email_ToPoManager_ApproveRequired({ ...data, recipientName: data.recipientName || 'Account PIC' })
 
 export const email_ToRequester_RegistrationCompleted = (data: MailTemplateData) =>
   renderStandardWorkflowMail(data, {

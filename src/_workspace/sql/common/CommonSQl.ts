@@ -1,5 +1,5 @@
 export const CommonSQL = {
-  GetByLikeMonthShortNameEnglish: async (dataItem: any) => {
+  getByLikeMonthShortNameEnglish: async (dataItem: any) => {
     let sql = `  SELECT
                         MONTH_ID
                       , MONTH_FULL_NAME_THAI
@@ -15,8 +15,7 @@ export const CommonSQL = {
 
     return sql
   },
-  GetYearNow: async () => {
-    let sql = ' SELECT YEAR(NOW()) as YEAR_NOW '
-    return sql
+  getYearNow: async () => {
+    return ' SELECT YEAR(NOW()) as YEAR_NOW '
   },
 }

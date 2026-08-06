@@ -36,6 +36,16 @@ const sanitizeForFileName = (text: string): string =>
     .replace(/_+/g, '_')            // collapse multiple underscores
     .replace(/^_|_$/g, '')          // trim leading/trailing underscores
 
+export const buildCriteriaReceivingFileName = (criteriaNo: string, originalName: string): string => {
+  const originalBaseName = path.basename(String(originalName || '').trim())
+  const parsedName = path.parse(originalBaseName)
+  const safeCriteriaNo = sanitizeForFileName(String(criteriaNo || '').trim()) || 'CRITERIA'
+  const safeFileBase = sanitizeForFileName(parsedName.name) || 'file'
+  const safeExtension = parsedName.ext.replace(/[^.a-zA-Z0-9]/g, '')
+
+  return `${safeCriteriaNo} ${safeFileBase}${safeExtension}`
+}
+
 const ensureFileExists = (filePath: string, context: string) => {
   if (!fs.existsSync(filePath)) {
     throw new Error(`${context} file not found: ${filePath}`)
@@ -327,7 +337,9 @@ export const SelectionFileService = {
   },
 
   /**
-   * Save a file directly to 01.Receiving using only the uploaded file name.
+   * Save a file directly to 01.Receiving with its criterion number as a prefix.
+   * Example: criterion 4.1 + "Supplier Policy.pdf" => "4.1 Supplier_Policy.pdf".
+   * Every attachment uses the same criterion prefix; FILE_ORDER is not included in the name.
    *
    * @param requestNumber  - e.g. "RQ-2026-001"
    * @param sourceFilePath - absolute path to the temp file (from multer)
@@ -353,8 +365,8 @@ export const SelectionFileService = {
     fs.mkdirSync(receivingPath, { recursive: true })
     logFolder('Ensured receiving folder', receivingPath)
 
-    const sanitizedOriginalName = sanitizeForFileName(originalName) || path.basename(sourceFilePath)
-    const destPath = path.join(receivingPath, sanitizedOriginalName)
+    const criteriaFileName = buildCriteriaReceivingFileName(criteriaNo, originalName || path.basename(sourceFilePath))
+    const destPath = path.join(receivingPath, criteriaFileName)
 
     ensureFileExists(sourceFilePath, 'Receiving source')
     const finalDestPath = moveFile(sourceFilePath, destPath)

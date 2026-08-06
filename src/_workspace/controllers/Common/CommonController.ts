@@ -5,7 +5,7 @@ import fs from 'fs'
 import path from 'path'
 
 export const CommonController = {
-  GetByLikeMonthShortNameEnglish: async (req: Request, res: Response) => {
+  getByLikeMonthShortNameEnglish: async (req: Request, res: Response) => {
     let dataItem
 
     if (!req.body || Object.entries(req.body).length === 0) {
@@ -14,7 +14,7 @@ export const CommonController = {
       dataItem = req.body
     }
 
-    const result = await CommonModel.GetByLikeMonthShortNameEnglish(dataItem)
+    const result = await CommonModel.getByLikeMonthShortNameEnglish(dataItem)
 
     res.json({
       Status: true,
@@ -37,10 +37,11 @@ export const CommonController = {
       const picPath = dataItem['URL_PATH']
       fs.readFile(path.resolve(picPath), (error, data) => {
         if (error)
-          return res.send({
+          res.send({
             Message: error,
             Status: false,
           })
+          return
         res.writeHead(200, { 'Content-Type': 'image/jpg' })
         res.end(data, 'utf8')
       })
@@ -85,21 +86,23 @@ export const CommonController = {
         path.join(`/mnt/C20_Smart_Factory/WG04_Smart-FFT/08_Master Data System/02_Requirement/Picture-for-item-code/Item-master-picture/${itemCode}`),
         (error, files) => {
           if (error) {
-            return res.status(404).json({
+            res.status(404).json({
               Status: false,
               Message: 'No such image folder or item code not found',
               data: [{ Status: false }],
             })
+            return
           }
 
           const filteredFiles = files.filter((file) => file.toLowerCase().endsWith('.jpg'))
 
           if (filteredFiles.length === 0) {
-            return res.status(200).json({
+            res.status(200).json({
               Status: false,
               Message: 'No JPG images found',
               data: [{ Status: false }],
             })
+            return
           }
 
           const result = filteredFiles.map((fileName) => {
@@ -131,8 +134,8 @@ export const CommonController = {
     }
   },
 
-  GetYearNow: async (req: Request, res: Response) => {
-    let result = await CommonModel.GetYearNow()
+  getYearNow: async (_req: Request, res: Response) => {
+    const result = await CommonModel.getYearNow()
     res.send({
       Status: true,
       Message: 'Search Data Success',

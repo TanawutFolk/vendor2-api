@@ -1,5 +1,6 @@
 ﻿import { MySQLExecute } from '@businessData/dbExecute'
 import { TaskManagerSQL } from '../../sql/_task-manager/TaskManagerSQL'
+import { TaskManagerRequestSQL } from '../../sql/_task-manager/TaskManagerRequestSQL'
 import { RowDataPacket } from 'mysql2'
 import getSqlWhere_aggrid from '@src/helpers/getSqlWhere_aggrid'
 
@@ -18,11 +19,19 @@ export const TaskManagerRequestService = {
     const pagination = TaskManagerRequestService.normalizeTaskManagerPagination(dataItem.LIMIT, dataItem.OFFSET ?? dataItem.START)
 
     const tableIds = [
-      { table: 't', id: 'REQUEST_STATUS', Fns: '=' },
+      { table: 't', id: 'CURRENT_M_REQUEST_STATUS_ID', Fns: '=' },
       { table: 't', id: 'CURRENT_OWNER_EMPCODE', Fns: '=' },
       { table: 't', id: 'COMPANY_NAME', Fns: 'LIKE' },
     ]
     const payload = { ...dataItem }
+    for (const filter of Array.isArray(payload.SEARCHFILTERS) ? payload.SEARCHFILTERS : []) {
+      if (String(filter?.id || '').toUpperCase() !== 'CURRENT_M_REQUEST_STATUS_ID') continue
+      const statusId = Number(filter?.value)
+      if (!Number.isInteger(statusId) || statusId <= 0) {
+        throw new Error('Task Manager status filter must use CURRENT_M_REQUEST_STATUS_ID')
+      }
+      filter.value = statusId
+    }
     getSqlWhere_aggrid(payload, tableIds, 't.REQUEST_REGISTER_VENDOR_ID')
 
     return {
@@ -42,9 +51,8 @@ export const TaskManagerRequestService = {
     }
   },
 
-  gprCTaskManagerQueue: async () => {
-    const { GprCApprovalSQL } = await import('../../sql/_approval-GPRC/GprCApprovalSQL')
-    const sql = GprCApprovalSQL.getTaskManagerQueue()
+  getGprCTaskManagerQueue: async () => {
+    const sql = TaskManagerRequestSQL.getTaskManagerQueue()
     const rows = (await MySQLExecute.search(sql)) as RowDataPacket[]
 
     return {

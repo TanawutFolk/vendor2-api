@@ -24,7 +24,12 @@ export const RequestHistoryService = {
     return RequestRegisterGprService.resolveEmployeeProfile(dataItem)
   },
 
-  getGprForm: async (dataItem: any) => {
-    return RequestRegisterGprService.getGprForm(dataItem)
+  getGprCProducts: async (dataItem: any) => {
+    const sql = await RequestHistorySQL.getGprCProducts(dataItem)
+    return (await MySQLExecute.search(sql)) as RowDataPacket[]
+  },
+
+  getSelectionForm: async (dataItem: any) => {
+    return RequestRegisterGprService.getSelectionForm(dataItem)
   },
 }

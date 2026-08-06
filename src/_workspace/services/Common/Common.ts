@@ -3,13 +3,13 @@ import { CommonSQL } from '@src/_workspace/sql/common/CommonSQl'
 import { RowDataPacket } from 'mysql2'
 
 export const CommonService = {
-  GetByLikeMonthShortNameEnglish: async (dataItem: any) => {
-    const sql = await CommonSQL.GetByLikeMonthShortNameEnglish(dataItem)
+  getByLikeMonthShortNameEnglish: async (dataItem: any) => {
+    const sql = await CommonSQL.getByLikeMonthShortNameEnglish(dataItem)
     const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
     return resultData
   },
-  GetYearNow: async () => {
-    const sql = await CommonSQL.GetYearNow()
+  getYearNow: async () => {
+    const sql = await CommonSQL.getYearNow()
     const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
     return resultData
   },

@@ -7,6 +7,10 @@ requestHistoryRoutes.post('/getById', RequestHistoryController.getById)
 requestHistoryRoutes.post('/getApprovalSteps', RequestHistoryController.getApprovalSteps)
 requestHistoryRoutes.post('/getApprovalLogs', RequestHistoryController.getApprovalLogs)
 requestHistoryRoutes.post('/resolveEmployeeProfile', RequestHistoryController.resolveEmployeeProfile)
-requestHistoryRoutes.post('/getSelectionSheet', RequestHistoryController.getGprForm)
+requestHistoryRoutes.post('/getGprCProducts', RequestHistoryController.getGprCProducts)
+requestHistoryRoutes.post('/getSelectionForm', RequestHistoryController.getSelectionForm)
+
+// Compatibility alias used by the current frontend.
+requestHistoryRoutes.post('/getSelectionSheet', RequestHistoryController.getSelectionForm)
 
 export default requestHistoryRoutes

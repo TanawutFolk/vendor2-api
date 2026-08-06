@@ -288,6 +288,40 @@ export const MySQLExecute = {
     }
   },
 
+  executeGuardedList: async (guardSql: string, sqlList: string[], configDb: string = '') => {
+    let conn: any = null
+    const listResult: any[] = []
+    try {
+      conn = await connection(configDb)
+      await conn.beginTransaction()
+
+      const [guardResult] = await conn.query(guardSql)
+      const affectedRows = Number(guardResult?.affectedRows || 0)
+      if (affectedRows !== 1) {
+        throw new Error('Workflow state changed. Please refresh the request and try again.')
+      }
+      listResult.push(guardResult)
+
+      for (const sql of sqlList) {
+        try {
+          const [result] = await conn.query(sql)
+          listResult.push(result)
+        } catch (innerError) {
+          console.error('Error in Query:', sql)
+          throw innerError
+        }
+      }
+
+      await conn.commit()
+      return listResult
+    } catch (error) {
+      if (conn) await conn.rollback()
+      throw error
+    } finally {
+      if (conn) conn.release()
+    }
+  },
+
   // Stored Procedure
   callProcedure: async (query: string, args: any[] = [], configDb: string = '') => {
     let conn: any = null

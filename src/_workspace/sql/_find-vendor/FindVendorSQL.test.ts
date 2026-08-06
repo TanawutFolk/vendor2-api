@@ -1,32 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import { FindVendorSQL } from './FindVendorSQL'
+import { VendorSearchSqlSnippets } from '../common/VendorSearchSqlSnippets'
 
-describe('FindVendorSQL audit preservation', () => {
-  test('soft-resets PRONES staging and match results', () => {
-    const stagingSql = FindVendorSQL.truncateStagingPrones()
-    const matchSql = FindVendorSQL.truncateMatchResult()
-
-    for (const sql of [stagingSql, matchSql]) {
-      expect(sql).toContain('INUSE = 0')
-      expect(sql).not.toContain('TRUNCATE TABLE')
-      expect(sql).not.toContain('DELETE FROM')
-    }
-  })
-
-  test('reactivates existing vendor match results through upsert', () => {
-    const sql = FindVendorSQL.insertMatchResultBatch([{
-      VENDORS_ID: 1,
-      STATUS_CHECK: 'matched',
-      PRONES_CODE: 'P001',
-      PRONES_NAME: 'Vendor',
-      MATCH_METHOD: 'code',
-    }])
-
-    expect(sql).toContain('ON DUPLICATE KEY UPDATE')
-    expect(sql).toContain('INUSE = 1')
-    expect(sql).toContain('DESCRIPTION')
-  })
-
+describe('FindVendorSQL', () => {
   test('loads province dropdown from info_province master data', () => {
     const sql = FindVendorSQL.getProvinces()
 
@@ -72,12 +48,53 @@ describe('FindVendorSQL audit preservation', () => {
     expect(dataSql).not.toContain('JSON_ARRAYAGG')
   })
 
+  test('resolves grid status from vendor master and active requests without staging joins', () => {
+    const [countSql, dataSql] = FindVendorSQL.search({
+      LIMIT: 20,
+      OFFSET: 0,
+      ORDER: 'VENDOR_STATUS_LABEL ASC',
+      SQLWHERECOLUMNFILTER: '',
+    }, '')
+
+    for (const sql of [countSql, dataSql]) {
+      expect(sql).toContain('m_vendor_status mvs')
+    }
+    expect(dataSql).toContain('AS VENDOR_STATUS_CODE')
+    expect(dataSql).toContain('AS VENDOR_STATUS_LABEL')
+    expect(dataSql).toContain('request_register_vendor active_vendor_request')
+    expect(countSql).not.toContain('vendor_match_result')
+    expect(dataSql).not.toContain('vendor_match_result')
+    expect(dataSql).not.toContain('PRONES_CODE')
+  })
+
+  test('filters vendor status by the selected master ID', () => {
+    const sql = VendorSearchSqlSnippets.statusIdFilter({
+      VENDOR_ALIAS: 'v',
+      M_VENDOR_STATUS_ID: 37,
+    })
+
+    expect(sql).toContain('= 37')
+    expect(sql).toContain('m_vendor_status')
+    expect(sql).not.toContain('dataItem.')
+  })
+
+  test('keeps the direct Prones raw-test query', () => {
+    const sql = FindVendorSQL.getPronesRawTest()
+
+    expect(sql).toContain('FFT.T_TRADE_MS')
+    expect(sql).not.toContain('staging_prones_data')
+    expect(sql).not.toContain('vendor_match_result')
+  })
+
   test('loads contact and product arrays only in vendor detail query', () => {
-    const sql = FindVendorSQL.getVendorDetails({ VENDORS_ID: 1 })
+    const sql = FindVendorSQL.getVendorDetail({ VENDORS_ID: 1 })
 
     expect(sql).toContain('v.VENDORS_ID = 1')
     expect(sql).toContain('CONTACTS_JSON')
     expect(sql).toContain('PRODUCTS_JSON')
     expect(sql).toContain('JSON_ARRAYAGG')
+    expect(sql).toContain("DATE_FORMAT(v.UPDATE_DATE, '%d-%b-%Y %H:%i:%s') AS UPDATE_DATE")
+    expect(sql).toContain("DATE_FORMAT(sub_vc.UPDATE_DATE, '%d-%b-%Y %H:%i:%s')")
+    expect(sql).toContain("DATE_FORMAT(sub_vp.UPDATE_DATE, '%d-%b-%Y %H:%i:%s')")
   })
 })

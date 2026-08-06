@@ -1,38 +1,29 @@
-import { RequestApprovalSummarySqlSnippets } from '../_request-register/RequestApprovalSummarySqlSnippets'
-
+import { RequestApprovalSummarySqlSnippets } from '../common/RequestApprovalSummarySqlSnippets'
+import { REQUEST_STATE_ID_SQL } from '../_status-master/StatusMasterSQL'
+import { VendorStatusSqlSnippets } from '../_status-master/StatusMasterSQL'
 
 export const FindVendorSQL = {
   // Search vendors with contacts
   search: (dataItem: any, sqlWhere: any = '') => {
-    const statusCheckExpression = `
-            CASE
-                WHEN v.FFT_STATUS = 2 THEN 'Cannot Register'
-                WHEN EXISTS (
-                    SELECT 1
-                    FROM request_register_vendor rrv_ip
-                    WHERE rrv_ip.VENDORS_ID = v.VENDORS_ID
-                      AND rrv_ip.INUSE = 1
-                      AND rrv_ip.REQUEST_STATE = 'in_progress'
-                ) THEN 'In Progress'
-                ELSE IFNULL(vmr.STATUS_CHECK, 'Not Registered')
-            END
-        `
+    const vendorStatusIdExpression = VendorStatusSqlSnippets.effectiveStatusIdExpr('v')
+    const vendorStatusCodeExpression = VendorStatusSqlSnippets.statusCodeExpr('v', 'mvs')
+    const vendorStatusLabelExpression = VendorStatusSqlSnippets.statusLabelExpr('v', 'mvs')
     // Count query
     let sqlCount = `
                             SELECT
                                        COUNT(DISTINCT v.VENDORS_ID) AS TOTAL_COUNT
-                            FROM
-                                       vendors v
-                                            LEFT JOIN
-                                       info_business_category vt ON v.BUSINESS_CATEGORY_ID = vt.BUSINESS_CATEGORY_ID
+                             FROM
+                                        vendors v
+                                             LEFT JOIN
+                                        m_vendor_status mvs ON mvs.M_VENDOR_STATUS_ID = v.FFT_STATUS AND mvs.INUSE = 1
+                                             LEFT JOIN
+                                        info_business_category vt ON v.BUSINESS_CATEGORY_ID = vt.BUSINESS_CATEGORY_ID
                                             LEFT JOIN
                                        vendor_contacts vc ON v.VENDORS_ID = vc.VENDORS_ID AND vc.INUSE = 1
                                             LEFT JOIN
                                        vendor_products vp ON v.VENDORS_ID = vp.VENDORS_ID AND vp.INUSE = 1
                                             LEFT JOIN
                                        master_product_groups mpg ON vp.MASTER_PRODUCT_GROUPS_ID = mpg.MASTER_PRODUCT_GROUPS_ID
-                                            LEFT JOIN
-                                       vendor_match_result vmr ON v.VENDORS_ID = vmr.VENDORS_ID
                             WHERE
                                        1 = 1
                                        dataItem.SQLWHERE
@@ -72,31 +63,30 @@ export const FindVendorSQL = {
                                      , v.UPDATE_DATE
                                      , v.INUSE
 
-                                     -- Prones Matching Data
-                                     , dataItem.STATUSCHECKEXPRESSION AS STATUS_CHECK
-                                     , IFNULL(vmr.PRONES_CODE, v.FFT_VENDOR_CODE) AS PRONES_CODE
-                                     , vmr.PRONES_NAME AS PRONES_NAME_EN
-                                     , vmr.MATCH_METHOD
+                                     -- Vendor Status (source of truth: vendors + active request)
+                                     , dataItem.VENDOR_STATUS_ID_SQL AS M_VENDOR_STATUS_ID
+                                     , dataItem.VENDOR_STATUS_CODE_SQL AS VENDOR_STATUS_CODE
+                                     , dataItem.VENDOR_STATUS_LABEL_SQL AS VENDOR_STATUS_LABEL
 
                                      -- Reject Reason
                                      , (
-                                          SELECT (${RequestApprovalSummarySqlSnippets.latestRejectReasonExpr('rrv.REQUEST_REGISTER_VENDOR_ID')})
+                                          SELECT (dataItem.LATEST_REJECT_REASON_SQL)
                                           FROM request_register_vendor rrv
-                                          WHERE rrv.VENDORS_ID = v.VENDORS_ID AND rrv.REQUEST_STATE = 'rejected'
+                                          WHERE rrv.VENDORS_ID = v.VENDORS_ID AND rrv.M_REQUEST_STATE_ID = dataItem.REQUEST_REJECTED_STATE_ID
                                           ORDER BY rrv.REQUEST_REGISTER_VENDOR_ID DESC LIMIT 1
                                      ) AS REJECT_REASON
-                            FROM
-                                       vendors v
-                                            LEFT JOIN
-                                       info_business_category vt ON v.BUSINESS_CATEGORY_ID = vt.BUSINESS_CATEGORY_ID
+                             FROM
+                                        vendors v
+                                             LEFT JOIN
+                                        m_vendor_status mvs ON mvs.M_VENDOR_STATUS_ID = v.FFT_STATUS AND mvs.INUSE = 1
+                                             LEFT JOIN
+                                        info_business_category vt ON v.BUSINESS_CATEGORY_ID = vt.BUSINESS_CATEGORY_ID
                                             LEFT JOIN
                                        vendor_contacts vc ON v.VENDORS_ID = vc.VENDORS_ID AND vc.INUSE = 1
                                             LEFT JOIN
                                        vendor_products vp ON v.VENDORS_ID = vp.VENDORS_ID AND vp.INUSE = 1
                                             LEFT JOIN
                                        master_product_groups mpg ON vp.MASTER_PRODUCT_GROUPS_ID = mpg.MASTER_PRODUCT_GROUPS_ID
-                                            LEFT JOIN
-                                       vendor_match_result vmr ON v.VENDORS_ID = vmr.VENDORS_ID
                             WHERE
                                        1 = 1
                                        dataItem.SQLWHERE
@@ -108,13 +98,16 @@ export const FindVendorSQL = {
                             LIMIT
                                        dataItem.LIMIT OFFSET dataItem.OFFSET
         `
+    sqlData = sqlData.replaceAll('dataItem.VENDOR_STATUS_ID_SQL', String(vendorStatusIdExpression))
+    sqlData = sqlData.replaceAll('dataItem.VENDOR_STATUS_CODE_SQL', String(vendorStatusCodeExpression))
+    sqlData = sqlData.replaceAll('dataItem.VENDOR_STATUS_LABEL_SQL', String(vendorStatusLabelExpression))
+    sqlData = sqlData.replaceAll('dataItem.LATEST_REJECT_REASON_SQL', String(RequestApprovalSummarySqlSnippets.latestRejectReasonExpr('rrv.REQUEST_REGISTER_VENDOR_ID')))
+    sqlData = sqlData.replaceAll('dataItem.REQUEST_REJECTED_STATE_ID', String(REQUEST_STATE_ID_SQL.REJECTED))
 
     // Replace placeholders
-    sqlCount = sqlCount.replaceAll('dataItem.STATUSCHECKEXPRESSION', statusCheckExpression)
     sqlCount = sqlCount.replaceAll('dataItem.SQLWHERECOLUMNFILTER', dataItem['SQLWHERECOLUMNFILTER'] || '')
     sqlCount = sqlCount.replaceAll('dataItem.SQLWHERE', sqlWhere)
 
-    sqlData = sqlData.replaceAll('dataItem.STATUSCHECKEXPRESSION', statusCheckExpression)
     sqlData = sqlData.replaceAll('dataItem.SQLWHERECOLUMNFILTER', dataItem['SQLWHERECOLUMNFILTER'] || '')
     sqlData = sqlData.replaceAll('dataItem.SQLWHERE', sqlWhere)
     sqlData = sqlData.replaceAll('dataItem.ORDER', dataItem['ORDER'] || 'v.VENDORS_ID DESC')
@@ -124,21 +117,11 @@ export const FindVendorSQL = {
     return [sqlCount, sqlData]
   },
 
-  // Get full vendor details for Find Vendor/Re-register modals
-  getVendorDetails: (dataItem: any) => {
-    const statusCheckExpression = `
-            CASE
-                WHEN v.FFT_STATUS = 2 THEN 'Cannot Register'
-                WHEN EXISTS (
-                    SELECT 1
-                    FROM request_register_vendor rrv_ip
-                    WHERE rrv_ip.VENDORS_ID = v.VENDORS_ID
-                      AND rrv_ip.INUSE = 1
-                      AND rrv_ip.REQUEST_STATE = 'in_progress'
-                ) THEN 'In Progress'
-                ELSE IFNULL(vmr.STATUS_CHECK, 'Not Registered')
-            END
-        `
+  // Shared query implementation behind each page-owned vendor detail endpoint.
+  getVendorDetail: (dataItem: any) => {
+    const vendorStatusIdExpression = VendorStatusSqlSnippets.effectiveStatusIdExpr('v')
+    const vendorStatusCodeExpression = VendorStatusSqlSnippets.statusCodeExpr('v', 'mvs')
+    const vendorStatusLabelExpression = VendorStatusSqlSnippets.statusLabelExpr('v', 'mvs')
     let sql = `
                             SELECT
                                        v.VENDORS_ID
@@ -157,15 +140,22 @@ export const FindVendorSQL = {
                                      , v.EMAILMAIN
                                      , v.CREATE_BY
                                      , v.UPDATE_BY
-                                     , v.CREATE_DATE
-                                     , v.UPDATE_DATE
+                                     , DATE_FORMAT(v.CREATE_DATE, '%d-%b-%Y %H:%i:%s') AS CREATE_DATE
+                                     , DATE_FORMAT(v.UPDATE_DATE, '%d-%b-%Y %H:%i:%s') AS UPDATE_DATE
                                      , v.INUSE
 
-                                     -- Prones Matching Data
-                                     , dataItem.STATUSCHECKEXPRESSION AS STATUS_CHECK
-                                     , IFNULL(vmr.PRONES_CODE, v.FFT_VENDOR_CODE) AS PRONES_CODE
-                                     , vmr.PRONES_NAME AS PRONES_NAME_EN
-                                     , vmr.MATCH_METHOD
+                                     -- Vendor Status (source of truth: vendors + active request)
+                                     , dataItem.VENDOR_STATUS_ID_SQL AS M_VENDOR_STATUS_ID
+                                     , dataItem.VENDOR_STATUS_CODE_SQL AS VENDOR_STATUS_CODE
+                                     , dataItem.VENDOR_STATUS_LABEL_SQL AS VENDOR_STATUS_LABEL
+
+                                     -- Latest rejection reason used by the detail modal
+                                     , (
+                                          SELECT (dataItem.LATEST_REJECT_REASON_SQL)
+                                          FROM request_register_vendor rrv
+                                          WHERE rrv.VENDORS_ID = v.VENDORS_ID AND rrv.M_REQUEST_STATE_ID = dataItem.REQUEST_REJECTED_STATE_ID
+                                          ORDER BY rrv.REQUEST_REGISTER_VENDOR_ID DESC LIMIT 1
+                                     ) AS REJECT_REASON
                                      
                                      -- Contacts JSON (aggregated)
                                      , (
@@ -179,8 +169,8 @@ export const FindVendorSQL = {
                                                                     'POSITION', sub_vc.POSITION,
                                                                     'CONTACT_CREATE_BY', sub_vc.CREATE_BY,
                                                                     'CONTACT_UPDATE_BY', sub_vc.UPDATE_BY,
-                                                                    'CONTACT_CREATE_DATE', DATE_FORMAT(sub_vc.CREATE_DATE, '%Y-%m-%d %H:%i:%s'),
-                                                                    'CONTACT_UPDATE_DATE', DATE_FORMAT(sub_vc.UPDATE_DATE, '%Y-%m-%d %H:%i:%s')
+                                                                    'CONTACT_CREATE_DATE', DATE_FORMAT(sub_vc.CREATE_DATE, '%d-%b-%Y %H:%i:%s'),
+                                                                    'CONTACT_UPDATE_DATE', DATE_FORMAT(sub_vc.UPDATE_DATE, '%d-%b-%Y %H:%i:%s')
                                                                 )
                                                            )
                                                 FROM
@@ -201,9 +191,9 @@ export const FindVendorSQL = {
                                                                     'PRODUCT_NAME', sub_vp.PRODUCT_NAME,
                                                                     'MODEL_LIST', sub_vp.MODEL_LIST,
                                                                     'PRODUCT_CREATE_BY', sub_vp.CREATE_BY,
-                                                                    'PRODUCT_CREATE_DATE', DATE_FORMAT(sub_vp.CREATE_DATE, '%Y-%m-%d %H:%i:%s'),
+                                                                    'PRODUCT_CREATE_DATE', DATE_FORMAT(sub_vp.CREATE_DATE, '%d-%b-%Y %H:%i:%s'),
                                                                     'PRODUCT_UPDATE_BY', sub_vp.UPDATE_BY,
-                                                                    'PRODUCT_UPDATE_DATE', DATE_FORMAT(sub_vp.UPDATE_DATE, '%Y-%m-%d %H:%i:%s')
+                                                                    'PRODUCT_UPDATE_DATE', DATE_FORMAT(sub_vp.UPDATE_DATE, '%d-%b-%Y %H:%i:%s')
                                                                 )
                                                            )
                                                 FROM
@@ -213,22 +203,23 @@ export const FindVendorSQL = {
                                                 WHERE
                                                            sub_vp.VENDORS_ID = v.VENDORS_ID AND sub_vp.INUSE = 1
                                         ) AS PRODUCTS_JSON
-                            FROM
-                                       vendors v
-                                            LEFT JOIN
-                                       info_business_category vt ON v.BUSINESS_CATEGORY_ID = vt.BUSINESS_CATEGORY_ID
-                                            LEFT JOIN
-                                       vendor_match_result vmr ON v.VENDORS_ID = vmr.VENDORS_ID
+                             FROM
+                                        vendors v
+                                             LEFT JOIN
+                                        m_vendor_status mvs ON mvs.M_VENDOR_STATUS_ID = v.FFT_STATUS AND mvs.INUSE = 1
+                                             LEFT JOIN
+                                        info_business_category vt ON v.BUSINESS_CATEGORY_ID = vt.BUSINESS_CATEGORY_ID
                             WHERE
                                        v.VENDORS_ID = dataItem.VENDORS_ID
         `
-    sql = sql.replaceAll('dataItem.STATUSCHECKEXPRESSION', statusCheckExpression)
+    sql = sql.replaceAll('dataItem.VENDOR_STATUS_ID_SQL', String(vendorStatusIdExpression))
+    sql = sql.replaceAll('dataItem.VENDOR_STATUS_CODE_SQL', String(vendorStatusCodeExpression))
+    sql = sql.replaceAll('dataItem.VENDOR_STATUS_LABEL_SQL', String(vendorStatusLabelExpression))
+    sql = sql.replaceAll('dataItem.LATEST_REJECT_REASON_SQL', String(RequestApprovalSummarySqlSnippets.latestRejectReasonExpr('rrv.REQUEST_REGISTER_VENDOR_ID')))
+    sql = sql.replaceAll('dataItem.REQUEST_REJECTED_STATE_ID', String(REQUEST_STATE_ID_SQL.REJECTED))
     sql = sql.replaceAll('dataItem.VENDORS_ID', (dataItem['VENDORS_ID'] || 0).toString())
     return sql
   },
-
-  // Legacy alias kept for older callers while new page code uses getVendorDetails.
-  getById: (dataItem: any) => FindVendorSQL.getVendorDetails(dataItem),
 
   // Helper to escape single quotes for SQL
   toNullableNumberSql: (value: any) => {
@@ -238,7 +229,9 @@ export const FindVendorSQL = {
 
   toNullableStringSql: (value: any) => {
     if (value === null || value === undefined || String(value).trim() === '') return 'NULL'
-    return `'${String(value).replaceAll("'", "''")}'`
+    let sql = '\'dataItem.ESCAPED_VALUE\''
+    sql = sql.replaceAll('dataItem.ESCAPED_VALUE', String(String(value).replaceAll("'", "''")))
+    return sql
   },
 
   // Update vendor
@@ -452,7 +445,7 @@ export const FindVendorSQL = {
 
   // Get vendor types for dropdown (source of truth: info_business_category,
   // which replaced the deprecated master_vendor_types table)
-  getVendorBusinessCategoryName: (dataItem?: any) => {
+  getVendorBusinessCategoryName: (_dataItem?: any) => {
     let sql = `
                             SELECT
                                        BUSINESS_CATEGORY_ID AS value
@@ -470,7 +463,7 @@ export const FindVendorSQL = {
   getVendorTypes: (dataItem?: any) => FindVendorSQL.getVendorBusinessCategoryName(dataItem),
 
   // Get provinces for dropdown
-  getProvinces: (dataItem?: any) => {
+  getProvinces: (_dataItem?: any) => {
     let sql = `
                             SELECT
                                        PROVINCE AS value
@@ -487,7 +480,7 @@ export const FindVendorSQL = {
     return sql
   },
   // Get countries for dropdown
-  getCountries: (dataItem?: any) => {
+  getCountries: (_dataItem?: any) => {
     let sql = `
                             SELECT
                                        INFO_COUNTRY_NAME AS value
@@ -508,7 +501,7 @@ export const FindVendorSQL = {
 
 
   // Get product groups for dropdown
-  getProductGroups: (dataItem?: any) => {
+  getProductGroups: (_dataItem?: any) => {
     let sql = `
                             SELECT
                                        MASTER_PRODUCT_GROUPS_ID AS value
@@ -525,19 +518,9 @@ export const FindVendorSQL = {
 
   // Search all vendors for export (no pagination limit)
   searchAllForExport: (dataItem: any, sqlWhere: any = '') => {
-    const statusCheckExpression = `
-            CASE
-                WHEN v.FFT_STATUS = 2 THEN 'Cannot Register'
-                WHEN EXISTS (
-                    SELECT 1
-                    FROM request_register_vendor rrv_ip
-                    WHERE rrv_ip.VENDORS_ID = v.VENDORS_ID
-                      AND rrv_ip.INUSE = 1
-                      AND rrv_ip.REQUEST_STATE = 'in_progress'
-                ) THEN 'In Progress'
-                ELSE IFNULL(vmr.STATUS_CHECK, 'Not Registered')
-            END
-        `
+    const vendorStatusIdExpression = VendorStatusSqlSnippets.effectiveStatusIdExpr('v')
+    const vendorStatusCodeExpression = VendorStatusSqlSnippets.statusCodeExpr('v', 'mvs')
+    const vendorStatusLabelExpression = VendorStatusSqlSnippets.statusLabelExpr('v', 'mvs')
     let sqlData = `
                             SELECT
                                        v.VENDORS_ID
@@ -569,17 +552,16 @@ export const FindVendorSQL = {
                                      , v.UPDATE_DATE
                                      , v.INUSE
 
-                                     -- Prones Matching Data
-                                     , dataItem.STATUSCHECKEXPRESSION AS STATUS_CHECK
-                                     , IFNULL(vmr.PRONES_CODE, v.FFT_VENDOR_CODE) AS PRONES_CODE
-                                     , vmr.PRONES_NAME AS PRONES_NAME_EN
-                                     , vmr.MATCH_METHOD
+                                     -- Vendor Status (source of truth: vendors + active request)
+                                     , dataItem.VENDOR_STATUS_ID_SQL AS M_VENDOR_STATUS_ID
+                                     , dataItem.VENDOR_STATUS_CODE_SQL AS VENDOR_STATUS_CODE
+                                     , dataItem.VENDOR_STATUS_LABEL_SQL AS VENDOR_STATUS_LABEL
 
                                      -- Reject Reason
                                      , (
-                                          SELECT (${RequestApprovalSummarySqlSnippets.latestRejectReasonExpr('rrv.REQUEST_REGISTER_VENDOR_ID')})
+                                          SELECT (dataItem.LATEST_REJECT_REASON_SQL)
                                           FROM request_register_vendor rrv
-                                          WHERE rrv.VENDORS_ID = v.VENDORS_ID AND rrv.REQUEST_STATE = 'rejected'
+                                          WHERE rrv.VENDORS_ID = v.VENDORS_ID AND rrv.M_REQUEST_STATE_ID = dataItem.REQUEST_REJECTED_STATE_ID
                                           ORDER BY rrv.REQUEST_REGISTER_VENDOR_ID DESC LIMIT 1
                                      ) AS REJECT_REASON
 
@@ -595,18 +577,18 @@ export const FindVendorSQL = {
                                      , vp.UPDATE_BY AS PRODUCT_UPDATE_BY
                                      , vp.UPDATE_DATE AS PRODUCT_UPDATE_DATE
                                      , v.INUSE
-                            FROM
-                                       vendors v
-                                            LEFT JOIN
-                                       info_business_category vt ON v.BUSINESS_CATEGORY_ID = vt.BUSINESS_CATEGORY_ID
+                             FROM
+                                        vendors v
+                                             LEFT JOIN
+                                        m_vendor_status mvs ON mvs.M_VENDOR_STATUS_ID = v.FFT_STATUS AND mvs.INUSE = 1
+                                             LEFT JOIN
+                                        info_business_category vt ON v.BUSINESS_CATEGORY_ID = vt.BUSINESS_CATEGORY_ID
                                             LEFT JOIN
                                        vendor_contacts vc ON v.VENDORS_ID = vc.VENDORS_ID AND vc.INUSE = 1
                                             LEFT JOIN
                                        vendor_products vp ON v.VENDORS_ID = vp.VENDORS_ID AND vp.INUSE = 1
                                             LEFT JOIN
                                        master_product_groups mpg ON vp.MASTER_PRODUCT_GROUPS_ID = mpg.MASTER_PRODUCT_GROUPS_ID
-                                            LEFT JOIN
-                                       vendor_match_result vmr ON v.VENDORS_ID = vmr.VENDORS_ID
                             WHERE
                                        1 = 1
                                        dataItem.SQLWHERE
@@ -616,8 +598,12 @@ export const FindVendorSQL = {
                             ORDER BY
                                        dataItem.ORDER
         `
+    sqlData = sqlData.replaceAll('dataItem.VENDOR_STATUS_ID_SQL', String(vendorStatusIdExpression))
+    sqlData = sqlData.replaceAll('dataItem.VENDOR_STATUS_CODE_SQL', String(vendorStatusCodeExpression))
+    sqlData = sqlData.replaceAll('dataItem.VENDOR_STATUS_LABEL_SQL', String(vendorStatusLabelExpression))
+    sqlData = sqlData.replaceAll('dataItem.LATEST_REJECT_REASON_SQL', String(RequestApprovalSummarySqlSnippets.latestRejectReasonExpr('rrv.REQUEST_REGISTER_VENDOR_ID')))
+    sqlData = sqlData.replaceAll('dataItem.REQUEST_REJECTED_STATE_ID', String(REQUEST_STATE_ID_SQL.REJECTED))
 
-    sqlData = sqlData.replaceAll('dataItem.STATUSCHECKEXPRESSION', statusCheckExpression)
     sqlData = sqlData.replaceAll('dataItem.SQLWHERECOLUMNFILTER', dataItem['SQLWHERECOLUMNFILTER'] || '')
     sqlData = sqlData.replaceAll('dataItem.SQLWHERE', sqlWhere)
     sqlData = sqlData.replaceAll('dataItem.ORDER', dataItem['ORDER'] || 'v.VENDORS_ID DESC')
@@ -649,7 +635,8 @@ export const FindVendorSQL = {
                             )
             `
 
-      const searchVal = `%${cleanKeyword}%`
+      let searchVal = '%dataItem.SEARCH_KEYWORD%'
+      searchVal = searchVal.replaceAll('dataItem.SEARCH_KEYWORD', String(cleanKeyword))
 
       sql = sql.replaceAll('searchVal', searchVal)
 
@@ -658,31 +645,8 @@ export const FindVendorSQL = {
     return ''
   },
 
-  // prones
-  getPronesData: (dataItem?: any) => {
-    let sql = `
-                            SELECT 
-                                       RTRIM(I_DL_CD) Customer_code
-                                     , RTRIM(I_DL_ARG_DESC) Customer_name
-                                     , RTRIM(I_ADDRESS1) Customer_Address1
-                                     , RTRIM(I_ADDRESS2) Customer_Address2
-                                     , RTRIM(I_ADDRESS3) Customer_Address3
-                                     , RTRIM(I_TEL) Customer_tel    
-                            FROM
-                                       FFT.T_TRADE_MS
-                            WHERE  
-                                       (
-                                           I_DL_CD LIKE '20030%'
-                                        OR I_DL_CD LIKE '20031%'
-                                        OR I_DL_CD = '20030FEC01'
-                                        OR I_DL_CD = '20020FTC03'
-                                       )
-        `
-    return sql
-  },
-
   // prones raw test
-  getPronesRawTest: (dataItem?: any) => {
+  getPronesRawTest: (_dataItem?: any) => {
     let sql = `
                             SELECT
                                        RTRIM(I_DL_CD) Customer_code
@@ -704,7 +668,7 @@ export const FindVendorSQL = {
     return sql
   },
 
-  getAllVendorNames: (dataItem?: any) => {
+  getAllVendorNames: (_dataItem?: any) => {
     let sql = `
                             SELECT
                                        COMPANY_NAME
@@ -717,148 +681,4 @@ export const FindVendorSQL = {
         `
     return sql
   },
-  // Staging Prones - Truncate
-  truncateStagingPrones: (dataItem?: any) => {
-    let sql = `
-      UPDATE staging_prones_data
-      SET INUSE = 0, UPDATE_BY = 'SYSTEM', UPDATE_DATE = NOW()
-      WHERE INUSE = 1
-    `
-    return sql
-  },
-
-  // Staging Prones - Batch Insert
-  insertStagingPronesBatch: (rows: any[]) => {
-    const values = rows
-      .map((row: any, index: any) => {
-        let valueSql = `('dataItem.CUSTOMER_CODE_${index}', 'dataItem.CUSTOMER_NAME_${index}', 'dataItem.CUSTOMER_ADDRESS1_${index}', 'dataItem.CUSTOMER_ADDRESS2_${index}',
-          'dataItem.CUSTOMER_ADDRESS3_${index}', 'dataItem.CUSTOMER_TEL_${index}', LEFT('dataItem.CUSTOMER_NAME_${index}', 100), 'SYSTEM', 'SYSTEM', NOW(), NOW(), 1)`
-        valueSql = valueSql.replaceAll(`dataItem.CUSTOMER_CODE_${index}`, row.CUSTOMER_CODE)
-        valueSql = valueSql.replaceAll(`dataItem.CUSTOMER_NAME_${index}`, row.CUSTOMER_NAME)
-        valueSql = valueSql.replaceAll(`dataItem.CUSTOMER_ADDRESS1_${index}`, row.CUSTOMER_ADDRESS1)
-        valueSql = valueSql.replaceAll(`dataItem.CUSTOMER_ADDRESS2_${index}`, row.CUSTOMER_ADDRESS2)
-        valueSql = valueSql.replaceAll(`dataItem.CUSTOMER_ADDRESS3_${index}`, row.CUSTOMER_ADDRESS3)
-        valueSql = valueSql.replaceAll(`dataItem.CUSTOMER_TEL_${index}`, row.CUSTOMER_TEL)
-        return valueSql
-      })
-      .join(',\n')
-
-    let sql = `
-                            INSERT INTO staging_prones_data (
-                                       CUSTOMER_CODE
-                                     , CUSTOMER_NAME
-                                     , CUSTOMER_ADDRESS1
-                                     , CUSTOMER_ADDRESS2
-                                     , CUSTOMER_ADDRESS3
-                                     , CUSTOMER_TEL
-                                     , DESCRIPTION
-                                     , CREATE_BY
-                                     , UPDATE_BY
-                                     , CREATE_DATE
-                                     , UPDATE_DATE
-                                     , INUSE
-                            ) VALUES dataItem.VALUES
-        `
-    sql = sql.replaceAll('dataItem.VALUES', values)
-    return sql
-  },
-
-  // Vendor Matching - Get staging prones data (from MySQL)
-  getStagingPronesData: (dataItem?: any) => {
-    let sql = 'SELECT CUSTOMER_CODE, CUSTOMER_NAME, CUSTOMER_ADDRESS1, CUSTOMER_ADDRESS2, CUSTOMER_ADDRESS3, CUSTOMER_TEL FROM staging_prones_data WHERE INUSE = 1'
-    return sql
-  },
-
-  // Vendor Matching - Get vendors for matching
-  // CONTACT_TELS carries every active contact phone, comma-separated, so the matcher can
-  // score a Prones tel against the company line or any contact line.
-  getVendorsForMatch: (dataItem?: any) => {
-    let sql = `
-      SELECT
-        v.VENDORS_ID,
-        v.COMPANY_NAME,
-        v.ADDRESS,
-        v.TEL_CENTER,
-        GROUP_CONCAT(DISTINCT vc.TEL_PHONE SEPARATOR ',') AS CONTACT_TELS
-      FROM vendors v
-      LEFT JOIN vendor_contacts vc
-        ON vc.VENDORS_ID = v.VENDORS_ID
-       AND vc.INUSE = 1
-       AND vc.TEL_PHONE IS NOT NULL
-       AND vc.TEL_PHONE <> ''
-      WHERE v.INUSE = 1
-      GROUP BY v.VENDORS_ID, v.COMPANY_NAME, v.ADDRESS, v.TEL_CENTER
-    `
-    return sql
-  },
-
-  // Vendor Matching - Truncate match result
-  truncateMatchResult: (dataItem?: any) => {
-    let sql = `
-      UPDATE vendor_match_result
-      SET INUSE = 0, UPDATE_BY = 'SYSTEM', UPDATE_DATE = NOW()
-      WHERE INUSE = 1
-    `
-    return sql
-  },
-
-  // Vendor Matching - Batch insert match results
-  insertMatchResultBatch: (rows: any[]) => {
-    const values = rows
-      .map((row: any, index: any) => {
-        let valueSql = `(dataItem.VENDOR_ID_${index}, 'dataItem.STATUS_CHECK_${index}', 'dataItem.PRONES_CODE_${index}', 'dataItem.PRONES_NAME_${index}',
-          'dataItem.MATCH_METHOD_${index}', NOW(), LEFT('dataItem.MATCH_METHOD_${index}', 100), 'SYSTEM', 'SYSTEM', NOW(), NOW(), 1)`
-        valueSql = valueSql.replaceAll(`dataItem.VENDOR_ID_${index}`, (Number(row.VENDORS_ID) || 0).toString())
-        valueSql = valueSql.replaceAll(`dataItem.STATUS_CHECK_${index}`, row.STATUS_CHECK)
-        valueSql = valueSql.replaceAll(`dataItem.PRONES_CODE_${index}`, row.PRONES_CODE)
-        valueSql = valueSql.replaceAll(`dataItem.PRONES_NAME_${index}`, row.PRONES_NAME)
-        valueSql = valueSql.replaceAll(`dataItem.MATCH_METHOD_${index}`, row.MATCH_METHOD)
-        return valueSql
-      })
-      .join(',\n')
-
-    let sql = `
-                            INSERT INTO vendor_match_result (
-                                       VENDORS_ID
-                                     , STATUS_CHECK
-                                     , PRONES_CODE
-                                     , PRONES_NAME
-                                     , MATCH_METHOD
-                                     , LAST_UPDATED
-                                     , DESCRIPTION
-                                     , CREATE_BY
-                                     , UPDATE_BY
-                                     , CREATE_DATE
-                                     , UPDATE_DATE
-                                     , INUSE
-                            ) VALUES dataItem.VALUES
-                            ON DUPLICATE KEY UPDATE
-                                       STATUS_CHECK = VALUES(STATUS_CHECK)
-                                     , PRONES_CODE = VALUES(PRONES_CODE)
-                                     , PRONES_NAME = VALUES(PRONES_NAME)
-                                     , MATCH_METHOD = VALUES(MATCH_METHOD)
-                                     , LAST_UPDATED = VALUES(LAST_UPDATED)
-                                     , DESCRIPTION = VALUES(DESCRIPTION)
-                                     , UPDATE_BY = VALUES(UPDATE_BY)
-                                     , UPDATE_DATE = NOW()
-                                     , INUSE = 1
-        `
-    sql = sql.replaceAll('dataItem.VALUES', values)
-    return sql
-  },
-
-  // Vendor Matching - Get match result by vendor_id
-  getMatchResultByVendorIds: (dataItem: any) => {
-    const ids = dataItem.VENDORIDS.map((id: any) => Number(id) || 0).join(',')
-    let sql = 'SELECT VENDORS_ID, STATUS_CHECK, PRONES_CODE, PRONES_NAME, MATCH_METHOD FROM vendor_match_result WHERE VENDORS_ID IN (dataItem.VENDOR_IDS) AND INUSE = 1'
-    sql = sql.replaceAll('dataItem.VENDOR_IDS', ids)
-    return sql
-  },
-
-  // Vendor Matching - Get all match results
-  getAllMatchResults: (dataItem?: any) => {
-    let sql = 'SELECT VENDORS_ID, STATUS_CHECK, PRONES_CODE, PRONES_NAME, MATCH_METHOD FROM vendor_match_result WHERE INUSE = 1'
-    return sql
-  },
 }
-

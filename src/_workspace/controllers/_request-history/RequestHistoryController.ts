@@ -16,13 +16,14 @@ export const RequestHistoryController = {
       const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
 
       if (!request_id || isNaN(request_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Get Registration Request',
           Message: 'Invalid request_id',
         } as ResponseI)
+        return
       }
 
       const result = await RequestHistoryModel.getById({ REQUEST_REGISTER_VENDOR_ID: request_id })
@@ -57,13 +58,14 @@ export const RequestHistoryController = {
     try {
       const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: [],
           TotalCountOnDb: 0,
           MethodOnDb: 'Get Approval Steps',
           Message: 'Invalid request_id',
         } as ResponseI)
+        return
       }
 
       const result = await RequestHistoryModel.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: request_id })
@@ -98,13 +100,14 @@ export const RequestHistoryController = {
     try {
       const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: [],
           TotalCountOnDb: 0,
           MethodOnDb: 'Get Approval Logs',
           Message: 'Invalid request_id',
         } as ResponseI)
+        return
       }
 
       const result = await RequestHistoryModel.getApprovalLogs({ REQUEST_REGISTER_VENDOR_ID: request_id })
@@ -134,13 +137,14 @@ export const RequestHistoryController = {
       const empcode = String(dataItem.EMPCODE || '').trim()
 
       if (!empcode) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Resolve Employee Profile',
           Message: 'Missing empcode',
         } as ResponseI)
+        return
       }
 
       const result = await RequestHistoryModel.resolveEmployeeProfile({ EMPCODE: empcode })
@@ -157,7 +161,32 @@ export const RequestHistoryController = {
     }
   },
 
-  getGprForm: async (req: Request, res: Response) => {
+  getGprCProducts: async (req: Request, res: Response) => {
+    const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
+
+    try {
+      const result = await RequestHistoryModel.getGprCProducts({
+        SEARCH_TEXT: String(dataItem.SEARCH_TEXT || '').trim(),
+      })
+      res.status(200).json({
+        Status: true,
+        ResultOnDb: result,
+        TotalCountOnDb: result.length,
+        MethodOnDb: 'Get GPR C Products',
+        Message: 'Get Data Success',
+      } as ResponseI)
+    } catch (error: any) {
+      res.status(200).json({
+        Status: false,
+        ResultOnDb: [],
+        TotalCountOnDb: 0,
+        MethodOnDb: 'Get GPR C Products',
+        Message: error?.message || 'Failed to get GPR C products',
+      } as ResponseI)
+    }
+  },
+
+  getSelectionForm: async (req: Request, res: Response) => {
     let dataItem
 
     if (!req.body || Object.entries(req.body).length === 0) {
@@ -169,30 +198,31 @@ export const RequestHistoryController = {
     try {
       const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
-          MethodOnDb: 'Get GPR Form',
+          MethodOnDb: 'Get Selection Form',
           Message: 'Invalid request_id',
         } as ResponseI)
+        return
       }
-      const result = await RequestHistoryModel.getGprForm(request_id)
+      const result = await RequestHistoryModel.getSelectionForm(request_id)
       res.status(200).json({
         Status: true,
         ResultOnDb: result || [],
         TotalCountOnDb: result ? 1 : 0,
-        MethodOnDb: 'Get GPR Form',
+        MethodOnDb: 'Get Selection Form',
         Message: 'Success',
       } as ResponseI)
     } catch (error: any) {
-      // console.error('Get GPR Form Error:', error)
+      // console.error('Get Selection Form Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
         TotalCountOnDb: 0,
-        MethodOnDb: 'Get GPR Form',
-        Message: error?.message || 'Failed to get GPR form',
+        MethodOnDb: 'Get Selection Form',
+        Message: error?.message || 'Failed to get Selection Form',
       } as ResponseI)
     }
   },

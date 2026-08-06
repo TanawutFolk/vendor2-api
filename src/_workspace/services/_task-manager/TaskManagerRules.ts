@@ -1,13 +1,10 @@
-const TERMINAL_REQUEST_STATUSES = new Set(['completed', 'rejected', 'cancelled', 'canceled'])
-
-export const normalizeTaskManagerStatus = (value: unknown) =>
-  String(value ?? '')
-    .trim()
-    .toLowerCase()
-
-export const isTaskManagerReassignable = (requestStatus: unknown, hasCurrentStep: boolean) => {
+export const isTaskManagerReassignable = (
+  requestStateId: unknown,
+  inProgressRequestStateId: unknown,
+  hasCurrentStep: boolean
+) => {
   if (!hasCurrentStep) return false
-  return !TERMINAL_REQUEST_STATUSES.has(normalizeTaskManagerStatus(requestStatus))
+  const currentId = Number(requestStateId)
+  const inProgressId = Number(inProgressRequestStateId)
+  return Number.isInteger(currentId) && currentId > 0 && currentId === inProgressId
 }
-
-export const getTaskManagerTerminalStatuses = () => Array.from(TERMINAL_REQUEST_STATUSES)

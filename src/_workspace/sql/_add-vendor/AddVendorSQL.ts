@@ -2,7 +2,9 @@
 export const AddVendorSQL = {
   toNullableStringSql: (value: any) => {
     if (value === null || value === undefined || String(value).trim() === '') return 'NULL'
-    return `'${String(value).replaceAll("'", "''")}'`
+    let sql = '\'dataItem.ESCAPED_VALUE\''
+    sql = sql.replaceAll('dataItem.ESCAPED_VALUE', String(String(value).replaceAll("'", "''")))
+    return sql
   },
 
   // Check duplicate vendor by local address or oversea country.
@@ -172,7 +174,7 @@ export const AddVendorSQL = {
   },
 
   // Get vendor types for dropdown
-  getVendorTypes: async (dataItem?: any) => {
+  getVendorTypes: async (_dataItem?: any) => {
     let sql = `
                             SELECT
                                        BUSINESS_CATEGORY_ID
@@ -188,7 +190,7 @@ export const AddVendorSQL = {
   },
 
   // Get product groups for dropdown
-  getProductGroups: async (dataItem?: any) => {
+  getProductGroups: async (_dataItem?: any) => {
     let sql = `
                             SELECT
                                        MASTER_PRODUCT_GROUPS_ID
@@ -204,7 +206,7 @@ export const AddVendorSQL = {
   },
 
   // Get last inserted vendor id
-  getLastInsertId: async (dataItem?: any) => {
+  getLastInsertId: async (_dataItem?: any) => {
     let sql = 'SELECT LAST_INSERT_ID() AS VENDORS_ID'
     return sql
   },
@@ -249,6 +251,80 @@ export const AddVendorSQL = {
 
     sql = sql.replaceAll('dataItem.GROUP_NAME', dataItem['GROUP_NAME'] || '')
 
+    return sql
+  },
+
+  checkBlacklist: async (normalizedCompanyName: string) => {
+    let sql = `
+                            SELECT
+                                       GROUP_CODE
+                                     , MATCHED_NAME
+                                     , MATCH_TYPE
+                                     , SOURCE_NAME
+                                     , ENTITY_NUMBER
+                                     , ENTITY_TYPE
+                                     , ADDRESSES
+                                     , PROGRAMS
+                            FROM (
+                                       SELECT
+                                                  'US' AS GROUP_CODE
+                                                , bu.NAME AS MATCHED_NAME
+                                                , 'name' AS MATCH_TYPE
+                                                , bu.SOURCE AS SOURCE_NAME
+                                                , bu.ENTITY_NUMBER
+                                                , bu.TYPE AS ENTITY_TYPE
+                                                , bu.ADDRESSES
+                                                , bu.PROGRAMS
+                                       FROM
+                                                  blacklist_us bu
+                                       WHERE
+                                                  bu.INUSE = 1
+                                                  AND TRIM(REGEXP_REPLACE(
+                                                        UPPER(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(bu.NAME,
+                                                            '.', ' '), ',', ' '), '(', ' '), ')', ' '), '-', ' '), '/', ' ')),
+                                                        ' {2,}', ' ')) = 'dataItem.NORMALIZED_COMPANY_NAME'
+
+                                       UNION ALL
+
+                                       SELECT
+                                                  'CN' AS GROUP_CODE
+                                                , bc.PRIMARY_NAME AS MATCHED_NAME
+                                                , 'name' AS MATCH_TYPE
+                                                , bc.SOURCE_NAME
+                                                , bc.ENTITY_NUMBER
+                                                , bc.ENTITY_TYPE
+                                                , bc.COUNTRY AS ADDRESSES
+                                                , bc.PROGRAMS
+                                       FROM
+                                                  blacklist_cn bc
+                                       WHERE
+                                                  bc.INUSE = 1
+                                                  AND bc.NORMALIZED_NAME = 'dataItem.NORMALIZED_COMPANY_NAME'
+
+                                       UNION ALL
+
+                                       SELECT
+                                                  'CN' AS GROUP_CODE
+                                                , bca.ALIAS_NAME AS MATCHED_NAME
+                                                , 'alias' AS MATCH_TYPE
+                                                , bc.SOURCE_NAME
+                                                , bc.ENTITY_NUMBER
+                                                , bc.ENTITY_TYPE
+                                                , bc.COUNTRY AS ADDRESSES
+                                                , bc.PROGRAMS
+                                       FROM
+                                                  blacklist_cn_aliases bca
+                                                       INNER JOIN
+                                                  blacklist_cn bc ON bc.BLACKLIST_CN_ID = bca.BLACKLIST_CN_ID AND bc.INUSE = 1
+                                       WHERE
+                                                  bca.INUSE = 1
+                                                  AND bca.NORMALIZED_ALIAS_NAME = 'dataItem.NORMALIZED_COMPANY_NAME'
+                            ) AS MATCHES
+                            ORDER BY
+                                       GROUP_CODE ASC
+                                     , MATCH_TYPE ASC
+        `
+    sql = sql.replaceAll('dataItem.NORMALIZED_COMPANY_NAME', normalizedCompanyName.replaceAll("'", "''"))
     return sql
   },
 }

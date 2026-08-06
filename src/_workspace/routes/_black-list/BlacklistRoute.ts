@@ -12,6 +12,12 @@ const upload = multer({
 
 // ─── US ──────────────────────────────────────────────────────
 blacklistRoutes.post('/search', BlacklistController.search)
+blacklistRoutes.post('/searchUS', BlacklistUSController.search)
+blacklistRoutes.post('/importUS', upload.single('file'), BlacklistUSController.importFile)
+blacklistRoutes.post('/searchCN', BlacklistCNController.search)
+blacklistRoutes.post('/importCN', upload.single('file'), BlacklistCNController.importFile)
+
+// Compatibility aliases used by the current frontend.
 blacklistRoutes.post('/us/search', BlacklistUSController.search)
 blacklistRoutes.post('/us/import', upload.single('file'), BlacklistUSController.importFile)
 

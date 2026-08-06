@@ -1,5 +1,4 @@
 import { RequestRegisterPageModel } from '@src/_workspace/models/_request-register/RequestRegisterPageModel'
-import { SelectionFileService } from '@src/_workspace/services/_request-register/SelectionFileService'
 import { ResponseI } from '@src/types/ResponseI'
 import { Request, Response } from 'express'
 import fs from 'fs'
@@ -25,21 +24,23 @@ export const RequestRegisterPageController = {
     try {
       const result = await RequestRegisterPageModel.getBusinessCategories()
 
-      return res.status(200).json({
+      res.status(200).json({
         Status: true,
         ResultOnDb: result,
         TotalCountOnDb: result.length,
         MethodOnDb: 'Get Business Categories',
         Message: 'Search Data Success',
       } as ResponseI)
+      return
     } catch (error: any) {
-      return res.status(200).json({
+      res.status(200).json({
         Status: false,
         ResultOnDb: [],
         TotalCountOnDb: 0,
         MethodOnDb: 'Get Business Categories',
         Message: error?.message || 'Failed to get business categories',
       } as ResponseI)
+      return
     }
   },
 
@@ -47,21 +48,23 @@ export const RequestRegisterPageController = {
     try {
       const result = await RequestRegisterPageModel.getCurrencies()
 
-      return res.status(200).json({
+      res.status(200).json({
         Status: true,
         ResultOnDb: result,
         TotalCountOnDb: result.length,
         MethodOnDb: 'Get Currencies',
         Message: 'Search Data Success',
       } as ResponseI)
+      return
     } catch (error: any) {
-      return res.status(200).json({
+      res.status(200).json({
         Status: false,
         ResultOnDb: [],
         TotalCountOnDb: 0,
         MethodOnDb: 'Get Currencies',
         Message: error?.message || 'Failed to get currencies',
       } as ResponseI)
+      return
     }
   },
 
@@ -79,13 +82,14 @@ export const RequestRegisterPageController = {
       const normalizedCreator = dataItem.CREATE_BY || dataItem.REQUEST_BY_EMPLOYEECODE || 'SYSTEM'
 
       if (!vendor_id || isNaN(vendor_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Create Registration Request',
           Message: 'Invalid vendor_id',
         } as ResponseI)
+        return
       }
 
       // req.files is populated by multer upload.array() middleware in the route
@@ -111,13 +115,14 @@ export const RequestRegisterPageController = {
 
       if (!createResult?.Status) {
         files.forEach((uploadedFile) => removeTempUpload(uploadedFile?.path))
-        return res.status(200).json({
+        res.status(200).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Create Registration Request',
           Message: createResult?.Message || 'Failed to create registration request',
         } as ResponseI)
+        return
       }
 
       const createResultData = (createResult?.ResultOnDb as any) || {}
@@ -125,34 +130,41 @@ export const RequestRegisterPageController = {
 
       if (!insertedId || Number.isNaN(insertedId)) {
         files.forEach((uploadedFile) => removeTempUpload(uploadedFile?.path))
-        return res.status(200).json({
+        res.status(200).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Create Registration Request',
           Message: 'Create request succeeded but request_id was not returned correctly',
         } as ResponseI)
+        return
       }
 
-      return res.status(200).json({
+      res.status(200).json({
         Status: true,
-        ResultOnDb: { REQUEST_REGISTER_VENDOR_ID: insertedId, REQUEST_NUMBER: createResultData?.request_number || '' },
+        ResultOnDb: {
+          REQUEST_REGISTER_VENDOR_ID: insertedId,
+          REQUEST_NUMBER: createResultData?.request_number || '',
+          REQUESTS_AHEAD: Number(createResultData?.requests_ahead || 0),
+        },
         TotalCountOnDb: 1,
         MethodOnDb: 'Create Registration Request',
         Message: createResult?.Message || 'Create Request Register Success',
       } as ResponseI)
+      return
 
     } catch (error: any) {
       const files = (req.files as any[]) || []
       files.forEach((uploadedFile) => removeTempUpload(uploadedFile?.path))
       console.error('Create Registration Request Error:', error)
-      return res.status(200).json({
+      res.status(200).json({
         Status: false,
         ResultOnDb: {},
         TotalCountOnDb: 0,
         MethodOnDb: 'Create Registration Request',
         Message: error?.message || 'Failed to create registration request',
       } as ResponseI)
+      return
     }
   },
 
@@ -169,13 +181,14 @@ export const RequestRegisterPageController = {
       const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
 
       if (!request_id || isNaN(request_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Update Request',
           Message: 'Invalid request_id',
         } as ResponseI)
+        return
       }
 
       const result = await RequestRegisterPageModel.updateRequest({
@@ -211,33 +224,36 @@ export const RequestRegisterPageController = {
 
     try {
       if (!dataItem.EMAILMAIN && !dataItem.REQUEST_REGISTER_VENDOR_ID) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Send Agreement Email',
           Message: 'Vendor emailmain or request_id is required',
         } as ResponseI)
+        return
       }
 
       const result = await RequestRegisterPageModel.sendMail_ToSupplier_RequestFormA(dataItem)
 
-      return res.status(200).json({
+      res.status(200).json({
         Status: true,
         ResultOnDb: result,
         TotalCountOnDb: 1,
         MethodOnDb: 'Send Agreement Email',
         Message: `Agreement email sent to ${result.sent_to}`,
       } as ResponseI)
+      return
     } catch (error: any) {
       console.error('Send Agreement Email Error:', error)
-      return res.status(200).json({
+      res.status(200).json({
         Status: false,
         ResultOnDb: {},
         TotalCountOnDb: 0,
         MethodOnDb: 'Send Agreement Email',
         Message: error?.message || 'Failed to send agreement email',
       } as ResponseI)
+      return
     }
   },
 
@@ -253,20 +269,22 @@ export const RequestRegisterPageController = {
     try {
       const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Create Approval Step',
           Message: 'Invalid request_id',
         } as ResponseI)
+        return
       }
 
       const insertedId = await RequestRegisterPageModel.createApprovalStep({
         REQUEST_REGISTER_VENDOR_ID: request_id,
+        WORKFLOW_STEP_MASTER_ID: Number(dataItem.WORKFLOW_STEP_MASTER_ID || 0),
         STEP_ORDER: dataItem.STEP_ORDER || 1,
         APPROVER_EMPCODE: dataItem.APPROVER_EMPCODE || '',
-        STEP_STATUS: dataItem.STEP_STATUS || 'pending',
+        M_APPROVAL_STEP_STATUS_ID: Number(dataItem.M_APPROVAL_STEP_STATUS_ID || 0),
         DESCRIPTION: dataItem.DESCRIPTION || '',
         STEP_CODE: dataItem.STEP_CODE || '',
         ASSIGNMENT_MODE: dataItem.ASSIGNMENT_MODE || 'AUTO',
@@ -304,18 +322,19 @@ export const RequestRegisterPageController = {
     try {
       const step_id = parseInt(dataItem.REQUEST_APPROVAL_STEP_ID as string)
       if (!step_id || isNaN(step_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Update Approval Step',
           Message: 'Invalid step_id',
         } as ResponseI)
+        return
       }
 
       await RequestRegisterPageModel.updateApprovalStep({
         REQUEST_APPROVAL_STEP_ID: step_id,
-        STEP_STATUS: dataItem.STEP_STATUS || '',
+        M_APPROVAL_STEP_STATUS_ID: Number(dataItem.M_APPROVAL_STEP_STATUS_ID || 0),
         UPDATE_BY: dataItem.UPDATE_BY || '',
       })
 
@@ -325,7 +344,7 @@ export const RequestRegisterPageController = {
           REQUEST_REGISTER_VENDOR_ID: parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string),
           REQUEST_APPROVAL_STEP_ID: step_id,
           ACTION_BY: dataItem.ACTION_BY || dataItem.UPDATE_BY || '',
-          ACTION_TYPE: dataItem.ACTION_TYPE || dataItem.STEP_STATUS || '',
+          ACTION_TYPE: dataItem.ACTION_TYPE || 'status_changed',
           REMARK: dataItem.REMARK || '',
         })
       }
@@ -361,13 +380,14 @@ export const RequestRegisterPageController = {
     try {
       const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Update CC Emails',
           Message: 'Invalid request_id',
         } as ResponseI)
+        return
       }
       await RequestRegisterPageModel.updateCcEmails({
         REQUEST_REGISTER_VENDOR_ID: request_id,
@@ -392,7 +412,7 @@ export const RequestRegisterPageController = {
     }
   },
 
-  saveGprForm: async (req: Request, res: Response) => {
+  saveSelectionForm: async (req: Request, res: Response) => {
     let dataItem
 
     if (!req.body || Object.entries(req.body).length === 0) {
@@ -404,29 +424,63 @@ export const RequestRegisterPageController = {
     try {
       const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
-          MethodOnDb: 'Save GPR Form',
+          MethodOnDb: 'Save Selection Form',
           Message: 'Invalid request_id',
         } as ResponseI)
+        return
       }
-      const result = await RequestRegisterPageModel.saveGprForm({
+      const result = await RequestRegisterPageModel.saveSelectionForm({
         REQUEST_REGISTER_VENDOR_ID: request_id,
-        GPR_DATA: dataItem.GPR_DATA || {},
+        SELECTION_FORM_DATA: dataItem.SELECTION_FORM_DATA || {},
         CREATE_BY: dataItem.CREATE_BY || dataItem.UPDATE_BY || 'SYSTEM',
         UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
       })
       res.status(200).json(result as ResponseI)
     } catch (error: any) {
-      // console.error('Save GPR Form Error:', error)
+      // console.error('Save Selection Form Error:', error)
       res.status(200).json({
         Status: false,
         ResultOnDb: {},
         TotalCountOnDb: 0,
-        MethodOnDb: 'Save GPR Form',
-        Message: error?.message || 'Failed to save GPR form',
+        MethodOnDb: 'Save Selection Form',
+        Message: error?.message || 'Failed to save Selection Form',
+      } as ResponseI)
+    }
+  },
+
+  saveAccountVendorCode: async (req: Request, res: Response) => {
+    const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
+
+    try {
+      const requestId = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
+      if (!requestId || isNaN(requestId)) {
+        res.status(400).json({
+          Status: false,
+          ResultOnDb: {},
+          TotalCountOnDb: 0,
+          MethodOnDb: 'Save Account Vendor Code',
+          Message: 'Invalid request_id',
+        } as ResponseI)
+        return
+      }
+
+      const result = await RequestRegisterPageModel.saveAccountVendorCode({
+        REQUEST_REGISTER_VENDOR_ID: requestId,
+        VENDOR_CODE: dataItem.VENDOR_CODE || '',
+        UPDATE_BY: dataItem.UPDATE_BY || '',
+      })
+      res.status(200).json(result as ResponseI)
+    } catch (error: any) {
+      res.status(200).json({
+        Status: false,
+        ResultOnDb: {},
+        TotalCountOnDb: 0,
+        MethodOnDb: 'Save Account Vendor Code',
+        Message: error?.message || 'Failed to save Vendor Code',
       } as ResponseI)
     }
   },
@@ -443,13 +497,14 @@ export const RequestRegisterPageController = {
     try {
       const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Save GPR C Notification',
           Message: 'Invalid request_id',
         } as ResponseI)
+        return
       }
 
       const result = await RequestRegisterPageModel.saveGprCNotification({
@@ -478,13 +533,14 @@ export const RequestRegisterPageController = {
     try {
       const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Get GPR C Flow',
           Message: 'Invalid request_id',
         } as ResponseI)
+        return
       }
 
       const result = await RequestRegisterPageModel.gprCGetFlow({ REQUEST_REGISTER_VENDOR_ID: request_id })
@@ -507,13 +563,14 @@ export const RequestRegisterPageController = {
     try {
       const request_id = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
       if (!request_id || isNaN(request_id)) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Submit GPR C Setup',
           Message: 'Invalid request_id',
         } as ResponseI)
+        return
       }
 
       const result = await RequestRegisterPageModel.gprCSubmitSetup({
@@ -550,22 +607,24 @@ export const RequestRegisterPageController = {
       const reqId = parseInt(REQUEST_REGISTER_VENDOR_ID as string)
       if (!reqId || isNaN(reqId)) {
         removeTempUpload(file?.path)
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Add Document',
           Message: 'Invalid request_id',
         } as ResponseI)
+        return
       }
       if (!file) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Add Document',
           Message: 'No file uploaded',
         } as ResponseI)
+        return
       }
       const file_name = Buffer.from(file.originalname, 'latin1').toString('utf8')
       const documentScope = String(DOCUMENT_SCOPE || '').trim().toUpperCase()
@@ -581,7 +640,8 @@ export const RequestRegisterPageController = {
         throw new Error('Missing REQUEST_NUMBER for GPR B file upload')
       }
 
-      // Selection documents live in the request's network folder, not the DB file table.
+      // Selection document binaries live in the request's network folder. Criteria attachment
+      // metadata is normalized in vendor_selection_criteria_files instead of request_register_file.
       // GPR B is a selection document too, but it belongs to the GPR B/C stage and must not
       // be gated by the Selection Sheet edit lock (which only guards GPR A criteria editing).
       const isSelectionDocument = documentScope === 'GPR_CRITERIA' || documentScope === 'GPR_PDF' || documentScope === 'GPR_B'
@@ -591,7 +651,7 @@ export const RequestRegisterPageController = {
       }
 
       const selectionFileResult = documentScope === 'GPR_CRITERIA'
-        ? SelectionFileService.saveToReceiving(
+        ? RequestRegisterPageModel.saveSelectionFileToReceiving(
           String(REQUEST_NUMBER),
           file.path,
           String(CRITERIA_NO),
@@ -599,13 +659,13 @@ export const RequestRegisterPageController = {
           file_name || path.basename(file.path),
         )
         : documentScope === 'GPR_PDF'
-          ? SelectionFileService.saveToSending(
+          ? RequestRegisterPageModel.saveSelectionFileToSending(
             String(REQUEST_NUMBER),
             file.path,
             file_name || path.basename(file.path),
           )
           : documentScope === 'GPR_B'
-            ? SelectionFileService.saveGprBToReceiving(
+            ? RequestRegisterPageModel.saveGprBFileToReceiving(
               String(REQUEST_NUMBER),
               file.path,
               file_name || path.basename(file.path),
@@ -614,6 +674,28 @@ export const RequestRegisterPageController = {
 
       const storedFilePath = selectionFileResult?.destPath || file.filename || path.basename(file.path)
       const storedFileName = selectionFileResult?.newFileName || file_name || path.basename(file.path)
+
+      let criteriaFileResult: any = null
+      if (documentScope === 'GPR_CRITERIA') {
+        try {
+          criteriaFileResult = await RequestRegisterPageModel.createCriteriaFile({
+            requestId: reqId,
+            criteriaNo: String(CRITERIA_NO),
+            filePath: storedFilePath,
+            fileName: storedFileName,
+            fileSize: file.size || 0,
+            fileType: file.mimetype || '',
+            createBy: CREATE_BY || 'SYSTEM',
+          })
+        } catch (error) {
+          RequestRegisterPageModel.deleteSelectionFile(
+            storedFilePath,
+            storedFileName,
+            String(REQUEST_NUMBER || ''),
+          )
+          throw error
+        }
+      }
 
       // Persist the single GPR B file reference on the request's selection row.
       if (documentScope === 'GPR_B') {
@@ -625,13 +707,14 @@ export const RequestRegisterPageController = {
         })
 
         if (!gprBResult?.Status) {
-          return res.status(200).json({
+          res.status(200).json({
             Status: false,
             ResultOnDb: {},
             TotalCountOnDb: 0,
             MethodOnDb: 'Add Document',
             Message: gprBResult?.Message || 'Failed to save GPR B file',
           } as ResponseI)
+          return
         }
       }
 
@@ -648,41 +731,27 @@ export const RequestRegisterPageController = {
         })
 
         if (!createDocumentResult?.Status) {
-          return res.status(200).json({
+          res.status(200).json({
             Status: false,
             ResultOnDb: {},
             TotalCountOnDb: 0,
             MethodOnDb: 'Add Document',
             Message: createDocumentResult?.Message || 'Failed to add document',
           } as ResponseI)
+          return
         }
 
         document_id = Number((createDocumentResult?.ResultOnDb as any)?.document_id || 0)
 
         if (!document_id || Number.isNaN(document_id)) {
-          return res.status(200).json({
+          res.status(200).json({
             Status: false,
             ResultOnDb: {},
             TotalCountOnDb: 0,
             MethodOnDb: 'Add Document',
             Message: 'Document was created but document_id was not returned correctly',
           } as ResponseI)
-        }
-      }
-
-      // Ã¢â€â‚¬Ã¢â€â‚¬ Selection File: Save criteria uploads directly to 01.Receiving Ã¢â€â‚¬Ã¢â€â‚¬
-      if (false && CRITERIA_NO && REQUEST_NUMBER) {
-        try {
-          SelectionFileService.saveToReceiving(
-            String(REQUEST_NUMBER),
-            file!.path,
-            String(CRITERIA_NO),
-            String(CRITERIA_DETAIL || ''),
-            file_name || path.basename(file!.path),
-          )
-        } catch (selectionFileError: any) {
-          // Never block the document upload Ã¢â‚¬â€ log warning only
-          console.warn('[SelectionFile] Failed to save to Receiving:', selectionFileError?.message)
+          return
         }
       }
 
@@ -690,6 +759,8 @@ export const RequestRegisterPageController = {
         Status: true,
         ResultOnDb: {
           DOCUMENT_ID: document_id,
+          CRITERIA_FILE_ID: criteriaFileResult?.CRITERIA_FILE_ID || 0,
+          FILE_ORDER: criteriaFileResult?.FILE_ORDER || 0,
           FILE_PATH: storedFilePath,
           FILE_NAME: storedFileName,
           SELECTION_FILE_PATH: selectionFileResult?.destPath || '',
@@ -721,34 +792,41 @@ export const RequestRegisterPageController = {
       const rawRequestNumber = String(dataItem.REQUEST_NUMBER || dataItem.request_number || '').trim()
 
       if (!rawFilePath) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Download Selection Document',
           Message: 'Missing file_path',
         } as ResponseI)
+        return
       }
 
-      const resolvedPath = SelectionFileService.resolveDownloadPath(rawFilePath, rawFileName, rawRequestNumber, { allowUploadedFallback: true })
+      const resolvedPath = RequestRegisterPageModel.resolveSelectionDownloadPath(
+        rawFilePath,
+        rawFileName,
+        rawRequestNumber,
+      )
       if (!resolvedPath) {
-        return res.status(400).json({
+        res.status(400).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Download Selection Document',
           Message: 'Invalid selection document path',
         } as ResponseI)
+        return
       }
 
       if (!fs.existsSync(resolvedPath)) {
-        return res.status(404).json({
+        res.status(404).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Download Selection Document',
           Message: 'Selection document not found',
         } as ResponseI)
+        return
       }
 
       const resolvedName = rawFileName || path.basename(resolvedPath)
@@ -757,20 +835,23 @@ export const RequestRegisterPageController = {
       const wantsInline = req.method === 'GET' || String(dataItem.DISPOSITION || '').toLowerCase() === 'inline'
       if (wantsInline) {
         res.setHeader('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(resolvedName)}`)
-        return res.sendFile(resolvedPath)
+        res.sendFile(resolvedPath)
+        return
       }
 
-      return res.download(resolvedPath, resolvedName)
+      res.download(resolvedPath, resolvedName)
+      return
     } catch (error: any) {
       // console.error('Download Selection Document Error:', error)
 
-      return res.status(200).json({
+      res.status(200).json({
         Status: false,
         ResultOnDb: {},
         TotalCountOnDb: 0,
         MethodOnDb: 'Download Selection Document',
         Message: error?.message || 'Failed to download selection document',
       } as ResponseI)
+      return
     }
   },
 
@@ -779,65 +860,54 @@ export const RequestRegisterPageController = {
 
     try {
       const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID || dataItem.request_id || 0)
-      const criteriaNo = String(dataItem.CRITERIA_NO || dataItem.criteria_no || '').trim()
+      const criteriaFileId = Number(dataItem.CRITERIA_FILE_ID || dataItem.criteria_file_id || 0)
       const updateBy = String(dataItem.UPDATE_BY || dataItem.update_by || 'SYSTEM').trim() || 'SYSTEM'
       const rawRequestNumber = String(dataItem.REQUEST_NUMBER || dataItem.request_number || '').trim()
 
-      if (!requestId || !criteriaNo) {
-        return res.status(200).json({
+      if (!requestId || !criteriaFileId) {
+        res.status(200).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Delete Selection Document',
-          Message: 'Missing request_id or criteria_no',
+          Message: 'Missing request_id or criteria_file_id',
         } as ResponseI)
+        return
       }
 
       await RequestRegisterPageModel.assertSelectionSheetEditable(requestId)
 
-      const criteriaRows = await RequestRegisterPageModel.getCriteriaFileForDelete({
-        REQUEST_REGISTER_VENDOR_ID: requestId,
-        CRITERIA_NO: criteriaNo,
-      })
-      const criteriaRow = criteriaRows[0]
+      const criteriaFile = await RequestRegisterPageModel.getCriteriaFileForDelete(
+        requestId,
+        criteriaFileId,
+      )
 
-      if (!criteriaRow) {
-        return res.status(200).json({
+      if (!criteriaFile) {
+        res.status(200).json({
           Status: false,
           ResultOnDb: {},
           TotalCountOnDb: 0,
           MethodOnDb: 'Delete Selection Document',
-          Message: 'Criteria document record not found',
+          Message: 'Criteria file record not found',
         } as ResponseI)
+        return
       }
 
-      const rawFilePath = String(
-        dataItem.FILE_PATH
-        || dataItem.file_path
-        || criteriaRow.UPLOADED_FILE_PATH
-        || ''
-      ).trim()
-      const rawFileName = String(
-        dataItem.FILE_NAME
-        || dataItem.file_name
-        || criteriaRow.UPLOADED_FILE_NAME
-        || ''
-      ).trim()
+      const rawFilePath = String(criteriaFile.FILE_PATH || '').trim()
+      const rawFileName = String(criteriaFile.FILE_NAME || '').trim()
 
       const deleteResult = rawFilePath
-        ? SelectionFileService.deleteSelectionFile(rawFilePath, rawFileName, rawRequestNumber)
+        ? RequestRegisterPageModel.deleteSelectionFile(rawFilePath, rawFileName, rawRequestNumber)
         : { deleted: false, filePath: '', reason: 'No file path in criteria record' }
 
-      await RequestRegisterPageModel.clearCriteriaUploadedFile({
-        REQUEST_VENDOR_SELECTIONS_ID: criteriaRow.REQUEST_VENDOR_SELECTIONS_ID,
-        CRITERIA_NO: criteriaNo,
-        UPDATE_BY: updateBy,
-      })
+      await RequestRegisterPageModel.softDeleteCriteriaFile(criteriaFileId, updateBy)
 
-      return res.status(200).json({
+      res.status(200).json({
         Status: true,
         ResultOnDb: {
-          criteria_no: criteriaNo,
+          criteria_file_id: criteriaFileId,
+          criteria_no: criteriaFile.CRITERIA_NO,
+          file_order: criteriaFile.FILE_ORDER,
           physical_deleted: deleteResult.deleted,
           deleted_file_path: deleteResult.filePath,
           reason: deleteResult.reason,
@@ -848,16 +918,18 @@ export const RequestRegisterPageController = {
           ? 'Selection document deleted successfully'
           : 'Selection document record cleared, but physical file was not found',
       } as ResponseI)
+      return
     } catch (error: any) {
       // console.error('Delete Selection Document Error:', error)
 
-      return res.status(200).json({
+      res.status(200).json({
         Status: false,
         ResultOnDb: {},
         TotalCountOnDb: 0,
         MethodOnDb: 'Delete Selection Document',
         Message: error?.message || 'Failed to delete selection document',
       } as ResponseI)
+      return
     }
   },
 }

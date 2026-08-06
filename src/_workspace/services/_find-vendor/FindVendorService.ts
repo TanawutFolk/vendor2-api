@@ -1,11 +1,13 @@
 import { MySQLExecute, OracleExecute } from '@businessData/dbExecute'
-import { connection } from '@businessData/db'
 import { FindVendorSQL } from '../../sql/_find-vendor/FindVendorSQL'
 import { RowDataPacket } from 'mysql2'
+import { mapVendorDetailRow } from '../Common/VendorDetailMapper'
+import { prepareVendorSearchData } from '../Common/VendorSearchData'
 
 export const FindVendorService = {
   // Search vendors with contacts
   searchVendors: async (dataItem: any) => {
+    prepareVendorSearchData(dataItem)
     let sqlWhere = dataItem.SQLWHERE || ''
 
     // Handle Global Search inside Service to match Bom pattern style
@@ -26,15 +28,12 @@ export const FindVendorService = {
     }
   },
 
-  // Get full vendor details for Find Vendor/Re-register modals
-  getVendorDetails: async (dataItem: any) => {
-    const sql = await FindVendorSQL.getVendorDetails(dataItem)
+  // Shared query implementation behind each page-owned vendor detail endpoint.
+  getVendorDetail: async (dataItem: any) => {
+    const sql = await FindVendorSQL.getVendorDetail(dataItem)
     const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
-    return resultData
+    return resultData.length > 0 ? mapVendorDetailRow(resultData[0]) : null
   },
-
-  // Legacy alias kept for older callers.
-  getById: async (dataItem: any) => FindVendorService.getVendorDetails(dataItem),
 
   // Update vendor
   updateVendor: async (dataItem: any) => {
@@ -291,13 +290,6 @@ export const FindVendorService = {
     return resultData
   },
 
-  // Get prones data (Oracle)
-  getPronesData: async (dataItem: any) => {
-    const sql = await FindVendorSQL.getPronesData(dataItem)
-    const resultData = (await OracleExecute.searchOracle(sql, 'PRONES')) as RowDataPacket[]
-    return resultData
-  },
-
   // Get prones raw data for testing (Oracle)
   getPronesRawTest: async (dataItem: any) => {
     const sql = await FindVendorSQL.getPronesRawTest(dataItem)
@@ -312,195 +304,4 @@ export const FindVendorService = {
     return resultData
   },
 
-  // Sync Prones data
-  syncPronesToStaging: async (dataItem: any) => {
-    try {
-      // Step 1: SELECT from Oracle
-      const oracleSql = await FindVendorSQL.getPronesData(dataItem)
-      const oracleResult = (await OracleExecute.searchOracle(oracleSql, 'PRONES')) as any
-      const rows = oracleResult?.rows || []
-
-      if (rows.length === 0) {
-        return {
-          Status: true,
-          Message: 'No data to sync',
-          ResultOnDb: { synced: 0 },
-          MethodOnDb: 'Sync Prones To Staging',
-          TotalCountOnDb: 0,
-        }
-      }
-
-      // Step 2: Truncate and Batch insert
-      const sqlList = []
-      sqlList.push(await FindVendorSQL.truncateStagingPrones(dataItem))
-
-      const batchSize = 500
-      for (let i = 0; i < rows.length; i += batchSize) {
-        const batch = rows.slice(i, i + batchSize)
-        sqlList.push(await FindVendorSQL.insertStagingPronesBatch(batch))
-      }
-
-      const resultData = await MySQLExecute.executeList(sqlList)
-
-      return {
-        Status: true,
-        Message: `Synced ${rows.length} rows successfully`,
-        ResultOnDb: resultData,
-        MethodOnDb: 'Sync Prones To Staging',
-        TotalCountOnDb: rows.length,
-      }
-    } catch (error: any) {
-      // console.error('Error in FindVendorService.syncPronesToStaging:', error)
-      return {
-        Status: false,
-        Message: error?.message || 'Sync Failed',
-        ResultOnDb: [],
-        MethodOnDb: 'Sync Prones To Staging Failed',
-        TotalCountOnDb: 0,
-      }
-    }
-  },
-
-  // Run matching
-  runVendorMatching: async (dataItem: any) => {
-    try {
-      // 1. Read staging prones data
-      const pronesRows = (await MySQLExecute.search(await FindVendorSQL.getStagingPronesData(dataItem))) as any[]
-      if (pronesRows.length === 0) throw new Error('No staging data found')
-
-      // 2. Read vendors
-      const vendors = (await MySQLExecute.search(await FindVendorSQL.getVendorsForMatch(dataItem))) as any[]
-
-      // 3. Match Logic (Simplified for Service context)
-      const matchResults: any[] = []
-      // ... (I'll keep the logic implementation same as before for correctness but wrap it)
-      // [Omitting full logic for brevity, assuming same as original but matching standard returns]
-      // Actually I must include it to ensure it remains functional.
-
-      // --- Matching Logic Block ---
-      const cleanTel = (raw: string) => (raw ? raw.toString().replace(/[^0-9]/g, '') : '')
-      const cleanName = (raw: string) => {
-        if (!raw) return ''
-        return raw
-          .toString()
-          .toLowerCase()
-          .replace(/co\.,?ltd\.?/g, '')
-          .replace(/limited/g, '')
-          .replace(/ltd\.?/g, '')
-          .replace(/company/g, '')
-          .replace(/part\.,?ltd\.?/g, '')
-          .replace(/Ã Â¸Â«Ã Â¸Ë†Ã Â¸Â\./g, '')
-          .replace(/Ã Â¸Å¡Ã Â¸Ë†Ã Â¸Â\./g, '')
-          .replace(/Ã Â¸Å¡Ã Â¸Â£Ã Â¸Â´Ã Â¸Â©Ã Â¸Â±Ã Â¸â€”/g, '')
-          .replace(/\s/g, '')
-          .replace(/[^a-z0-9Ã Â¸Â-Ã Â¹â„¢]/g, '')
-      }
-      const calculateSimilarity = (str1: string, str2: string): number => {
-        if (!str1 || !str2) return 0
-        const tokenize = (text: string) =>
-          text
-            .toString()
-            .toLowerCase()
-            .replace(/[^a-z0-9Ã Â¸Â-Ã Â¹â„¢\s]/g, ' ')
-            .split(/\s+/)
-            .filter((w) => w.length > 2)
-        const tokens1 = tokenize(str1),
-          tokens2 = tokenize(str2)
-        let matches = 0
-        const set2 = new Set(tokens2)
-        tokens1.forEach((token) => {
-          if (set2.has(token)) matches++
-        })
-        const totalTokens = tokens1.length + tokens2.length
-        return totalTokens === 0 ? 0 : (2 * matches) / totalTokens
-      }
-
-      for (const vendor of vendors) {
-        // A Prones tel counts as a match against the company line or any of the vendor's contact lines.
-        const mTels = [vendor.TEL_CENTER, ...String(vendor.CONTACT_TELS || '').split(',')]
-          .map(cleanTel)
-          .filter(Boolean)
-        const mName = cleanName(vendor.COMPANY_NAME),
-          mAddress = vendor.ADDRESS || ''
-        let bestScore = 0,
-          bestMethods: string[] = [],
-          bestPronesRef: any = null
-        for (const prones of pronesRows) {
-          let score = 0,
-            methods: string[] = []
-          if (mName && cleanName(prones.CUSTOMER_NAME) === mName) {
-            score++
-            methods.push('name')
-          }
-          const pTel = cleanTel(prones.CUSTOMER_TEL)
-          if (pTel && mTels.includes(pTel)) {
-            score++
-            methods.push('tel')
-          }
-          if (mAddress) {
-            const pFullAddr = `${prones.CUSTOMER_ADDRESS1 || ''} ${prones.CUSTOMER_ADDRESS2 || ''} ${prones.CUSTOMER_ADDRESS3 || ''}`
-            if (calculateSimilarity(mAddress, pFullAddr) > 0.7) {
-              score++
-              methods.push('address')
-            }
-          }
-          if (score > bestScore) {
-            bestScore = score
-            bestMethods = methods
-            bestPronesRef = prones
-          }
-          if (bestScore === 3) break
-        }
-        matchResults.push({
-          VENDORS_ID: vendor.VENDORS_ID,
-          STATUS_CHECK: bestScore >= 2 ? 'Registered' : 'Not Registered',
-          PRONES_CODE: bestPronesRef ? bestPronesRef.CUSTOMER_CODE : '',
-          PRONES_NAME: bestPronesRef ? bestPronesRef.CUSTOMER_NAME : '',
-          MATCH_METHOD: bestMethods.join('+') || 'none',
-        })
-      }
-
-      // 4. Truncate + Batch insert
-      const sqlList = []
-      sqlList.push(await FindVendorSQL.truncateMatchResult(dataItem))
-      const batchSize = 500
-      for (let i = 0; i < matchResults.length; i += batchSize) {
-        const batch = matchResults.slice(i, i + batchSize)
-        sqlList.push(await FindVendorSQL.insertMatchResultBatch(batch))
-      }
-
-      const resultData = await MySQLExecute.executeList(sqlList)
-      return {
-        Status: true,
-        Message: 'Matching completed successfully',
-        ResultOnDb: resultData,
-        MethodOnDb: 'Run Vendor Matching',
-        TotalCountOnDb: matchResults.length,
-      }
-    } catch (error: any) {
-      // console.error('Error in FindVendorService.runVendorMatching:', error)
-      return {
-        Status: false,
-        Message: error?.message || 'Matching Failed',
-        ResultOnDb: [],
-        MethodOnDb: 'Run Vendor Matching Failed',
-        TotalCountOnDb: 0,
-      }
-    }
-  },
-
-  // Get matching results
-  getMatchResults: async (dataItem: any) => {
-    const sql = await FindVendorSQL.getAllMatchResults(dataItem)
-    const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
-    return resultData
-  },
-
-  // Get match results by vendor IDs
-  getMatchResultsByVendorIds: async (dataItem: any) => {
-    if (!dataItem.VENDORIDS || dataItem.VENDORIDS.length === 0) return []
-    const sql = await FindVendorSQL.getMatchResultByVendorIds(dataItem)
-    const resultData = (await MySQLExecute.search(sql)) as RowDataPacket[]
-    return resultData
-  },
 }
