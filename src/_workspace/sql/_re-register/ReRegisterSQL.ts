@@ -445,47 +445,58 @@ export const ReRegisterSQL = {
 
   // Get vendor types for dropdown (source of truth: info_business_category,
   // which replaced the deprecated master_vendor_types table)
-  getVendorBusinessCategoryName: (_dataItem?: any) => {
+  getVendorBusinessCategoryName: (dataItem: any = {}) => {
     let sql = `
                             SELECT
-                                       BUSINESS_CATEGORY_ID AS value
-                                     , BUSINESS_CATEGORY_NAME AS label
+                                       BUSINESS_CATEGORY_ID
+                                     , BUSINESS_CATEGORY_NAME
                             FROM
                                        info_business_category
                             WHERE
                                        INUSE = 1
+                                       AND (
+                                              'dataItem.BUSINESS_CATEGORY_NAME' = ''
+                                              OR BUSINESS_CATEGORY_NAME LIKE '%dataItem.BUSINESS_CATEGORY_NAME%'
+                                       )
                             ORDER BY
                                        BUSINESS_CATEGORY_NAME ASC
         `
+    sql = sql.replaceAll(
+      'dataItem.BUSINESS_CATEGORY_NAME',
+      String(dataItem.BUSINESS_CATEGORY_NAME || '').trim().replaceAll("'", "''")
+    )
     return sql
   },
 
   getVendorTypes: (dataItem?: any) => ReRegisterSQL.getVendorBusinessCategoryName(dataItem),
 
   // Get provinces for dropdown
-  getProvinces: (_dataItem?: any) => {
+  getProvinces: (dataItem: any = {}) => {
     let sql = `
                             SELECT
-                                       PROVINCE AS value
-                                     , PROVINCE AS label
+                                       PROVINCE
                             FROM
                                        info_province
                             WHERE
                                        IFNULL(INUSE, 1) = 1
                                        AND PROVINCE IS NOT NULL
                                        AND TRIM(PROVINCE) != ''
+                                       AND (
+                                              'dataItem.PROVINCE' = ''
+                                              OR PROVINCE LIKE '%dataItem.PROVINCE%'
+                                       )
                             ORDER BY
                                        PROVINCE ASC
         `
+    sql = sql.replaceAll('dataItem.PROVINCE', String(dataItem.PROVINCE || '').trim().replaceAll("'", "''"))
     return sql
   },
   // Get countries for dropdown
-  getCountries: (_dataItem?: any) => {
+  getCountries: (dataItem: any = {}) => {
     let sql = `
                             SELECT
-                                       INFO_COUNTRY_NAME AS value
-                                     , INFO_COUNTRY_NAME AS label
-                                     , INFO_COUNTRY_ID
+                                       INFO_COUNTRY_ID
+                                     , INFO_COUNTRY_NAME
                                      , DESCRIPTION
                             FROM
                                        info_country
@@ -493,26 +504,39 @@ export const ReRegisterSQL = {
                                        IFNULL(INUSE, 1) = 1
                                        AND INFO_COUNTRY_NAME IS NOT NULL
                                        AND TRIM(INFO_COUNTRY_NAME) != ''
+                                       AND (
+                                              'dataItem.INFO_COUNTRY_NAME' = ''
+                                              OR INFO_COUNTRY_NAME LIKE '%dataItem.INFO_COUNTRY_NAME%'
+                                       )
                             ORDER BY
                                        INFO_COUNTRY_NAME ASC
         `
+    sql = sql.replaceAll(
+      'dataItem.INFO_COUNTRY_NAME',
+      String(dataItem.INFO_COUNTRY_NAME || '').trim().replaceAll("'", "''")
+    )
     return sql
   },
 
 
   // Get product groups for dropdown
-  getProductGroups: (_dataItem?: any) => {
+  getProductGroups: (dataItem: any = {}) => {
     let sql = `
                             SELECT
-                                       MASTER_PRODUCT_GROUPS_ID AS value
-                                     , GROUP_NAME AS label
+                                       MASTER_PRODUCT_GROUPS_ID
+                                     , GROUP_NAME
                             FROM
                                        master_product_groups
                             WHERE
                                        INUSE = 1
+                                       AND (
+                                              'dataItem.GROUP_NAME' = ''
+                                              OR GROUP_NAME LIKE '%dataItem.GROUP_NAME%'
+                                       )
                             ORDER BY
                                        GROUP_NAME ASC
         `
+    sql = sql.replaceAll('dataItem.GROUP_NAME', String(dataItem.GROUP_NAME || '').trim().replaceAll("'", "''"))
     return sql
   },
 

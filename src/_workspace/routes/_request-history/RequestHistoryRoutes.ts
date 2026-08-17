@@ -8,6 +8,7 @@ requestHistoryRoutes.post('/getApprovalSteps', RequestHistoryController.getAppro
 requestHistoryRoutes.post('/getApprovalLogs', RequestHistoryController.getApprovalLogs)
 requestHistoryRoutes.post('/resolveEmployeeProfile', RequestHistoryController.resolveEmployeeProfile)
 requestHistoryRoutes.post('/getGprCProducts', RequestHistoryController.getGprCProducts)
+requestHistoryRoutes.post('/getGprCSections', RequestHistoryController.getGprCSections)
 requestHistoryRoutes.post('/getSelectionForm', RequestHistoryController.getSelectionForm)
 
 // Compatibility alias used by the current frontend.

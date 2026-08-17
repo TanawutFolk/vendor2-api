@@ -7,11 +7,11 @@ import {
   email_ToGprCApprover_NextStep,
   email_ToRequester_RegistrationIncomplete,
   email_ToPic_RejectedByApprover,
-  email_ToPic_RejectedByChecker,
+  email_ToPic_RecheckByApprover,
+  email_ToPic_RecheckByGprCApprover,
   email_ToPic_RequestRegisterVendor,
   email_ToAccount_RegisterRequired,
   email_ToChecker_CheckRequired,
-  email_ToChecker_ReturnedByPoMgr,
   email_ToMd_ApproveRequired,
   email_ToPoGm_ApproveRequired,
   email_ToPoManager_ApproveRequired,
@@ -55,8 +55,8 @@ const templates = [
   email_ToGprCApprover_NextStep,
   email_ToPic_RejectedByApprover,
   email_ToChecker_CheckRequired,
-  email_ToChecker_ReturnedByPoMgr,
-  email_ToPic_RejectedByChecker,
+  email_ToPic_RecheckByApprover,
+  email_ToPic_RecheckByGprCApprover,
   email_ToPoManager_ApproveRequired,
   email_ToPoGm_ApproveRequired,
   email_ToMd_ApproveRequired,
@@ -88,12 +88,22 @@ describe('mail templates', () => {
     expect(html).toContain('<div>PO &amp; SCM PIC</div>')
   })
 
-  test('renders the PO Mgr return remark for Document Check', () => {
-    const html = email_ToChecker_ReturnedByPoMgr(sample)
+  test('renders the approver re-check remark for PO PIC', () => {
+    const html = email_ToPic_RecheckByApprover(sample)
 
-    expect(html).toContain('Returned by PO Mgr for document recheck')
+    expect(html).toContain('Vendor registration requires recheck')
     expect(html).toContain('Please correct the document.')
-    expect(html).toContain('PO &amp; SCM Check All Document')
+  })
+
+  test('renders the GPR C approver re-check remark for PO PIC', () => {
+    const html = email_ToPic_RecheckByGprCApprover({
+      ...sample,
+      stageLabel: 'QMS Approver',
+    })
+
+    expect(html).toContain('GPR C re-check requested')
+    expect(html).toContain('QMS Approver')
+    expect(html).toContain('Please correct the document.')
   })
 
   test('does not render empcode or email values as signature names', () => {

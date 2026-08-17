@@ -497,6 +497,16 @@ BEGIN
         SELECT 1 FROM information_schema.COLUMNS
         WHERE TABLE_SCHEMA = DATABASE()
           AND TABLE_NAME = 'request_approval_log'
+          AND COLUMN_NAME = 'RECHECK_REASON'
+    ) THEN
+        ALTER TABLE request_approval_log
+            ADD COLUMN RECHECK_REASON VARCHAR(500) NULL AFTER REJECT_REASON;
+    END IF;
+
+    IF NOT EXISTS (
+        SELECT 1 FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'request_approval_log'
           AND COLUMN_NAME = 'STEP_CODE_SNAPSHOT'
     ) THEN
         ALTER TABLE request_approval_log
@@ -579,9 +589,10 @@ BEGIN
         ('ISSUE_GPR_C', 'DISAGREE', 'VENDOR_DISAGREED', 'rejected', NULL, 1),
         ('ISSUE_GPR_C', 'REJECT', NULL, 'rejected', NULL, 1),
         ('DOC_CHECK', 'APPROVE', 'PO_MGR_APPROVAL', NULL, NULL, 1),
-        ('DOC_CHECK', 'REJECT', 'PO_PIC_IN_PROGRESS', NULL, 'RETURN_TO_PIC', 1),
+        ('DOC_CHECK', 'RECHECK', 'PO_PIC_IN_PROGRESS', NULL, 'RECHECK_TO_PIC', 1),
         ('PO_MGR_APPROVAL', 'APPROVE', 'PO_GM_APPROVAL', NULL, NULL, 1),
         ('PO_MGR_APPROVAL', 'REJECT', NULL, 'rejected', NULL, 1),
+        ('PO_MGR_APPROVAL', 'RECHECK', 'PO_PIC_IN_PROGRESS', NULL, 'RECHECK_TO_PIC', 1),
         ('PO_GM_APPROVAL', 'APPROVE', 'MD_APPROVAL', NULL, NULL, 1),
         ('PO_GM_APPROVAL', 'REJECT', NULL, 'rejected', NULL, 1),
         ('MD_APPROVAL', 'APPROVE', 'ACCOUNT_REGISTERED', NULL, NULL, 1),

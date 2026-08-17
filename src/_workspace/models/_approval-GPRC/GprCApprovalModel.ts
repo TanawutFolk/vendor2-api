@@ -2,6 +2,7 @@ import { GprCApprovalService } from '../../services/_approval-GPRC/GprCApprovalS
 
 export const GprCApprovalModel = {
   gprCApproveStep: async (dataItem: any) => GprCApprovalService.approveStep(dataItem),
+  gprCRecheckStep: async (dataItem: any) => GprCApprovalService.recheckStep(dataItem),
   gprCRejectStep: async (dataItem: any) => GprCApprovalService.rejectStep(dataItem),
   gprCActionRequired: async (dataItem: any) => GprCApprovalService.actionRequired(dataItem),
   gprCRecordActionResult: async (dataItem: any) => GprCApprovalService.recordActionResult(dataItem),

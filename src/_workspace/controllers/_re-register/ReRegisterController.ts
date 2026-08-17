@@ -405,12 +405,12 @@ export const ReRegisterController = {
     return
   },
 
-  getVendorTypes: async (_req: Request, res: Response) =>
-    dropdownResponse(res, 'Get Re-register Vendor Types', ReRegisterModel.getVendorTypes),
-  getProvinces: async (_req: Request, res: Response) =>
-    dropdownResponse(res, 'Get Re-register Provinces', ReRegisterModel.getProvinces),
-  getCountries: async (_req: Request, res: Response) =>
-    dropdownResponse(res, 'Get Re-register Countries', ReRegisterModel.getCountries),
-  getProductGroups: async (_req: Request, res: Response) =>
-    dropdownResponse(res, 'Get Re-register Product Groups', ReRegisterModel.getProductGroups),
+  getVendorTypes: async (req: Request, res: Response) =>
+    dropdownResponse(res, 'Get Re-register Vendor Types', () => ReRegisterModel.getVendorTypes(requestData(req))),
+  getProvinces: async (req: Request, res: Response) =>
+    dropdownResponse(res, 'Get Re-register Provinces', () => ReRegisterModel.getProvinces(requestData(req))),
+  getCountries: async (req: Request, res: Response) =>
+    dropdownResponse(res, 'Get Re-register Countries', () => ReRegisterModel.getCountries(requestData(req))),
+  getProductGroups: async (req: Request, res: Response) =>
+    dropdownResponse(res, 'Get Re-register Product Groups', () => ReRegisterModel.getProductGroups(requestData(req))),
 }

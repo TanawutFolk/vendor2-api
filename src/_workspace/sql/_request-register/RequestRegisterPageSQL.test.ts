@@ -241,6 +241,7 @@ describe('RequestRegisterPageSQL approval step identity', () => {
 
   test('stores Product Checkers as normalized selection child rows', () => {
     const readSql = RequestRegisterPageSQL.getGprProductCheckers({ REQUEST_VENDOR_SELECTIONS_ID: 10 })
+    const sectionLookupSql = RequestRegisterPageSQL.getSectionByName({ SECTION_NAME: "QA's Section" })
     const deactivateSql = RequestRegisterPageSQL.deactivateGprProductCheckers({
       REQUEST_VENDOR_SELECTIONS_ID: 10,
       UPDATE_BY: 'S00001',
@@ -256,9 +257,22 @@ describe('RequestRegisterPageSQL approval step identity', () => {
       CREATE_BY: 'S00001',
       UPDATE_BY: 'S00001',
     })
+    const sectionInsertSql = RequestRegisterPageSQL.insertGprProductChecker({
+      REQUEST_VENDOR_SELECTIONS_ID: 10,
+      ITEM_ORDER: 2,
+      PRODUCT_MAIN_ID: null,
+      PRODUCT_MAIN_NAME: '',
+      SECTION_NAME: "QA's Section",
+      CHECKER_EMPCODE: 'S00003',
+      CHECKER_NAME: 'Section Checker',
+      CHECKER_EMAIL: 'section.checker@example.com',
+      CREATE_BY: 'S00001',
+      UPDATE_BY: 'S00001',
+    })
 
     expect(readSql).toContain('request_vendor_gpr_c_product_group_checkers')
     expect(readSql).toContain('PRODUCT_MAIN_ID')
+    expect(readSql).toContain('SECTION_NAME')
     expect(readSql).not.toContain('master_product_groups')
     expect(readSql).toContain('pgc.INUSE = 1')
     expect(deactivateSql).toContain('INUSE = 0')
@@ -266,6 +280,11 @@ describe('RequestRegisterPageSQL approval step identity', () => {
     expect(insertSql).toContain('PRODUCT_MAIN_ID')
     expect(insertSql).toContain("Engineer''s Parts (EP)")
     expect(insertSql).toContain("O''Brien")
+    expect(sectionLookupSql).toContain('set_section_fed')
+    expect(sectionLookupSql).toContain("QA''s Section")
+    expect(sectionInsertSql).toContain("QA''s Section")
+    expect(sectionInsertSql).toContain('NULL')
+    expect(sectionInsertSql).toContain('GPR C checker assignment by Product Main or Section')
     expect(insertSql).not.toContain('FOREIGN KEY')
   })
 

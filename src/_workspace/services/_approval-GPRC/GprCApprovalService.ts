@@ -7,6 +7,7 @@ import {
   email_ToGprCApprover_NextStep,
   email_ToRequester_GprCSetup,
   email_ToGprCApprover_FirstStep,
+  email_ToPic_RecheckByGprCApprover,
 } from '@src/config/mailTemplate'
 import { GprCApprovalSQL } from '../../sql/_approval-GPRC/GprCApprovalSQL'
 import { RequestRegisterPageSQL } from '../../sql/_request-register/RequestRegisterPageSQL'
@@ -21,11 +22,7 @@ import {
   getWorkflowStepIdentity,
 } from '../_status-master/StatusIdentityService'
 import { buildGprCBaseMailData as buildBaseMailData } from './GprCApprovalMailData'
-import {
-  GROUP_CODE,
-  mergeUniqueEmails,
-  normalizeEmail,
-} from '../_request-register/RegisterRequestWorkflowHelper'
+import { GROUP_CODE, mergeUniqueEmails, normalizeEmail } from '../_request-register/RegisterRequestWorkflowHelper'
 
 const getGprCMainWorkflowIdentity = async () => {
   const [workflowStep, approvalStep, requestState, requestStatus] = await Promise.all([
@@ -39,19 +36,13 @@ const getGprCMainWorkflowIdentity = async () => {
 }
 
 const getGprCMainWorkflowRejectionIdentity = async () => {
-  const [statusIdentity, vendor] = await Promise.all([
-    getGprCMainWorkflowIdentity(),
-    getVendorStatusIdentity(),
-  ])
+  const [statusIdentity, vendor] = await Promise.all([getGprCMainWorkflowIdentity(), getVendorStatusIdentity()])
 
   return { ...statusIdentity, vendor }
 }
 
 const getGprCStepStatusIdentity = async () => {
-  const [approvalStep, gprCFlow] = await Promise.all([
-    getApprovalStepStatusIdentity(),
-    getGprCFlowStatusIdentity(),
-  ])
+  const [approvalStep, gprCFlow] = await Promise.all([getApprovalStepStatusIdentity(), getGprCFlowStatusIdentity()])
 
   return { approvalStep, gprCFlow }
 }
@@ -107,15 +98,7 @@ const getRequesterProfile = async (empcodeRaw: any) => {
 }
 
 const isActionRequiredStep = (stepCode: string) =>
-  [
-    'PRODUCT_GROUP_CHECKER',
-    'REQUESTER_APPROVER',
-    'EMR_CHECKER',
-    'EMR_APPROVER',
-    'QMS_CHECKER',
-    'QMS_APPROVER',
-    'PM_MANAGER_APPROVER',
-  ].includes(stepCode)
+  ['PRODUCT_GROUP_CHECKER', 'REQUESTER_APPROVER', 'EMR_CHECKER', 'EMR_APPROVER', 'QMS_CHECKER', 'QMS_APPROVER', 'PM_MANAGER_APPROVER'].includes(stepCode)
 
 const GPR_C_STEP_DEFS = [
   { order: 1, code: 'REQUESTER_APPROVER', name: 'Requester Approver', source: 'REQUESTER_APPROVER' },
@@ -146,9 +129,9 @@ const runGprCPostCommitTasks = async (tasks: GprCPostCommitTask[], _requestId: n
   results.forEach((result, _index) => {
     if (result.status === 'rejected') {
       // console.error('[GprCApprovalService] postCommitTask failed', {
-        // taskIndex: index,
-        // request_id: requestId,
-        // error: result.reason instanceof Error ? result.reason.message : result.reason,
+      // taskIndex: index,
+      // request_id: requestId,
+      // error: result.reason instanceof Error ? result.reason.message : result.reason,
       // })
     }
   })
@@ -305,31 +288,46 @@ const buildCircularMembers = async (empcodesRaw: any[]) => {
 
 const buildProductCheckers = async (rawItems: any[]) => {
   const items = Array.isArray(rawItems) ? rawItems : []
-  if (items.length === 0) throw new Error('At least one Product and Checker is required')
+  if (items.length === 0) throw new Error('At least one Product Main or Section and Checker is required')
 
-  const seenProductIds = new Set<number>()
+  const seenSelectorKeys = new Set<string>()
   const result = []
 
   for (const [index, rawItem] of items.entries()) {
-    const productMainId = Number(
-      rawItem?.product_main_id || rawItem?.PRODUCT_MAIN_ID || rawItem?.product_group_id || rawItem?.MASTER_PRODUCT_GROUPS_ID || 0
-    )
+    const productMainId = Number(rawItem?.product_main_id || rawItem?.PRODUCT_MAIN_ID || rawItem?.product_group_id || rawItem?.MASTER_PRODUCT_GROUPS_ID || 0)
+    const sectionName = normalizeValue(rawItem?.section_name || rawItem?.SECTION_NAME)
     const checkerEmpcode = normalizeValue(rawItem?.checker_empcode || rawItem?.CHECKER_EMPCODE)
-    if (!productMainId) throw new Error(`Product is required for Checker row ${index + 1}`)
-    if (!checkerEmpcode) throw new Error(`Checker employee code is required for Product row ${index + 1}`)
-    if (seenProductIds.has(productMainId)) throw new Error('Product cannot be selected more than once')
-    seenProductIds.add(productMainId)
+    if (Number(Boolean(productMainId)) + Number(Boolean(sectionName)) !== 1) {
+      throw new Error(`Choose either Product Main or Section for Checker row ${index + 1}`)
+    }
+    if (!checkerEmpcode) throw new Error(`Checker employee code is required for row ${index + 1}`)
 
-    const productRows = (await MySQLExecute.search(
-      RequestRegisterPageSQL.getActiveProductMainById({ PRODUCT_MAIN_ID: productMainId })
-    )) as RowDataPacket[]
-    const product = productRows[0]
-    if (!product) throw new Error(`Product not found or inactive for row ${index + 1}`)
+    const selectorKey = productMainId ? `PRODUCT:${productMainId}` : `SECTION:${sectionName.toUpperCase()}`
+    if (seenSelectorKeys.has(selectorKey)) {
+      throw new Error(productMainId ? 'Product Main cannot be selected more than once' : 'Section cannot be selected more than once')
+    }
+    seenSelectorKeys.add(selectorKey)
+
+    let productMainName = ''
+    let resolvedSectionName = ''
+    if (productMainId) {
+      const productRows = (await MySQLExecute.search(RequestRegisterPageSQL.getActiveProductMainById({ PRODUCT_MAIN_ID: productMainId }))) as RowDataPacket[]
+      const product = productRows[0]
+      if (!product) throw new Error(`Product Main not found or inactive for row ${index + 1}`)
+      productMainName = normalizeValue(getValue(product, 'PRODUCT_MAIN_NAME', 'product_main_name'))
+    } else {
+      const sectionRows = (await MySQLExecute.search(RequestRegisterPageSQL.getSectionByName({ SECTION_NAME: sectionName }))) as RowDataPacket[]
+      const section = sectionRows[0]
+      if (!section) throw new Error(`Section not found for row ${index + 1}`)
+      resolvedSectionName = normalizeValue(getValue(section, 'SECTION_NAME', 'section_name'))
+    }
 
     const checker = await getMemberProfile(checkerEmpcode)
     result.push({
-      product_main_id: productMainId,
-      product_main_name: normalizeValue(getValue(product, 'PRODUCT_MAIN_NAME', 'product_main_name')),
+      product_main_id: productMainId || null,
+      product_main_name: productMainName,
+      section_name: resolvedSectionName,
+      selector_name: productMainName || resolvedSectionName,
       checker,
     })
   }
@@ -342,7 +340,7 @@ const resolveStepApprovers = async (requesterApprover: any, productCheckers: any
   const result = productCheckers.map((item, index) => ({
     order: index + 1,
     code: 'PRODUCT_GROUP_CHECKER',
-    name: `${item.product_main_name} Checker`,
+    name: `${item.selector_name} Checker`,
     source: 'PRODUCT_GROUP_CHECKER',
     approver: item.checker,
   }))
@@ -382,24 +380,24 @@ const sendGprCEmail = async (payload: { templateName: string; toEmail: string; c
   })
   if (!mailResult.success) {
     // console.error('[GPR C MAIL][failed]', {
-      // templateName: payload.templateName,
-      // toEmail: payload.toEmail,
-      // ccCount: payload.ccEmails?.length || 0,
-      // subject: payload.subject,
-      // requestId: payload.requestId,
-      // requestNumber: payload.requestNumber,
-      // reason: mailResult.reason || 'sendEmail returned failed',
-    // })
-    return
-  }
-
-  // console.log('[GPR C MAIL][sent]', {
     // templateName: payload.templateName,
     // toEmail: payload.toEmail,
     // ccCount: payload.ccEmails?.length || 0,
     // subject: payload.subject,
     // requestId: payload.requestId,
     // requestNumber: payload.requestNumber,
+    // reason: mailResult.reason || 'sendEmail returned failed',
+    // })
+    return
+  }
+
+  // console.log('[GPR C MAIL][sent]', {
+  // templateName: payload.templateName,
+  // toEmail: payload.toEmail,
+  // ccCount: payload.ccEmails?.length || 0,
+  // subject: payload.subject,
+  // requestId: payload.requestId,
+  // requestNumber: payload.requestNumber,
   // })
 }
 
@@ -443,20 +441,19 @@ const notifyStepApprover = async (requestId: number, step: any, ccEmails: string
     (email) => email !== approverEmail
   )
   const templateName = isFirstStep ? 'email_ToGprCApprover_FirstStep' : 'email_ToGprCApprover_NextStep'
-  const emailHtml =
-    isFirstStep
-      ? email_ToGprCApprover_FirstStep({
-          ...mailData,
-          userName: approverName,
-          recipientName: approverName,
-          picName: requester?.name || poPicContext.picName,
-        })
-      : email_ToGprCApprover_NextStep({
-          ...mailData,
-          picNextStepName: approverName,
-          recipientName: approverName,
-          picName: requester?.name || poPicContext.picName,
-        })
+  const emailHtml = isFirstStep
+    ? email_ToGprCApprover_FirstStep({
+        ...mailData,
+        userName: approverName,
+        recipientName: approverName,
+        picName: requester?.name || poPicContext.picName,
+      })
+    : email_ToGprCApprover_NextStep({
+        ...mailData,
+        picNextStepName: approverName,
+        recipientName: approverName,
+        picName: requester?.name || poPicContext.picName,
+      })
 
   await sendGprCEmail({
     templateName,
@@ -498,9 +495,7 @@ const notifyActionResultRecorded = async (record: any) => {
   const stepId = Number(getValue(record, 'REQUEST_VENDOR_GPR_C_STEPS_ID', 'gpr_c_step_id'))
   if (!requestId || !stepId) return
 
-  const stepRows = (await MySQLExecute.search(
-    GprCApprovalSQL.getStepById({ REQUEST_VENDOR_GPR_C_STEPS_ID: stepId })
-  )) as RowDataPacket[]
+  const stepRows = (await MySQLExecute.search(GprCApprovalSQL.getStepById({ REQUEST_VENDOR_GPR_C_STEPS_ID: stepId }))) as RowDataPacket[]
   const step = stepRows[0]
   const approverEmail = normalizeEmail(getValue(step, 'APPROVER_EMAIL', 'approver_email'))
   if (!approverEmail) return
@@ -534,6 +529,7 @@ const notifyActionResultRecorded = async (record: any) => {
 const loadMainWorkflowTransition = async (
   requestId: number,
   currentStep: any,
+  actionCode: 'APPROVE' | 'REJECT' | 'RECHECK',
   targetWorkflowStepMasterId: number | null,
   terminalRequestStateId: number | null,
   requestInProgressStateId: number
@@ -544,6 +540,7 @@ const loadMainWorkflowTransition = async (
   const sql = await GprCApprovalSQL.getMainWorkflowTransition({
     REQUEST_REGISTER_VENDOR_ID: requestId,
     CURRENT_WORKFLOW_STEP_MASTER_ID: workflowStepId,
+    ACTION_CODE: actionCode,
     TARGET_WORKFLOW_STEP_MASTER_ID: targetWorkflowStepMasterId,
     TERMINAL_REQUEST_STATE_ID: terminalRequestStateId,
     M_REQUEST_IN_PROGRESS_STATE_ID: requestInProgressStateId,
@@ -556,14 +553,36 @@ const loadMainWorkflowTransition = async (
   return transition
 }
 
-const executeGuardedMainWorkflow = async (
-  requestId: number,
-  currentStep: any,
-  context: any,
-  actionBy: string,
-  requestInProgressStateId: number,
-  sqlList: string[]
-) => {
+const notifyPoPicGprCRecheck = async (requestId: number, step: any, remark: string) => {
+  const summary = await getRequestSummary(requestId)
+  const poPicContext = await getPoPicMailContext(summary)
+  if (!poPicContext.picEmail) return
+
+  const approverEmail = normalizeEmail(getValue(step, 'APPROVER_EMAIL', 'approver_email'))
+  const approverName = normalizeValue(getValue(step, 'APPROVER_NAME', 'approver_name')) || 'GPR C Approver'
+  const stepName = normalizeValue(getValue(step, 'STEP_NAME', 'step_name')) || approverName
+  const mailData = buildBaseMailData(summary, requestId, poPicContext.picName)
+  const ccEmails = mergeUniqueEmails(poPicContext.peerPicCc, approverEmail ? [approverEmail] : []).filter((email) => email !== poPicContext.picEmail)
+
+  await sendGprCEmail({
+    templateName: 'email_ToPic_RecheckByGprCApprover',
+    toEmail: poPicContext.picEmail,
+    ccEmails,
+    subject: `[GPR C Re-check] ${mailData.requestNumber} - ${stepName}`,
+    requestId,
+    requestNumber: mailData.requestNumber,
+    html: email_ToPic_RecheckByGprCApprover({
+      ...mailData,
+      recipientName: poPicContext.picName,
+      stageLabel: stepName,
+      remarkEN: remark,
+      remarkTH: remark,
+      picName: approverName,
+    }),
+  })
+}
+
+const executeGuardedMainWorkflow = async (requestId: number, currentStep: any, context: any, actionBy: string, requestInProgressStateId: number, sqlList: string[]) => {
   const currentTaskId = Number(getValue(context, 'CURRENT_REQUEST_APPROVAL_STEP_ID', 'current_step_id'))
   const lockVersion = Number(getValue(context, 'LOCK_VERSION', 'lock_version'))
   if (!currentTaskId || currentTaskId !== Number(currentStep.step_id)) {
@@ -586,27 +605,14 @@ const markMainIssueGprCApproved = async (requestId: number, actionBy: string, re
     GprCApprovalSQL.getRequestStatusContext({ REQUEST_REGISTER_VENDOR_ID: requestId }),
     getGprCMainWorkflowIdentity(),
   ])
-  const [stepRows, contextRows] = await Promise.all([
-    MySQLExecute.search(stepsSql) as Promise<RowDataPacket[]>,
-    MySQLExecute.search(contextSql) as Promise<RowDataPacket[]>,
-  ])
+  const [stepRows, contextRows] = await Promise.all([MySQLExecute.search(stepsSql) as Promise<RowDataPacket[]>, MySQLExecute.search(contextSql) as Promise<RowDataPacket[]>])
   const steps = stepRows.map(normalizeMainApprovalStep)
   const context = contextRows[0]
   const currentTaskId = Number(getValue(context, 'CURRENT_REQUEST_APPROVAL_STEP_ID', 'current_step_id'))
-  const currentStep = steps.find(
-    (step: any) =>
-      step.step_id === currentTaskId &&
-      step.approval_step_status_id === statusIdentity.approvalStep.inProgress
-  )
+  const currentStep = steps.find((step: any) => step.step_id === currentTaskId && step.approval_step_status_id === statusIdentity.approvalStep.inProgress)
   if (!currentStep || currentStep.workflow_step_id !== statusIdentity.workflowStep.issueGprC) return null
 
-  const transition = await loadMainWorkflowTransition(
-    requestId,
-    currentStep,
-    statusIdentity.workflowStep.docCheck,
-    null,
-    statusIdentity.requestState.inProgress
-  )
+  const transition = await loadMainWorkflowTransition(requestId, currentStep, 'APPROVE', statusIdentity.workflowStep.docCheck, null, statusIdentity.requestState.inProgress)
   const nextStepId = Number(getValue(transition, 'NEXT_REQUEST_APPROVAL_STEP_ID'))
   if (!nextStepId) {
     throw new Error('Configured Issue GPR C approval transition has no runtime target task')
@@ -656,14 +662,7 @@ const markMainIssueGprCApproved = async (requestId: number, actionBy: string, re
     }),
   ]
 
-  await executeGuardedMainWorkflow(
-    requestId,
-    currentStep,
-    context,
-    actionBy,
-    statusIdentity.requestState.inProgress,
-    sqlList
-  )
+  await executeGuardedMainWorkflow(requestId, currentStep, context, actionBy, statusIdentity.requestState.inProgress, sqlList)
   return nextStep
 }
 
@@ -673,28 +672,15 @@ const markMainIssueGprCRejected = async (requestId: number, actionBy: string, re
     GprCApprovalSQL.getRequestStatusContext({ REQUEST_REGISTER_VENDOR_ID: requestId }),
     getGprCMainWorkflowRejectionIdentity(),
   ])
-  const [stepRows, contextRows] = await Promise.all([
-    MySQLExecute.search(stepsSql) as Promise<RowDataPacket[]>,
-    MySQLExecute.search(contextSql) as Promise<RowDataPacket[]>,
-  ])
+  const [stepRows, contextRows] = await Promise.all([MySQLExecute.search(stepsSql) as Promise<RowDataPacket[]>, MySQLExecute.search(contextSql) as Promise<RowDataPacket[]>])
   const steps = stepRows.map(normalizeMainApprovalStep)
   const context = contextRows[0]
   const currentTaskId = Number(getValue(context, 'CURRENT_REQUEST_APPROVAL_STEP_ID', 'current_step_id'))
-  const currentStep = steps.find(
-    (step: any) =>
-      step.step_id === currentTaskId &&
-      step.approval_step_status_id === statusIdentity.approvalStep.inProgress
-  )
+  const currentStep = steps.find((step: any) => step.step_id === currentTaskId && step.approval_step_status_id === statusIdentity.approvalStep.inProgress)
   if (!currentStep || currentStep.workflow_step_id !== statusIdentity.workflowStep.issueGprC) {
     throw new Error('Issue GPR C is no longer the active main workflow task')
   }
-  const transition = await loadMainWorkflowTransition(
-    requestId,
-    currentStep,
-    null,
-    statusIdentity.requestState.rejected,
-    statusIdentity.requestState.inProgress
-  )
+  const transition = await loadMainWorkflowTransition(requestId, currentStep, 'REJECT', null, statusIdentity.requestState.rejected, statusIdentity.requestState.inProgress)
 
   const sqlList = []
   const vendorId = getValue(context, 'vendor_id', 'VENDORS_ID')
@@ -723,9 +709,10 @@ const markMainIssueGprCRejected = async (requestId: number, actionBy: string, re
       REQUEST_REGISTER_VENDOR_ID: requestId,
       REQUEST_APPROVAL_STEP_ID: currentStep.step_id,
       ACTION_BY: actionBy || 'SYSTEM',
-      ACTION_TYPE: String(getValue(transition, 'ACTION_CODE')).toLowerCase(),
+      ACTION_TYPE: 'rejected',
       ACTION_CODE: getValue(transition, 'ACTION_CODE'),
-      REMARK: remark || 'GPR C sub-workflow rejected',
+      REMARK: '',
+      REJECT_REASON: remark || 'GPR C sub-workflow rejected',
     })
   )
   for (const step of steps.filter((item: any) => item.approval_step_status_id === statusIdentity.approvalStep.pending)) {
@@ -743,27 +730,236 @@ const markMainIssueGprCRejected = async (requestId: number, actionBy: string, re
     )
   }
 
-  await executeGuardedMainWorkflow(
-    requestId,
-    currentStep,
-    context,
-    actionBy,
-    statusIdentity.requestState.inProgress,
-    sqlList
-  )
+  await executeGuardedMainWorkflow(requestId, currentStep, context, actionBy, statusIdentity.requestState.inProgress, sqlList)
   return { ...currentStep, approver_id: getValue(currentStep, 'approver_id', 'APPROVER_EMPCODE') }
 }
+
+const markMainIssueGprCRecheckToPic = async (requestId: number, flowId: number, currentGprStep: any, actionBy: string, remark: string) => {
+  const [stepsSql, contextSql, statusIdentity, gprCFlowStatus] = await Promise.all([
+    GprCApprovalSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId }),
+    GprCApprovalSQL.getRequestStatusContext({ REQUEST_REGISTER_VENDOR_ID: requestId }),
+    getGprCMainWorkflowIdentity(),
+    getGprCFlowStatusIdentity(),
+  ])
+  const [stepRows, contextRows] = await Promise.all([MySQLExecute.search(stepsSql) as Promise<RowDataPacket[]>, MySQLExecute.search(contextSql) as Promise<RowDataPacket[]>])
+  const steps = stepRows.map(normalizeMainApprovalStep)
+  const context = contextRows[0]
+  const currentTaskId = Number(getValue(context, 'CURRENT_REQUEST_APPROVAL_STEP_ID', 'current_step_id'))
+  const currentMainStep = steps.find((step: any) => step.step_id === currentTaskId && step.approval_step_status_id === statusIdentity.approvalStep.inProgress)
+  if (!currentMainStep || currentMainStep.workflow_step_id !== statusIdentity.workflowStep.issueGprC) {
+    throw new Error('Issue GPR C is no longer the active main workflow task')
+  }
+
+  const transition = await loadMainWorkflowTransition(
+    requestId,
+    currentMainStep,
+    'RECHECK',
+    statusIdentity.workflowStep.poPicInProgress,
+    null,
+    statusIdentity.requestState.inProgress
+  )
+  if (normalizeValue(getValue(transition, 'ACTION_CODE')).toUpperCase() !== 'RECHECK' || normalizeValue(getValue(transition, 'CONDITION_KEY')).toUpperCase() !== 'RECHECK_TO_PIC') {
+    throw new Error('Workflow configuration error: GPR C RECHECK must target PO PIC In Progress.')
+  }
+
+  const targetStep = normalizeMainApprovalStep({
+    REQUEST_APPROVAL_STEP_ID: getValue(transition, 'NEXT_REQUEST_APPROVAL_STEP_ID'),
+    WORKFLOW_STEP_MASTER_ID: getValue(transition, 'TO_WORKFLOW_STEP_MASTER_ID'),
+    STEP_ORDER: getValue(transition, 'NEXT_STEP_ORDER'),
+    APPROVER_EMPCODE: getValue(transition, 'NEXT_APPROVER_EMPCODE'),
+    M_APPROVAL_STEP_STATUS_ID: getValue(transition, 'NEXT_STEP_STATUS_ID'),
+    STEP_CODE: getValue(transition, 'NEXT_STEP_CODE'),
+    ACTOR_TYPE: getValue(transition, 'NEXT_ACTOR_TYPE'),
+    DESCRIPTION: getValue(transition, 'NEXT_STATUS_VALUE'),
+  })
+  if (
+    !targetStep.step_id ||
+    targetStep.workflow_step_id !== statusIdentity.workflowStep.poPicInProgress ||
+    targetStep.approval_step_status_id === statusIdentity.approvalStep.inProgress
+  ) {
+    throw new Error('PO PIC task cannot be re-opened. Please refresh and try again.')
+  }
+
+  const currentGprStepId = Number(getValue(currentGprStep, 'REQUEST_VENDOR_GPR_C_STEPS_ID', 'gpr_c_step_id'))
+  if (!currentGprStepId) throw new Error('Current GPR C step identity is missing')
+  const issueGprBStep = steps.find((step) => step.workflow_step_id === statusIdentity.workflowStep.issueGprB)
+  if (!issueGprBStep || issueGprBStep.approval_step_status_id === statusIdentity.approvalStep.inProgress) {
+    throw new Error('Issue GPR B task cannot be prepared for re-check. Please refresh and try again.')
+  }
+
+  const sqlList = [
+    GprCApprovalSQL.updateStepAction({
+      REQUEST_VENDOR_GPR_C_STEPS_ID: currentGprStepId,
+      M_APPROVAL_STEP_STATUS_ID: statusIdentity.approvalStep.pending,
+      ACTION_BY: actionBy,
+      ACTION_TYPE: 'RECHECK',
+      ACTION_REMARK: remark,
+      UPDATE_BY: actionBy,
+    }),
+    GprCApprovalSQL.updateFlowStatus({
+      REQUEST_VENDOR_GPR_C_FLOWS_ID: flowId,
+      M_GPR_C_FLOW_STATUS_ID: gprCFlowStatus.recheckRequired,
+      FLOW_STATUS: 'recheck_required',
+      CURRENT_STEP_CODE: getValue(currentGprStep, 'STEP_CODE', 'step_code'),
+      COMPLETED_AT: null,
+      REJECTED_AT: null,
+      REJECTED_BY: '',
+      REJECTED_REMARK: '',
+      UPDATE_BY: actionBy,
+    }),
+    await GprCApprovalSQL.updateApprovalStep({
+      REQUEST_APPROVAL_STEP_ID: issueGprBStep.step_id,
+      M_APPROVAL_STEP_STATUS_ID: statusIdentity.approvalStep.pending,
+      M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID: statusIdentity.approvalStep.inProgress,
+      M_APPROVAL_STEP_REJECTED_STATUS_ID: statusIdentity.approvalStep.rejected,
+      M_REQUEST_REJECTED_STATE_ID: statusIdentity.requestState.rejected,
+      M_REQUEST_IN_PROGRESS_STATE_ID: statusIdentity.requestState.inProgress,
+      M_REQUEST_REJECTED_STATUS_ID: statusIdentity.requestStatus.rejected,
+      UPDATE_BY: actionBy,
+    }),
+    await GprCApprovalSQL.updateApprovalStep({
+      REQUEST_APPROVAL_STEP_ID: currentMainStep.step_id,
+      M_APPROVAL_STEP_STATUS_ID: statusIdentity.approvalStep.pending,
+      M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID: statusIdentity.approvalStep.inProgress,
+      M_APPROVAL_STEP_REJECTED_STATUS_ID: statusIdentity.approvalStep.rejected,
+      M_REQUEST_REJECTED_STATE_ID: statusIdentity.requestState.rejected,
+      M_REQUEST_IN_PROGRESS_STATE_ID: statusIdentity.requestState.inProgress,
+      M_REQUEST_REJECTED_STATUS_ID: statusIdentity.requestStatus.rejected,
+      UPDATE_BY: actionBy,
+    }),
+    await GprCApprovalSQL.createApprovalLog({
+      REQUEST_REGISTER_VENDOR_ID: requestId,
+      REQUEST_APPROVAL_STEP_ID: currentMainStep.step_id,
+      ACTION_BY: actionBy,
+      ACTION_TYPE: String(getValue(transition, 'ACTION_CODE')).toLowerCase(),
+      ACTION_CODE: getValue(transition, 'ACTION_CODE'),
+      REMARK: '',
+      RECHECK_REASON: remark,
+    }),
+  ]
+
+  const poPicEmpcode = normalizeValue(getValue(context, 'ASSIGN_TO', 'assign_to'))
+  if (poPicEmpcode && poPicEmpcode !== targetStep.approver_id) {
+    sqlList.push(
+      await GprCApprovalSQL.updateMainApprovalStepApprover({
+        REQUEST_APPROVAL_STEP_ID: targetStep.step_id,
+        APPROVER_EMPCODE: poPicEmpcode,
+        UPDATE_BY: actionBy,
+      })
+    )
+    targetStep.approver_id = poPicEmpcode
+  }
+
+  sqlList.push(
+    await GprCApprovalSQL.updateApprovalStep({
+      REQUEST_APPROVAL_STEP_ID: targetStep.step_id,
+      M_APPROVAL_STEP_STATUS_ID: statusIdentity.approvalStep.inProgress,
+      M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID: statusIdentity.approvalStep.inProgress,
+      M_APPROVAL_STEP_REJECTED_STATUS_ID: statusIdentity.approvalStep.rejected,
+      M_REQUEST_REJECTED_STATE_ID: statusIdentity.requestState.rejected,
+      M_REQUEST_IN_PROGRESS_STATE_ID: statusIdentity.requestState.inProgress,
+      M_REQUEST_REJECTED_STATUS_ID: statusIdentity.requestStatus.rejected,
+      UPDATE_BY: actionBy,
+    })
+  )
+
+  await executeGuardedMainWorkflow(requestId, currentMainStep, context, actionBy, statusIdentity.requestState.inProgress, sqlList)
+  return targetStep
+}
+
+const resumeGprCRecheckFlow = async (requestId: number, flow: any, updateBy: string) => {
+  const [statusIdentity, mainStatusIdentity, contextSql, mainStepsSql] = await Promise.all([
+    getGprCStepStatusIdentity(),
+    getGprCMainWorkflowIdentity(),
+    GprCApprovalSQL.getRequestStatusContext({ REQUEST_REGISTER_VENDOR_ID: requestId }),
+    GprCApprovalSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId }),
+  ])
+  if (Number(getValue(flow, 'M_GPR_C_FLOW_STATUS_ID', 'gpr_c_flow_status_id')) !== statusIdentity.gprCFlow.recheckRequired) {
+    return false
+  }
+
+  const [contextRows, mainStepRows] = await Promise.all([
+    MySQLExecute.search(contextSql) as Promise<RowDataPacket[]>,
+    MySQLExecute.search(mainStepsSql) as Promise<RowDataPacket[]>,
+  ])
+  const context = contextRows[0]
+  const currentTaskId = Number(getValue(context, 'CURRENT_REQUEST_APPROVAL_STEP_ID', 'current_step_id'))
+  const currentMainStep = mainStepRows
+    .map(normalizeMainApprovalStep)
+    .find(
+      (step: any) =>
+        step.step_id === currentTaskId &&
+        step.workflow_step_id === mainStatusIdentity.workflowStep.issueGprC &&
+        step.approval_step_status_id === mainStatusIdentity.approvalStep.inProgress
+    )
+  if (!currentMainStep) return false
+
+  const flowId = Number(getValue(flow, 'REQUEST_VENDOR_GPR_C_FLOWS_ID', 'gpr_c_flow_id'))
+  const steps = await getStepsByFlow(flowId)
+  const pausedStep = steps.find(
+    (step: any) =>
+      Number(getValue(step, 'M_APPROVAL_STEP_STATUS_ID', 'approval_step_status_id')) === statusIdentity.approvalStep.pending &&
+      normalizeValue(getValue(step, 'ACTION_TYPE', 'action_type')).toUpperCase() === 'RECHECK'
+  )
+  if (!pausedStep) {
+    throw new Error('Paused GPR C re-check step was not found')
+  }
+
+  const sqlList: string[] = []
+  const resolvedApprover = await resolveGprCStepApprover(pausedStep).catch(() => null)
+  const currentApprover = normalizeValue(getValue(pausedStep, 'APPROVER_EMPCODE', 'approver_empcode'))
+  if (resolvedApprover?.empcode && resolvedApprover.empcode !== currentApprover) {
+    sqlList.push(
+      GprCApprovalSQL.updateStepApprover({
+        REQUEST_VENDOR_GPR_C_STEPS_ID: getValue(pausedStep, 'REQUEST_VENDOR_GPR_C_STEPS_ID', 'gpr_c_step_id'),
+        APPROVER_EMPCODE: resolvedApprover.empcode,
+        APPROVER_NAME: resolvedApprover.name,
+        APPROVER_EMAIL: resolvedApprover.email,
+        UPDATE_BY: updateBy,
+      })
+    )
+    pausedStep.APPROVER_EMPCODE = resolvedApprover.empcode
+    pausedStep.APPROVER_NAME = resolvedApprover.name
+    pausedStep.APPROVER_EMAIL = resolvedApprover.email
+  }
+  sqlList.push(
+    GprCApprovalSQL.activateStep({
+      REQUEST_VENDOR_GPR_C_STEPS_ID: getValue(pausedStep, 'REQUEST_VENDOR_GPR_C_STEPS_ID', 'gpr_c_step_id'),
+      M_APPROVAL_STEP_STATUS_ID: statusIdentity.approvalStep.inProgress,
+      UPDATE_BY: updateBy,
+    }),
+    GprCApprovalSQL.updateFlowStatus({
+      REQUEST_VENDOR_GPR_C_FLOWS_ID: flowId,
+      M_GPR_C_FLOW_STATUS_ID: statusIdentity.gprCFlow.inProgress,
+      FLOW_STATUS: 'in_progress',
+      CURRENT_STEP_CODE: getValue(pausedStep, 'STEP_CODE', 'step_code'),
+      COMPLETED_AT: null,
+      REJECTED_AT: null,
+      REJECTED_BY: '',
+      REJECTED_REMARK: '',
+      UPDATE_BY: updateBy,
+    })
+  )
+  await MySQLExecute.executeList(sqlList)
+  await notifyStepApprover(requestId, pausedStep)
+  return true
+}
+
 export const GprCApprovalService = {
   createOrGetFlow: async (dataItem: any) => {
     try {
       const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID)
       if (!requestId) throw new Error('Missing request_id')
       const existingFlow = await getFlowByRequest(requestId)
-      const flow = existingFlow || (await ensureFlow(requestId, normalizeValue(dataItem.UPDATE_BY) || 'SYSTEM'))
+      const updateBy = normalizeValue(dataItem.UPDATE_BY) || 'SYSTEM'
+      let flow = existingFlow || (await ensureFlow(requestId, updateBy))
       if (!existingFlow) {
         await notifyRequesterSetup(requestId).catch(() => undefined /* console.error */)
       }
       const flowId = Number(getValue(flow, 'REQUEST_VENDOR_GPR_C_FLOWS_ID', 'gpr_c_flow_id'))
+      if (existingFlow && (await resumeGprCRecheckFlow(requestId, existingFlow, updateBy))) {
+        flow = (await getFlowByRequest(requestId)) || flow
+      }
       const steps = flowId ? await getStepsByFlow(flowId) : []
       return response(true, 'GPR C flow ready', { flow, steps }, 'GPR C Flow')
     } catch (error: any) {
@@ -898,9 +1094,7 @@ export const GprCApprovalService = {
       const approverEmpcode = normalizeValue(gprCData.gpr_c_approver_empcode)
       if (!approverEmpcode) throw new Error('GPR C approver empcode is required')
 
-      const productCheckers = await buildProductCheckers(
-        gprCData.gpr_c_product_checkers || gprCData.gpr_c_product_group_checkers
-      )
+      const productCheckers = await buildProductCheckers(gprCData.gpr_c_product_checkers || gprCData.gpr_c_product_group_checkers)
       const stepApprovers = await resolveStepApprovers(approverEmpcode, productCheckers)
       const requesterApproverStep = stepApprovers.find((step: any) => step.code === 'REQUESTER_APPROVER')
       if (!requesterApproverStep) throw new Error('GPR C requester approver step could not be created')
@@ -958,6 +1152,7 @@ export const GprCApprovalService = {
               ITEM_ORDER: index + 1,
               PRODUCT_MAIN_ID: item.product_main_id,
               PRODUCT_MAIN_NAME: item.product_main_name,
+              SECTION_NAME: item.section_name,
               CHECKER_EMPCODE: item.checker.empcode,
               CHECKER_NAME: item.checker.name,
               CHECKER_EMAIL: item.checker.email,
@@ -993,8 +1188,7 @@ export const GprCApprovalService = {
             APPROVER_EMPCODE: step.approver.empcode,
             APPROVER_NAME: step.approver.name,
             APPROVER_EMAIL: step.approver.email,
-            M_APPROVAL_STEP_STATUS_ID:
-              step.order === 1 ? statusIdentity.approvalStep.inProgress : statusIdentity.approvalStep.pending,
+            M_APPROVAL_STEP_STATUS_ID: step.order === 1 ? statusIdentity.approvalStep.inProgress : statusIdentity.approvalStep.pending,
             CREATE_BY: updateBy,
             UPDATE_BY: updateBy,
           })
@@ -1005,10 +1199,7 @@ export const GprCApprovalService = {
       const updatedFlow = await getFlowByRequest(requestId)
       const steps = await getStepsByFlow(flowId)
       const firstStep = steps.find((step: any) => Number(step.STEP_ORDER || step.step_order) === 1)
-      await runGprCPostCommitTasks(
-        firstStep ? [() => notifyStepApprover(requestId, firstStep, ccEmails)] : [],
-        requestId
-      )
+      await runGprCPostCommitTasks(firstStep ? [() => notifyStepApprover(requestId, firstStep, ccEmails)] : [], requestId)
 
       return response(true, 'GPR C setup submitted successfully', { flow: updatedFlow, steps }, 'Submit GPR C Setup')
     } catch (error: any) {
@@ -1106,13 +1297,7 @@ export const GprCApprovalService = {
         const mainNextStep = await markMainIssueGprCApproved(requestId, actionBy, remark)
         if (mainNextStep) {
           const mainNextApprover = normalizeValue(getValue(mainNextStep, 'approver_id', 'APPROVER_EMPCODE', 'approver_empcode'))
-          postCommitTasks.push(() =>
-            sendMail_ToApprover_NextStep(
-              { REQUEST_REGISTER_VENDOR_ID: requestId, UPDATE_BY: actionBy },
-              mainNextStep,
-              mainNextApprover
-            )
-          )
+          postCommitTasks.push(() => sendMail_ToApprover_NextStep({ REQUEST_REGISTER_VENDOR_ID: requestId, UPDATE_BY: actionBy }, mainNextStep, mainNextApprover))
         }
       }
 
@@ -1121,6 +1306,37 @@ export const GprCApprovalService = {
       return response(true, 'GPR C step approved successfully', await getFlowByRequest(requestId), 'Approve GPR C Step')
     } catch (error: any) {
       return response(false, error?.message || 'Failed to approve GPR C step', [], 'Approve GPR C Step Failed', 0)
+    }
+  },
+
+  recheckStep: async (dataItem: any) => {
+    try {
+      const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID)
+      if (!requestId) throw new Error('Missing request_id')
+      const actionBy = normalizeValue(dataItem.ACTION_BY || dataItem.UPDATE_BY)
+      if (!actionBy) throw new Error('Missing action_by')
+      const remark = normalizeValue(dataItem.REMARK || dataItem.ACTION_REMARK)
+      if (!remark) throw new Error('Re-check remark is required')
+
+      const flow = await getFlowByRequest(requestId)
+      if (!flow) throw new Error('GPR C flow not found')
+      const flowId = Number(getValue(flow, 'REQUEST_VENDOR_GPR_C_FLOWS_ID', 'gpr_c_flow_id'))
+      const currentStep = await getCurrentStep(flowId)
+      if (!currentStep) throw new Error('No GPR C step in progress')
+      const currentStepCode = normalizeValue(getValue(currentStep, 'STEP_CODE', 'step_code')).toUpperCase()
+      if (currentStepCode !== 'REQUESTER_APPROVER') {
+        throw new Error('Re-check with PO PIC is available only for Requester Approver')
+      }
+      if (normalizeValue(getValue(currentStep, 'APPROVER_EMPCODE', 'approver_empcode')) !== actionBy) {
+        throw new Error(`Unauthorized: current GPR C step requires ${getValue(currentStep, 'APPROVER_EMPCODE', 'approver_empcode')}`)
+      }
+
+      await markMainIssueGprCRecheckToPic(requestId, flowId, currentStep, actionBy, remark)
+      await runGprCPostCommitTasks([() => notifyPoPicGprCRecheck(requestId, currentStep, remark)], requestId)
+
+      return response(true, 'GPR C sent to PO PIC for re-check successfully', await getFlowByRequest(requestId), 'Re-check GPR C Step')
+    } catch (error: any) {
+      return response(false, error?.message || 'Failed to re-check GPR C step', [], 'Re-check GPR C Step Failed', 0)
     }
   },
 
@@ -1168,15 +1384,16 @@ export const GprCApprovalService = {
       const rejectedStep = await markMainIssueGprCRejected(requestId, actionBy, remark)
       await runGprCPostCommitTasks(
         [
-          () => sendMail_ToPic_RequestRejected(
-            {
-              REQUEST_REGISTER_VENDOR_ID: requestId,
-              APPROVER_REMARK: remark || 'GPR C sub-workflow rejected',
-              APPROVE_BY: actionBy,
-              UPDATE_BY: actionBy,
-            },
-            rejectedStep
-          ),
+          () =>
+            sendMail_ToPic_RequestRejected(
+              {
+                REQUEST_REGISTER_VENDOR_ID: requestId,
+                APPROVER_REMARK: remark || 'GPR C sub-workflow rejected',
+                APPROVE_BY: actionBy,
+                UPDATE_BY: actionBy,
+              },
+              rejectedStep
+            ),
         ],
         requestId
       )

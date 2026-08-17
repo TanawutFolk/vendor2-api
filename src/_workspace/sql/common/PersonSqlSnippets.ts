@@ -14,4 +14,9 @@ export const PersonSqlSnippets = {
     sql = sql.replaceAll('dataItem.PERSON_SCHEMA', String(getPersonSchema()))
     return sql
   },
+  sectionTable: () => {
+    let sql = 'dataItem.PERSON_SCHEMA.set_section_fed'
+    sql = sql.replaceAll('dataItem.PERSON_SCHEMA', String(getPersonSchema()))
+    return sql
+  },
 }

@@ -29,6 +29,11 @@ export const RequestHistoryService = {
     return (await MySQLExecute.search(sql)) as RowDataPacket[]
   },
 
+  getGprCSections: async (dataItem: any) => {
+    const sql = await RequestHistorySQL.getGprCSections(dataItem)
+    return (await MySQLExecute.search(sql)) as RowDataPacket[]
+  },
+
   getSelectionForm: async (dataItem: any) => {
     return RequestRegisterGprService.getSelectionForm(dataItem)
   },

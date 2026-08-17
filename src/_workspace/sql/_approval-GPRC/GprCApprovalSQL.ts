@@ -303,9 +303,9 @@ export const GprCApprovalSQL = {
     sql = sql.replaceAll('dataItem.CURRENT_STEP_CODE', "'" + currentStepCode + "'")
     sql = sql.replaceAll('dataItem.COMPLETED_AT', GprCApprovalSQL.nullableDate(dataItem.COMPLETED_AT))
     sql = sql.replaceAll('dataItem.REJECTED_AT', GprCApprovalSQL.nullableDate(dataItem.REJECTED_AT))
-    sql = sql.replaceAll('dataItem.REJECTED_BY', dataItem.REJECTED_BY)
-    sql = sql.replaceAll('dataItem.REJECTED_REMARK', dataItem.REJECTED_REMARK)
-    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.REJECTED_BY', escapeSqlText(dataItem.REJECTED_BY))
+    sql = sql.replaceAll('dataItem.REJECTED_REMARK', escapeSqlText(dataItem.REJECTED_REMARK))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', escapeSqlText(dataItem.UPDATE_BY || 'SYSTEM'))
     sql = sql.replaceAll('dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID', GprCApprovalSQL.num(dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID).toString())
     return sql
   },
@@ -423,10 +423,10 @@ export const GprCApprovalSQL = {
       'dataItem.M_APPROVAL_STEP_STATUS_ID',
       approvalStatusId.toString()
     )
-    sql = sql.replaceAll('dataItem.ACTION_BY', dataItem.ACTION_BY)
-    sql = sql.replaceAll('dataItem.ACTION_TYPE', dataItem.ACTION_TYPE)
-    sql = sql.replaceAll('dataItem.ACTION_REMARK', dataItem.ACTION_REMARK)
-    sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY || dataItem.ACTION_BY || 'SYSTEM')
+    sql = sql.replaceAll('dataItem.ACTION_BY', escapeSqlText(dataItem.ACTION_BY))
+    sql = sql.replaceAll('dataItem.ACTION_TYPE', escapeSqlText(dataItem.ACTION_TYPE))
+    sql = sql.replaceAll('dataItem.ACTION_REMARK', escapeSqlText(dataItem.ACTION_REMARK))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', escapeSqlText(dataItem.UPDATE_BY || dataItem.ACTION_BY || 'SYSTEM'))
     sql = sql.replaceAll('dataItem.REQUEST_VENDOR_GPR_C_STEPS_ID', GprCApprovalSQL.num(dataItem.REQUEST_VENDOR_GPR_C_STEPS_ID).toString())
     return sql
   },
@@ -1170,8 +1170,9 @@ export const GprCApprovalSQL = {
                                      , target_status.STATUS_VALUE AS NEXT_STATUS_VALUE
                             FROM request_register_vendor rr
                             INNER JOIN workflow_transition wt
-                              ON wt.WORKFLOW_DEFINITION_ID = rr.WORKFLOW_DEFINITION_ID
+                             ON wt.WORKFLOW_DEFINITION_ID = rr.WORKFLOW_DEFINITION_ID
                              AND wt.FROM_WORKFLOW_STEP_MASTER_ID = dataItem.CURRENT_WORKFLOW_STEP_MASTER_ID
+                             AND wt.ACTION_CODE = 'dataItem.ACTION_CODE'
                              AND dataItem.TRANSITION_IDENTITY_CONDITION
                              AND wt.INUSE = 1
                             LEFT JOIN workflow_step_master target_wsm
@@ -1198,6 +1199,7 @@ export const GprCApprovalSQL = {
     )
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.CURRENT_WORKFLOW_STEP_MASTER_ID', (dataItem['CURRENT_WORKFLOW_STEP_MASTER_ID'] || 0).toString())
+    sql = sql.replaceAll('dataItem.ACTION_CODE', escapeSqlText(dataItem.ACTION_CODE))
     const targetWorkflowStepMasterId = GprCApprovalSQL.num(dataItem.TARGET_WORKFLOW_STEP_MASTER_ID)
     const terminalRequestStateId = GprCApprovalSQL.num(dataItem.TERMINAL_REQUEST_STATE_ID)
     let transitionIdentityCondition = targetWorkflowStepMasterId
@@ -1313,6 +1315,23 @@ export const GprCApprovalSQL = {
     return sql
   },
 
+  updateMainApprovalStepApprover: async (dataItem: any) => {
+    let sql = `
+                            UPDATE request_approval_step SET
+                                       APPROVER_EMPCODE = 'dataItem.APPROVER_EMPCODE'
+                                     , ASSIGNMENT_MODE = 'AUTO'
+                                     , UPDATE_BY = 'dataItem.UPDATE_BY'
+                                     , UPDATE_DATE = NOW()
+                            WHERE
+                                       REQUEST_APPROVAL_STEP_ID = dataItem.REQUEST_APPROVAL_STEP_ID
+                                       AND INUSE = 1
+        `
+    sql = sql.replaceAll('dataItem.REQUEST_APPROVAL_STEP_ID', GprCApprovalSQL.num(dataItem.REQUEST_APPROVAL_STEP_ID).toString())
+    sql = sql.replaceAll('dataItem.APPROVER_EMPCODE', escapeSqlText(dataItem.APPROVER_EMPCODE))
+    sql = sql.replaceAll('dataItem.UPDATE_BY', escapeSqlText(dataItem.UPDATE_BY || 'SYSTEM'))
+    return sql
+  },
+
   createApprovalLog: async (dataItem: any) => {
     let sql = `
                             INSERT INTO request_approval_log (
@@ -1327,6 +1346,7 @@ export const GprCApprovalSQL = {
                                      , STATUS_LABEL_SNAPSHOT
                                      , DESCRIPTION
                                      , REJECT_REASON
+                                     , RECHECK_REASON
                                      , CREATE_BY
                                      , UPDATE_BY
                                      , CREATE_DATE
@@ -1370,6 +1390,10 @@ export const GprCApprovalSQL = {
                                            WHEN LOWER('dataItem.ACTION_TYPE') IN ('rejected', 'vendor_disagreed') THEN LEFT('dataItem.REJECT_REASON', 500)
                                            ELSE NULL
                                        END
+                                     , CASE
+                                           WHEN UPPER('dataItem.ACTION_CODE') = 'RECHECK' THEN LEFT('dataItem.RECHECK_REASON', 500)
+                                           ELSE NULL
+                                       END
                                      , 'dataItem.ACTION_BY'
                                      , 'dataItem.ACTION_BY'
                                      , NOW()
@@ -1380,11 +1404,15 @@ export const GprCApprovalSQL = {
 
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.REQUEST_APPROVAL_STEP_ID', dataItem['REQUEST_APPROVAL_STEP_ID'] ? dataItem['REQUEST_APPROVAL_STEP_ID'].toString() : 'NULL')
-    sql = sql.replaceAll('dataItem.ACTION_BY', dataItem['ACTION_BY'] || '')
-    sql = sql.replaceAll('dataItem.ACTION_TYPE', dataItem['ACTION_TYPE'] || '')
-    sql = sql.replaceAll('dataItem.ACTION_CODE', String(dataItem['ACTION_CODE'] || dataItem['ACTION_TYPE'] || '').trim().toUpperCase())
-    sql = sql.replaceAll('dataItem.REMARK', dataItem['REMARK'] || '')
-    sql = sql.replaceAll('dataItem.REJECT_REASON', dataItem['REJECT_REASON'] ?? dataItem['REMARK'] ?? '')
+    sql = sql.replaceAll('dataItem.ACTION_BY', escapeSqlText(dataItem['ACTION_BY'] || ''))
+    sql = sql.replaceAll('dataItem.ACTION_TYPE', escapeSqlText(dataItem['ACTION_TYPE'] || ''))
+    sql = sql.replaceAll(
+      'dataItem.ACTION_CODE',
+      escapeSqlText(String(dataItem['ACTION_CODE'] || dataItem['ACTION_TYPE'] || '').trim().toUpperCase())
+    )
+    sql = sql.replaceAll('dataItem.REMARK', escapeSqlText(dataItem['REMARK'] || ''))
+    sql = sql.replaceAll('dataItem.REJECT_REASON', escapeSqlText(dataItem['REJECT_REASON'] ?? dataItem['REMARK'] ?? ''))
+    sql = sql.replaceAll('dataItem.RECHECK_REASON', escapeSqlText(dataItem['RECHECK_REASON'] ?? ''))
 
     return sql
   },

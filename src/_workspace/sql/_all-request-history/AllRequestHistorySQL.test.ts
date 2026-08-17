@@ -1,13 +1,16 @@
 import { describe, expect, test } from 'bun:test'
 import { AllRequestHistorySQL } from './AllRequestHistorySQL'
+import { RequestHistorySQL } from '../_request-history/RequestHistorySQL'
 
 describe('AllRequestHistorySQL', () => {
-  test('loads filter options from persisted request section and request create year', async () => {
+  test('loads every section master value while keeping request create years', async () => {
     const sql = await AllRequestHistorySQL.getFilterOptions()
 
-    expect(sql).toContain('TRIM(rr.REQUESTER_SECTION) AS REQUESTER_SECTION')
+    expect(sql).toContain('set_section_fed')
+    expect(sql).toContain('TRIM(section_master.SECT_NAME) AS REQUESTER_SECTION')
     expect(sql).toContain('YEAR(rr.CREATE_DATE) AS REQUEST_YEAR')
     expect(sql).toContain('rr.INUSE = 1')
+    expect(sql).not.toContain('dataItem.SECTION_TABLE')
   })
 
   test('builds a lightweight read-only list query for section and year', async () => {
@@ -44,6 +47,17 @@ describe('AllRequestHistorySQL', () => {
     expect(sql).toContain('rr.REQUEST_REGISTER_VENDOR_ID = 123')
     expect(sql).toContain('AS CONTACTS')
     expect(sql).toContain('AS PRODUCTS')
+    expect(sql).toContain('WORKFLOW_STEP_MASTER_ID')
+    expect(sql).toContain('ras.WORKFLOW_STEP_MASTER_ID')
+    expect(sql).not.toContain('dataItem.')
+  })
+
+  test('keeps workflow step master IDs in legacy request-history details', async () => {
+    const sql = await RequestHistorySQL.getById({ REQUEST_REGISTER_VENDOR_ID: 123 })
+
+    expect(sql).toContain('rr.REQUEST_REGISTER_VENDOR_ID = 123')
+    expect(sql).toContain('WORKFLOW_STEP_MASTER_ID')
+    expect(sql).toContain('ras.WORKFLOW_STEP_MASTER_ID')
     expect(sql).not.toContain('dataItem.')
   })
 })

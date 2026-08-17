@@ -120,6 +120,7 @@ export const AllRequestHistoryDetailSQL = {
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
                                                                                'REQUEST_APPROVAL_STEP_ID', ras.REQUEST_APPROVAL_STEP_ID,
+                                                                               'WORKFLOW_STEP_MASTER_ID', ras.WORKFLOW_STEP_MASTER_ID,
                                                                                'M_REQUEST_STATUS_ID', wsm.M_REQUEST_STATUS_ID,
                                                                                 'STEP_ORDER', ras.STEP_ORDER,
                                                                                 'APPROVER_EMPCODE', ras.APPROVER_EMPCODE,
@@ -177,6 +178,7 @@ export const AllRequestHistoryDetailSQL = {
                                                                                'ACTION_TYPE', ral.ACTION_TYPE,
                                                                                'DESCRIPTION', ral.DESCRIPTION,
                                                                                'REJECT_REASON', ral.REJECT_REASON,
+                                                                               'RECHECK_REASON', ral.RECHECK_REASON,
                                                                                'CREATE_DATE', ral.CREATE_DATE,
                                                                                'CREATE_BY', ral.CREATE_BY,
                                                                                'UPDATE_BY', ral.UPDATE_BY,

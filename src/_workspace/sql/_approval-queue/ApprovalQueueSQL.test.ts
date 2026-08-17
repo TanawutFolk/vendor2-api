@@ -60,19 +60,22 @@ describe('ApprovalQueueSQL reassignment statements', () => {
     expect(sql).toContain('INUSE')
   })
 
-  test('stores the reason when document checker returns a request to PO PIC', async () => {
+  test('stores the remark when document checker requests a PO PIC re-check', async () => {
     const sql = await ApprovalQueueSQL.createApprovalLog({
       REQUEST_REGISTER_VENDOR_ID: 1,
       REQUEST_APPROVAL_STEP_ID: 2,
       ACTION_BY: 'S00001',
-      ACTION_TYPE: 'returned_to_pic',
-      ACTION_CODE: 'REJECT',
-      REMARK: 'Missing document',
+      ACTION_TYPE: 'recheck',
+      ACTION_CODE: 'RECHECK',
+      REMARK: '',
+      RECHECK_REASON: 'Missing document',
     })
 
-    expect(sql).toContain("'returned_to_pic'")
-    expect(sql).toContain("'returned_doc_check'")
+    expect(sql).toMatch(/,\s*'recheck'\s*,\s*'RECHECK'/)
+
+    expect(sql).toContain('RECHECK_REASON')
     expect(sql).toContain("'Missing document'")
+    expect(sql).toContain("LEFT('', 100)")
   })
 
   test('guards actions with request, current task, and lock version', async () => {
@@ -155,6 +158,14 @@ describe('ApprovalQueueSQL reassignment statements', () => {
     expect(sql).toContain('ORDER BY VERSION_NO DESC')
     expect(sql).toContain('LIMIT 1')
   })
+
+  test('loads workflow behavior flags with approval tasks', async () => {
+    const sql = await ApprovalQueueSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: 10 })
+
+    expect(sql).toContain('wsm.REQUIRES_VENDOR_REPLY')
+    expect(sql).toContain('wsm.REQUIRES_VENDOR_CODE')
+  })
+
   test('keeps approval queue list query lightweight', async () => {
     const [, dataSql] = await ApprovalQueueSQL.getAllRequests({
       APPROVER_EMPCODE: 'S00001',
@@ -191,6 +202,9 @@ describe('ApprovalQueueSQL reassignment statements', () => {
     expect(sql).toContain('current_selection_step.WORKFLOW_STEP_MASTER_ID IN')
     expect(sql).toContain('3, 5')
     expect(sql).toContain('current_selection_step.M_APPROVAL_STEP_STATUS_ID = 2')
+    expect(sql).toContain('WORKFLOW_STEP_MASTER_ID')
+    expect(sql).toContain('ras.WORKFLOW_STEP_MASTER_ID')
+    expect(sql).toContain('ral.INUSE = 1')
     expect(sql).not.toContain('rr0.')
     expect(sql).not.toContain('dataItem.')
   })

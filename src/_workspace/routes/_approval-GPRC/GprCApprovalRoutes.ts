@@ -4,6 +4,7 @@ import { GprCApprovalController } from '@src/_workspace/controllers/_approval-GP
 const gprCApprovalRoutes = Router()
 
 gprCApprovalRoutes.post('/approveGprCStep', GprCApprovalController.gprCApproveStep)
+gprCApprovalRoutes.post('/recheckGprCStep', GprCApprovalController.gprCRecheckStep)
 gprCApprovalRoutes.post('/rejectGprCStep', GprCApprovalController.gprCRejectStep)
 gprCApprovalRoutes.post('/getGprCActionRequired', GprCApprovalController.gprCActionRequired)
 gprCApprovalRoutes.post('/recordGprCActionResult', GprCApprovalController.gprCRecordActionResult)
@@ -12,6 +13,7 @@ gprCApprovalRoutes.post('/getGprCActionRequiredQueue', GprCApprovalController.gp
 
 // Compatibility aliases used by the current frontend.
 gprCApprovalRoutes.post('/gpr-c/approve-step', GprCApprovalController.gprCApproveStep)
+gprCApprovalRoutes.post('/gpr-c/recheck-step', GprCApprovalController.gprCRecheckStep)
 gprCApprovalRoutes.post('/gpr-c/reject-step', GprCApprovalController.gprCRejectStep)
 gprCApprovalRoutes.post('/gpr-c/action-required', GprCApprovalController.gprCActionRequired)
 gprCApprovalRoutes.post('/gpr-c/record-action-result', GprCApprovalController.gprCRecordActionResult)

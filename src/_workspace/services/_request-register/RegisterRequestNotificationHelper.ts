@@ -11,11 +11,10 @@ import {
   email_ToRequester_RegistrationCompleted,
   email_ToRequester_RegistrationIncomplete,
   email_ToPic_RejectedByApprover,
-  email_ToPic_RejectedByChecker,
+  email_ToPic_RecheckByApprover,
   email_ToPic_RequestRegisterVendor,
   email_ToAccount_RegisterRequired,
   email_ToChecker_CheckRequired,
-  email_ToChecker_ReturnedByPoMgr,
   email_ToMd_ApproveRequired,
   email_ToPoGm_ApproveRequired,
   email_ToPoManager_ApproveRequired,
@@ -23,7 +22,7 @@ import {
   type MailTemplateData,
 } from '@src/config/mailTemplate'
 import { SelectionFileService } from './SelectionFileService'
-import { buildPoMgrReturnTestMailRoute, PO_MGR_RETURN_TEST_EMP_CODE } from './PoMgrReturnNotificationRoute'
+import { buildPoMgrRecheckTestMailRoute, PO_MGR_RECHECK_TEST_EMP_CODE } from './PoMgrRecheckNotificationRoute'
 import {
   excludeEmails,
   GROUP_CODE,
@@ -34,10 +33,7 @@ import {
   resolveGroupCodeForStep,
   resolveRequestNumber,
 } from './RegisterRequestWorkflowHelper'
-import {
-  getWorkflowStepIdentity,
-  type WorkflowStepIdentity,
-} from '../_status-master/StatusIdentityService'
+import { getWorkflowStepIdentity, type WorkflowStepIdentity } from '../_status-master/StatusIdentityService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -919,11 +915,7 @@ export const sendMail_ToApprover_NextStep = async (dataItem: any, nextStep: any,
     const workflowStep = await getWorkflowStepIdentity()
     const nextWorkflowStepMasterId = Number(getValue(nextStep, 'workflow_step_id', 'WORKFLOW_STEP_MASTER_ID') || 0)
     const isDocumentCheckerStep = nextWorkflowStepMasterId === workflowStep.docCheck
-    const isPmMgrAndAbove = [
-      workflowStep.poMgrApproval,
-      workflowStep.poGmApproval,
-      workflowStep.mdApproval,
-    ].includes(nextWorkflowStepMasterId)
+    const isPmMgrAndAbove = [workflowStep.poMgrApproval, workflowStep.poGmApproval, workflowStep.mdApproval].includes(nextWorkflowStepMasterId)
     const isAccountStep = nextWorkflowStepMasterId === workflowStep.accountRegistered
 
     const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
@@ -977,12 +969,7 @@ export const sendMail_ToApprover_NextStep = async (dataItem: any, nextStep: any,
       picTel,
     }
 
-    const { templateName, emailHtml, emailSubject } = selectApprovalNotificationByStep(
-      nextStep,
-      baseEmailData,
-      requestNumber,
-      workflowStep
-    )
+    const { templateName, emailHtml, emailSubject } = selectApprovalNotificationByStep(nextStep, baseEmailData, requestNumber, workflowStep)
 
     await sendTemplatedEmail({
       templateName,
@@ -1003,23 +990,23 @@ export const sendMail_ToApprover_NextStep = async (dataItem: any, nextStep: any,
   }
 }
 
-export const sendMail_ToDocumentChecker_ReturnedByPoMgr = async (dataItem: any) => {
+export const sendMail_ToPic_RecheckByPoMgr = async (dataItem: any, _currentStep: any) => {
   try {
     const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID || 0)
-    const testRecipient = await resolveEmployeeProfile(PO_MGR_RETURN_TEST_EMP_CODE)
+    const testRecipient = await resolveEmployeeProfile(PO_MGR_RECHECK_TEST_EMP_CODE)
     const testEmail = normalizeEmail(testRecipient?.email)
-    const mailRoute = buildPoMgrReturnTestMailRoute(testEmail)
+    const mailRoute = buildPoMgrRecheckTestMailRoute(testEmail)
 
-    // Temporary safe test routing: both business roles resolve only to S00823.
-    // Do not fall back to the real checker/PIC groups, otherwise a test Return could leak externally.
+    // Temporary safe test routing: PO Mgr re-check mail resolves only to S00823.
+    // Do not fall back to the real PO PIC group, otherwise a test Re-check could leak externally.
     if (!mailRoute.toEmail) {
-      console.error('[poMgrReturnToDocumentCheck] Email skipped: S00823 has no valid email address.')
+      console.error('[poMgrRecheckToPic] Email skipped: S00823 has no valid email address.')
       return
     }
 
     const vd = await fetchVendorContext(requestId)
     const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
-    const recipientName = resolveMailRecipientName([testRecipient?.fullName, PO_MGR_RETURN_TEST_EMP_CODE], 'PO CHECKER')
+    const recipientName = resolveMailRecipientName([testRecipient?.fullName, PO_MGR_RECHECK_TEST_EMP_CODE], 'PO PIC')
     const emailData: MailTemplateData = {
       toEmail: mailRoute.toEmail,
       ccEmail: mailRoute.ccEmails.join('; '),
@@ -1038,23 +1025,23 @@ export const sendMail_ToDocumentChecker_ReturnedByPoMgr = async (dataItem: any) 
     }
 
     await sendTemplatedEmail({
-      templateName: 'email_ToChecker_ReturnedByPoMgr',
-      emailHtml: email_ToChecker_ReturnedByPoMgr(emailData),
+      templateName: 'email_ToPic_RecheckByApprover',
+      emailHtml: email_ToPic_RecheckByApprover(emailData),
       toEmail: mailRoute.toEmail,
-      subject: `[Return for Recheck] PO Mgr returned vendor request "${requestNumber}" - Document Check`,
+      subject: `[Re-check] PO Mgr returned vendor request "${requestNumber}" to PO PIC`,
       ccEmails: mailRoute.ccEmails,
       requestId,
       requestNumber,
       extra: {
-        flow: 'poMgrReturnToDocumentCheck',
-        toRole: 'PO & SCM Check All Document',
-        ccRole: 'PO PIC',
+        flow: 'poMgrRecheckToPic',
+        toRole: 'PO PIC',
+        ccRole: 'PO PIC test copy',
         testToEmpCode: mailRoute.toEmpCode,
         testCcEmpCode: mailRoute.ccEmpCodes.join(';'),
       },
     })
   } catch (err: any) {
-    console.error('[poMgrReturnToDocumentCheck] Failed:', err?.message)
+    console.error('[poMgrRecheckToPic] Failed:', err?.message)
   }
 }
 
@@ -1179,7 +1166,7 @@ export const sendMail_ToRequester_GprCApproved = async (dataItem: any) => {
   }
 }
 
-export const sendMail_ToPic_RequestRejected = async (dataItem: any, currentStep: any) => {
+const sendMailToPicWorkflowAction = async (dataItem: any, currentStep: any, action: 'REJECT' | 'RECHECK') => {
   try {
     const requestId = dataItem.REQUEST_REGISTER_VENDOR_ID
     const vd = await fetchVendorContext(requestId)
@@ -1197,14 +1184,13 @@ export const sendMail_ToPic_RequestRejected = async (dataItem: any, currentStep:
     const checkerPicCc = await getPoCheckerMainEmails()
 
     const workflowStep = await getWorkflowStepIdentity()
-    const currentWorkflowStepMasterId = Number(
-      getValue(currentStep, 'workflow_step_id', 'WORKFLOW_STEP_MASTER_ID') || 0
-    )
-    const isCheckerReject = currentWorkflowStepMasterId === workflowStep.docCheck
+    const currentWorkflowStepMasterId = Number(getValue(currentStep, 'workflow_step_id', 'WORKFLOW_STEP_MASTER_ID') || 0)
+    const isRecheck = action === 'RECHECK'
+    const isCheckerRecheck = isRecheck && currentWorkflowStepMasterId === workflowStep.docCheck
 
     const isPicReject = currentWorkflowStepMasterId === workflowStep.picReview
 
-    const ccSources = isCheckerReject
+    const ccSources = isCheckerRecheck
       ? [checkerPicCc, requester.email ? [requester.email] : [], poPicContext.peerPicCc]
       : isPicReject
         ? [picEmail ? [picEmail] : []]
@@ -1222,10 +1208,10 @@ export const sendMail_ToPic_RequestRejected = async (dataItem: any, currentStep:
       [vd.vendor_email, vd.vendor_main_email]
     )
 
-    const rejectTemplate = isCheckerReject ? email_ToPic_RejectedByChecker : email_ToPic_RejectedByApprover
+    const workflowTemplate = isRecheck ? email_ToPic_RecheckByApprover : email_ToPic_RejectedByApprover
     const rejectRemark = dataItem.APPROVER_REMARK || ''
 
-    const emailHtml = rejectTemplate({
+    const emailHtml = workflowTemplate({
       toEmail: primaryToEmail,
       recipientName,
       ccEmailLine1: approverEmail,
@@ -1246,10 +1232,10 @@ export const sendMail_ToPic_RequestRejected = async (dataItem: any, currentStep:
     })
 
     await sendTemplatedEmail({
-      templateName: isCheckerReject ? 'email_ToPic_RejectedByChecker' : 'email_ToPic_RejectedByApprover',
+      templateName: isRecheck ? 'email_ToPic_RecheckByApprover' : 'email_ToPic_RejectedByApprover',
       emailHtml,
       toEmail: primaryToEmail,
-      subject: isCheckerReject
+      subject: isRecheck
         ? `[RECHECK] Register vendor "${requestNumber}" requires recheck`
         : `[REJECT] Please recheck register vendor follow as "${requestNumber}" - General Purchase Specification Form B`,
       ccEmails,
@@ -1262,9 +1248,13 @@ export const sendMail_ToPic_RequestRejected = async (dataItem: any, currentStep:
       },
     })
   } catch (err: any) {
-    console.error('[triggerRejectionEmail] Failed:', err?.message)
+    console.error('[sendMailToPicWorkflowAction] Failed:', err?.message)
   }
 }
+
+export const sendMail_ToPic_RequestRejected = async (dataItem: any, currentStep: any) => sendMailToPicWorkflowAction(dataItem, currentStep, 'REJECT')
+
+export const sendMail_ToPic_RecheckByApprover = async (dataItem: any, currentStep: any) => sendMailToPicWorkflowAction(dataItem, currentStep, 'RECHECK')
 
 export const sendMail_ToRequester_RegistrationCompleted = async (dataItem: any) => {
   try {

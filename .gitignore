@@ -12,7 +12,9 @@ dist/
 .env.*.local
 
 # Logs
-logs/
+# Keep the folder itself tracked so PM2 always has somewhere to write.
+logs/*
+!logs/.gitkeep
 *.log
 npm-debug.log*
 pnpm-debug.log*

@@ -347,6 +347,8 @@ export const ApprovalQueueSQL = {
                                      , mrs.STATUS_VALUE AS DESCRIPTION
                                      , wsm.STEP_CODE
                                      , wsm.ACTOR_TYPE
+                                     , wsm.REQUIRES_VENDOR_REPLY
+                                     , wsm.REQUIRES_VENDOR_CODE
                                      , ras.APPROVAL_GROUP_ID
                                      , task_group.GROUP_CODE
                                      , task_group.GROUP_NAME
@@ -529,6 +531,7 @@ export const ApprovalQueueSQL = {
                                      , STATUS_LABEL_SNAPSHOT
                                      , DESCRIPTION
                                      , REJECT_REASON
+                                     , RECHECK_REASON
                                      , CREATE_BY
                                      , UPDATE_BY
                                      , CREATE_DATE
@@ -574,10 +577,12 @@ export const ApprovalQueueSQL = {
                                      , CASE
                                            WHEN LOWER('dataItem.ACTION_TYPE') IN (
                                                'rejected',
-                                               'vendor_disagreed',
-                                               'returned_to_pic',
-                                               'returned_doc_check'
+                                               'vendor_disagreed'
                                            ) THEN LEFT('dataItem.REJECT_REASON', 500)
+                                           ELSE NULL
+                                       END
+                                     , CASE
+                                           WHEN UPPER('dataItem.ACTION_CODE') = 'RECHECK' THEN LEFT('dataItem.RECHECK_REASON', 500)
                                            ELSE NULL
                                        END
                                      , 'dataItem.ACTION_BY'
@@ -599,10 +604,9 @@ export const ApprovalQueueSQL = {
         .toUpperCase()
     )
     sql = sql.replaceAll('dataItem.REMARK', dataItem['REMARK'])
-    // Reject rows: store the full reason (up to 500 chars) in the dedicated REJECT_REASON column,
-    // falling back to REMARK so callers that only pass REMARK still populate it. The column is only
-    // written for terminal rejections, vendor disagreement, and workflow returns for another review.
+    // Reject and re-check reasons are intentionally stored in separate dedicated columns.
     sql = sql.replaceAll('dataItem.REJECT_REASON', dataItem['REJECT_REASON'] ?? dataItem['REMARK'] ?? '')
+    sql = sql.replaceAll('dataItem.RECHECK_REASON', dataItem['RECHECK_REASON'] ?? '')
 
     return sql
   },
@@ -617,6 +621,7 @@ export const ApprovalQueueSQL = {
                                      , ral.ACTION_TYPE
                                      , ral.DESCRIPTION
                                      , ral.REJECT_REASON
+                                     , ral.RECHECK_REASON
                                      , ral.CREATE_DATE
                                      , ral.DESCRIPTION
                                      , ral.CREATE_BY
@@ -1153,6 +1158,7 @@ export const ApprovalQueueSQL = {
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
                                                                                'REQUEST_APPROVAL_STEP_ID', ras.REQUEST_APPROVAL_STEP_ID,
+                                                                               'WORKFLOW_STEP_MASTER_ID', ras.WORKFLOW_STEP_MASTER_ID,
                                                                                'M_REQUEST_STATUS_ID', wsm.M_REQUEST_STATUS_ID,
                                                                                 'STEP_ORDER', ras.STEP_ORDER,
                                                                                 'APPROVER_EMPCODE', ras.APPROVER_EMPCODE,
@@ -1210,6 +1216,7 @@ export const ApprovalQueueSQL = {
                                                                                'ACTION_TYPE', ral.ACTION_TYPE,
                                                                                'DESCRIPTION', ral.DESCRIPTION,
                                                                                'REJECT_REASON', ral.REJECT_REASON,
+                                                                               'RECHECK_REASON', ral.RECHECK_REASON,
                                                                                'CREATE_DATE', ral.CREATE_DATE
                                                                            )
                                                                       )
@@ -1217,6 +1224,7 @@ export const ApprovalQueueSQL = {
                                                                       request_approval_log ral
                                                            WHERE
                                                                       ral.REQUEST_REGISTER_VENDOR_ID = rr.REQUEST_REGISTER_VENDOR_ID
+                                                                      AND ral.INUSE = 1
                                                 ),
                                                 JSON_ARRAY()
                                        ) AS APPROVAL_LOGS

@@ -13,7 +13,8 @@ import {
 } from '../_request-register/RegisterRequestWorkflowHelper'
 import {
   sendMail_ToApprover_NextStep,
-  sendMail_ToDocumentChecker_ReturnedByPoMgr,
+  sendMail_ToPic_RecheckByApprover,
+  sendMail_ToPic_RecheckByPoMgr,
   sendMail_ToUser_ActionRequired,
   sendMail_ToRequester_GprCApproved,
   sendMail_ToRequester_RegistrationCompleted,
@@ -34,10 +35,7 @@ import {
   type WorkspaceStatusIdentity,
 } from '../_status-master/StatusIdentityService'
 
-type ApprovalQueueWorkflowIdentity = Pick<
-  WorkspaceStatusIdentity,
-  'workflowStep' | 'approvalStep' | 'requestState' | 'requestStatus' | 'vendor'
->
+type ApprovalQueueWorkflowIdentity = Pick<WorkspaceStatusIdentity, 'workflowStep' | 'approvalStep' | 'requestState' | 'requestStatus' | 'vendor'>
 
 const getApprovalQueueWorkflowIdentity = async (): Promise<ApprovalQueueWorkflowIdentity> => {
   const [workflowStep, approvalStep, requestState, requestStatus, vendor] = await Promise.all([
@@ -148,9 +146,7 @@ const normalizeApprovalStep = (step: any): ApprovalStep =>
     step_id: Number(step?.step_id ?? step?.REQUEST_APPROVAL_STEP_ID ?? 0),
     workflow_step_id: Number(step?.workflow_step_id ?? step?.WORKFLOW_STEP_MASTER_ID ?? 0) || undefined,
     status_id: Number(step?.status_id ?? step?.M_REQUEST_STATUS_ID ?? 0) || undefined,
-    approval_step_status_id: Number(
-      step?.approval_step_status_id ?? step?.M_APPROVAL_STEP_STATUS_ID ?? 0
-    ),
+    approval_step_status_id: Number(step?.approval_step_status_id ?? step?.M_APPROVAL_STEP_STATUS_ID ?? 0),
     request_id: Number(step?.request_id ?? step?.REQUEST_REGISTER_VENDOR_ID ?? 0),
     step_order: Number(step?.step_order ?? step?.STEP_ORDER ?? 0),
     approver_id: String(step?.approver_id ?? step?.APPROVER_EMPCODE ?? ''),
@@ -171,7 +167,8 @@ const normalizeApprovalLog = (log: any) => ({
   step_id: Number(log?.step_id ?? log?.REQUEST_APPROVAL_STEP_ID ?? 0),
   action_by: String(log?.action_by ?? log?.ACTION_BY ?? ''),
   action_type: String(log?.action_type ?? log?.ACTION_TYPE ?? ''),
-  remark: log?.remark ?? log?.DESCRIPTION ?? log?.description ?? '',
+  remark: log?.remark ?? log?.RECHECK_REASON ?? log?.recheck_reason ?? log?.REJECT_REASON ?? log?.reject_reason ?? log?.DESCRIPTION ?? log?.description ?? '',
+  RECHECK_REASON: log?.RECHECK_REASON ?? log?.recheck_reason ?? null,
   action_date: log?.action_date ?? log?.CREATE_DATE ?? log?.create_date ?? null,
   DESCRIPTION: log?.DESCRIPTION ?? log?.description ?? log?.remark ?? '',
   CREATE_BY: String(log?.CREATE_BY ?? log?.create_by ?? log?.ACTION_BY ?? log?.action_by ?? 'SYSTEM'),
@@ -258,8 +255,7 @@ type SqlStatement = string
 type SqlList = SqlStatement[]
 type PostCommitTask = () => Promise<void>
 type ServicePayload = Record<string, any>
-const RETURN_TO_PIC_CONDITION = 'RETURN_TO_PIC'
-const RETURN_TO_DOC_CHECK_CONDITION = 'RETURN_TO_DOC_CHECK'
+const RECHECK_TO_PIC_CONDITION = 'RECHECK_TO_PIC'
 type ReassignPayload = ServicePayload & {
   request_id?: number | string
   scope?: string
@@ -308,10 +304,7 @@ enum StepType {
 
 const normalizeStatusText = (value: unknown) => normalizeText(String(value || '').replace(/[_-]+/g, ' '))
 
-const getStepType = (
-  step: Partial<ApprovalStep> | undefined,
-  identity: Pick<WorkspaceStatusIdentity, 'workflowStep'>
-): StepType => {
+const getStepType = (step: Partial<ApprovalStep> | undefined, identity: Pick<WorkspaceStatusIdentity, 'workflowStep'>): StepType => {
   const stepId = Number(step?.workflow_step_id || 0)
   if (stepId === identity.workflowStep.poPicInProgress) return StepType.PO_PIC_IN_PROGRESS
   if (stepId === identity.workflowStep.issueGprB) return StepType.ISSUE_GPR_B
@@ -322,11 +315,8 @@ const getStepType = (
   return StepType.OTHER
 }
 
-const isStepType = (
-  step: ApprovalStep | undefined,
-  identity: Pick<WorkspaceStatusIdentity, 'workflowStep'>,
-  ...types: StepType[]
-) => (step ? types.includes(getStepType(step, identity)) : false)
+const isStepType = (step: ApprovalStep | undefined, identity: Pick<WorkspaceStatusIdentity, 'workflowStep'>, ...types: StepType[]) =>
+  step ? types.includes(getStepType(step, identity)) : false
 const resolveActionRequiredStage = (step: ApprovalStep) => {
   const desc = normalizeStatusText(step?.DESCRIPTION)
   if (desc.includes('engineer')) return 'engineer'
@@ -351,7 +341,7 @@ const getGprCApproverEmpCodeFromSelection = (selection: SelectionRecord | null) 
   return String(meta?.gpr_c_approver_empcode || '').trim()
 }
 
-const NEED_CRITERIA = new Set(['4.1', '4.2', '4.3', '4.4', '4.5'])
+const NEED_FILE_CRITERIA = ['4.2', '4.4', '4.5']
 const OPTIONAL_CRITERIA = new Set(['4.6', '4.7', '4.8', '4.9', '4.10', '4.11', '4.12', '4.13'])
 const OPTIONAL_REQUIRED_COUNT = 3
 
@@ -362,7 +352,7 @@ const normalizeGpr43AcceptanceStatus = (value: unknown) => {
   return normalized.toUpperCase()
 }
 
-const evaluateGprCriteria = (criteriaRows: CriteriaRow[], selection?: SelectionRecord | null) => {
+export const evaluateGprCriteria = (criteriaRows: CriteriaRow[], selection?: SelectionRecord | null) => {
   const rows = Array.isArray(criteriaRows) ? criteriaRows : []
   const normalizedRows = rows.map((row) => ({
     no: String(row?.NO || '').trim(),
@@ -371,12 +361,13 @@ const evaluateGprCriteria = (criteriaRows: CriteriaRow[], selection?: SelectionR
   }))
   const gpr43Status = normalizeGpr43AcceptanceStatus(selection?.gpr_43_acceptance_status) || normalizeGpr43AcceptanceStatus(normalizedRows.find((row) => row.no === '4.3')?.remark)
 
-  const needRows = normalizedRows.filter((row) => NEED_CRITERIA.has(row.no) && row.no !== '4.3')
   const optionalRows = normalizedRows.filter((row) => OPTIONAL_CRITERIA.has(row.no))
 
-  const needFileCriteriaCount = NEED_CRITERIA.size - 1
   const gpr43Accepted = gpr43Status === 'ACCEPT'
-  const needPassed = needFileCriteriaCount > 0 && needRows.length === needFileCriteriaCount && needRows.every((row) => !!row.uploaded_file) && gpr43Accepted
+  const hasFile = (criteriaNo: string) =>
+    normalizedRows.some((row) => row.no === criteriaNo && !!row.uploaded_file)
+  const hasLawDocument = hasFile('4.1') || hasFile('4.11')
+  const needPassed = gpr43Accepted && hasLawDocument && NEED_FILE_CRITERIA.every(hasFile)
 
   const optionalUploaded = optionalRows.filter((row) => !!row.uploaded_file).length
   const optionalPassed = optionalUploaded >= OPTIONAL_REQUIRED_COUNT
@@ -464,7 +455,10 @@ const createWorkflowResolver = (context: WorkflowContext) => {
     if (!step) return ''
     if (isPicStep(step)) {
       const currentPic = String(context.request.assign_to || '').trim()
-      const picStepGroupCode = String(step.group_code || '').trim().toUpperCase() || picGroupCode
+      const picStepGroupCode =
+        String(step.group_code || '')
+          .trim()
+          .toUpperCase() || picGroupCode
       if (currentPic && (await isActiveAssigneeInGroup(currentPic, picStepGroupCode))) {
         return currentPic
       }
@@ -475,7 +469,9 @@ const createWorkflowResolver = (context: WorkflowContext) => {
       return getGprCApproverEmpCodeFromSelection(selection) || context.requesterCode
     }
 
-    const stepGroupCode = String(step.group_code || '').trim().toUpperCase()
+    const stepGroupCode = String(step.group_code || '')
+      .trim()
+      .toUpperCase()
     if (step.approver_id && stepGroupCode && (await isActiveAssigneeInGroup(String(step.approver_id), stepGroupCode))) {
       return String(step.approver_id)
     }
@@ -519,12 +515,8 @@ const loadWorkflowContext = async (dataItem: UpdateStatusPayload): Promise<Workf
   const request = normalizeRequestRecord(checkRes[0] || {})
 
   const currentStep =
-    steps.find(
-      step =>
-        step.step_id === request.current_step_id &&
-        step.approval_step_status_id === statusIdentity.approvalStep.inProgress
-    ) ||
-    steps.find(step => step.approval_step_status_id === statusIdentity.approvalStep.inProgress)
+    steps.find((step) => step.step_id === request.current_step_id && step.approval_step_status_id === statusIdentity.approvalStep.inProgress) ||
+    steps.find((step) => step.approval_step_status_id === statusIdentity.approvalStep.inProgress)
 
   return {
     dataItem,
@@ -539,10 +531,7 @@ const loadWorkflowContext = async (dataItem: UpdateStatusPayload): Promise<Workf
   }
 }
 
-const resolveConfiguredTransition = async (
-  context: WorkflowContext,
-  workflowTransitionId: number
-): Promise<WorkflowTransition> => {
+const resolveConfiguredTransition = async (context: WorkflowContext, workflowTransitionId: number): Promise<WorkflowTransition> => {
   const currentStep = context.currentStep
   if (!currentStep?.workflow_step_id) {
     throw new Error('Workflow configuration error: current task has no workflow step identity.')
@@ -560,7 +549,7 @@ const resolveConfiguredTransition = async (
   }
 
   const transition = normalizeWorkflowTransition(rows[0], context.dataItem.REQUEST_REGISTER_VENDOR_ID)
-  const supportedConditions = new Set(['', 'GPR_ACCEPTED', 'GPR_B_REQUIRED', RETURN_TO_PIC_CONDITION, RETURN_TO_DOC_CHECK_CONDITION])
+  const supportedConditions = new Set(['', 'GPR_ACCEPTED', 'GPR_B_REQUIRED', RECHECK_TO_PIC_CONDITION])
   if (!supportedConditions.has(transition.condition_key)) {
     throw new Error(`Workflow condition ${transition.condition_key} is not supported by this API version.`)
   }
@@ -568,13 +557,13 @@ const resolveConfiguredTransition = async (
     throw new Error(`Workflow configuration error: target task ${transition.NEXT_STEP_CODE || transition.TO_WORKFLOW_STEP_MASTER_ID} was not created for this request.`)
   }
   const targetStatusId = transition.nextStep?.approval_step_status_id
-  const isReturnTransition = [RETURN_TO_PIC_CONDITION, RETURN_TO_DOC_CHECK_CONDITION].includes(transition.condition_key)
+  const isReopenTransition = transition.condition_key === RECHECK_TO_PIC_CONDITION
   const canActivateTarget =
     !transition.nextStep ||
     targetStatusId === context.statusIdentity.approvalStep.pending ||
     targetStatusId === context.statusIdentity.approvalStep.rejected ||
     targetStatusId === context.statusIdentity.approvalStep.skipped ||
-    (isReturnTransition && targetStatusId !== context.statusIdentity.approvalStep.inProgress)
+    (isReopenTransition && targetStatusId !== context.statusIdentity.approvalStep.inProgress)
 
   if (!canActivateTarget) {
     throw new Error('Workflow state changed. Please refresh the request and try again.')
@@ -643,7 +632,9 @@ const validateCurrentStep = async (context: WorkflowContext, resolver: WorkflowR
   const actionBy = String(dataItem.APPROVE_BY || dataItem.UPDATE_BY || '')
   const isCurrentPicStep = isPicStep(currentStep)
   const requiresRoleApprover = ['APPROVER', 'ACCOUNT'].includes(
-    String(currentStep.actor_type || '').trim().toUpperCase()
+    String(currentStep.actor_type || '')
+      .trim()
+      .toUpperCase()
   )
 
   if (currentStep.approver_id) {
@@ -667,11 +658,7 @@ const validateCurrentStep = async (context: WorkflowContext, resolver: WorkflowR
     dataItem.VENDOR_CODE_EXTRACTED = extractedVendorCode
   }
 
-  const requiresGprDecision = isStepType(
-    currentStep,
-    context.statusIdentity,
-    StepType.PO_PIC_IN_PROGRESS
-  )
+  const requiresGprDecision = isStepType(currentStep, context.statusIdentity, StepType.PO_PIC_IN_PROGRESS)
   if (requiresGprDecision && explicitAction !== WORKFLOW_ACTION.REJECT && explicitAction !== WORKFLOW_ACTION.ACTION_REQUIRED) {
     const attemptingDisagree = explicitAction === WORKFLOW_ACTION.DISAGREE
     const attemptingApprove = !attemptingDisagree
@@ -692,13 +679,10 @@ const validateCurrentStep = async (context: WorkflowContext, resolver: WorkflowR
       if (!gprEval.passed) {
         throw new Error(
           'Approval blocked: Selection Form does not pass criteria ' +
-            '(4.3 must be ACCEPT, 4.1/4.2/4.4/4.5 need files, and optional criteria including 4.11 need at least 3 files).'
+            '(4.3 must be ACCEPT; 4.1 or its 4.11 substitute, 4.2, 4.4 and 4.5 need files; and optional criteria need at least 3 files).'
         )
       }
-    } else if (
-      transition.condition_key === 'GPR_B_REQUIRED' ||
-      transition.nextStep?.workflow_step_id === context.statusIdentity.workflowStep.issueGprB
-    ) {
+    } else if (transition.condition_key === 'GPR_B_REQUIRED' || transition.nextStep?.workflow_step_id === context.statusIdentity.workflowStep.issueGprB) {
       const gpr43Status = normalizeGpr43AcceptanceStatus(selection.gpr_43_acceptance_status)
       if (gpr43Status !== 'NOT_ACCEPT') {
         throw new Error('GPR B can be sent to vendor only when item 4.3 is NOT_ACCEPT.')
@@ -750,12 +734,7 @@ const addVendorCodeUpdates = async (context: WorkflowContext, sqlList: SqlList) 
   }
 }
 
-const handleRejection = async (
-  context: WorkflowContext,
-  transition: WorkflowTransition,
-  sqlList: SqlList,
-  postCommitTasks: PostCommitTask[]
-) => {
+const handleRejection = async (context: WorkflowContext, transition: WorkflowTransition, sqlList: SqlList, postCommitTasks: PostCommitTask[]) => {
   const { dataItem, currentStep, steps, vendor_id } = context
   if (vendor_id) {
     sqlList.push(
@@ -780,13 +759,12 @@ const handleRejection = async (
         ACTION_BY: dataItem.APPROVE_BY || dataItem.UPDATE_BY || 'SYSTEM',
         ACTION_TYPE: 'rejected',
         ACTION_CODE: transition.action_code,
-        REMARK: dataItem.APPROVER_REMARK || '',
+        REMARK: '',
+        REJECT_REASON: dataItem.APPROVER_REMARK || '',
       })
     )
   }
-  const pendingSteps = steps.filter(
-    step => step.approval_step_status_id === context.statusIdentity.approvalStep.pending
-  )
+  const pendingSteps = steps.filter((step) => step.approval_step_status_id === context.statusIdentity.approvalStep.pending)
   for (const pendingStep of pendingSteps) {
     sqlList.push(
       await buildApprovalStepUpdateSql(context, {
@@ -799,22 +777,24 @@ const handleRejection = async (
   postCommitTasks.push(async () => sendMail_ToPic_RequestRejected(dataItem, currentStep))
 }
 
-const handleReturnToPic = async (context: WorkflowContext, resolver: WorkflowResolver, transition: WorkflowTransition, sqlList: SqlList, postCommitTasks: PostCommitTask[]) => {
-  const { dataItem, currentStep } = context
+const handleRecheckToPic = async (context: WorkflowContext, resolver: WorkflowResolver, transition: WorkflowTransition, sqlList: SqlList, postCommitTasks: PostCommitTask[]) => {
+  const { dataItem, currentStep, steps } = context
   const targetStep = transition.nextStep
 
   if (!currentStep || !targetStep) {
-    throw new Error('Workflow configuration error: Return to PO PIC requires both source and target tasks.')
+    throw new Error('Workflow configuration error: Re-check to PO PIC requires both source and target tasks.')
   }
-  if (!isPicStep(targetStep)) {
-    throw new Error('Workflow configuration error: RETURN_TO_PIC must target a PO PIC task.')
+  const sourceWorkflowStepId = Number(currentStep.workflow_step_id || 0)
+  const allowedSourceStepIds = new Set([context.statusIdentity.workflowStep.docCheck, context.statusIdentity.workflowStep.poMgrApproval])
+  if (!allowedSourceStepIds.has(sourceWorkflowStepId) || targetStep.workflow_step_id !== context.statusIdentity.workflowStep.poPicInProgress) {
+    throw new Error('Workflow configuration error: RECHECK_TO_PIC must connect Document Check or PO Mgr Approval to PO PIC In Progress.')
   }
 
   const updateBy = dataItem.UPDATE_BY || dataItem.APPROVE_BY || 'SYSTEM'
   sqlList.push(
     await buildApprovalStepUpdateSql(context, {
       REQUEST_APPROVAL_STEP_ID: currentStep.step_id,
-      M_APPROVAL_STEP_STATUS_ID: context.statusIdentity.approvalStep.rejected,
+      M_APPROVAL_STEP_STATUS_ID: context.statusIdentity.approvalStep.pending,
       UPDATE_BY: updateBy,
     })
   )
@@ -823,12 +803,25 @@ const handleReturnToPic = async (context: WorkflowContext, resolver: WorkflowRes
       REQUEST_REGISTER_VENDOR_ID: dataItem.REQUEST_REGISTER_VENDOR_ID,
       REQUEST_APPROVAL_STEP_ID: currentStep.step_id,
       ACTION_BY: dataItem.APPROVE_BY || updateBy,
-      ACTION_TYPE: 'returned_to_pic',
+      ACTION_TYPE: transition.action_code.toLowerCase(),
       ACTION_CODE: transition.action_code,
-      REMARK: dataItem.APPROVER_REMARK || '',
-      REJECT_REASON: dataItem.APPROVER_REMARK || '',
+      REMARK: '',
+      RECHECK_REASON: dataItem.APPROVER_REMARK || '',
     })
   )
+
+  // A re-check restarts the main workflow from PO PIC. Clear every later decision so the
+  // selected GPR branch and all approvals can run again without reusing an approved task.
+  const downstreamSteps = steps.filter((step) => step.step_id !== currentStep.step_id && step.step_id !== targetStep.step_id && step.step_order > targetStep.step_order)
+  for (const downstreamStep of downstreamSteps) {
+    sqlList.push(
+      await buildApprovalStepUpdateSql(context, {
+        REQUEST_APPROVAL_STEP_ID: downstreamStep.step_id,
+        M_APPROVAL_STEP_STATUS_ID: context.statusIdentity.approvalStep.pending,
+        UPDATE_BY: updateBy,
+      })
+    )
+  }
 
   const targetApprover = await resolver.resolveStepApprover(targetStep)
   if (targetApprover && targetApprover !== targetStep.approver_id) {
@@ -849,69 +842,8 @@ const handleReturnToPic = async (context: WorkflowContext, resolver: WorkflowRes
     })
   )
 
-  postCommitTasks.push(async () => sendMail_ToPic_RequestRejected(dataItem, currentStep))
-}
-
-const handleReturnToDocumentCheck = async (
-  context: WorkflowContext,
-  resolver: WorkflowResolver,
-  transition: WorkflowTransition,
-  sqlList: SqlList,
-  postCommitTasks: PostCommitTask[]
-) => {
-  const { dataItem, currentStep } = context
-  const targetStep = transition.nextStep
-
-  if (!currentStep || !targetStep) {
-    throw new Error('Workflow configuration error: Return to Document Check requires both source and target tasks.')
-  }
-  if (
-    currentStep.workflow_step_id !== context.statusIdentity.workflowStep.poMgrApproval ||
-    getStepType(targetStep, context.statusIdentity) !== StepType.DOCUMENT_CHECK
-  ) {
-    throw new Error('Workflow configuration error: RETURN_TO_DOC_CHECK must connect PO Mgr to Document Check.')
-  }
-
-  const updateBy = dataItem.UPDATE_BY || dataItem.APPROVE_BY || 'SYSTEM'
-  sqlList.push(
-    await buildApprovalStepUpdateSql(context, {
-      REQUEST_APPROVAL_STEP_ID: currentStep.step_id,
-      M_APPROVAL_STEP_STATUS_ID: context.statusIdentity.approvalStep.rejected,
-      UPDATE_BY: updateBy,
-    })
-  )
-  sqlList.push(
-    await ApprovalQueueSQL.createApprovalLog({
-      REQUEST_REGISTER_VENDOR_ID: dataItem.REQUEST_REGISTER_VENDOR_ID,
-      REQUEST_APPROVAL_STEP_ID: currentStep.step_id,
-      ACTION_BY: dataItem.APPROVE_BY || updateBy,
-      ACTION_TYPE: 'returned_doc_check',
-      ACTION_CODE: transition.action_code,
-      REMARK: dataItem.APPROVER_REMARK || '',
-      REJECT_REASON: dataItem.APPROVER_REMARK || '',
-    })
-  )
-
-  const targetApprover = await resolver.resolveStepApprover(targetStep)
-  if (targetApprover && targetApprover !== targetStep.approver_id) {
-    sqlList.push(
-      await ApprovalQueueSQL.updateApprovalStepApprover({
-        REQUEST_APPROVAL_STEP_ID: targetStep.step_id,
-        APPROVER_EMPCODE: targetApprover,
-        ASSIGNMENT_MODE: 'AUTO',
-        UPDATE_BY: updateBy,
-      })
-    )
-  }
-  sqlList.push(
-    await buildApprovalStepUpdateSql(context, {
-      REQUEST_APPROVAL_STEP_ID: targetStep.step_id,
-      M_APPROVAL_STEP_STATUS_ID: context.statusIdentity.approvalStep.inProgress,
-      UPDATE_BY: updateBy,
-    })
-  )
-
-  postCommitTasks.push(async () => sendMail_ToDocumentChecker_ReturnedByPoMgr(dataItem))
+  const isPoMgrRecheck = sourceWorkflowStepId === context.statusIdentity.workflowStep.poMgrApproval
+  postCommitTasks.push(async () => (isPoMgrRecheck ? sendMail_ToPic_RecheckByPoMgr(dataItem, currentStep) : sendMail_ToPic_RecheckByApprover(dataItem, currentStep)))
 }
 
 const handleVendorReplyRequest = async (
@@ -924,13 +856,7 @@ const handleVendorReplyRequest = async (
   const { dataItem, currentStep } = context
   if (!currentStep) return null
 
-  const isNegotiationBranchCurrentStep = isStepType(
-    currentStep,
-    context.statusIdentity,
-    StepType.PO_PIC_IN_PROGRESS,
-    StepType.ISSUE_GPR_B,
-    StepType.ISSUE_GPR_C
-  )
+  const isNegotiationBranchCurrentStep = isStepType(currentStep, context.statusIdentity, StepType.PO_PIC_IN_PROGRESS, StepType.ISSUE_GPR_B, StepType.ISSUE_GPR_C)
   if (!requiresVendorReply(currentStep) || hasRequestLog || isNegotiationBranchCurrentStep) return null
 
   sqlList.push(
@@ -1074,11 +1000,8 @@ const handleNormalApproval = async (
   if (!currentStep) return
 
   const actionRequiredRequested = explicitAction === WORKFLOW_ACTION.ACTION_REQUIRED
-  const approvalActionType = actionRequiredRequested
-    ? 'action_required'
-    : explicitAction === WORKFLOW_ACTION.DISAGREE
-      ? 'vendor_disagreed'
-      : explicitAction.toLowerCase()
+  const disagreementRequested = explicitAction === WORKFLOW_ACTION.DISAGREE
+  const approvalActionType = actionRequiredRequested ? 'action_required' : disagreementRequested ? 'vendor_disagreed' : explicitAction.toLowerCase()
   const approvalRemark = actionRequiredRequested ? buildActionRequiredRemark(dataItem) : dataItem.APPROVER_REMARK || ''
 
   sqlList.push(
@@ -1095,14 +1018,12 @@ const handleNormalApproval = async (
       ACTION_BY: dataItem.APPROVE_BY || dataItem.UPDATE_BY || 'SYSTEM',
       ACTION_TYPE: approvalActionType,
       ACTION_CODE: explicitAction,
-      REMARK: approvalRemark,
+      REMARK: disagreementRequested ? '' : approvalRemark,
+      REJECT_REASON: disagreementRequested ? approvalRemark : undefined,
     })
   )
 
-  if (
-    transition.terminal_is_terminal &&
-    transition.terminal_request_state_id === context.statusIdentity.requestState.rejected
-  ) {
+  if (transition.terminal_is_terminal && transition.terminal_request_state_id === context.statusIdentity.requestState.rejected) {
     if (vendor_id) {
       sqlList.push(
         await ApprovalQueueSQL.updateVendorFftStatus({
@@ -1210,10 +1131,7 @@ const handleNormalApproval = async (
   } else {
     postCommitTasks.push(async () => sendMail_ToApprover_NextStep(dataItem, nextStep, nextStepApprover))
   }
-  if (
-    getStepType(currentStep, context.statusIdentity) === StepType.ISSUE_GPR_C &&
-    explicitAction === WORKFLOW_ACTION.APPROVE
-  ) {
+  if (getStepType(currentStep, context.statusIdentity) === StepType.ISSUE_GPR_C && explicitAction === WORKFLOW_ACTION.APPROVE) {
     postCommitTasks.push(async () => sendMail_ToRequester_GprCApproved(dataItem))
   }
   if (actionRequiredRequested) {
@@ -1253,16 +1171,10 @@ export const ApprovalQueueService = {
     const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID) || 0
     if (!requestId) throw new Error('Invalid request_id')
 
-    const [workflowStep, approvalStep] = await Promise.all([
-      getWorkflowStepIdentity(),
-      getApprovalStepStatusIdentity(),
-    ])
+    const [workflowStep, approvalStep] = await Promise.all([getWorkflowStepIdentity(), getApprovalStepStatusIdentity()])
     const sql = await ApprovalQueueSQL.getById({
       REQUEST_REGISTER_VENDOR_ID: requestId,
-      EDITABLE_WORKFLOW_STEP_MASTER_IDS: [
-        workflowStep.poPicInProgress,
-        workflowStep.docCheck,
-      ],
+      EDITABLE_WORKFLOW_STEP_MASTER_IDS: [workflowStep.poPicInProgress, workflowStep.docCheck],
       M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID: approvalStep.inProgress,
     })
     const result = (await MySQLExecute.search(sql)) as RowDataPacket[]
@@ -1294,11 +1206,7 @@ export const ApprovalQueueService = {
         getRequestStateIdentity(),
       ])
       const steps = stepRows.map(normalizeApprovalStep)
-      const currentStep = steps.find(
-        step =>
-          step.step_id === request.current_step_id &&
-          step.approval_step_status_id === approvalStep.inProgress
-      )
+      const currentStep = steps.find((step) => step.step_id === request.current_step_id && step.approval_step_status_id === approvalStep.inProgress)
 
       if (!currentStep || !isPicStep(currentStep)) {
         throw new Error('Request can only be edited when it is in the PIC checking step')
@@ -1348,9 +1256,7 @@ export const ApprovalQueueService = {
 
   updateStatus: async (dataItem: UpdateStatusPayload) => {
     try {
-      const workflowTransitionId = Number(
-        dataItem.WORKFLOW_TRANSITION_ID ?? dataItem.workflow_transition_id ?? 0
-      )
+      const workflowTransitionId = Number(dataItem.WORKFLOW_TRANSITION_ID ?? dataItem.workflow_transition_id ?? 0)
       if (!Number.isInteger(workflowTransitionId) || workflowTransitionId <= 0) {
         throw new Error('workflow_transition_id is required. Allowed IDs come from ALLOWED_ACTIONS on the request.')
       }
@@ -1371,21 +1277,17 @@ export const ApprovalQueueService = {
       await addVendorCodeUpdates(context, sqlList)
 
       if (explicitAction === WORKFLOW_ACTION.REJECT) {
-        if (transition.condition_key === RETURN_TO_PIC_CONDITION) {
-          await handleReturnToPic(context, resolver, transition, sqlList, postCommitTasks)
-        } else if (
-          transition.terminal_is_terminal &&
-          transition.terminal_request_state_id === context.statusIdentity.requestState.rejected
-        ) {
+        if (transition.terminal_is_terminal && transition.terminal_request_state_id === context.statusIdentity.requestState.rejected) {
           await handleRejection(context, transition, sqlList, postCommitTasks)
         } else {
-          throw new Error('Workflow configuration error: REJECT must either return to PO PIC or end as rejected.')
+          throw new Error('Workflow configuration error: REJECT must end as rejected.')
         }
-      } else if (explicitAction === WORKFLOW_ACTION.RETURN) {
-        if (transition.condition_key !== RETURN_TO_DOC_CHECK_CONDITION) {
-          throw new Error('Workflow configuration error: RETURN must target Document Check.')
+      } else if (explicitAction === WORKFLOW_ACTION.RECHECK) {
+        if (transition.condition_key === RECHECK_TO_PIC_CONDITION) {
+          await handleRecheckToPic(context, resolver, transition, sqlList, postCommitTasks)
+        } else {
+          throw new Error('Workflow configuration error: RECHECK must target PO PIC.')
         }
-        await handleReturnToDocumentCheck(context, resolver, transition, sqlList, postCommitTasks)
       } else if (context.currentStep) {
         const vendorReplyResponse = await handleVendorReplyRequest(context, resolver, transition, sqlList, vendorRequestLogExists)
         if (vendorReplyResponse) return vendorReplyResponse
@@ -1439,17 +1341,10 @@ export const ApprovalQueueService = {
       if (!toEmpCode) throw new Error('Missing to_empcode')
       if (!reason) throw new Error('Reassignment reason is required')
 
-      const [workflowStep, approvalStep, requestState] = await Promise.all([
-        getWorkflowStepIdentity(),
-        getApprovalStepStatusIdentity(),
-        getRequestStateIdentity(),
-      ])
+      const [workflowStep, approvalStep, requestState] = await Promise.all([getWorkflowStepIdentity(), getApprovalStepStatusIdentity(), getRequestStateIdentity()])
       const requestSql = await ApprovalQueueSQL.getById({
         REQUEST_REGISTER_VENDOR_ID: requestId,
-        EDITABLE_WORKFLOW_STEP_MASTER_IDS: [
-          workflowStep.poPicInProgress,
-          workflowStep.docCheck,
-        ],
+        EDITABLE_WORKFLOW_STEP_MASTER_IDS: [workflowStep.poPicInProgress, workflowStep.docCheck],
         M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID: approvalStep.inProgress,
       })
       const requestRes = (await MySQLExecute.search(requestSql)) as RowDataPacket[]
@@ -1457,21 +1352,11 @@ export const ApprovalQueueService = {
       if (!request) throw new Error('Request not found')
 
       const stepsSql = await ApprovalQueueSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId })
-      const stepRows = await MySQLExecute.search(stepsSql) as ApprovalStep[]
+      const stepRows = (await MySQLExecute.search(stepsSql)) as ApprovalStep[]
       const steps = stepRows.map(normalizeApprovalStep)
-      const currentStep = steps.find(
-        step =>
-          step.step_id === request.current_step_id &&
-          step.approval_step_status_id === approvalStep.inProgress
-      )
+      const currentStep = steps.find((step) => step.step_id === request.current_step_id && step.approval_step_status_id === approvalStep.inProgress)
 
-      if (
-        !isTaskManagerReassignable(
-          request.request_state_id,
-          requestState.inProgress,
-          Boolean(currentStep)
-        )
-      ) {
+      if (!isTaskManagerReassignable(request.request_state_id, requestState.inProgress, Boolean(currentStep))) {
         throw new Error('Only requests with an active workflow step can be reassigned')
       }
       if (toEmpCode === request.assign_to) throw new Error('The selected employee is already assigned to this request')

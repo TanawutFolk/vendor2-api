@@ -38,6 +38,40 @@ export const GprCApprovalController = {
     }
   },
 
+  gprCRecheckStep: async (req: Request, res: Response) => {
+    const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
+
+    try {
+      const requestId = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
+      if (!requestId || isNaN(requestId)) {
+        res.status(200).json({
+          Status: false,
+          ResultOnDb: {},
+          TotalCountOnDb: 0,
+          MethodOnDb: 'Re-check GPR C Step',
+          Message: 'Invalid request_id',
+        } as ResponseI)
+        return
+      }
+
+      const result = await GprCApprovalModel.gprCRecheckStep({
+        REQUEST_REGISTER_VENDOR_ID: requestId,
+        ACTION_BY: dataItem.ACTION_BY || dataItem.UPDATE_BY || '',
+        REMARK: dataItem.REMARK || dataItem.ACTION_REMARK || '',
+        UPDATE_BY: dataItem.UPDATE_BY || dataItem.ACTION_BY || 'SYSTEM',
+      })
+      res.status(200).json(result as ResponseI)
+    } catch (error: any) {
+      res.status(200).json({
+        Status: false,
+        ResultOnDb: {},
+        TotalCountOnDb: 0,
+        MethodOnDb: 'Re-check GPR C Step',
+        Message: error?.message || 'Failed to re-check GPR C step',
+      } as ResponseI)
+    }
+  },
+
   gprCRejectStep: async (req: Request, res: Response) => {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 

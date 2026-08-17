@@ -385,18 +385,7 @@ export const email_ToChecker_CheckRequired = (data: MailTemplateData) =>
     thaiMessage: `กรุณาตรวจสอบคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong>`,
   })
 
-export const email_ToChecker_ReturnedByPoMgr = (data: MailTemplateData) =>
-  renderStandardWorkflowMail(data, {
-    recipient: data.recipientName || 'PO CHECKER',
-    status: 'Returned by PO Mgr for document recheck',
-    message: `PO Mgr returned vendor request <strong>"${text(data.requestNumber)}"</strong> to PO &amp; SCM Check All Document.`,
-    detail: `Return remark: ${text(data.remarkEN)}`,
-    thaiStatus: 'PO Mgr ส่งกลับให้ตรวจสอบเอกสารอีกครั้ง',
-    thaiMessage: `PO Mgr ส่งคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong> กลับมายังขั้นตอน PO &amp; SCM Check All Document`,
-    thaiDetail: `หมายเหตุการส่งกลับ: ${text(data.remarkTH || data.remarkEN)}`,
-  })
-
-export const email_ToPic_RejectedByChecker = (data: MailTemplateData) =>
+export const email_ToPic_RecheckByApprover = (data: MailTemplateData) =>
   renderStandardWorkflowMail(data, {
     recipient: data.recipientName || 'PO PIC',
     status: 'Vendor registration requires recheck',
@@ -405,6 +394,19 @@ export const email_ToPic_RejectedByChecker = (data: MailTemplateData) =>
     thaiStatus: 'ต้องตรวจสอบการลงทะเบียนผู้ขายอีกครั้ง',
     thaiMessage: `กรุณาตรวจสอบคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong> อีกครั้ง`,
     thaiDetail: `สาเหตุ: ${text(data.remarkTH || data.remarkEN)}`,
+  })
+
+export const email_ToPic_RecheckByGprCApprover = (data: MailTemplateData) =>
+  renderStandardWorkflowMail(data, {
+    recipient: data.recipientName || 'PO PIC',
+    status: 'GPR C re-check requested',
+    message:
+      `The GPR C approver requested changes for vendor request <strong>"${text(data.requestNumber)}"</strong>. ` +
+      'Please review the information before resubmitting it to the same approver.',
+    detail: `${text(data.stageLabel, 'GPR C Approver')} remark: ${text(data.remarkEN)}`,
+    thaiStatus: 'ผู้อนุมัติ GPR C ขอให้ตรวจสอบอีกครั้ง',
+    thaiMessage: `ผู้อนุมัติ GPR C ขอให้แก้ไขคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong> กรุณาตรวจสอบข้อมูลก่อนส่งกลับให้ผู้อนุมัติคนเดิม`,
+    thaiDetail: `หมายเหตุจาก ${text(data.stageLabel, 'ผู้อนุมัติ GPR C')}: ${text(data.remarkTH || data.remarkEN)}`,
   })
 
 export const email_ToPoManager_ApproveRequired = (data: MailTemplateData) =>

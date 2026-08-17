@@ -262,9 +262,9 @@ export const FindVendorController = {
     },
 
     // Get vendor business category names for dropdown
-    getVendorBusinessCategoryName: async (_req: Request, res: Response) => {
+    getVendorBusinessCategoryName: async (req: Request, res: Response) => {
         try {
-            const result = await FindVendorModel.getVendorBusinessCategoryName()
+            const result = await FindVendorModel.getVendorBusinessCategoryName(req.body || {})
             res.status(200).json({
                 Status: true,
                 ResultOnDb: result,
@@ -285,9 +285,9 @@ export const FindVendorController = {
     },
 
     // Get provinces for dropdown
-    getProvinces: async (_req: Request, res: Response) => {
+    getProvinces: async (req: Request, res: Response) => {
         try {
-            const result = await FindVendorModel.getProvinces()
+            const result = await FindVendorModel.getProvinces(req.body || {})
             res.status(200).json({
                 Status: true,
                 ResultOnDb: result,
@@ -307,9 +307,9 @@ export const FindVendorController = {
         }
     },
     // Get countries for dropdown
-    getCountries: async (_req: Request, res: Response) => {
+    getCountries: async (req: Request, res: Response) => {
         try {
-            const result = await FindVendorModel.getCountries()
+            const result = await FindVendorModel.getCountries(req.body || {})
             res.status(200).json({
                 Status: true,
                 ResultOnDb: result,
@@ -330,9 +330,9 @@ export const FindVendorController = {
 
 
     // Get product groups for dropdown
-    getProductGroups: async (_req: Request, res: Response) => {
+    getProductGroups: async (req: Request, res: Response) => {
         try {
-            const result = await FindVendorModel.getProductGroups()
+            const result = await FindVendorModel.getProductGroups(req.body || {})
             res.status(200).json({
                 Status: true,
                 ResultOnDb: result,

@@ -60,8 +60,8 @@ describe('RegisterRequestWorkflowHelper', () => {
     expect(inferStepCode({ STEP_CODE: 'PENDING_AGREEMENT' })).toBe('PENDING_AGREEMENT')
   })
 
-  test('resolves RETURN as a separate workflow action', () => {
-    expect(resolveWorkflowAction({ ACTION_CODE: 'RETURN' })).toBe(WORKFLOW_ACTION.RETURN)
+  test('resolves RECHECK as a separate workflow action', () => {
+    expect(resolveWorkflowAction({ ACTION_CODE: 'RECHECK' })).toBe(WORKFLOW_ACTION.RECHECK)
   })
 
   test('does not treat the local or oversea prefix as a completed vendor code', () => {

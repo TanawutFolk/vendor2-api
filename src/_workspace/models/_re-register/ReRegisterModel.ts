@@ -7,9 +7,9 @@ export const ReRegisterModel = {
   updateComprehensive: async (dataItem: any) =>
     ReRegisterService.updateVendorComprehensive(dataItem),
   deleteVendor: async (dataItem: any) => ReRegisterService.deleteVendor(dataItem),
-  getVendorTypes: async () => ReRegisterService.getVendorTypes({}),
-  getProvinces: async () => ReRegisterService.getProvinces({}),
-  getCountries: async () => ReRegisterService.getCountries({}),
-  getProductGroups: async () => ReRegisterService.getProductGroups({}),
+  getVendorTypes: async (dataItem: any = {}) => ReRegisterService.getVendorTypes(dataItem),
+  getProvinces: async (dataItem: any = {}) => ReRegisterService.getProvinces(dataItem),
+  getCountries: async (dataItem: any = {}) => ReRegisterService.getCountries(dataItem),
+  getProductGroups: async (dataItem: any = {}) => ReRegisterService.getProductGroups(dataItem),
   searchAllForExport: async (dataItem: any) => ReRegisterService.searchAllForExport(dataItem),
 }

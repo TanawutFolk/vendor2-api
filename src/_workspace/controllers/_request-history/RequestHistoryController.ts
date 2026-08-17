@@ -186,6 +186,31 @@ export const RequestHistoryController = {
     }
   },
 
+  getGprCSections: async (req: Request, res: Response) => {
+    const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
+
+    try {
+      const result = await RequestHistoryModel.getGprCSections({
+        SEARCH_TEXT: String(dataItem.SEARCH_TEXT || '').trim(),
+      })
+      res.status(200).json({
+        Status: true,
+        ResultOnDb: result,
+        TotalCountOnDb: result.length,
+        MethodOnDb: 'Get GPR C Sections',
+        Message: 'Get Data Success',
+      } as ResponseI)
+    } catch (error: any) {
+      res.status(200).json({
+        Status: false,
+        ResultOnDb: [],
+        TotalCountOnDb: 0,
+        MethodOnDb: 'Get GPR C Sections',
+        Message: error?.message || 'Failed to get GPR C sections',
+      } as ResponseI)
+    }
+  },
+
   getSelectionForm: async (req: Request, res: Response) => {
     let dataItem
 

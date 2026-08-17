@@ -6,7 +6,6 @@ import { PersonSqlSnippets } from '../common/PersonSqlSnippets'
 import { MesProductSqlSnippets } from '../common/MesProductSqlSnippets'
 import { RequestStateSqlSnippets } from '../_status-master/StatusMasterSQL'
 
-
 export const RequestHistorySQL = {
   getById: async (dataItem: any) => {
     let sql = `
@@ -122,6 +121,7 @@ export const RequestHistorySQL = {
                                                                       JSON_ARRAYAGG(
                                                                            JSON_OBJECT(
                                                                                'REQUEST_APPROVAL_STEP_ID', ras.REQUEST_APPROVAL_STEP_ID,
+                                                                               'WORKFLOW_STEP_MASTER_ID', ras.WORKFLOW_STEP_MASTER_ID,
                                                                                'M_REQUEST_STATUS_ID', wsm.M_REQUEST_STATUS_ID,
                                                                                 'STEP_ORDER', ras.STEP_ORDER,
                                                                                 'APPROVER_EMPCODE', ras.APPROVER_EMPCODE,
@@ -179,6 +179,7 @@ export const RequestHistorySQL = {
                                                                                'ACTION_TYPE', ral.ACTION_TYPE,
                                                                                'DESCRIPTION', ral.DESCRIPTION,
                                                                                'REJECT_REASON', ral.REJECT_REASON,
+                                                                               'RECHECK_REASON', ral.RECHECK_REASON,
                                                                                'CREATE_DATE', ral.CREATE_DATE,
                                                                                'CREATE_BY', ral.CREATE_BY,
                                                                                'UPDATE_BY', ral.UPDATE_BY,
@@ -343,6 +344,7 @@ export const RequestHistorySQL = {
                                      , ral.ACTION_TYPE
                                      , ral.DESCRIPTION
                                      , ral.REJECT_REASON
+                                     , ral.RECHECK_REASON
                                      , ral.CREATE_DATE
                                      , ral.DESCRIPTION
                                      , ral.CREATE_BY
@@ -368,14 +370,7 @@ export const RequestHistorySQL = {
   getGprCProducts: (dataItem: any) => {
     let sql = `
                             SELECT
-                                       pm.PRODUCT_MAIN_ID AS value
-                                     , CONCAT(
-                                           TRIM(pm.PRODUCT_MAIN_NAME),
-                                           ' (',
-                                           TRIM(pm.PRODUCT_MAIN_ALPHABET),
-                                           ')'
-                                       ) AS label
-                                     , pm.PRODUCT_MAIN_ID
+                                       pm.PRODUCT_MAIN_ID
                                      , pm.PRODUCT_MAIN_NAME
                                      , pm.PRODUCT_MAIN_ALPHABET
                             FROM
@@ -399,7 +394,38 @@ export const RequestHistorySQL = {
                             LIMIT 100
         `
     sql = sql.replaceAll('dataItem.PRODUCT_MAIN_TABLE', MesProductSqlSnippets.productMainTable())
-    sql = sql.replaceAll('dataItem.SEARCH_TEXT', String(dataItem.SEARCH_TEXT || '').trim().replaceAll("'", "''"))
+    sql = sql.replaceAll(
+      'dataItem.SEARCH_TEXT',
+      String(dataItem.SEARCH_TEXT || '')
+        .trim()
+        .replaceAll("'", "''")
+    )
+    return sql
+  },
+
+  getGprCSections: (dataItem: any) => {
+    let sql = `
+                            SELECT DISTINCT
+                                       TRIM(section_master.SECT_NAME) AS SECT_NAME
+                            FROM
+                                       dataItem.SECTION_TABLE section_master
+                            WHERE
+                                       NULLIF(TRIM(section_master.SECT_NAME), '') IS NOT NULL
+                                       AND (
+                                              'dataItem.SEARCH_TEXT' = ''
+                                              OR section_master.SECT_NAME LIKE '%dataItem.SEARCH_TEXT%'
+                                       )
+                            ORDER BY
+                                       SECT_NAME ASC
+                            LIMIT 200
+        `
+    sql = sql.replaceAll('dataItem.SECTION_TABLE', PersonSqlSnippets.sectionTable())
+    sql = sql.replaceAll(
+      'dataItem.SEARCH_TEXT',
+      String(dataItem.SEARCH_TEXT || '')
+        .trim()
+        .replaceAll("'", "''")
+    )
     return sql
   },
 

@@ -2,6 +2,23 @@ import { describe, expect, test } from 'bun:test'
 import { GprCApprovalSQL } from './GprCApprovalSQL'
 
 describe('GprCApprovalSQL normalized circular members', () => {
+  test('stores a main GPR C rejection in REJECT_REASON without using DESCRIPTION', async () => {
+    const sql = await GprCApprovalSQL.createApprovalLog({
+      REQUEST_REGISTER_VENDOR_ID: 1,
+      REQUEST_APPROVAL_STEP_ID: 2,
+      ACTION_BY: 'S00001',
+      ACTION_TYPE: 'rejected',
+      ACTION_CODE: 'REJECT',
+      REMARK: '',
+      REJECT_REASON: 'GPR C reject verification',
+    })
+
+    expect(sql).toMatch(/,\s*'rejected'\s*,\s*'REJECT'/)
+    expect(sql).toContain('REJECT_REASON')
+    expect(sql).toContain("'GPR C reject verification'")
+    expect(sql).toContain("LEFT('', 100)")
+  })
+
   test('keeps CIRCULAR_JSON out of request_vendor_gpr_c_flows', () => {
     const sql = GprCApprovalSQL.updateFlowSetup({
       REQUEST_VENDOR_GPR_C_FLOWS_ID: 1,
@@ -138,5 +155,27 @@ describe('GprCApprovalSQL normalized circular members', () => {
     expect(actionSql).toContain('status_master.M_ACTION_RESULT_STATUS_ID = 37')
     expect(queueSql).toContain("status_master.STATUS_CODE = 'IN_PROGRESS'")
     expect(queueSql).toContain("flow_status_master.STATUS_CODE = 'IN_PROGRESS'")
+  })
+
+  test('resolves the GPR C re-check transition by action and target master IDs', async () => {
+    const transitionSql = await GprCApprovalSQL.getMainWorkflowTransition({
+      REQUEST_REGISTER_VENDOR_ID: 101,
+      CURRENT_WORKFLOW_STEP_MASTER_ID: 10,
+      ACTION_CODE: 'RECHECK',
+      TARGET_WORKFLOW_STEP_MASTER_ID: 3,
+      TERMINAL_REQUEST_STATE_ID: null,
+      M_REQUEST_IN_PROGRESS_STATE_ID: 1,
+    })
+    const approverSql = await GprCApprovalSQL.updateMainApprovalStepApprover({
+      REQUEST_APPROVAL_STEP_ID: 200,
+      APPROVER_EMPCODE: 'S00007',
+      UPDATE_BY: 'S00001',
+    })
+
+    expect(transitionSql).toContain("wt.ACTION_CODE = 'RECHECK'")
+    expect(transitionSql).toContain('wt.TO_WORKFLOW_STEP_MASTER_ID = 3')
+    expect(transitionSql).not.toContain('dataItem.')
+    expect(approverSql).toContain('REQUEST_APPROVAL_STEP_ID = 200')
+    expect(approverSql).toContain("APPROVER_EMPCODE = 'S00007'")
   })
 })

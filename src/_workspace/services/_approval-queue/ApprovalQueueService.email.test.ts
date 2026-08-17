@@ -51,10 +51,11 @@ const requestContext = {
 // Post-commit mail tasks are fire-and-forget (void runPostCommitTasks). Give them a tick to run.
 const flushPostCommit = () => new Promise((resolve) => setTimeout(resolve, 30))
 
-async function setup(steps: any[], context: any, requester = 'S00009', options: { returnToPic?: boolean; returnToDocCheck?: boolean } = {}) {
+async function setup(steps: any[], context: any, requester = 'S00009', options: { recheckToPic?: boolean } = {}) {
   const spies = {
     nextStep: mock(async () => undefined),
-    returnedToDocumentCheck: mock(async () => undefined),
+    recheckToPicByApprover: mock(async () => undefined),
+    recheckToPicByPoMgr: mock(async () => undefined),
     actionRequired: mock(async () => undefined),
     gprCApproved: mock(async () => undefined),
     completed: mock(async () => undefined),
@@ -66,19 +67,19 @@ async function setup(steps: any[], context: any, requester = 'S00009', options: 
   const search = mock(async (query: string) => {
     if (query.includes('workflow_transition wt')) {
       const transitionId = Number(query.match(/wt\.WORKFLOW_TRANSITION_ID = (\d+)/)?.[1] || 0)
-      const isReturn = transitionId === 3
+      const isRecheck = transitionId === 3
       const isReject = transitionId === 2
-      const nextStep = isReject && options.returnToPic ? steps.find((step) => step.STEP_CODE === 'PO_PIC_IN_PROGRESS') : steps.find((step) => step.STEP_STATUS === 'pending')
-      const transitionNextStep = isReturn && options.returnToDocCheck ? steps.find((step) => step.STEP_CODE === 'DOC_CHECK') : nextStep
+      const nextStep = steps.find((step) => step.STEP_STATUS === 'pending')
+      const transitionNextStep = isRecheck && options.recheckToPic ? steps.find((step) => step.STEP_CODE === 'PO_PIC_IN_PROGRESS') : nextStep
       return [
         {
           WORKFLOW_TRANSITION_ID: transitionId,
-          ACTION_CODE: isReject ? 'REJECT' : isReturn ? 'RETURN' : 'APPROVE',
+          ACTION_CODE: isReject ? 'REJECT' : isRecheck ? 'RECHECK' : 'APPROVE',
           TO_WORKFLOW_STEP_MASTER_ID: transitionNextStep?.WORKFLOW_STEP_MASTER_ID || null,
-          TERMINAL_REQUEST_STATE_ID: isReject && !options.returnToPic ? 3 : transitionNextStep ? null : 2,
-          TERMINAL_STATE: isReject && !options.returnToPic ? 'rejected' : transitionNextStep ? null : 'completed',
+          TERMINAL_REQUEST_STATE_ID: isReject ? 3 : transitionNextStep ? null : 2,
+          TERMINAL_STATE: isReject ? 'rejected' : transitionNextStep ? null : 'completed',
           TERMINAL_IS_TERMINAL: transitionNextStep ? 0 : 1,
-          CONDITION_KEY: isReject && options.returnToPic ? 'RETURN_TO_PIC' : isReturn && options.returnToDocCheck ? 'RETURN_TO_DOC_CHECK' : null,
+          CONDITION_KEY: isRecheck && options.recheckToPic ? 'RECHECK_TO_PIC' : null,
           NEXT_REQUEST_APPROVAL_STEP_ID: transitionNextStep?.REQUEST_APPROVAL_STEP_ID || null,
           NEXT_STEP_ORDER: transitionNextStep?.STEP_ORDER,
           NEXT_APPROVER_EMPCODE: transitionNextStep?.APPROVER_EMPCODE,
@@ -122,7 +123,8 @@ async function setup(steps: any[], context: any, requester = 'S00009', options: 
   // Full superset of the helper exports ApprovalQueueService imports, so the import never fails.
   mock.module('../_request-register/RegisterRequestNotificationHelper', () => ({
     sendMail_ToApprover_NextStep: spies.nextStep,
-    sendMail_ToDocumentChecker_ReturnedByPoMgr: spies.returnedToDocumentCheck,
+    sendMail_ToPic_RecheckByApprover: spies.recheckToPicByApprover,
+    sendMail_ToPic_RecheckByPoMgr: spies.recheckToPicByPoMgr,
     sendMail_ToUser_ActionRequired: spies.actionRequired,
     sendMail_ToRequester_GprCApproved: spies.gprCApproved,
     sendMail_ToRequester_RegistrationCompleted: spies.completed,
@@ -150,7 +152,7 @@ async function setup(steps: any[], context: any, requester = 'S00009', options: 
       requestState: { inProgress: 1, completed: 2, rejected: 3, cancelled: 4 },
       requestStatus: { rejected: 99 },
       vendor: { notRegistered: 1, registered: 2, inProgress: 3, cannotRegister: 4 },
-      gprCFlow: { draft: 1, requesterSetup: 2, inProgress: 3, approved: 4, rejected: 5 },
+      gprCFlow: { draft: 1, requesterSetup: 2, inProgress: 3, approved: 4, rejected: 5, recheckRequired: 6 },
       actionResult: { pending: 1, incomplete: 2, completed: 3 },
     }
 
@@ -172,7 +174,7 @@ async function setup(steps: any[], context: any, requester = 'S00009', options: 
 }
 
 describe('ApprovalQueueService.updateStatus email notifications', () => {
-  test('PO_MGR RETURN reopens Document Check without changing terminal Reject behavior', async () => {
+  test('PO_MGR RECHECK reopens PO PIC and resets Document Check', async () => {
     const poMgrStep = {
       ...approverStep,
       WORKFLOW_STEP_MASTER_ID: 304,
@@ -191,7 +193,20 @@ describe('ApprovalQueueService.updateStatus email notifications', () => {
       GROUP_CODE: 'PO_CHECKER_MAIN',
       DESCRIPTION: 'PO & SCM Check All Document',
     }
-    const { ApprovalQueueService, spies, executeGuardedList } = await setup([docCheckStep, poMgrStep], requestContext, 'S00009', { returnToDocCheck: true })
+    const poPicStep = {
+      ...nextApproverStep,
+      REQUEST_APPROVAL_STEP_ID: 8,
+      WORKFLOW_STEP_MASTER_ID: 299,
+      M_APPROVAL_STEP_STATUS_ID: 3,
+      STEP_ORDER: 1,
+      STEP_STATUS: 'approved',
+      STEP_CODE: 'PO_PIC_IN_PROGRESS',
+      ACTOR_TYPE: 'PIC',
+      APPROVER_EMPCODE: 'S00007',
+      GROUP_CODE: 'LOCAL_PO_PIC',
+      DESCRIPTION: 'PO PIC In Progress',
+    }
+    const { ApprovalQueueService, spies, executeGuardedList } = await setup([poPicStep, docCheckStep, poMgrStep], requestContext, 'S00009', { recheckToPic: true })
 
     const result = await ApprovalQueueService.updateStatus({
       REQUEST_REGISTER_VENDOR_ID: 101,
@@ -206,22 +221,29 @@ describe('ApprovalQueueService.updateStatus email notifications', () => {
     expect(result.Status).toBe(true)
     const sqlList = (executeGuardedList as any).mock.calls[0]?.[1] as string[]
     const sql = sqlList.join('\n')
-    expect(sql).toContain('returned_doc_check')
-    expect(sql).toContain('RETURN')
+    expect(sql).toMatch(/,\s*'recheck'\s*,\s*'RECHECK'/)
+    expect(sql).toContain('RECHECK_REASON')
+    expect(sql).toContain('RECHECK')
     expect(sql).toContain('REQUEST_APPROVAL_STEP_ID = 10')
-    expect(sql).toContain('M_APPROVAL_STEP_STATUS_ID = 4')
+    expect(sql).toContain('M_APPROVAL_STEP_STATUS_ID = 1')
     expect(sql).toContain('REQUEST_APPROVAL_STEP_ID = 9')
+    expect(sql).toContain('REQUEST_APPROVAL_STEP_ID = 8')
     expect(sql).toContain('M_APPROVAL_STEP_STATUS_ID = 2')
     expect(sql).not.toContain('UPDATE vendors SET')
+    const docCheckResetSql = sqlList.find((statement) => statement.includes('UPDATE request_approval_step SET') && statement.includes('REQUEST_APPROVAL_STEP_ID = 9'))
+    const poPicReopenSql = sqlList.find((statement) => statement.includes('UPDATE request_approval_step SET') && statement.includes('REQUEST_APPROVAL_STEP_ID = 8'))
+    expect(docCheckResetSql).toContain('M_APPROVAL_STEP_STATUS_ID = 1')
+    expect(poPicReopenSql).toContain('M_APPROVAL_STEP_STATUS_ID = 2')
 
     await flushPostCommit()
-    expect(spies.returnedToDocumentCheck).toHaveBeenCalledTimes(1)
+    expect(spies.recheckToPicByPoMgr).toHaveBeenCalledTimes(1)
+    expect(spies.recheckToPicByApprover).not.toHaveBeenCalled()
     expect(spies.nextStep).not.toHaveBeenCalled()
     expect(spies.rejected).not.toHaveBeenCalled()
     expect(spies.incomplete).not.toHaveBeenCalled()
   })
 
-  test('DOC_CHECK REJECT reopens the PO PIC task instead of terminating the request', async () => {
+  test('DOC_CHECK RECHECK reopens the PO PIC task without using Reject', async () => {
     const docCheckStep = {
       ...approverStep,
       WORKFLOW_STEP_MASTER_ID: 303,
@@ -241,13 +263,13 @@ describe('ApprovalQueueService.updateStatus email notifications', () => {
       GROUP_CODE: 'LOCAL_PO_PIC',
       DESCRIPTION: 'PO PIC In Progress',
     }
-    const { ApprovalQueueService, spies, executeGuardedList } = await setup([poPicStep, docCheckStep], requestContext, 'S00009', { returnToPic: true })
+    const { ApprovalQueueService, spies, executeGuardedList } = await setup([poPicStep, docCheckStep], requestContext, 'S00009', { recheckToPic: true })
 
     const result = await ApprovalQueueService.updateStatus({
       REQUEST_REGISTER_VENDOR_ID: 101,
       CURRENT_TASK_ID: 10,
       LOCK_VERSION: 0,
-      WORKFLOW_TRANSITION_ID: 2,
+      WORKFLOW_TRANSITION_ID: 3,
       APPROVE_BY: 'S00001',
       UPDATE_BY: 'S00001',
       APPROVER_REMARK: 'Please correct the missing documents',
@@ -256,15 +278,18 @@ describe('ApprovalQueueService.updateStatus email notifications', () => {
     expect(result.Status).toBe(true)
     const sqlList = (executeGuardedList as any).mock.calls[0]?.[1] as string[]
     const sql = sqlList.join('\n')
-    expect(sql).toContain("'returned_to_pic'")
+    expect(sql).toMatch(/,\s*'recheck'\s*,\s*'RECHECK'/)
+    expect(sql).toContain('RECHECK_REASON')
     expect(sql).toContain('REQUEST_APPROVAL_STEP_ID = 10')
-    expect(sql).toContain('M_APPROVAL_STEP_STATUS_ID = 4')
+    expect(sql).toContain('M_APPROVAL_STEP_STATUS_ID = 1')
     expect(sql).toContain('REQUEST_APPROVAL_STEP_ID = 9')
     expect(sql).toContain('M_APPROVAL_STEP_STATUS_ID = 2')
     expect(sql).not.toContain('UPDATE vendors SET')
 
     await flushPostCommit()
-    expect(spies.rejected).toHaveBeenCalledTimes(1)
+    expect(spies.recheckToPicByApprover).toHaveBeenCalledTimes(1)
+    expect(spies.recheckToPicByPoMgr).not.toHaveBeenCalled()
+    expect(spies.rejected).not.toHaveBeenCalled()
     expect(spies.incomplete).not.toHaveBeenCalled()
   })
 

@@ -45,6 +45,7 @@ export interface GprCFlowStatusIdentity {
   draft: number
   requesterSetup: number
   inProgress: number
+  recheckRequired: number
   approved: number
   rejected: number
 }
@@ -200,6 +201,7 @@ export const getGprCFlowStatusIdentity = createCachedLoader<GprCFlowStatusIdenti
     draft: requireId('DRAFT'),
     requesterSetup: requireId('REQUESTER_SETUP'),
     inProgress: requireId('IN_PROGRESS'),
+    recheckRequired: requireId('RECHECK_REQUIRED'),
     approved: requireId('APPROVED'),
     rejected: requireId('REJECTED'),
   }

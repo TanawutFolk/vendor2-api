@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import { FindVendorSQL } from './FindVendorSQL'
 import { VendorSearchSqlSnippets } from '../common/VendorSearchSqlSnippets'
+import { prepareVendorSearchData } from '../../services/Common/VendorSearchData'
 
 describe('FindVendorSQL', () => {
   test('loads province dropdown from info_province master data', () => {
@@ -8,8 +9,9 @@ describe('FindVendorSQL', () => {
 
     expect(sql).toContain('FROM')
     expect(sql).toContain('info_province')
-    expect(sql).toContain('PROVINCE AS value')
-    expect(sql).toContain('PROVINCE AS label')
+    expect(sql).toContain('PROVINCE')
+    expect(sql).not.toContain('AS value')
+    expect(sql).not.toContain('AS label')
     expect(sql).toContain('IFNULL(INUSE, 1) = 1')
     expect(sql).not.toContain('FROM\n                                       vendors')
   })
@@ -17,8 +19,10 @@ describe('FindVendorSQL', () => {
     const sql = FindVendorSQL.getCountries()
 
     expect(sql).toContain('info_country')
-    expect(sql).toContain('INFO_COUNTRY_NAME AS value')
-    expect(sql).toContain('INFO_COUNTRY_NAME AS label')
+    expect(sql).toContain('INFO_COUNTRY_ID')
+    expect(sql).toContain('INFO_COUNTRY_NAME')
+    expect(sql).not.toContain('AS value')
+    expect(sql).not.toContain('AS label')
     expect(sql).toContain('IFNULL(INUSE, 1) = 1')
     expect(sql).not.toContain('FROM\n                                       vendors')
   })
@@ -27,8 +31,10 @@ describe('FindVendorSQL', () => {
     const sql = FindVendorSQL.getVendorBusinessCategoryName()
 
     expect(sql).toContain('info_business_category')
-    expect(sql).toContain('BUSINESS_CATEGORY_ID AS value')
-    expect(sql).toContain('BUSINESS_CATEGORY_NAME AS label')
+    expect(sql).toContain('BUSINESS_CATEGORY_ID')
+    expect(sql).toContain('BUSINESS_CATEGORY_NAME')
+    expect(sql).not.toContain('AS value')
+    expect(sql).not.toContain('AS label')
     expect(sql).toContain('BUSINESS_CATEGORY_NAME ASC')
     expect(sql).not.toContain('master_vendor_types')
   })
@@ -76,6 +82,36 @@ describe('FindVendorSQL', () => {
     expect(sql).toContain('= 37')
     expect(sql).toContain('m_vendor_status')
     expect(sql).not.toContain('dataItem.')
+  })
+
+  test('does not filter vendor status when the search value is null', () => {
+    const dataItem: Record<string, any> = {
+      SEARCHFILTERS: [{ id: 'M_VENDOR_STATUS_ID', value: null }],
+      ColumnFilters: [],
+      Order: [],
+      Start: 0,
+      Limit: 20,
+    }
+
+    prepareVendorSearchData(dataItem)
+
+    expect(dataItem.SQLWHERE).toBe('')
+    expect(dataItem.VENDOR_STATUS_ID).toBeNull()
+  })
+
+  test('keeps zero as the valid Not Registered vendor status ID', () => {
+    const dataItem: Record<string, any> = {
+      SEARCHFILTERS: [{ id: 'M_VENDOR_STATUS_ID', value: 0 }],
+      ColumnFilters: [],
+      Order: [],
+      Start: 0,
+      Limit: 20,
+    }
+
+    prepareVendorSearchData(dataItem)
+
+    expect(dataItem.SQLWHERE).toContain('= 0')
+    expect(dataItem.VENDOR_STATUS_ID).toBe(0)
   })
 
   test('keeps the direct Prones raw-test query', () => {

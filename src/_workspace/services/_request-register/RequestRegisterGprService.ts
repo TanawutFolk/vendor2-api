@@ -3,16 +3,10 @@ import { RequestRegisterPageSQL } from '../../sql/_request-register/RequestRegis
 import { GprCApprovalService } from '../_approval-GPRC/GprCApprovalService'
 import { ResultSetHeader } from 'mysql2'
 import { isVendorCodeComplete } from './RegisterRequestWorkflowHelper'
-import {
-  getApprovalStepStatusIdentity,
-  getWorkflowStepIdentity,
-} from '../_status-master/StatusIdentityService'
+import { getApprovalStepStatusIdentity, getWorkflowStepIdentity } from '../_status-master/StatusIdentityService'
 
 const getSelectionSheetWorkflowIdentity = async () => {
-  const [workflowStep, approvalStep] = await Promise.all([
-    getWorkflowStepIdentity(),
-    getApprovalStepStatusIdentity(),
-  ])
+  const [workflowStep, approvalStep] = await Promise.all([getWorkflowStepIdentity(), getApprovalStepStatusIdentity()])
 
   return { workflowStep, approvalStep }
 }
@@ -43,8 +37,7 @@ const resolveGpr43AcceptanceStatus = (formData: any) => {
 }
 
 const SELECTION_SHEET_LOCKED_MESSAGE = 'Selection Sheet is read-only after Document Checker approval.'
-const SELECTION_SHEET_EDITABLE_MESSAGE =
-  'Selection Sheet can only be edited during PO PIC In Progress or PO & SCM Check All Document.'
+const SELECTION_SHEET_EDITABLE_MESSAGE = 'Selection Sheet can only be edited during PO PIC In Progress or PO & SCM Check All Document.'
 
 const getSelectionSheetLockState = async (requestId: number) => {
   if (!requestId) {
@@ -53,14 +46,12 @@ const getSelectionSheetLockState = async (requestId: number) => {
     }
   }
 
-  const [stepsSql, statusIdentity] = await Promise.all([
-    RequestRegisterPageSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId }),
-    getSelectionSheetWorkflowIdentity(),
-  ])
+  const [stepsSql, statusIdentity] = await Promise.all([RequestRegisterPageSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId }), getSelectionSheetWorkflowIdentity()])
   const steps = (await MySQLExecute.search(stepsSql)) as any[]
-  const isLocked = steps.some((step: any) =>
-    Number(getValue(step, 'WORKFLOW_STEP_MASTER_ID', 'workflow_step_id')) === statusIdentity.workflowStep.docCheck &&
-    Number(getValue(step, 'M_APPROVAL_STEP_STATUS_ID', 'approval_step_status_id')) === statusIdentity.approvalStep.approved
+  const isLocked = steps.some(
+    (step: any) =>
+      Number(getValue(step, 'WORKFLOW_STEP_MASTER_ID', 'workflow_step_id')) === statusIdentity.workflowStep.docCheck &&
+      Number(getValue(step, 'M_APPROVAL_STEP_STATUS_ID', 'approval_step_status_id')) === statusIdentity.approvalStep.approved
   )
   return {
     isLocked,
@@ -80,10 +71,7 @@ const assertSelectionSheetEditable = async (requestId: number) => {
   const statusIdentity = await getSelectionSheetWorkflowIdentity()
   const accessSql = await RequestRegisterPageSQL.getSelectionSheetEditAccess({
     REQUEST_REGISTER_VENDOR_ID: requestId,
-    EDITABLE_WORKFLOW_STEP_MASTER_IDS: [
-      statusIdentity.workflowStep.poPicInProgress,
-      statusIdentity.workflowStep.docCheck,
-    ],
+    EDITABLE_WORKFLOW_STEP_MASTER_IDS: [statusIdentity.workflowStep.poPicInProgress, statusIdentity.workflowStep.docCheck],
     M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID: statusIdentity.approvalStep.inProgress,
   })
   const accessRows = (await MySQLExecute.search(accessSql)) as any[]
@@ -139,35 +127,33 @@ const buildActionRequiredMeta = (existingActionRequired: any, meta: Record<strin
 
 const GPR_ACTION_SETUP_STAGES = ['engineer', 'emr', 'qms', 'pm_manager'] as const
 
-const actionSetupRowsToPayload = (rows: any[] = []) => Object.fromEntries(
-  (Array.isArray(rows) ? rows : []).map((row) => [
-    normalizeValue(getValue(row, 'stage_code', 'STAGE_CODE')),
-    {
-      pic_name: normalizeValue(getValue(row, 'pic_name', 'PIC_NAME')),
-      pic_email: normalizeValue(getValue(row, 'pic_email', 'PIC_EMAIL')),
-      result_status: normalizeValue(getValue(row, 'result_status', 'RESULT_STATUS')),
-      result_note: normalizeValue(getValue(row, 'result_note', 'RESULT_NOTE')),
-      result_updated_at: getValue(row, 'result_updated_at', 'RESULT_UPDATED_AT') || '',
-    },
-  ]).filter(([stageCode]) => Boolean(stageCode))
-)
+const actionSetupRowsToPayload = (rows: any[] = []) =>
+  Object.fromEntries(
+    (Array.isArray(rows) ? rows : [])
+      .map((row) => [
+        normalizeValue(getValue(row, 'stage_code', 'STAGE_CODE')),
+        {
+          pic_name: normalizeValue(getValue(row, 'pic_name', 'PIC_NAME')),
+          pic_email: normalizeValue(getValue(row, 'pic_email', 'PIC_EMAIL')),
+          result_status: normalizeValue(getValue(row, 'result_status', 'RESULT_STATUS')),
+          result_note: normalizeValue(getValue(row, 'result_note', 'RESULT_NOTE')),
+          result_updated_at: getValue(row, 'result_updated_at', 'RESULT_UPDATED_AT') || '',
+        },
+      ])
+      .filter(([stageCode]) => Boolean(stageCode))
+  )
 
-const buildNormalizedGprSetupSql = async (
-  selectionId: number,
-  circularMembersRaw: any[],
-  actionRequiredRaw: any,
-  actor: string
-) => {
+const buildNormalizedGprSetupSql = async (selectionId: number, circularMembersRaw: any[], actionRequiredRaw: any, actor: string) => {
   const circularMembers = (Array.isArray(circularMembersRaw) ? circularMembersRaw : [])
-    .map((item) => (
+    .map((item) =>
       typeof item === 'string'
         ? { empcode: '', name: '', email: normalizeValue(item) }
         : {
-          empcode: normalizeValue(item?.empcode),
-          name: normalizeValue(item?.name),
-          email: normalizeValue(item?.email),
-        }
-    ))
+            empcode: normalizeValue(item?.empcode),
+            name: normalizeValue(item?.name),
+            email: normalizeValue(item?.email),
+          }
+    )
     .filter((item) => item.email)
     .slice(0, 6)
   const actionRequired = parseStoredObject(actionRequiredRaw)
@@ -177,30 +163,34 @@ const buildNormalizedGprSetupSql = async (
   ]
 
   circularMembers.forEach((member, index) => {
-    sqlList.push(RequestRegisterPageSQL.insertGprCircularMember({
-      REQUEST_VENDOR_SELECTIONS_ID: selectionId,
-      MEMBER_ORDER: index + 1,
-      EMPCODE: member.empcode,
-      MEMBER_NAME: member.name,
-      EMAIL: member.email,
-      CREATE_BY: actor,
-      UPDATE_BY: actor,
-    }))
+    sqlList.push(
+      RequestRegisterPageSQL.insertGprCircularMember({
+        REQUEST_VENDOR_SELECTIONS_ID: selectionId,
+        MEMBER_ORDER: index + 1,
+        EMPCODE: member.empcode,
+        MEMBER_NAME: member.name,
+        EMAIL: member.email,
+        CREATE_BY: actor,
+        UPDATE_BY: actor,
+      })
+    )
   })
 
   GPR_ACTION_SETUP_STAGES.forEach((stageCode) => {
     const stage = parseStoredObject(actionRequired[stageCode])
-    sqlList.push(RequestRegisterPageSQL.insertGprActionSetup({
-      REQUEST_VENDOR_SELECTIONS_ID: selectionId,
-      STAGE_CODE: stageCode,
-      PIC_NAME: stage.pic_name,
-      PIC_EMAIL: stage.pic_email,
-      RESULT_STATUS: stage.result_status,
-      RESULT_NOTE: stage.result_note,
-      RESULT_UPDATED_AT: stage.result_updated_at,
-      CREATE_BY: actor,
-      UPDATE_BY: actor,
-    }))
+    sqlList.push(
+      RequestRegisterPageSQL.insertGprActionSetup({
+        REQUEST_VENDOR_SELECTIONS_ID: selectionId,
+        STAGE_CODE: stageCode,
+        PIC_NAME: stage.pic_name,
+        PIC_EMAIL: stage.pic_email,
+        RESULT_STATUS: stage.result_status,
+        RESULT_NOTE: stage.result_note,
+        RESULT_UPDATED_AT: stage.result_updated_at,
+        CREATE_BY: actor,
+        UPDATE_BY: actor,
+      })
+    )
   })
 
   return Promise.all(sqlList)
@@ -232,9 +222,7 @@ export const RequestRegisterGprService = {
     try {
       const reqId = dataItem.REQUEST_REGISTER_VENDOR_ID
       if (!reqId) throw new Error('Missing request_id')
-      const rawFormData = typeof dataItem.SELECTION_FORM_DATA === 'string'
-        ? JSON.parse(dataItem.SELECTION_FORM_DATA)
-        : dataItem.SELECTION_FORM_DATA || {}
+      const rawFormData = typeof dataItem.SELECTION_FORM_DATA === 'string' ? JSON.parse(dataItem.SELECTION_FORM_DATA) : dataItem.SELECTION_FORM_DATA || {}
       const updateBy = dataItem.UPDATE_BY || 'SYSTEM'
       await assertSelectionSheetEditable(Number(reqId))
 
@@ -284,40 +272,40 @@ export const RequestRegisterGprService = {
 
       sqlList.push(await RequestRegisterPageSQL.deleteFinancials({ REQUEST_VENDOR_SELECTIONS_ID: selection_id }))
       sqlList.push(await RequestRegisterPageSQL.deleteCriteria({ REQUEST_VENDOR_SELECTIONS_ID: selection_id }))
-      sqlList.push(...await buildNormalizedGprSetupSql(
-        Number(selection_id),
-        circularList,
-        rawFormData.action_required_setup,
-        updateBy
-      ))
+      sqlList.push(...(await buildNormalizedGprSetupSql(Number(selection_id), circularList, rawFormData.action_required_setup, updateBy)))
 
       if (rawFormData.sales_profit) {
         for (const sp of rawFormData.sales_profit) {
-          const hasFinancialValue = [getValue(sp, 'YEAR', 'year'), getValue(sp, 'TOTAL_REVENUE', 'total_revenue'), getValue(sp, 'NET_PROFIT', 'net_profit')]
-            .some((value) => normalizeValue(value) !== '')
+          const hasFinancialValue = [getValue(sp, 'YEAR', 'year'), getValue(sp, 'TOTAL_REVENUE', 'total_revenue'), getValue(sp, 'NET_PROFIT', 'net_profit')].some(
+            (value) => normalizeValue(value) !== ''
+          )
           if (!hasFinancialValue) continue
 
-          sqlList.push(await RequestRegisterPageSQL.insertFinancial({
-            REQUEST_VENDOR_SELECTIONS_ID: selection_id,
-            YEAR: getValue(sp, 'YEAR', 'year') || '',
-            TOTAL_REVENUE: getValue(sp, 'TOTAL_REVENUE', 'total_revenue') || '',
-            NET_PROFIT: getValue(sp, 'NET_PROFIT', 'net_profit') || '',
-            CREATE_BY: formData.CREATE_BY || formData.UPDATE_BY || 'SYSTEM',
-            UPDATE_BY: formData.UPDATE_BY || formData.CREATE_BY || 'SYSTEM',
-          }))
+          sqlList.push(
+            await RequestRegisterPageSQL.insertFinancial({
+              REQUEST_VENDOR_SELECTIONS_ID: selection_id,
+              YEAR: getValue(sp, 'YEAR', 'year') || '',
+              TOTAL_REVENUE: getValue(sp, 'TOTAL_REVENUE', 'total_revenue') || '',
+              NET_PROFIT: getValue(sp, 'NET_PROFIT', 'net_profit') || '',
+              CREATE_BY: formData.CREATE_BY || formData.UPDATE_BY || 'SYSTEM',
+              UPDATE_BY: formData.UPDATE_BY || formData.CREATE_BY || 'SYSTEM',
+            })
+          )
         }
       }
       if (rawFormData.criteria) {
         for (const cr of rawFormData.criteria) {
           const criteriaNo = getValue(cr, 'NO', 'no') || ''
-          sqlList.push(await RequestRegisterPageSQL.insertCriteria({
-            REQUEST_VENDOR_SELECTIONS_ID: selection_id,
-            NO: criteriaNo,
-            CRITERIA: criteriaNo === '4.11' ? 'Optional' : (getValue(cr, 'CRITERIA', 'criteria') || ''),
-            REMARK: getValue(cr, 'REMARK', 'remark') || '',
-            CREATE_BY: formData.CREATE_BY || formData.UPDATE_BY || 'SYSTEM',
-            UPDATE_BY: formData.UPDATE_BY || formData.CREATE_BY || 'SYSTEM',
-          }))
+          sqlList.push(
+            await RequestRegisterPageSQL.insertCriteria({
+              REQUEST_VENDOR_SELECTIONS_ID: selection_id,
+              NO: criteriaNo,
+              CRITERIA: criteriaNo === '4.11' ? 'Optional' : getValue(cr, 'CRITERIA', 'criteria') || '',
+              REMARK: getValue(cr, 'REMARK', 'remark') || '',
+              CREATE_BY: formData.CREATE_BY || formData.UPDATE_BY || 'SYSTEM',
+              UPDATE_BY: formData.UPDATE_BY || formData.CREATE_BY || 'SYSTEM',
+            })
+          )
         }
       }
 
@@ -438,7 +426,7 @@ export const RequestRegisterGprService = {
 
       const selectionIdForSetup = getValue(existingSelection, 'selection_id', 'REQUEST_VENDOR_SELECTIONS_ID')
       const existingActionSetupRows = selectionIdForSetup
-        ? await MySQLExecute.search(RequestRegisterPageSQL.getGprActionSetup({ REQUEST_VENDOR_SELECTIONS_ID: selectionIdForSetup })) as any[]
+        ? ((await MySQLExecute.search(RequestRegisterPageSQL.getGprActionSetup({ REQUEST_VENDOR_SELECTIONS_ID: selectionIdForSetup }))) as any[])
         : []
       const existingActionRequiredSetup = actionSetupRowsToPayload(existingActionSetupRows)
       const incomingActionRequiredSetup = parseStoredObject(gprCData.action_required_setup)
@@ -489,12 +477,7 @@ export const RequestRegisterGprService = {
 
       if (!selection_id) throw new Error('Failed to create/identify GPR selection record')
 
-      const normalizedSetupSql = await buildNormalizedGprSetupSql(
-        Number(selection_id),
-        circularMembers,
-        actionRequiredPayload,
-        updater
-      )
+      const normalizedSetupSql = await buildNormalizedGprSetupSql(Number(selection_id), circularMembers, actionRequiredPayload, updater)
       await MySQLExecute.executeList(normalizedSetupSql)
 
       const flowResult = await GprCApprovalService.submitSetup({
@@ -561,13 +544,14 @@ export const RequestRegisterGprService = {
     }
     const actionRequiredSetup = { ...relationalActionRequiredSetup, _meta: meta }
     const circularMembers = circularRows.map((row) => ({
-        empcode: normalizeValue(getValue(row, 'empcode', 'EMPCODE')),
-        name: normalizeValue(getValue(row, 'member_name', 'MEMBER_NAME')),
-        email: normalizeValue(getValue(row, 'email', 'EMAIL')),
-      }))
+      empcode: normalizeValue(getValue(row, 'empcode', 'EMPCODE')),
+      name: normalizeValue(getValue(row, 'member_name', 'MEMBER_NAME')),
+      email: normalizeValue(getValue(row, 'email', 'EMAIL')),
+    }))
     const productCheckers = productCheckerRows.map((row) => ({
       product_main_id: Number(getValue(row, 'product_main_id', 'PRODUCT_MAIN_ID')) || null,
       product_main_name: normalizeValue(getValue(row, 'product_main_name', 'PRODUCT_MAIN_NAME')),
+      section_name: normalizeValue(getValue(row, 'section_name', 'SECTION_NAME')),
       checker_empcode: normalizeValue(getValue(row, 'checker_empcode', 'CHECKER_EMPCODE')),
       checker_name: normalizeValue(getValue(row, 'checker_name', 'CHECKER_NAME')),
       checker_email: normalizeValue(getValue(row, 'checker_email', 'CHECKER_EMAIL')),

@@ -139,20 +139,35 @@ export const AllRequestHistorySQL = {
     return [countSql, dataSql]
   },
 
-  getFilterOptions: async () => `
+  getFilterOptions: async () => {
+    let sql = `
                             SELECT DISTINCT
-                                       TRIM(rr.REQUESTER_SECTION) AS REQUESTER_SECTION
+                                       TRIM(section_master.SECT_NAME) AS REQUESTER_SECTION
+                                     , NULL AS REQUEST_YEAR
+                            FROM
+                                       dataItem.SECTION_TABLE section_master
+                            WHERE
+                                       NULLIF(TRIM(section_master.SECT_NAME), '') IS NOT NULL
+
+                            UNION ALL
+
+                            SELECT DISTINCT
+                                       NULL AS REQUESTER_SECTION
                                      , YEAR(rr.CREATE_DATE) AS REQUEST_YEAR
                             FROM
                                        request_register_vendor rr
                             WHERE
                                        rr.INUSE = 1
-                                       AND NULLIF(TRIM(rr.REQUESTER_SECTION), '') IS NOT NULL
                                        AND rr.CREATE_DATE IS NOT NULL
                             ORDER BY
                                        REQUEST_YEAR DESC
                                      , REQUESTER_SECTION ASC
-  `,
+    `
+
+    sql = sql.replaceAll('dataItem.SECTION_TABLE', String(PersonSqlSnippets.sectionTable()))
+
+    return sql
+  },
 
   getById: async (dataItem: { REQUEST_REGISTER_VENDOR_ID: number }) => AllRequestHistoryDetailSQL.getById(dataItem),
 }

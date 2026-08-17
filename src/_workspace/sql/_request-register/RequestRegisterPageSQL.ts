@@ -9,7 +9,6 @@ import { requireStatusId } from '../../utils/StatusId'
 
 const escapeSqlText = (value: any) => String(value ?? '').replaceAll("'", "''")
 
-
 export const RequestRegisterPageSQL = {
   acquireRequestCreateLock: (dataItem: any) => {
     let sql = `
@@ -88,7 +87,7 @@ export const RequestRegisterPageSQL = {
   getLastAssignedPicByVendorRegion: async (dataItem: any) => {
     const isOversea = String(dataItem['IS_OVERSEA'] || '').toLowerCase() === 'true' || Number(dataItem['IS_OVERSEA']) === 1
 
-    const vendorRegionClause = isOversea ? '= \'Oversea\'' : '!= \'Oversea\' OR v.VENDOR_REGION IS NULL'
+    const vendorRegionClause = isOversea ? "= 'Oversea'" : "!= 'Oversea' OR v.VENDOR_REGION IS NULL"
 
     let sql = `
                             SELECT
@@ -130,12 +129,15 @@ export const RequestRegisterPageSQL = {
   },
 
   getNextRequestRunningNumber: async (dataItem: any) => {
-    const year = String(dataItem['REQUEST_NUMBER_YEAR'] || '').replace(/[^0-9]/g, '').slice(-2)
-    const prefix = String(dataItem['REQUEST_NUMBER_PREFIX'] || 'N')
-      .trim()
-      .toUpperCase() === 'R'
-      ? 'R'
-      : 'N'
+    const year = String(dataItem['REQUEST_NUMBER_YEAR'] || '')
+      .replace(/[^0-9]/g, '')
+      .slice(-2)
+    const prefix =
+      String(dataItem['REQUEST_NUMBER_PREFIX'] || 'N')
+        .trim()
+        .toUpperCase() === 'R'
+        ? 'R'
+        : 'N'
 
     let sql = `
                             SELECT
@@ -208,10 +210,7 @@ export const RequestRegisterPageSQL = {
                                        1
         `
 
-    sql = sql.replaceAll(
-      'dataItem.SELECTION_SHEET_EDITABLE_SQL',
-      String(SelectionSheetAccessSqlSnippets.editableExpr('rr', dataItem))
-    )
+    sql = sql.replaceAll('dataItem.SELECTION_SHEET_EDITABLE_SQL', String(SelectionSheetAccessSqlSnippets.editableExpr('rr', dataItem)))
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
 
     return sql
@@ -419,10 +418,7 @@ export const RequestRegisterPageSQL = {
                                      ,  1
                             )
         `
-    sql = sql.replaceAll(
-      'dataItem.M_REQUEST_IN_PROGRESS_STATE_ID',
-      requireStatusId(dataItem['M_REQUEST_IN_PROGRESS_STATE_ID'], 'M_REQUEST_IN_PROGRESS_STATE_ID').toString()
-    )
+    sql = sql.replaceAll('dataItem.M_REQUEST_IN_PROGRESS_STATE_ID', requireStatusId(dataItem['M_REQUEST_IN_PROGRESS_STATE_ID'], 'M_REQUEST_IN_PROGRESS_STATE_ID').toString())
 
     sql = sql.replaceAll('dataItem.VENDORS_ID', (dataItem['VENDORS_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.REQUEST_BY_EMPLOYEECODE', dataItem['REQUEST_BY_EMPLOYEECODE'] || '')
@@ -458,10 +454,7 @@ export const RequestRegisterPageSQL = {
                                        1
         `
     sql = sql.replaceAll('dataItem.REQUEST_STATUS_SQL', String(RequestStatusSqlSnippets.requestStatusExpr('rr')))
-    sql = sql.replaceAll(
-      'dataItem.M_REQUEST_IN_PROGRESS_STATE_ID',
-      requireStatusId(dataItem['M_REQUEST_IN_PROGRESS_STATE_ID'], 'M_REQUEST_IN_PROGRESS_STATE_ID').toString()
-    )
+    sql = sql.replaceAll('dataItem.M_REQUEST_IN_PROGRESS_STATE_ID', requireStatusId(dataItem['M_REQUEST_IN_PROGRESS_STATE_ID'], 'M_REQUEST_IN_PROGRESS_STATE_ID').toString())
 
     sql = sql.replaceAll('dataItem.VENDORS_ID', (dataItem['VENDORS_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.REQUEST_BY_EMPLOYEECODE', dataItem['REQUEST_BY_EMPLOYEECODE'] || '')
@@ -480,10 +473,7 @@ export const RequestRegisterPageSQL = {
                                        AND rr.INUSE = 1
                                        AND rr.M_REQUEST_STATE_ID = dataItem.M_REQUEST_IN_PROGRESS_STATE_ID
         `
-    sql = sql.replaceAll(
-      'dataItem.M_REQUEST_IN_PROGRESS_STATE_ID',
-      requireStatusId(dataItem['M_REQUEST_IN_PROGRESS_STATE_ID'], 'M_REQUEST_IN_PROGRESS_STATE_ID').toString()
-    )
+    sql = sql.replaceAll('dataItem.M_REQUEST_IN_PROGRESS_STATE_ID', requireStatusId(dataItem['M_REQUEST_IN_PROGRESS_STATE_ID'], 'M_REQUEST_IN_PROGRESS_STATE_ID').toString())
 
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
 
@@ -550,16 +540,16 @@ export const RequestRegisterPageSQL = {
   createDocument: async (dataItem: any) => {
     const requestId = Number(dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0)
     if (!requestId || Number.isNaN(requestId)) {
-      throw new Error(
-        'Invalid REQUEST_REGISTER_VENDOR_ID for createDocument: ' +
-          String(dataItem['REQUEST_REGISTER_VENDOR_ID']),
-      )
+      throw new Error('Invalid REQUEST_REGISTER_VENDOR_ID for createDocument: ' + String(dataItem['REQUEST_REGISTER_VENDOR_ID']))
     }
 
     // MySQL string literals interpret backslash escape sequences (e.g. "\0" becomes a NUL byte),
     // so Windows/UNC file paths must have backslashes escaped before quote-escaping, or they get
     // silently mangled on INSERT.
-    const escape = (value: any) => String(value ?? '').replaceAll('\\', '\\\\').replaceAll("'", "''")
+    const escape = (value: any) =>
+      String(value ?? '')
+        .replaceAll('\\', '\\\\')
+        .replaceAll("'", "''")
 
     let sql = `
                             INSERT INTO request_register_file (
@@ -696,41 +686,54 @@ export const RequestRegisterPageSQL = {
     return sql
   },
 
-  getBusinessCategories: async (_dataItem?: any) => {
-    return `
+  getBusinessCategories: async (dataItem: any = {}) => {
+    let sql = `
                             SELECT
-                                       BUSINESS_CATEGORY_NAME AS value
-                                     , BUSINESS_CATEGORY_NAME AS label
-                                     , BUSINESS_CATEGORY_ID
+                                       BUSINESS_CATEGORY_ID
+                                     , BUSINESS_CATEGORY_NAME
                                      , DESCRIPTION
                             FROM
                                        info_business_category
                             WHERE
                                        INUSE = 1
+                                       AND (
+                                              'dataItem.BUSINESS_CATEGORY_NAME' = ''
+                                              OR BUSINESS_CATEGORY_NAME LIKE '%dataItem.BUSINESS_CATEGORY_NAME%'
+                                       )
                             ORDER BY
                                        BUSINESS_CATEGORY_NAME ASC
         `
+    sql = sql.replaceAll(
+      'dataItem.BUSINESS_CATEGORY_NAME',
+      String(dataItem.BUSINESS_CATEGORY_NAME || '').trim().replaceAll("'", "''")
+    )
+    return sql
   },
 
-  getCurrencies: async (_dataItem?: any) => {
-    return `
+  getCurrencies: async (dataItem: any = {}) => {
+    let sql = `
                             SELECT
-                                       CURRENCY_NAME AS value
-                                     , CURRENCY_NAME AS label
-                                     , INFO_CURRENCY_ID
+                                       INFO_CURRENCY_ID
+                                     , CURRENCY_NAME
                             FROM
                                        info_currency
+                            WHERE
+                                       'dataItem.CURRENCY_NAME' = ''
+                                       OR CURRENCY_NAME LIKE '%dataItem.CURRENCY_NAME%'
                             ORDER BY
                                        CURRENCY_NAME ASC
         `
+    sql = sql.replaceAll(
+      'dataItem.CURRENCY_NAME',
+      String(dataItem.CURRENCY_NAME || '').trim().replaceAll("'", "''")
+    )
+    return sql
   },
 
   createApprovalStep: async (dataItem: any) => {
     const stepStatusId = requireStatusId(dataItem['M_APPROVAL_STEP_STATUS_ID'], 'M_APPROVAL_STEP_STATUS_ID')
     const pendingStatusId = requireStatusId(dataItem['M_APPROVAL_STEP_PENDING_STATUS_ID'], 'M_APPROVAL_STEP_PENDING_STATUS_ID')
-    const terminalStatusIds = (Array.isArray(dataItem['M_APPROVAL_STEP_TERMINAL_STATUS_IDS'])
-      ? dataItem['M_APPROVAL_STEP_TERMINAL_STATUS_IDS']
-      : [])
+    const terminalStatusIds = (Array.isArray(dataItem['M_APPROVAL_STEP_TERMINAL_STATUS_IDS']) ? dataItem['M_APPROVAL_STEP_TERMINAL_STATUS_IDS'] : [])
       .map((statusId: any) => Number(statusId))
       .filter((statusId: number) => Number.isInteger(statusId) && statusId > 0)
     if (terminalStatusIds.length === 0) {
@@ -793,10 +796,7 @@ export const RequestRegisterPageSQL = {
                             )
         `
     sql = sql.replaceAll('dataItem.APPROVAL_STEP_PENDING_STATUS_ID', String(pendingStatusId))
-    sql = sql.replaceAll(
-      'dataItem.TERMINAL_APPROVAL_STEP_STATUS_IDS_SQL',
-      terminalStatusIds.join(', ')
-    )
+    sql = sql.replaceAll('dataItem.TERMINAL_APPROVAL_STEP_STATUS_IDS_SQL', terminalStatusIds.join(', '))
 
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.WORKFLOW_STEP_MASTER_ID', (dataItem['WORKFLOW_STEP_MASTER_ID'] || 0).toString())
@@ -891,10 +891,7 @@ export const RequestRegisterPageSQL = {
       'dataItem.APPROVAL_STEP_IN_PROGRESS_STATUS_ID',
       requireStatusId(dataItem['M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID'], 'M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID').toString()
     )
-    sql = sql.replaceAll(
-      'dataItem.REQUEST_IN_PROGRESS_STATE_ID',
-      requireStatusId(dataItem['M_REQUEST_IN_PROGRESS_STATE_ID'], 'M_REQUEST_IN_PROGRESS_STATE_ID').toString()
-    )
+    sql = sql.replaceAll('dataItem.REQUEST_IN_PROGRESS_STATE_ID', requireStatusId(dataItem['M_REQUEST_IN_PROGRESS_STATE_ID'], 'M_REQUEST_IN_PROGRESS_STATE_ID').toString())
 
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem['UPDATE_BY'] || 'SYSTEM')
@@ -937,10 +934,7 @@ export const RequestRegisterPageSQL = {
       'dataItem.APPROVAL_STEP_IN_PROGRESS_STATUS_ID',
       requireStatusId(dataItem['M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID'], 'M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID').toString()
     )
-    sql = sql.replaceAll(
-      'dataItem.REQUEST_IN_PROGRESS_STATE_ID',
-      requireStatusId(dataItem['M_REQUEST_IN_PROGRESS_STATE_ID'], 'M_REQUEST_IN_PROGRESS_STATE_ID').toString()
-    )
+    sql = sql.replaceAll('dataItem.REQUEST_IN_PROGRESS_STATE_ID', requireStatusId(dataItem['M_REQUEST_IN_PROGRESS_STATE_ID'], 'M_REQUEST_IN_PROGRESS_STATE_ID').toString())
 
     sql = sql.replaceAll('dataItem.REQUEST_APPROVAL_STEP_ID', (dataItem['REQUEST_APPROVAL_STEP_ID'] || 0).toString())
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
@@ -1019,7 +1013,12 @@ export const RequestRegisterPageSQL = {
     sql = sql.replaceAll('dataItem.REQUEST_APPROVAL_STEP_ID', dataItem['REQUEST_APPROVAL_STEP_ID'] ? dataItem['REQUEST_APPROVAL_STEP_ID'].toString() : 'NULL')
     sql = sql.replaceAll('dataItem.ACTION_BY', dataItem['ACTION_BY'] || '')
     sql = sql.replaceAll('dataItem.ACTION_TYPE', dataItem['ACTION_TYPE'] || '')
-    sql = sql.replaceAll('dataItem.ACTION_CODE', String(dataItem['ACTION_CODE'] || dataItem['ACTION_TYPE'] || '').trim().toUpperCase())
+    sql = sql.replaceAll(
+      'dataItem.ACTION_CODE',
+      String(dataItem['ACTION_CODE'] || dataItem['ACTION_TYPE'] || '')
+        .trim()
+        .toUpperCase()
+    )
     sql = sql.replaceAll('dataItem.REMARK', dataItem['REMARK'] || '')
     sql = sql.replaceAll('dataItem.REJECT_REASON', dataItem['REJECT_REASON'] ?? dataItem['REMARK'] ?? '')
 
@@ -1455,12 +1454,28 @@ export const RequestRegisterPageSQL = {
     return sql
   },
 
+  getSectionByName: (dataItem: any) => {
+    let sql = `
+                            SELECT
+                                       TRIM(section_master.SECT_NAME) AS SECTION_NAME
+                            FROM
+                                       dataItem.SECTION_TABLE section_master
+                            WHERE
+                                       TRIM(section_master.SECT_NAME) = 'dataItem.SECTION_NAME'
+                            LIMIT 1
+        `
+    sql = sql.replaceAll('dataItem.SECTION_TABLE', PersonSqlSnippets.sectionTable())
+    sql = sql.replaceAll('dataItem.SECTION_NAME', escapeSqlText(dataItem.SECTION_NAME))
+    return sql
+  },
+
   getGprProductCheckers: (dataItem: any) => {
     let sql = `
                             SELECT
                                        pgc.ITEM_ORDER
                                      , pgc.PRODUCT_MAIN_ID
                                      , pgc.PRODUCT_MAIN_NAME
+                                     , pgc.SECTION_NAME
                                      , pgc.CHECKER_EMPCODE
                                      , pgc.CHECKER_NAME
                                      , pgc.CHECKER_EMAIL
@@ -1499,6 +1514,7 @@ export const RequestRegisterPageSQL = {
                                      , ITEM_ORDER
                                      , PRODUCT_MAIN_ID
                                      , PRODUCT_MAIN_NAME
+                                     , SECTION_NAME
                                      , CHECKER_EMPCODE
                                      , CHECKER_NAME
                                      , CHECKER_EMAIL
@@ -1509,21 +1525,23 @@ export const RequestRegisterPageSQL = {
                             ) VALUES (
                                        dataItem.REQUEST_VENDOR_SELECTIONS_ID
                                      , dataItem.ITEM_ORDER
-                                     , dataItem.PRODUCT_MAIN_ID
-                                     , 'dataItem.PRODUCT_MAIN_NAME'
+                                     , NULLIF(dataItem.PRODUCT_MAIN_ID, 0)
+                                     , NULLIF('dataItem.PRODUCT_MAIN_NAME', '')
+                                     , NULLIF('dataItem.SECTION_NAME', '')
                                      , 'dataItem.CHECKER_EMPCODE'
                                      , 'dataItem.CHECKER_NAME'
                                      , 'dataItem.CHECKER_EMAIL'
                                      , 'dataItem.CREATE_BY'
                                      , 'dataItem.UPDATE_BY'
                                      , 1
-                                     , LEFT(CONCAT('dataItem.PRODUCT_MAIN_NAME', ': ', 'dataItem.CHECKER_EMPCODE'), 100)
+                                     , 'GPR C checker assignment by Product Main or Section'
                             )
         `
     sql = sql.replaceAll('dataItem.REQUEST_VENDOR_SELECTIONS_ID', (Number(dataItem.REQUEST_VENDOR_SELECTIONS_ID) || 0).toString())
     sql = sql.replaceAll('dataItem.ITEM_ORDER', (Number(dataItem.ITEM_ORDER) || 0).toString())
     sql = sql.replaceAll('dataItem.PRODUCT_MAIN_ID', (Number(dataItem.PRODUCT_MAIN_ID) || 0).toString())
-    sql = sql.replaceAll('dataItem.PRODUCT_MAIN_NAME', escapeSqlText(dataItem.PRODUCT_MAIN_NAME))
+    sql = sql.replaceAll('dataItem.PRODUCT_MAIN_NAME', escapeSqlText(String(dataItem.PRODUCT_MAIN_NAME || '').trim()))
+    sql = sql.replaceAll('dataItem.SECTION_NAME', escapeSqlText(String(dataItem.SECTION_NAME || '').trim()))
     sql = sql.replaceAll('dataItem.CHECKER_EMPCODE', escapeSqlText(dataItem.CHECKER_EMPCODE))
     sql = sql.replaceAll('dataItem.CHECKER_NAME', escapeSqlText(dataItem.CHECKER_NAME))
     sql = sql.replaceAll('dataItem.CHECKER_EMAIL', escapeSqlText(dataItem.CHECKER_EMAIL))
@@ -1758,7 +1776,10 @@ export const RequestRegisterPageSQL = {
   updateDocumentFilePath: (dataItem: any) => {
     // Backslashes must be escaped before quotes — MySQL string literals treat "\0" as a NUL
     // byte and silently drop other backslashes, which corrupts Windows/UNC file paths.
-    const escape = (value: any) => String(value ?? '').replaceAll('\\', '\\\\').replaceAll("'", "''")
+    const escape = (value: any) =>
+      String(value ?? '')
+        .replaceAll('\\', '\\\\')
+        .replaceAll("'", "''")
 
     let sql = `
                             UPDATE request_register_file
@@ -1781,7 +1802,10 @@ export const RequestRegisterPageSQL = {
   updateGprBFile: (dataItem: any) => {
     // Backslashes must be escaped before quotes — MySQL string literals treat "\0" as a NUL
     // byte and silently drop other backslashes, which corrupts Windows/UNC file paths.
-    const escape = (value: any) => String(value ?? '').replaceAll('\\', '\\\\').replaceAll("'", "''")
+    const escape = (value: any) =>
+      String(value ?? '')
+        .replaceAll('\\', '\\\\')
+        .replaceAll("'", "''")
 
     let sql = `
                             UPDATE request_vendor_selections
@@ -1796,17 +1820,10 @@ export const RequestRegisterPageSQL = {
         `
 
     sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem.REQUEST_REGISTER_VENDOR_ID || 0).toString())
-    sql = sql.replaceAll(
-      'dataItem.PATH_NULL',
-      dataItem.GPR_B_FILE_PATH ? "'" + escape(dataItem.GPR_B_FILE_PATH) + "'" : 'NULL',
-    )
-    sql = sql.replaceAll(
-      'dataItem.NAME_NULL',
-      dataItem.GPR_B_FILE_NAME ? "'" + escape(dataItem.GPR_B_FILE_NAME) + "'" : 'NULL',
-    )
+    sql = sql.replaceAll('dataItem.PATH_NULL', dataItem.GPR_B_FILE_PATH ? "'" + escape(dataItem.GPR_B_FILE_PATH) + "'" : 'NULL')
+    sql = sql.replaceAll('dataItem.NAME_NULL', dataItem.GPR_B_FILE_NAME ? "'" + escape(dataItem.GPR_B_FILE_NAME) + "'" : 'NULL')
     sql = sql.replaceAll('dataItem.UPDATE_BY', escape(dataItem.UPDATE_BY || 'SYSTEM'))
 
     return sql
   },
 }
-

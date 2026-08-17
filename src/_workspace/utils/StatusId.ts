@@ -10,6 +10,9 @@ export const requireStatusId = (value: unknown, fieldName: string): number => {
 }
 
 export const toVendorStatusId = (value: unknown): number | null => {
+  if (typeof value !== 'number' && typeof value !== 'string') return null
+  if (typeof value === 'string' && value.trim() === '') return null
+
   const statusId = Number(value)
   return Number.isInteger(statusId) && statusId >= 0 ? statusId : null
 }

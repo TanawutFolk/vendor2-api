@@ -16,7 +16,7 @@ export const WORKFLOW_ACTION = {
   DISAGREE: 'DISAGREE',
   ACTION_REQUIRED: 'ACTION_REQUIRED',
   REJECT: 'REJECT',
-  RETURN: 'RETURN',
+  RECHECK: 'RECHECK',
 } as const
 
 export const WORKFLOW_STEP_CODE = {
@@ -39,18 +39,15 @@ export const VENDOR_CODE_PREFIX = {
   OVERSEA: '20031',
 } as const
 
-export const getVendorCodePrefix = (isOversea: boolean) =>
-  isOversea ? VENDOR_CODE_PREFIX.OVERSEA : VENDOR_CODE_PREFIX.LOCAL
+export const getVendorCodePrefix = (isOversea: boolean) => (isOversea ? VENDOR_CODE_PREFIX.OVERSEA : VENDOR_CODE_PREFIX.LOCAL)
 
 export const isVendorCodeComplete = (vendorCode: any, isOversea: boolean) => {
-  const normalizedVendorCode = String(vendorCode || '').trim().toUpperCase()
+  const normalizedVendorCode = String(vendorCode || '')
+    .trim()
+    .toUpperCase()
   const expectedPrefix = getVendorCodePrefix(isOversea)
 
-  return (
-    normalizedVendorCode.startsWith(expectedPrefix) &&
-    normalizedVendorCode.length > expectedPrefix.length &&
-    /^[A-Z0-9]+$/.test(normalizedVendorCode)
-  )
+  return normalizedVendorCode.startsWith(expectedPrefix) && normalizedVendorCode.length > expectedPrefix.length && /^[A-Z0-9]+$/.test(normalizedVendorCode)
 }
 
 export const normalizeText = (value: any) =>
@@ -86,22 +83,28 @@ export const resolveWorkflowAction = (dataItem: any) => {
   if (['reject', 'rejected'].includes(token)) {
     return WORKFLOW_ACTION.REJECT
   }
-  if (['return', 'returned', 'return_to_document_check'].includes(token)) {
-    return WORKFLOW_ACTION.RETURN
+  if (['recheck', 're_check', 'recheck_to_pic'].includes(token)) {
+    return WORKFLOW_ACTION.RECHECK
   }
 
   return ''
 }
 
 export const inferStepCode = (step: any) => {
-  return String(step?.step_code || step?.STEP_CODE || '').trim().toUpperCase()
+  return String(step?.step_code || step?.STEP_CODE || '')
+    .trim()
+    .toUpperCase()
 }
 
 export const inferActorType = (step: any) =>
-  String(step?.actor_type || step?.ACTOR_TYPE || '').trim().toUpperCase()
+  String(step?.actor_type || step?.ACTOR_TYPE || '')
+    .trim()
+    .toUpperCase()
 
 export const resolveGroupCodeForStep = (step: any, _isOversea: boolean) =>
-  String(step?.group_code || step?.GROUP_CODE || '').trim().toUpperCase()
+  String(step?.group_code || step?.GROUP_CODE || '')
+    .trim()
+    .toUpperCase()
 
 export const isPicStep = (step: any) => inferActorType(step) === 'PIC'
 

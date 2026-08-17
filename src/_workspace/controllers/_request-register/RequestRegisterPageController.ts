@@ -20,9 +20,9 @@ const removeTempUpload = (filePath?: string) => {
 }
 
 export const RequestRegisterPageController = {
-  getBusinessCategories: async (_req: Request, res: Response) => {
+  getBusinessCategories: async (req: Request, res: Response) => {
     try {
-      const result = await RequestRegisterPageModel.getBusinessCategories()
+      const result = await RequestRegisterPageModel.getBusinessCategories(req.body || {})
 
       res.status(200).json({
         Status: true,
@@ -44,9 +44,9 @@ export const RequestRegisterPageController = {
     }
   },
 
-  getCurrencies: async (_req: Request, res: Response) => {
+  getCurrencies: async (req: Request, res: Response) => {
     try {
-      const result = await RequestRegisterPageModel.getCurrencies()
+      const result = await RequestRegisterPageModel.getCurrencies(req.body || {})
 
       res.status(200).json({
         Status: true,
