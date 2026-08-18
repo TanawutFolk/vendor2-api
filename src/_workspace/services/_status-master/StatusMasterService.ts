@@ -10,12 +10,16 @@ export const StatusMasterService = {
     const sql = await StatusMasterSQL.getStatusMasters(dataItem)
     return (await MySQLExecute.search(sql)) as RowDataPacket[]
   },
-  getActiveWorkflowStepMasters: async () => {
-    const sql = await StatusMasterSQL.getActiveWorkflowStepMasters()
+  getActiveWorkflowStepMasters: async (dataItem: { WORKFLOW_DEFINITION_ID?: number } = {}) => {
+    const sql = await StatusMasterSQL.getActiveWorkflowStepMasters(dataItem)
     return (await MySQLExecute.search(sql)) as RowDataPacket[]
   },
   getActiveRequestStatusMasters: async () => {
     const sql = await StatusMasterSQL.getActiveRequestStatusMasters()
+    return (await MySQLExecute.search(sql)) as RowDataPacket[]
+  },
+  getWorkflowStepTypes: async () => {
+    const sql = await StatusMasterSQL.getWorkflowStepTypes()
     return (await MySQLExecute.search(sql)) as RowDataPacket[]
   },
 }

@@ -1206,7 +1206,7 @@ export const GprCApprovalSQL = {
       ? 'wt.TO_WORKFLOW_STEP_MASTER_ID = dataItem.TARGET_WORKFLOW_STEP_MASTER_ID'
       : terminalRequestStateId
         ? 'wt.TO_WORKFLOW_STEP_MASTER_ID IS NULL AND wt.M_REQUEST_STATE_ID = dataItem.TERMINAL_REQUEST_STATE_ID'
-        : '1 = 0'
+        : 'wt.TO_WORKFLOW_STEP_MASTER_ID IS NOT NULL AND wt.M_REQUEST_STATE_ID IS NULL'
     transitionIdentityCondition = transitionIdentityCondition.replaceAll(
       'dataItem.TARGET_WORKFLOW_STEP_MASTER_ID',
       targetWorkflowStepMasterId.toString()

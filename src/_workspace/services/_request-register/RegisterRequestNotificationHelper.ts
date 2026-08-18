@@ -87,6 +87,7 @@ const getValue = (row: any, ...keys: string[]) => {
 
 /** Shape of the row returned by getNotificationVendorContextByRequestId */
 interface VendorContext {
+  workflow_definition_id?: number
   assign_to?: string
   vendor_region?: string
   vendor_email?: string
@@ -312,6 +313,7 @@ const fetchVendorContext = async (requestId: number): Promise<VendorContext> => 
     purchase_frequency: getValue(row, 'purchase_frequency', 'PURCHASE_FREQUENCY'),
     request_number: getValue(row, 'request_number', 'REQUEST_NUMBER'),
     CREATE_DATE: getValue(row, 'CREATE_DATE', 'create_date'),
+    workflow_definition_id: Number(getValue(row, 'WORKFLOW_DEFINITION_ID', 'workflow_definition_id')) || undefined,
     fft_vendor_code: getValue(row, 'fft_vendor_code', 'FFT_VENDOR_CODE'),
     vendor_code: getValue(row, 'vendor_code', 'VENDOR_CODE'),
     action_required_json: getValue(row, 'action_required_json', 'ACTION_REQUIRED_JSON'),
@@ -912,7 +914,7 @@ export const sendMail_ToApprover_NextStep = async (dataItem: any, nextStep: any,
     const requestNumber = resolveRequestNumber(vd.request_number, requestId, vd.CREATE_DATE)
     const requester = await resolveRequesterMailProfile(vd)
 
-    const workflowStep = await getWorkflowStepIdentity()
+    const workflowStep = await getWorkflowStepIdentity(vd.workflow_definition_id)
     const nextWorkflowStepMasterId = Number(getValue(nextStep, 'workflow_step_id', 'WORKFLOW_STEP_MASTER_ID') || 0)
     const isDocumentCheckerStep = nextWorkflowStepMasterId === workflowStep.docCheck
     const isPmMgrAndAbove = [workflowStep.poMgrApproval, workflowStep.poGmApproval, workflowStep.mdApproval].includes(nextWorkflowStepMasterId)
@@ -1183,7 +1185,7 @@ const sendMailToPicWorkflowAction = async (dataItem: any, currentStep: any, acti
     const poPicContext = await getPoPicAndSubPicCc(vd.vendor_region, vd.assign_to, picEmail)
     const checkerPicCc = await getPoCheckerMainEmails()
 
-    const workflowStep = await getWorkflowStepIdentity()
+    const workflowStep = await getWorkflowStepIdentity(vd.workflow_definition_id)
     const currentWorkflowStepMasterId = Number(getValue(currentStep, 'workflow_step_id', 'WORKFLOW_STEP_MASTER_ID') || 0)
     const isRecheck = action === 'RECHECK'
     const isCheckerRecheck = isRecheck && currentWorkflowStepMasterId === workflowStep.docCheck

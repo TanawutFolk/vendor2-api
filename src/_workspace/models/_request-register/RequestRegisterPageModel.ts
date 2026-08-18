@@ -20,28 +20,33 @@ export const RequestRegisterPageModel = {
   gprCSubmitSetup: async (dataItem: any) => RequestRegisterPageService.gprCSubmitSetup(dataItem),
   saveSelectionFileToReceiving: (
     requestNumber: string,
-    sourcePath: string,
+    fileBuffer: Buffer,
     criteriaNo: string,
     criteriaDetail: string,
     originalFileName: string,
   ) =>
     RequestRegisterPageService.saveSelectionFileToReceiving(
       requestNumber,
-      sourcePath,
+      fileBuffer,
       criteriaNo,
       criteriaDetail,
       originalFileName,
     ),
   saveSelectionFileToSending: (
     requestNumber: string,
-    sourcePath: string,
+    fileBuffer: Buffer,
     originalFileName: string,
-  ) => RequestRegisterPageService.saveSelectionFileToSending(requestNumber, sourcePath, originalFileName),
+  ) => RequestRegisterPageService.saveSelectionFileToSending(requestNumber, fileBuffer, originalFileName),
   saveGprBFileToReceiving: (
     requestNumber: string,
-    sourcePath: string,
+    fileBuffer: Buffer,
     originalFileName: string,
-  ) => RequestRegisterPageService.saveGprBFileToReceiving(requestNumber, sourcePath, originalFileName),
+  ) => RequestRegisterPageService.saveGprBFileToReceiving(requestNumber, fileBuffer, originalFileName),
+  saveRequestDocument: (
+    requestNumber: string,
+    fileBuffer: Buffer,
+    originalFileName: string,
+  ) => RequestRegisterPageService.saveRequestDocument(requestNumber, fileBuffer, originalFileName),
   deleteSelectionFile: (filePath: string, fileName: string, requestNumber: string) =>
     RequestRegisterPageService.deleteSelectionFile(filePath, fileName, requestNumber),
   resolveSelectionDownloadPath: (filePath: string, fileName: string, requestNumber: string) =>

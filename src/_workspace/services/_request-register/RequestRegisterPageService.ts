@@ -50,6 +50,8 @@ export const RequestRegisterPageService = {
     let conn: any = null
     let duplicateGuardLockKey = ''
     let requestsAhead = 0
+    let transactionCommitted = false
+    const createdNetworkFilePaths: string[] = []
     try {
       const statusIdentity = await getRequestRegisterIdentity()
       conn = await connection()
@@ -147,6 +149,12 @@ export const RequestRegisterPageService = {
       const statusSql = await RequestRegisterPageSQL.getStatusOptions()
       const statusRows = await queryRows(statusSql)
       const workflowStatuses = statusRows
+      const workflowDefinitionIds = [...new Set(workflowStatuses.map((status: any) => Number(status.WORKFLOW_DEFINITION_ID || 0)).filter(Boolean))]
+      if (workflowDefinitionIds.length !== 1) {
+        throw new Error('Published vendor-registration workflow is incomplete or inconsistent')
+      }
+      dataItem.WORKFLOW_DEFINITION_ID = workflowDefinitionIds[0]
+      statusIdentity.workflowStep = await getWorkflowStepIdentity(dataItem.WORKFLOW_DEFINITION_ID)
       const poPicInProgressStatus = workflowStatuses.find(
         (status: any) => Number(status.WORKFLOW_STEP_MASTER_ID) === statusIdentity.workflowStep.poPicInProgress
       )
@@ -154,13 +162,11 @@ export const RequestRegisterPageService = {
         (status: any) => Number(status.WORKFLOW_STEP_MASTER_ID) === statusIdentity.workflowStep.requestSubmitted
       )
       const initialWorkflowStatus = isReRegisterRequest ? poPicInProgressStatus : requestSubmittedStatus
-      const workflowDefinitionIds = [...new Set(workflowStatuses.map((status: any) => Number(status.WORKFLOW_DEFINITION_ID || 0)).filter(Boolean))]
 
-      if (workflowDefinitionIds.length !== 1 || !initialWorkflowStatus?.M_REQUEST_STATUS_ID) {
+      if (!initialWorkflowStatus?.M_REQUEST_STATUS_ID) {
         throw new Error('Published vendor-registration workflow is incomplete or inconsistent')
       }
 
-      dataItem.WORKFLOW_DEFINITION_ID = workflowDefinitionIds[0]
       dataItem.CURRENT_M_REQUEST_STATUS_ID = Number(initialWorkflowStatus.M_REQUEST_STATUS_ID)
       dataItem.M_REQUEST_IN_PROGRESS_STATE_ID = statusIdentity.requestState.inProgress
 
@@ -234,6 +240,10 @@ export const RequestRegisterPageService = {
       })
       await executeSql(setRequestNumberSql)
 
+      // The request folder is the only document storage location. A network-storage error
+      // must abort the transaction instead of falling back to a local upload directory.
+      SelectionFileService.createFolderStructure(requestNumber)
+
       if (selectedVendorContactIds.length > 0) {
         const contactSqlList = await Promise.all(
           selectedVendorContactIds.map((contactId, index) =>
@@ -249,31 +259,31 @@ export const RequestRegisterPageService = {
       }
 
       const uploadedFiles = Array.isArray(dataItem.UPLOADED_FILES) ? dataItem.UPLOADED_FILES : []
-      const requestDocsToRelocate: Array<{ documentId: number; filename: string; originalName: string }> = []
       if (uploadedFiles.length > 0) {
-        const normalizedFiles: Array<{ file: any; originalName: string }> = uploadedFiles.map((file: any) => ({
-          file,
-          originalName: Buffer.from(file.originalname || '', 'latin1').toString('utf8') || file.filename || '',
-        }))
+        const normalizedFiles: Array<{ file: any; originalName: string; destPath: string }> = uploadedFiles.map((file: any) => {
+          const originalName = Buffer.from(file.originalname || '', 'latin1').toString('utf8') || 'file'
+          const { destPath } = SelectionFileService.saveBufferToRequestDocuments(
+            requestNumber,
+            file.buffer,
+            originalName,
+          )
+          createdNetworkFilePaths.push(destPath)
+
+          return { file, originalName, destPath }
+        })
         const fileSqlList = await Promise.all(
-          normalizedFiles.map(({ file, originalName }) =>
+          normalizedFiles.map(({ file, originalName, destPath }) =>
             RequestRegisterPageSQL.createDocument({
               REQUEST_REGISTER_VENDOR_ID: insertedId,
               FILE_NAME: originalName,
-              FILE_PATH: file.filename || '',
+              FILE_PATH: destPath,
               FILE_SIZE: file.size || 0,
               FILE_TYPE: file.mimetype || '',
               CREATE_BY: dataItem.CREATE_BY || 'SYSTEM',
             })
           )
         )
-        const fileInsertResults = await executeSqlList(fileSqlList)
-        normalizedFiles.forEach(({ file, originalName }, index) => {
-          const documentId = Number(fileInsertResults[index]?.insertId || 0)
-          if (documentId && file?.filename) {
-            requestDocsToRelocate.push({ documentId, filename: file.filename, originalName })
-          }
-        })
+        await executeSqlList(fileSqlList)
       }
 
       const sqlList = []
@@ -389,6 +399,7 @@ export const RequestRegisterPageService = {
       }
 
       await conn.commit()
+      transactionCommitted = true
       if (duplicateGuardLockKey) {
         const releaseLockSql = RequestRegisterPageSQL.releaseRequestCreateLock({
           LOCK_KEY: duplicateGuardLockKey,
@@ -408,36 +419,6 @@ export const RequestRegisterPageService = {
         requestsAhead = Number(requestsAheadRows[0]?.REQUESTS_AHEAD || requestsAheadRows[0]?.requests_ahead || 0)
       } catch (queueCountError: any) {
         console.warn('[RequestQueue] Failed to count requests ahead:', queueCountError?.message)
-      }
-
-      // Always provision the request's folder structure ({year}/{requestNumber}/00.Sending,
-      // 01.Receiving, 02.Request Documents) as soon as the request is created — even with no
-      // attachments — so 02.Request Documents exists up front. If the request is later rejected,
-      // the folders are simply left in place. Runs after commit and never fails the request.
-      try {
-        SelectionFileService.createFolderStructure(requestNumber)
-      } catch (folderError: any) {
-        console.warn('[SelectionFile] Failed to ensure request folder structure:', folderError?.message)
-      }
-
-      // Move the requester's attached files into 02.Request Documents and repoint each
-      // request_register_file row to the network path (single source of truth — no uploads/documents
-      // copy is kept). Per-file failure is isolated so a network-share hiccup on one file cannot
-      // fail the request or block the others.
-      for (const doc of requestDocsToRelocate) {
-        try {
-          const { destPath } = SelectionFileService.moveToRequestDocuments(requestNumber, doc.filename, doc.originalName)
-          await MySQLExecute.execute(
-            RequestRegisterPageSQL.updateDocumentFilePath({
-              REQUEST_REGISTER_FILE_ID: doc.documentId,
-              FILE_PATH: destPath,
-              UPDATE_BY: dataItem.CREATE_BY || 'SYSTEM',
-            })
-          )
-        } catch (fileError: any) {
-          // Leave this file in uploads/documents with its original DB FILE_PATH so it still downloads.
-          console.warn(`[SelectionFile] Failed to move request document ${doc.filename} to 02.Request Documents:`, fileError?.message)
-        }
       }
 
       let message = isReRegisterRequest ? 'Re-register request created and sent to vendor successfully' : 'Request created successfully'
@@ -461,6 +442,15 @@ export const RequestRegisterPageService = {
         TotalCountOnDb: 1,
       }
     } catch (error: any) {
+      if (!transactionCommitted) {
+        for (const filePath of createdNetworkFilePaths) {
+          try {
+            SelectionFileService.deleteSelectionFile(filePath)
+          } catch (cleanupError: any) {
+            console.warn('[SelectionFile] Failed to clean up request document:', cleanupError?.message)
+          }
+        }
+      }
       if (conn) {
         await conn.rollback()
         if (duplicateGuardLockKey) {
@@ -647,7 +637,7 @@ export const RequestRegisterPageService = {
       const stepsSql = await RequestRegisterPageSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId })
       const steps = (await MySQLExecute.search(stepsSql)) as RowDataPacket[]
       const [workflowStep, approvalStep] = await Promise.all([
-        getWorkflowStepIdentity(),
+        getWorkflowStepIdentity(Number(request.WORKFLOW_DEFINITION_ID) || undefined),
         getApprovalStepStatusIdentity(),
       ])
       const currentStep = steps.find(
@@ -728,14 +718,14 @@ export const RequestRegisterPageService = {
 
   saveSelectionFileToReceiving: (
     requestNumber: string,
-    sourcePath: string,
+    fileBuffer: Buffer,
     criteriaNo: string,
     criteriaDetail: string,
     originalFileName: string,
   ) =>
-    SelectionFileService.saveToReceiving(
+    SelectionFileService.saveBufferToReceiving(
       requestNumber,
-      sourcePath,
+      fileBuffer,
       criteriaNo,
       criteriaDetail,
       originalFileName,
@@ -743,15 +733,21 @@ export const RequestRegisterPageService = {
 
   saveSelectionFileToSending: (
     requestNumber: string,
-    sourcePath: string,
+    fileBuffer: Buffer,
     originalFileName: string,
-  ) => SelectionFileService.saveToSending(requestNumber, sourcePath, originalFileName),
+  ) => SelectionFileService.saveBufferToSending(requestNumber, fileBuffer, originalFileName),
 
   saveGprBFileToReceiving: (
     requestNumber: string,
-    sourcePath: string,
+    fileBuffer: Buffer,
     originalFileName: string,
-  ) => SelectionFileService.saveGprBToReceiving(requestNumber, sourcePath, originalFileName),
+  ) => SelectionFileService.saveGprBBufferToReceiving(requestNumber, fileBuffer, originalFileName),
+
+  saveRequestDocument: (
+    requestNumber: string,
+    fileBuffer: Buffer,
+    originalFileName: string,
+  ) => SelectionFileService.saveBufferToRequestDocuments(requestNumber, fileBuffer, originalFileName),
 
   deleteSelectionFile: (
     filePath: string,
@@ -763,10 +759,7 @@ export const RequestRegisterPageService = {
     filePath: string,
     fileName: string,
     requestNumber: string,
-  ) =>
-    SelectionFileService.resolveDownloadPath(filePath, fileName, requestNumber, {
-      allowUploadedFallback: true,
-    }),
+  ) => SelectionFileService.resolveDownloadPath(filePath, fileName, requestNumber),
 
   createCriteriaFile: (dataItem: any) => CriteriaFileService.create(dataItem),
 

@@ -52,6 +52,10 @@ const requestContext = {
 const flushPostCommit = () => new Promise((resolve) => setTimeout(resolve, 30))
 
 async function setup(steps: any[], context: any, requester = 'S00009', options: { recheckToPic?: boolean } = {}) {
+  steps = steps.map((step) => ({
+    ...step,
+    WORKFLOW_STEP_TYPE_ID: step.WORKFLOW_STEP_TYPE_ID || step.WORKFLOW_STEP_MASTER_ID,
+  }))
   const spies = {
     nextStep: mock(async () => undefined),
     recheckToPicByApprover: mock(async () => undefined),
@@ -89,6 +93,7 @@ async function setup(steps: any[], context: any, requester = 'S00009', options: 
           NEXT_ASSIGNMENT_MODE: 'AUTO',
           NEXT_M_REQUEST_STATUS_ID: 2,
           NEXT_STEP_CODE: transitionNextStep?.STEP_CODE,
+          NEXT_WORKFLOW_STEP_TYPE_ID: transitionNextStep?.WORKFLOW_STEP_TYPE_ID,
           NEXT_ACTOR_TYPE: transitionNextStep?.ACTOR_TYPE,
           NEXT_STATUS_VALUE: transitionNextStep?.DESCRIPTION,
         },
@@ -148,6 +153,19 @@ async function setup(steps: any[], context: any, requester = 'S00009', options: 
         mdApproval: 306,
         accountRegistered: 307,
       },
+      workflowStepType: {
+        requestSubmitted: 297,
+        picReview: 298,
+        poPicInProgress: 299,
+        vendorDisagreed: 300,
+        issueGprB: 301,
+        issueGprC: 302,
+        docCheck: 303,
+        poMgrApproval: 304,
+        poGmApproval: 305,
+        mdApproval: 306,
+        accountRegistered: 307,
+      },
       approvalStep: { pending: 1, inProgress: 2, approved: 3, rejected: 4, skipped: 5 },
       requestState: { inProgress: 1, completed: 2, rejected: 3, cancelled: 4 },
       requestStatus: { rejected: 99 },
@@ -158,6 +176,7 @@ async function setup(steps: any[], context: any, requester = 'S00009', options: 
 
     return {
       getWorkflowStepIdentity: mock(async () => identity.workflowStep),
+      getWorkflowStepTypeIdentity: mock(async () => identity.workflowStepType),
       getApprovalStepStatusIdentity: mock(async () => identity.approvalStep),
       getRequestStateIdentity: mock(async () => identity.requestState),
       getRequestStatusIdentity: mock(async () => identity.requestStatus),

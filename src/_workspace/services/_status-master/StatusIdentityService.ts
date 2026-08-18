@@ -8,6 +8,20 @@ export interface WorkflowStepIdentity {
   vendorDisagreed: number
   issueGprB: number
   issueGprC: number
+  docCheck: number | null
+  poMgrApproval: number
+  poGmApproval: number
+  mdApproval: number
+  accountRegistered: number
+}
+
+export interface WorkflowStepTypeIdentity {
+  requestSubmitted: number
+  picReview: number
+  poPicInProgress: number
+  vendorDisagreed: number
+  issueGprB: number
+  issueGprC: number
   docCheck: number
   poMgrApproval: number
   poGmApproval: number
@@ -58,6 +72,7 @@ export interface ActionResultStatusIdentity {
 
 export interface WorkspaceStatusIdentity {
   workflowStep: WorkflowStepIdentity
+  workflowStepType: WorkflowStepTypeIdentity
   approvalStep: ApprovalStepStatusIdentity
   requestState: RequestStateIdentity
   requestStatus: RequestStatusIdentity
@@ -115,8 +130,12 @@ const requireMasterId = (
 const loadStatusMasterRows = (masterType: keyof typeof STATUS_MASTER_TYPE) =>
   StatusMasterService.getStatusMasters({ MASTER_TYPE: masterType })
 
-export const getWorkflowStepIdentity = createCachedLoader<WorkflowStepIdentity>(async () => {
-  const rows = await StatusMasterService.getActiveWorkflowStepMasters()
+const workflowStepIdentityLoaders = new Map<number, () => Promise<WorkflowStepIdentity>>()
+
+const createWorkflowStepIdentityLoader = (workflowDefinitionId?: number) => createCachedLoader<WorkflowStepIdentity>(async () => {
+  const rows = await StatusMasterService.getActiveWorkflowStepMasters({
+    WORKFLOW_DEFINITION_ID: workflowDefinitionId,
+  })
   const requireWorkflowStepId = (stepCode: string) => {
     const row = rows.find(item => normalizeCode(item?.STEP_CODE) === stepCode)
     const id = Number(row?.WORKFLOW_STEP_MASTER_ID)
@@ -127,6 +146,11 @@ export const getWorkflowStepIdentity = createCachedLoader<WorkflowStepIdentity>(
 
     return id
   }
+  const optionalWorkflowStepId = (stepCode: string) => {
+    const row = rows.find(item => normalizeCode(item?.STEP_CODE) === stepCode)
+    const id = Number(row?.WORKFLOW_STEP_MASTER_ID)
+    return Number.isInteger(id) && id > 0 ? id : null
+  }
 
   return {
     requestSubmitted: requireWorkflowStepId('REQUEST_SUBMITTED'),
@@ -135,11 +159,47 @@ export const getWorkflowStepIdentity = createCachedLoader<WorkflowStepIdentity>(
     vendorDisagreed: requireWorkflowStepId('VENDOR_DISAGREED'),
     issueGprB: requireWorkflowStepId('ISSUE_GPR_B'),
     issueGprC: requireWorkflowStepId('ISSUE_GPR_C'),
-    docCheck: requireWorkflowStepId('DOC_CHECK'),
+    docCheck: optionalWorkflowStepId('DOC_CHECK'),
     poMgrApproval: requireWorkflowStepId('PO_MGR_APPROVAL'),
     poGmApproval: requireWorkflowStepId('PO_GM_APPROVAL'),
     mdApproval: requireWorkflowStepId('MD_APPROVAL'),
     accountRegistered: requireWorkflowStepId('ACCOUNT_REGISTERED'),
+  }
+})
+
+export const getWorkflowStepIdentity = (workflowDefinitionId?: number) => {
+  const cacheKey = Number(workflowDefinitionId) || 0
+  let loader = workflowStepIdentityLoaders.get(cacheKey)
+  if (!loader) {
+    loader = createWorkflowStepIdentityLoader(cacheKey || undefined)
+    workflowStepIdentityLoaders.set(cacheKey, loader)
+  }
+  return loader()
+}
+
+export const getWorkflowStepTypeIdentity = createCachedLoader<WorkflowStepTypeIdentity>(async () => {
+  const rows = await StatusMasterService.getWorkflowStepTypes()
+  const requireWorkflowStepTypeId = (stepCode: string) => {
+    const row = rows.find(item => normalizeCode(item?.STEP_CODE) === stepCode)
+    const id = Number(row?.WORKFLOW_STEP_TYPE_ID)
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new Error(`Missing active workflow step type: ${stepCode}`)
+    }
+    return id
+  }
+
+  return {
+    requestSubmitted: requireWorkflowStepTypeId('REQUEST_SUBMITTED'),
+    picReview: requireWorkflowStepTypeId('PIC_REVIEW'),
+    poPicInProgress: requireWorkflowStepTypeId('PO_PIC_IN_PROGRESS'),
+    vendorDisagreed: requireWorkflowStepTypeId('VENDOR_DISAGREED'),
+    issueGprB: requireWorkflowStepTypeId('ISSUE_GPR_B'),
+    issueGprC: requireWorkflowStepTypeId('ISSUE_GPR_C'),
+    docCheck: requireWorkflowStepTypeId('DOC_CHECK'),
+    poMgrApproval: requireWorkflowStepTypeId('PO_MGR_APPROVAL'),
+    poGmApproval: requireWorkflowStepTypeId('PO_GM_APPROVAL'),
+    mdApproval: requireWorkflowStepTypeId('MD_APPROVAL'),
+    accountRegistered: requireWorkflowStepTypeId('ACCOUNT_REGISTERED'),
   }
 })
 

@@ -29,13 +29,6 @@ export const AccRegisterService = {
         throw new Error('Vendor Code is required in the Selection Sheet before completing registration.')
       }
       dataItem.VENDOR_CODE = vendorCode
-      const [workflowStep, approvalStep, requestState, vendor] = await Promise.all([
-        getWorkflowStepIdentity(),
-        getApprovalStepStatusIdentity(),
-        getRequestStateIdentity(),
-        getVendorStatusIdentity(),
-      ])
-
       const [stepsSql, contextSql] = await Promise.all([
         AccRegisterSQL.getApprovalSteps(dataItem),
         AccRegisterSQL.getWorkflowContext(dataItem),
@@ -46,6 +39,12 @@ export const AccRegisterService = {
       ])
       const steps = stepRows.map(normalizeApprovalStep)
       const context = contextRows[0]
+      const [workflowStep, approvalStep, requestState, vendor] = await Promise.all([
+        getWorkflowStepIdentity(Number(context?.WORKFLOW_DEFINITION_ID) || undefined),
+        getApprovalStepStatusIdentity(),
+        getRequestStateIdentity(),
+        getVendorStatusIdentity(),
+      ])
       const vendorId = Number(context?.VENDORS_ID || 0)
       const currentTaskId = Number(context?.CURRENT_REQUEST_APPROVAL_STEP_ID || 0)
       const lockVersion = Number(context?.LOCK_VERSION || 0)

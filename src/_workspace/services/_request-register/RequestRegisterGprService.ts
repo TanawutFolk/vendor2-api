@@ -6,9 +6,8 @@ import { isVendorCodeComplete } from './RegisterRequestWorkflowHelper'
 import { getApprovalStepStatusIdentity, getWorkflowStepIdentity } from '../_status-master/StatusIdentityService'
 
 const getSelectionSheetWorkflowIdentity = async () => {
-  const [workflowStep, approvalStep] = await Promise.all([getWorkflowStepIdentity(), getApprovalStepStatusIdentity()])
-
-  return { workflowStep, approvalStep }
+  const approvalStep = await getApprovalStepStatusIdentity()
+  return { approvalStep }
 }
 
 const normalizeValue = (value: any) => String(value || '').trim()
@@ -46,13 +45,13 @@ const getSelectionSheetLockState = async (requestId: number) => {
     }
   }
 
-  const [stepsSql, statusIdentity] = await Promise.all([RequestRegisterPageSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId }), getSelectionSheetWorkflowIdentity()])
-  const steps = (await MySQLExecute.search(stepsSql)) as any[]
-  const isLocked = steps.some(
-    (step: any) =>
-      Number(getValue(step, 'WORKFLOW_STEP_MASTER_ID', 'workflow_step_id')) === statusIdentity.workflowStep.docCheck &&
-      Number(getValue(step, 'M_APPROVAL_STEP_STATUS_ID', 'approval_step_status_id')) === statusIdentity.approvalStep.approved
-  )
+  const statusIdentity = await getSelectionSheetWorkflowIdentity()
+  const lockSql = await RequestRegisterPageSQL.getSelectionSheetLockState({
+    REQUEST_REGISTER_VENDOR_ID: requestId,
+    M_APPROVAL_STEP_APPROVED_STATUS_ID: statusIdentity.approvalStep.approved,
+  })
+  const lockRows = (await MySQLExecute.search(lockSql)) as any[]
+  const isLocked = Number(getValue(lockRows[0], 'IS_SELECTION_SHEET_LOCKED', 'is_selection_sheet_locked')) === 1
   return {
     isLocked,
   }
@@ -71,7 +70,6 @@ const assertSelectionSheetEditable = async (requestId: number) => {
   const statusIdentity = await getSelectionSheetWorkflowIdentity()
   const accessSql = await RequestRegisterPageSQL.getSelectionSheetEditAccess({
     REQUEST_REGISTER_VENDOR_ID: requestId,
-    EDITABLE_WORKFLOW_STEP_MASTER_IDS: [statusIdentity.workflowStep.poPicInProgress, statusIdentity.workflowStep.docCheck],
     M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID: statusIdentity.approvalStep.inProgress,
   })
   const accessRows = (await MySQLExecute.search(accessSql)) as any[]
@@ -348,11 +346,14 @@ export const RequestRegisterGprService = {
       if (!isVendorCodeComplete(vendorCode, isOversea)) {
         throw new Error('Vendor Code must include the code after the 20030/20031 prefix.')
       }
-      const statusIdentity = await getSelectionSheetWorkflowIdentity()
+      const [workflowStep, statusIdentity] = await Promise.all([
+        getWorkflowStepIdentity(Number(getValue(vendorRegionRows[0], 'WORKFLOW_DEFINITION_ID', 'workflow_definition_id')) || undefined),
+        getSelectionSheetWorkflowIdentity(),
+      ])
 
       const updateSql = await RequestRegisterPageSQL.updateAccountVendorCode({
         REQUEST_REGISTER_VENDOR_ID: requestId,
-        WORKFLOW_STEP_MASTER_ID: statusIdentity.workflowStep.accountRegistered,
+        WORKFLOW_STEP_MASTER_ID: workflowStep.accountRegistered,
         M_APPROVAL_STEP_STATUS_ID: statusIdentity.approvalStep.inProgress,
         VENDOR_CODE: vendorCode,
         UPDATE_BY: updateBy,

@@ -204,16 +204,15 @@ describe('RequestRegisterPageSQL approval step identity', () => {
     expect(sql).not.toContain('rr.REQUEST_STATE')
   })
 
-  test('checks Selection Sheet edit access by current workflow IDs', async () => {
+  test('checks Selection Sheet edit access by configured step capability', async () => {
     const sql = await RequestRegisterPageSQL.getSelectionSheetEditAccess({
       REQUEST_REGISTER_VENDOR_ID: 10,
-      EDITABLE_WORKFLOW_STEP_MASTER_IDS: [3, 5],
       M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID: 2,
     })
 
     expect(sql).toContain('current_selection_step.REQUEST_APPROVAL_STEP_ID = rr.CURRENT_REQUEST_APPROVAL_STEP_ID')
-    expect(sql).toContain('current_selection_step.WORKFLOW_STEP_MASTER_ID IN')
-    expect(sql).toContain('3, 5')
+    expect(sql).toContain('workflow_step_capability')
+    expect(sql).toContain("CAPABILITY_CODE = 'EDIT_SELECTION_SHEET'")
     expect(sql).toContain('current_selection_step.M_APPROVAL_STEP_STATUS_ID = 2')
     expect(sql).toContain('IS_SELECTION_SHEET_EDITABLE')
     expect(sql).not.toContain('dataItem.')

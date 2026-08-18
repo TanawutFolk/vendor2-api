@@ -14,11 +14,6 @@ const parseVendorContactIds = (dataItem: any): string[] => {
     .filter((value) => value && Number(value) > 0)
 }
 
-const removeTempUpload = (filePath?: string) => {
-  if (!filePath || !fs.existsSync(filePath)) return
-  fs.unlinkSync(filePath)
-}
-
 export const RequestRegisterPageController = {
   getBusinessCategories: async (req: Request, res: Response) => {
     try {
@@ -114,7 +109,6 @@ export const RequestRegisterPageController = {
       })
 
       if (!createResult?.Status) {
-        files.forEach((uploadedFile) => removeTempUpload(uploadedFile?.path))
         res.status(200).json({
           Status: false,
           ResultOnDb: {},
@@ -129,7 +123,6 @@ export const RequestRegisterPageController = {
       const insertedId = Number(createResultData?.insertedId || 0)
 
       if (!insertedId || Number.isNaN(insertedId)) {
-        files.forEach((uploadedFile) => removeTempUpload(uploadedFile?.path))
         res.status(200).json({
           Status: false,
           ResultOnDb: {},
@@ -154,8 +147,6 @@ export const RequestRegisterPageController = {
       return
 
     } catch (error: any) {
-      const files = (req.files as any[]) || []
-      files.forEach((uploadedFile) => removeTempUpload(uploadedFile?.path))
       console.error('Create Registration Request Error:', error)
       res.status(200).json({
         Status: false,
@@ -593,6 +584,8 @@ export const RequestRegisterPageController = {
 
   addDocument: async (req: Request, res: Response) => {
     const file = req.file
+    let storedNetworkPath = ''
+    let storedNetworkFileName = ''
     let dataItem
 
     if (!req.body || Object.entries(req.body).length === 0) {
@@ -606,7 +599,6 @@ export const RequestRegisterPageController = {
     try {
       const reqId = parseInt(REQUEST_REGISTER_VENDOR_ID as string)
       if (!reqId || isNaN(reqId)) {
-        removeTempUpload(file?.path)
         res.status(400).json({
           Status: false,
           ResultOnDb: {},
@@ -628,16 +620,11 @@ export const RequestRegisterPageController = {
       }
       const file_name = Buffer.from(file.originalname, 'latin1').toString('utf8')
       const documentScope = String(DOCUMENT_SCOPE || '').trim().toUpperCase()
-      const persistedFileName = file_name || path.basename(file.path)
+      const persistedFileName = file_name || file.originalname || 'file'
       const { CRITERIA_NO, CRITERIA_DETAIL, REQUEST_NUMBER } = dataItem
-      if (documentScope === 'GPR_CRITERIA' && (!CRITERIA_NO || !REQUEST_NUMBER)) {
-        throw new Error('Missing CRITERIA_NO or REQUEST_NUMBER for GPR criteria file upload')
-      }
-      if (documentScope === 'GPR_PDF' && !REQUEST_NUMBER) {
-        throw new Error('Missing REQUEST_NUMBER for GPR PDF upload')
-      }
-      if (documentScope === 'GPR_B' && !REQUEST_NUMBER) {
-        throw new Error('Missing REQUEST_NUMBER for GPR B file upload')
+      if (!REQUEST_NUMBER) throw new Error('Missing REQUEST_NUMBER for document upload')
+      if (documentScope === 'GPR_CRITERIA' && !CRITERIA_NO) {
+        throw new Error('Missing CRITERIA_NO for GPR criteria file upload')
       }
 
       // Selection document binaries live in the request's network folder. Criteria attachment
@@ -650,50 +637,58 @@ export const RequestRegisterPageController = {
         await RequestRegisterPageModel.assertSelectionSheetEditable(reqId)
       }
 
-      const selectionFileResult = documentScope === 'GPR_CRITERIA'
+      const networkFileResult = documentScope === 'GPR_CRITERIA'
         ? RequestRegisterPageModel.saveSelectionFileToReceiving(
           String(REQUEST_NUMBER),
-          file.path,
+          file.buffer,
           String(CRITERIA_NO),
           String(CRITERIA_DETAIL || ''),
-          file_name || path.basename(file.path),
+          persistedFileName,
         )
         : documentScope === 'GPR_PDF'
           ? RequestRegisterPageModel.saveSelectionFileToSending(
             String(REQUEST_NUMBER),
-            file.path,
-            file_name || path.basename(file.path),
+            file.buffer,
+            persistedFileName,
           )
           : documentScope === 'GPR_B'
             ? RequestRegisterPageModel.saveGprBFileToReceiving(
               String(REQUEST_NUMBER),
-              file.path,
-              file_name || path.basename(file.path),
+              file.buffer,
+              persistedFileName,
             )
-            : null
+            : RequestRegisterPageModel.saveRequestDocument(
+              String(REQUEST_NUMBER),
+              file.buffer,
+              persistedFileName,
+            )
 
-      const storedFilePath = selectionFileResult?.destPath || file.filename || path.basename(file.path)
-      const storedFileName = selectionFileResult?.newFileName || file_name || path.basename(file.path)
+      const storedFilePath = networkFileResult.destPath
+      const storedFileName = networkFileResult.newFileName
+      storedNetworkPath = storedFilePath
+      storedNetworkFileName = storedFileName
 
       let criteriaFileResult: any = null
       if (documentScope === 'GPR_CRITERIA') {
-        try {
-          criteriaFileResult = await RequestRegisterPageModel.createCriteriaFile({
-            requestId: reqId,
-            criteriaNo: String(CRITERIA_NO),
-            filePath: storedFilePath,
-            fileName: storedFileName,
-            fileSize: file.size || 0,
-            fileType: file.mimetype || '',
-            createBy: CREATE_BY || 'SYSTEM',
-          })
-        } catch (error) {
+        criteriaFileResult = await RequestRegisterPageModel.createCriteriaFile({
+          requestId: reqId,
+          criteriaNo: String(CRITERIA_NO),
+          filePath: storedFilePath,
+          fileName: storedFileName,
+          fileSize: file.size || 0,
+          fileType: file.mimetype || '',
+          createBy: CREATE_BY || 'SYSTEM',
+        })
+      }
+
+      const deleteStoredNetworkFile = () => {
+        if (storedNetworkPath) {
           RequestRegisterPageModel.deleteSelectionFile(
-            storedFilePath,
-            storedFileName,
+            storedNetworkPath,
+            storedNetworkFileName,
             String(REQUEST_NUMBER || ''),
           )
-          throw error
+          storedNetworkPath = ''
         }
       }
 
@@ -707,6 +702,7 @@ export const RequestRegisterPageController = {
         })
 
         if (!gprBResult?.Status) {
+          deleteStoredNetworkFile()
           res.status(200).json({
             Status: false,
             ResultOnDb: {},
@@ -731,6 +727,7 @@ export const RequestRegisterPageController = {
         })
 
         if (!createDocumentResult?.Status) {
+          deleteStoredNetworkFile()
           res.status(200).json({
             Status: false,
             ResultOnDb: {},
@@ -763,15 +760,25 @@ export const RequestRegisterPageController = {
           FILE_ORDER: criteriaFileResult?.FILE_ORDER || 0,
           FILE_PATH: storedFilePath,
           FILE_NAME: storedFileName,
-          SELECTION_FILE_PATH: selectionFileResult?.destPath || '',
-          SELECTION_FILE_NAME: selectionFileResult?.newFileName || '',
+          SELECTION_FILE_PATH: isSelectionDocument ? storedFilePath : '',
+          SELECTION_FILE_NAME: isSelectionDocument ? storedFileName : '',
         },
         TotalCountOnDb: 1,
         MethodOnDb: 'Add Document',
         Message: 'Document added successfully',
       } as ResponseI)
     } catch (error: any) {
-      removeTempUpload(file?.path)
+      if (storedNetworkPath) {
+        try {
+          RequestRegisterPageModel.deleteSelectionFile(
+            storedNetworkPath,
+            storedNetworkFileName,
+            String(dataItem.REQUEST_NUMBER || ''),
+          )
+        } catch (cleanupError: any) {
+          console.warn('[SelectionFile] Failed to clean up uploaded document:', cleanupError?.message)
+        }
+      }
       console.error('Add Document Error:', error)
       res.status(200).json({
         Status: false,

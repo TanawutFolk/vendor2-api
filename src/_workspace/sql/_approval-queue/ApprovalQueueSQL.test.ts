@@ -189,22 +189,35 @@ describe('ApprovalQueueSQL reassignment statements', () => {
     expect(dataSql).not.toContain('AS gpr_criteria')
   })
 
+  test('filters a queue by stable workflow step type across workflow versions', async () => {
+    const [, dataSql] = await ApprovalQueueSQL.getAllRequests({
+      APPROVER_EMPCODE: 'S00001',
+      QUEUE_WORKFLOW_STEP_TYPE_ID: 7,
+      LIMIT: 25,
+      OFFSET: 0,
+    })
+
+    expect(dataSql).toContain('wsm_my.WORKFLOW_STEP_TYPE_ID = 7')
+    expect(dataSql).not.toContain('dataItem.QUEUE_WORKFLOW_STEP_TYPE_ID')
+  })
+
   test('resolves semantic selection aliases in request details', async () => {
     const sql = await ApprovalQueueSQL.getById({
       REQUEST_REGISTER_VENDOR_ID: 10,
-      EDITABLE_WORKFLOW_STEP_MASTER_IDS: [3, 5],
       M_APPROVAL_STEP_IN_PROGRESS_STATUS_ID: 2,
     })
 
     expect(sql).toContain('rvs.GPR_B_FILE_PATH AS GPR_B_FILE_PATH')
     expect(sql).toContain('rvs.GPR_B_FILE_NAME AS GPR_B_FILE_NAME')
     expect(sql).toContain('AS IS_SELECTION_SHEET_EDITABLE')
-    expect(sql).toContain('current_selection_step.WORKFLOW_STEP_MASTER_ID IN')
-    expect(sql).toContain('3, 5')
+    expect(sql).toContain('workflow_step_capability')
+    expect(sql).toContain("CAPABILITY_CODE = 'EDIT_SELECTION_SHEET'")
     expect(sql).toContain('current_selection_step.M_APPROVAL_STEP_STATUS_ID = 2')
     expect(sql).toContain('WORKFLOW_STEP_MASTER_ID')
     expect(sql).toContain('ras.WORKFLOW_STEP_MASTER_ID')
     expect(sql).toContain('ral.INUSE = 1')
+    expect(sql).toContain('rr.REQUEST_BY_EMPLOYEECODE')
+    expect(sql).toContain('AS REQUEST_BY_EMPLOYEE')
     expect(sql).not.toContain('rr0.')
     expect(sql).not.toContain('dataItem.')
   })

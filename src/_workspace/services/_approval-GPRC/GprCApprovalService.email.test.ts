@@ -155,6 +155,7 @@ async function setup() {
 
     return {
       getWorkflowStepIdentity: mock(async () => identity.workflowStep),
+      getWorkflowStepTypeIdentity: mock(async () => identity.workflowStep),
       getApprovalStepStatusIdentity: mock(async () => identity.approvalStep),
       getRequestStateIdentity: mock(async () => identity.requestState),
       getRequestStatusIdentity: mock(async () => identity.requestStatus),

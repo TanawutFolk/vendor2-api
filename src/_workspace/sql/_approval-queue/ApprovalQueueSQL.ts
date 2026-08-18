@@ -59,7 +59,19 @@ const allowedActionsExpr = (requestAlias = 'rr') => {
   return sql
 }
 
-const queueStepConditionSql = (queueWorkflowStepMasterId: unknown, workflowStepAlias = 'wsm_my') => {
+const queueStepConditionSql = (
+  queueWorkflowStepTypeId: unknown,
+  queueWorkflowStepMasterId: unknown,
+  workflowStepAlias = 'wsm_my'
+) => {
+  const workflowStepTypeId = toPositiveInteger(queueWorkflowStepTypeId)
+  if (workflowStepTypeId) {
+    let sql = 'dataItem.WORKFLOW_STEP_ALIAS.WORKFLOW_STEP_TYPE_ID = dataItem.QUEUE_WORKFLOW_STEP_TYPE_ID'
+    sql = sql.replaceAll('dataItem.WORKFLOW_STEP_ALIAS', String(workflowStepAlias))
+    sql = sql.replaceAll('dataItem.QUEUE_WORKFLOW_STEP_TYPE_ID', String(workflowStepTypeId))
+    return sql
+  }
+
   const workflowStepMasterId = toPositiveInteger(queueWorkflowStepMasterId)
   if (!workflowStepMasterId) return ''
 
@@ -73,7 +85,10 @@ const myApprovalStatusExpr = (dataItem: any, returnStatusId = false) => {
   const approverEmpcode = escapeSqlLiteral(dataItem?.APPROVER_EMPCODE)
   if (!approverEmpcode) return 'NULL'
 
-  const queueCondition = queueStepConditionSql(dataItem?.QUEUE_WORKFLOW_STEP_MASTER_ID)
+  const queueCondition = queueStepConditionSql(
+    dataItem?.QUEUE_WORKFLOW_STEP_TYPE_ID,
+    dataItem?.QUEUE_WORKFLOW_STEP_MASTER_ID
+  )
   let queueConditionSql = queueCondition ? 'AND dataItem.QUEUE_CONDITION' : ''
   queueConditionSql = queueConditionSql.replaceAll('dataItem.QUEUE_CONDITION', queueCondition)
 
@@ -150,6 +165,7 @@ export const ApprovalQueueSQL = {
                                      , rr.WORKFLOW_DEFINITION_ID
                                      , rr.LOCK_VERSION
                                      , current_ras.WORKFLOW_STEP_MASTER_ID AS CURRENT_WORKFLOW_STEP_MASTER_ID
+                                     , current_wsm.WORKFLOW_STEP_TYPE_ID AS CURRENT_WORKFLOW_STEP_TYPE_ID
                                      , current_wsm.STEP_CODE AS CURRENT_STEP_CODE
                                      , LOWER(current_task_status.STATUS_CODE) AS CURRENT_STEP_STATUS
                                      , current_ras.M_APPROVAL_STEP_STATUS_ID AS CURRENT_STEP_STATUS_ID
@@ -338,6 +354,7 @@ export const ApprovalQueueSQL = {
                                        ras.REQUEST_APPROVAL_STEP_ID
                                      , ras.REQUEST_REGISTER_VENDOR_ID
                                      , ras.WORKFLOW_STEP_MASTER_ID
+                                     , wsm.WORKFLOW_STEP_TYPE_ID
                                      , wsm.M_REQUEST_STATUS_ID AS M_REQUEST_STATUS_ID
                                      , ras.STEP_ORDER
                                      , ras.APPROVER_EMPCODE
@@ -412,6 +429,7 @@ export const ApprovalQueueSQL = {
                                      , target_task.ASSIGNMENT_MODE AS NEXT_ASSIGNMENT_MODE
                                      , target_wsm.M_REQUEST_STATUS_ID AS NEXT_M_REQUEST_STATUS_ID
                                      , target_wsm.STEP_CODE AS NEXT_STEP_CODE
+                                     , target_wsm.WORKFLOW_STEP_TYPE_ID AS NEXT_WORKFLOW_STEP_TYPE_ID
                                      , target_wsm.ACTOR_TYPE AS NEXT_ACTOR_TYPE
                                      , target_wsm.DEFAULT_APPROVAL_GROUP_ID_LOCAL AS NEXT_DEFAULT_APPROVAL_GROUP_ID_LOCAL
                                      , target_wsm.DEFAULT_APPROVAL_GROUP_ID_OVERSEA AS NEXT_DEFAULT_APPROVAL_GROUP_ID_OVERSEA
@@ -1064,7 +1082,9 @@ export const ApprovalQueueSQL = {
                                      , rr.ASSIGN_TO
                                      , rr.PIC_EMAIL
                                      , dataItem.PRIMARY_VENDOR_CONTACT_ID_SQL AS VENDOR_CONTACTS_ID
+                                     , rr.REQUEST_BY_EMPLOYEECODE
                                      , rr.REQUEST_BY_EMPLOYEECODE AS EMPLOYEE_CODE
+                                     , TRIM(CONCAT_WS(' ', m.EMPNAME, m.EMPSURNAME)) AS REQUEST_BY_EMPLOYEE
                                      , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS FULL_NAME
                                      , m.EMPDEPT AS EMPLOYEE_DEPT
                                      , rr.REQUESTER_SECTION
@@ -1159,6 +1179,7 @@ export const ApprovalQueueSQL = {
                                                                            JSON_OBJECT(
                                                                                'REQUEST_APPROVAL_STEP_ID', ras.REQUEST_APPROVAL_STEP_ID,
                                                                                'WORKFLOW_STEP_MASTER_ID', ras.WORKFLOW_STEP_MASTER_ID,
+                                                                               'WORKFLOW_STEP_TYPE_ID', wsm.WORKFLOW_STEP_TYPE_ID,
                                                                                'M_REQUEST_STATUS_ID', wsm.M_REQUEST_STATUS_ID,
                                                                                 'STEP_ORDER', ras.STEP_ORDER,
                                                                                 'APPROVER_EMPCODE', ras.APPROVER_EMPCODE,

@@ -16,6 +16,13 @@ export const ApprovalQueueSearchSQL = {
   },
 
   queueStepCondition: (dataItem: any) => {
+    const workflowStepTypeId = Number(dataItem.QUEUE_WORKFLOW_STEP_TYPE_ID)
+    if (Number.isInteger(workflowStepTypeId) && workflowStepTypeId > 0) {
+      let sql = 'wsm.WORKFLOW_STEP_TYPE_ID = dataItem.QUEUE_WORKFLOW_STEP_TYPE_ID'
+      sql = sql.replaceAll('dataItem.QUEUE_WORKFLOW_STEP_TYPE_ID', String(workflowStepTypeId))
+      return sql
+    }
+
     const workflowStepMasterId = Number(dataItem.QUEUE_WORKFLOW_STEP_MASTER_ID)
     if (!Number.isInteger(workflowStepMasterId) || workflowStepMasterId <= 0) return ''
 

@@ -15,6 +15,7 @@ import assigneesRoutes from './routes/_Employee-manager/AssigneesRoutes'
 import taskManagerRequestRoutes from './routes/_task-manager/TaskManagerRequestRoutes'
 import allRequestHistoryRoutes from './routes/_all-request-history/AllRequestHistoryRoutes'
 import statusMasterRoutes from './routes/_status-master/StatusMasterRoutes'
+import approvalFlowSettingRoutes from './routes/_approval-flow-setting/ApprovalFlowSettingRoutes'
 
 const Routers = Router()
 
@@ -43,6 +44,9 @@ Routers.use('/all-request-history', allRequestHistoryRoutes)
 
 // ? Status Master Routes
 Routers.use('/status-master', statusMasterRoutes)
+
+// ? Approval Flow Setting Routes
+Routers.use('/approval-flow-setting', approvalFlowSettingRoutes)
 
 // ? Assignees Configuration Routes
 Routers.use('/assignees', assigneesRoutes)

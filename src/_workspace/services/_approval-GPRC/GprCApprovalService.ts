@@ -24,9 +24,9 @@ import {
 import { buildGprCBaseMailData as buildBaseMailData } from './GprCApprovalMailData'
 import { GROUP_CODE, mergeUniqueEmails, normalizeEmail } from '../_request-register/RegisterRequestWorkflowHelper'
 
-const getGprCMainWorkflowIdentity = async () => {
+const getGprCMainWorkflowIdentity = async (workflowDefinitionId?: number) => {
   const [workflowStep, approvalStep, requestState, requestStatus] = await Promise.all([
-    getWorkflowStepIdentity(),
+    getWorkflowStepIdentity(workflowDefinitionId),
     getApprovalStepStatusIdentity(),
     getRequestStateIdentity(),
     getRequestStatusIdentity(),
@@ -35,8 +35,8 @@ const getGprCMainWorkflowIdentity = async () => {
   return { workflowStep, approvalStep, requestState, requestStatus }
 }
 
-const getGprCMainWorkflowRejectionIdentity = async () => {
-  const [statusIdentity, vendor] = await Promise.all([getGprCMainWorkflowIdentity(), getVendorStatusIdentity()])
+const getGprCMainWorkflowRejectionIdentity = async (workflowDefinitionId?: number) => {
+  const [statusIdentity, vendor] = await Promise.all([getGprCMainWorkflowIdentity(workflowDefinitionId), getVendorStatusIdentity()])
 
   return { ...statusIdentity, vendor }
 }
@@ -600,19 +600,21 @@ const executeGuardedMainWorkflow = async (requestId: number, currentStep: any, c
 
 // Advances the pinned main workflow using its configured transition after the GPR C sub-flow ends.
 const markMainIssueGprCApproved = async (requestId: number, actionBy: string, remark: string) => {
-  const [stepsSql, contextSql, statusIdentity] = await Promise.all([
+  const [stepsSql, contextSql] = await Promise.all([
     GprCApprovalSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId }),
     GprCApprovalSQL.getRequestStatusContext({ REQUEST_REGISTER_VENDOR_ID: requestId }),
-    getGprCMainWorkflowIdentity(),
   ])
   const [stepRows, contextRows] = await Promise.all([MySQLExecute.search(stepsSql) as Promise<RowDataPacket[]>, MySQLExecute.search(contextSql) as Promise<RowDataPacket[]>])
   const steps = stepRows.map(normalizeMainApprovalStep)
   const context = contextRows[0]
+  const statusIdentity = await getGprCMainWorkflowIdentity(
+    Number(getValue(context, 'WORKFLOW_DEFINITION_ID', 'workflow_definition_id')) || undefined
+  )
   const currentTaskId = Number(getValue(context, 'CURRENT_REQUEST_APPROVAL_STEP_ID', 'current_step_id'))
   const currentStep = steps.find((step: any) => step.step_id === currentTaskId && step.approval_step_status_id === statusIdentity.approvalStep.inProgress)
   if (!currentStep || currentStep.workflow_step_id !== statusIdentity.workflowStep.issueGprC) return null
 
-  const transition = await loadMainWorkflowTransition(requestId, currentStep, 'APPROVE', statusIdentity.workflowStep.docCheck, null, statusIdentity.requestState.inProgress)
+  const transition = await loadMainWorkflowTransition(requestId, currentStep, 'APPROVE', null, null, statusIdentity.requestState.inProgress)
   const nextStepId = Number(getValue(transition, 'NEXT_REQUEST_APPROVAL_STEP_ID'))
   if (!nextStepId) {
     throw new Error('Configured Issue GPR C approval transition has no runtime target task')
@@ -667,14 +669,16 @@ const markMainIssueGprCApproved = async (requestId: number, actionBy: string, re
 }
 
 const markMainIssueGprCRejected = async (requestId: number, actionBy: string, remark: string) => {
-  const [stepsSql, contextSql, statusIdentity] = await Promise.all([
+  const [stepsSql, contextSql] = await Promise.all([
     GprCApprovalSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId }),
     GprCApprovalSQL.getRequestStatusContext({ REQUEST_REGISTER_VENDOR_ID: requestId }),
-    getGprCMainWorkflowRejectionIdentity(),
   ])
   const [stepRows, contextRows] = await Promise.all([MySQLExecute.search(stepsSql) as Promise<RowDataPacket[]>, MySQLExecute.search(contextSql) as Promise<RowDataPacket[]>])
   const steps = stepRows.map(normalizeMainApprovalStep)
   const context = contextRows[0]
+  const statusIdentity = await getGprCMainWorkflowRejectionIdentity(
+    Number(getValue(context, 'WORKFLOW_DEFINITION_ID', 'workflow_definition_id')) || undefined
+  )
   const currentTaskId = Number(getValue(context, 'CURRENT_REQUEST_APPROVAL_STEP_ID', 'current_step_id'))
   const currentStep = steps.find((step: any) => step.step_id === currentTaskId && step.approval_step_status_id === statusIdentity.approvalStep.inProgress)
   if (!currentStep || currentStep.workflow_step_id !== statusIdentity.workflowStep.issueGprC) {
@@ -735,15 +739,17 @@ const markMainIssueGprCRejected = async (requestId: number, actionBy: string, re
 }
 
 const markMainIssueGprCRecheckToPic = async (requestId: number, flowId: number, currentGprStep: any, actionBy: string, remark: string) => {
-  const [stepsSql, contextSql, statusIdentity, gprCFlowStatus] = await Promise.all([
+  const [stepsSql, contextSql, gprCFlowStatus] = await Promise.all([
     GprCApprovalSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId }),
     GprCApprovalSQL.getRequestStatusContext({ REQUEST_REGISTER_VENDOR_ID: requestId }),
-    getGprCMainWorkflowIdentity(),
     getGprCFlowStatusIdentity(),
   ])
   const [stepRows, contextRows] = await Promise.all([MySQLExecute.search(stepsSql) as Promise<RowDataPacket[]>, MySQLExecute.search(contextSql) as Promise<RowDataPacket[]>])
   const steps = stepRows.map(normalizeMainApprovalStep)
   const context = contextRows[0]
+  const statusIdentity = await getGprCMainWorkflowIdentity(
+    Number(getValue(context, 'WORKFLOW_DEFINITION_ID', 'workflow_definition_id')) || undefined
+  )
   const currentTaskId = Number(getValue(context, 'CURRENT_REQUEST_APPROVAL_STEP_ID', 'current_step_id'))
   const currentMainStep = steps.find((step: any) => step.step_id === currentTaskId && step.approval_step_status_id === statusIdentity.approvalStep.inProgress)
   if (!currentMainStep || currentMainStep.workflow_step_id !== statusIdentity.workflowStep.issueGprC) {

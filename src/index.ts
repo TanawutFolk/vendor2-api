@@ -1,7 +1,6 @@
 import compression from 'compression'
 import cors from 'cors'
 import express, { Request, Response } from 'express'
-import path from 'path'
 
 import Routers from './_workspace/Routes'
 import { loadEnvironmentVariables } from './config/env'
@@ -44,12 +43,6 @@ app.get(prefix, (req: Request, res: Response) => {
   - Last Update       : 2025-Mar-25 18:31
   `)
 })
-
-// * Static Files
-// Serve uploaded documents at: GET {prefix}/uploads/documents/<filename>
-// Mounted under the API prefix because every frontend caller builds this URL as
-// `${API_BASE}/uploads/documents/...`, and API_BASE already includes the prefix.
-app.use(`${prefix}/uploads`, express.static(path.join(process.cwd(), 'uploads')))
 
 app.use(prefix, Routers)
 

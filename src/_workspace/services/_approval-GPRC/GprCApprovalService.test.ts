@@ -61,7 +61,7 @@ describe('GprCApprovalService mail data', () => {
   })
 })
 describe('GprCApprovalService approval flow transitions', () => {
-  test('moves the main workflow from Issue GPR C to Doc Check when the GPR C sub-flow finishes', async () => {
+  test('moves Issue GPR C to the configured next step when Document Checker is skipped', async () => {
     const executedSqlLists: string[][] = []
     let flowStatusId = 3
     let gprStepStatusId = 2
@@ -92,6 +92,7 @@ describe('GprCApprovalService approval flow transitions', () => {
 
       return {
         getWorkflowStepIdentity: mock(async () => identity.workflowStep),
+        getWorkflowStepTypeIdentity: mock(async () => identity.workflowStep),
         getApprovalStepStatusIdentity: mock(async () => identity.approvalStep),
         getRequestStateIdentity: mock(async () => identity.requestState),
         getRequestStatusIdentity: mock(async () => identity.requestStatus),
@@ -221,18 +222,18 @@ describe('GprCApprovalService approval flow transitions', () => {
           {
             WORKFLOW_TRANSITION_ID: isRecheck ? 2 : 1,
             ACTION_CODE: isRecheck ? 'RECHECK' : 'APPROVE',
-            TO_WORKFLOW_STEP_MASTER_ID: isRecheck ? 299 : 302,
+            TO_WORKFLOW_STEP_MASTER_ID: isRecheck ? 299 : 303,
             TERMINAL_REQUEST_STATE_ID: null,
             TERMINAL_STATE: null,
             CONDITION_KEY: isRecheck ? 'RECHECK_TO_PIC' : null,
-            NEXT_REQUEST_APPROVAL_STEP_ID: isRecheck ? 200 : 202,
-            NEXT_STEP_ORDER: isRecheck ? 2 : 5,
-            NEXT_APPROVER_EMPCODE: isRecheck ? 'S00007' : 'S00002',
+            NEXT_REQUEST_APPROVAL_STEP_ID: isRecheck ? 200 : 203,
+            NEXT_STEP_ORDER: isRecheck ? 2 : 6,
+            NEXT_APPROVER_EMPCODE: isRecheck ? 'S00007' : 'S00003',
             NEXT_STEP_STATUS: isRecheck ? 'approved' : 'pending',
             NEXT_STEP_STATUS_ID: isRecheck ? 3 : 1,
-            NEXT_STEP_CODE: isRecheck ? 'PO_PIC_IN_PROGRESS' : 'DOC_CHECK',
+            NEXT_STEP_CODE: isRecheck ? 'PO_PIC_IN_PROGRESS' : 'PO_MGR_APPROVAL',
             NEXT_ACTOR_TYPE: isRecheck ? 'PIC' : 'APPROVER',
-            NEXT_STATUS_VALUE: isRecheck ? 'PO PIC In Progress' : 'PO & SCM Check All Document',
+            NEXT_STATUS_VALUE: isRecheck ? 'PO PIC In Progress' : 'PO MGR Approve',
           },
         ]
       }
@@ -297,10 +298,10 @@ describe('GprCApprovalService approval flow transitions', () => {
     expect(mainWorkflowSql).toContain('REQUEST_APPROVAL_STEP_ID = 201')
     expect(mainWorkflowSql).toContain('M_APPROVAL_STEP_STATUS_ID = 3')
     expect(mainWorkflowSql).not.toContain("STEP_STATUS = LOWER('approved')")
-    expect(mainWorkflowSql).toContain('REQUEST_APPROVAL_STEP_ID = 202')
+    expect(mainWorkflowSql).toContain('REQUEST_APPROVAL_STEP_ID = 203')
     expect(mainWorkflowSql).toContain('M_APPROVAL_STEP_STATUS_ID = 2')
     expect(mainWorkflowSql).not.toContain("STEP_STATUS = LOWER('in_progress')")
-    expect(mainWorkflowSql).not.toContain('REQUEST_APPROVAL_STEP_ID = 203')
+    expect(mainWorkflowSql).not.toContain('REQUEST_APPROVAL_STEP_ID = 202')
     expect(mainWorkflowSql).not.toContain("request_state_master.STATE_CODE = 'COMPLETED'")
 
     executedSqlLists.length = 0

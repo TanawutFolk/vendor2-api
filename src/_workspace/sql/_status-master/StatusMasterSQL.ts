@@ -534,26 +534,38 @@ export const StatusMasterSQL = {
     return sql
   },
 
-  getActiveWorkflowStepMasters: async () => {
-    let sql = `
-      SELECT
-          wsm.WORKFLOW_STEP_MASTER_ID
-        , wsm.STEP_CODE
-      FROM workflow_step_master wsm
-      INNER JOIN workflow_definition wd
-        ON wd.WORKFLOW_DEFINITION_ID = wsm.WORKFLOW_DEFINITION_ID
-      WHERE wd.WORKFLOW_CODE = 'dataItem.WORKFLOW_CODE'
-        AND wd.INUSE = 1
-        AND wsm.INUSE = 1
+  getActiveWorkflowStepMasters: async (dataItem: any = {}) => {
+    const workflowDefinitionId = Number(dataItem.WORKFLOW_DEFINITION_ID)
+    let workflowDefinitionCondition = workflowDefinitionId > 0
+      ? 'wsm.WORKFLOW_DEFINITION_ID = dataItem.WORKFLOW_DEFINITION_ID'
+      : `wd.INUSE = 1
+        AND wd.DEFINITION_STATUS = 'PUBLISHED'
         AND wd.VERSION_NO = (
           SELECT MAX(active_wd.VERSION_NO)
           FROM workflow_definition active_wd
           WHERE active_wd.WORKFLOW_CODE = wd.WORKFLOW_CODE
+            AND active_wd.DEFINITION_STATUS = 'PUBLISHED'
             AND active_wd.INUSE = 1
-        )
+        )`
+    let sql = `
+      SELECT
+          wsm.WORKFLOW_STEP_MASTER_ID
+        , wsm.STEP_CODE
+        , wsm.WORKFLOW_STEP_TYPE_ID
+      FROM workflow_step_master wsm
+      INNER JOIN workflow_definition wd
+        ON wd.WORKFLOW_DEFINITION_ID = wsm.WORKFLOW_DEFINITION_ID
+      WHERE wd.WORKFLOW_CODE = 'dataItem.WORKFLOW_CODE'
+        AND dataItem.WORKFLOW_DEFINITION_CONDITION
+        AND wsm.INUSE = 1
       ORDER BY wsm.DEFAULT_STEP_ORDER, wsm.WORKFLOW_STEP_MASTER_ID
     `
     sql = sql.replaceAll('dataItem.WORKFLOW_CODE', 'VENDOR_REGISTRATION')
+    workflowDefinitionCondition = workflowDefinitionCondition.replaceAll(
+      'dataItem.WORKFLOW_DEFINITION_ID',
+      workflowDefinitionId.toString()
+    )
+    sql = sql.replaceAll('dataItem.WORKFLOW_DEFINITION_CONDITION', workflowDefinitionCondition)
     return sql
   },
 
@@ -565,6 +577,17 @@ export const StatusMasterSQL = {
       FROM m_request_status request_status_master
       WHERE request_status_master.INUSE = 1
       ORDER BY request_status_master.M_REQUEST_STATUS_ID
+    `
+  },
+
+  getWorkflowStepTypes: async () => {
+    return `
+      SELECT
+          WORKFLOW_STEP_TYPE_ID
+        , STEP_CODE
+      FROM m_workflow_step_type
+      WHERE INUSE = 1
+      ORDER BY SORT_ORDER, WORKFLOW_STEP_TYPE_ID
     `
   },
 }

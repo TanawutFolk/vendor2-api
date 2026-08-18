@@ -27,7 +27,9 @@ export const AllRequestHistoryDetailSQL = {
                                      , rr.ASSIGN_TO
                                      , rr.PIC_EMAIL
                                      , dataItem.PRIMARY_VENDOR_CONTACT_ID_SQL AS VENDOR_CONTACTS_ID
+                                     , rr.REQUEST_BY_EMPLOYEECODE
                                      , rr.REQUEST_BY_EMPLOYEECODE AS EMPLOYEE_CODE
+                                     , TRIM(CONCAT_WS(' ', m.EMPNAME, m.EMPSURNAME)) AS REQUEST_BY_EMPLOYEE
                                      , CONCAT(m.EMPNAME, ' ', m.EMPSURNAME) AS FULL_NAME
                                      , m.EMPDEPT AS EMPLOYEE_DEPT
                                      , rr.REQUESTER_SECTION

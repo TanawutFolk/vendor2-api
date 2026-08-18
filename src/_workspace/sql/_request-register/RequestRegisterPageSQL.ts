@@ -179,6 +179,7 @@ export const RequestRegisterPageSQL = {
                                      , dataItem.REQUEST_STATE_SQL AS REQUEST_STATE
                                      , CURRENT_M_REQUEST_STATUS_ID
                                      , CURRENT_REQUEST_APPROVAL_STEP_ID
+                                     , rr.WORKFLOW_DEFINITION_ID
                                      , ASSIGN_TO
                             FROM
                                        request_register_vendor rr
@@ -216,10 +217,40 @@ export const RequestRegisterPageSQL = {
     return sql
   },
 
+  getSelectionSheetLockState: async (dataItem: any) => {
+    let sql = `
+                            SELECT
+                                       CASE
+                                           WHEN EXISTS (
+                                               SELECT 1
+                                               FROM request_approval_step approved_step
+                                               INNER JOIN workflow_step_capability step_capability
+                                                 ON step_capability.WORKFLOW_STEP_MASTER_ID = approved_step.WORKFLOW_STEP_MASTER_ID
+                                                AND step_capability.INUSE = 1
+                                               INNER JOIN m_workflow_capability lock_capability
+                                                 ON lock_capability.M_WORKFLOW_CAPABILITY_ID = step_capability.M_WORKFLOW_CAPABILITY_ID
+                                                AND lock_capability.CAPABILITY_CODE = 'LOCK_SELECTION_SHEET_ON_APPROVE'
+                                                AND lock_capability.INUSE = 1
+                                               WHERE approved_step.REQUEST_REGISTER_VENDOR_ID = dataItem.REQUEST_REGISTER_VENDOR_ID
+                                                 AND approved_step.M_APPROVAL_STEP_STATUS_ID = dataItem.M_APPROVAL_STEP_APPROVED_STATUS_ID
+                                                 AND approved_step.INUSE = 1
+                                           ) THEN 1
+                                           ELSE 0
+                                       END AS IS_SELECTION_SHEET_LOCKED
+    `
+    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_VENDOR_ID', (dataItem['REQUEST_REGISTER_VENDOR_ID'] || 0).toString())
+    sql = sql.replaceAll(
+      'dataItem.M_APPROVAL_STEP_APPROVED_STATUS_ID',
+      requireStatusId(dataItem['M_APPROVAL_STEP_APPROVED_STATUS_ID'], 'M_APPROVAL_STEP_APPROVED_STATUS_ID').toString()
+    )
+    return sql
+  },
+
   getRequestVendorRegion: async (dataItem: any) => {
     let sql = `
                             SELECT
                                        v.VENDOR_REGION
+                                     , rr.WORKFLOW_DEFINITION_ID
                             FROM
                                        request_register_vendor rr
                                             INNER JOIN
@@ -332,6 +363,7 @@ export const RequestRegisterPageSQL = {
                             SELECT
                                        rr.REQUEST_NUMBER
                                      , rr.CREATE_DATE
+                                     , rr.WORKFLOW_DEFINITION_ID
                                      , rr.ASSIGN_TO
                                      , rr.SUPPORTPRODUCT_PROCESS
                                      , rr.PURCHASE_FREQUENCY
@@ -1767,33 +1799,6 @@ export const RequestRegisterPageSQL = {
 
     sql = sql.replaceAll('dataItem.CREATE_BY', dataItem.CREATE_BY || dataItem.UPDATE_BY || 'SYSTEM')
     sql = sql.replaceAll('dataItem.UPDATE_BY', dataItem.UPDATE_BY || dataItem.CREATE_BY || 'SYSTEM')
-
-    return sql
-  },
-
-  // Repoint a request_register_file row to its final storage path (e.g. after moving the
-  // uploaded file from uploads/documents into the request's 02.Request Documents folder).
-  updateDocumentFilePath: (dataItem: any) => {
-    // Backslashes must be escaped before quotes — MySQL string literals treat "\0" as a NUL
-    // byte and silently drop other backslashes, which corrupts Windows/UNC file paths.
-    const escape = (value: any) =>
-      String(value ?? '')
-        .replaceAll('\\', '\\\\')
-        .replaceAll("'", "''")
-
-    let sql = `
-                            UPDATE request_register_file
-                            SET
-                                       FILE_PATH = 'dataItem.FILE_PATH'
-                                     , UPDATE_BY = 'dataItem.UPDATE_BY'
-                                     , UPDATE_DATE = NOW()
-                            WHERE
-                                       REQUEST_REGISTER_FILE_ID = dataItem.REQUEST_REGISTER_FILE_ID
-        `
-
-    sql = sql.replaceAll('dataItem.REQUEST_REGISTER_FILE_ID', (dataItem.REQUEST_REGISTER_FILE_ID || 0).toString())
-    sql = sql.replaceAll('dataItem.FILE_PATH', escape(dataItem.FILE_PATH))
-    sql = sql.replaceAll('dataItem.UPDATE_BY', escape(dataItem.UPDATE_BY || 'SYSTEM'))
 
     return sql
   },

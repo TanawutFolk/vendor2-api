@@ -9,9 +9,6 @@ import path from 'path'
 const DEFAULT_SELECTION_FILE_BASE_PATH =
   '/mnt/c01_qms/PM/02_Record/FM-PM-303 Selection Supplier/FM-PM-303 Selection Supplier Test/01.Selection_File'
 
-// Upload directory where multer stores temporary files
-const UPLOADS_DIR = path.join(process.cwd(), 'uploads', 'documents')
-
 const getSelectionFileBasePath = () => process.env.SELECTION_FILE_BASE_PATH || DEFAULT_SELECTION_FILE_BASE_PATH
 
 const logFolder = (message: string, detail?: unknown) => {
@@ -46,12 +43,6 @@ export const buildCriteriaReceivingFileName = (criteriaNo: string, originalName:
   return `${safeCriteriaNo} ${safeFileBase}${safeExtension}`
 }
 
-const ensureFileExists = (filePath: string, context: string) => {
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`${context} file not found: ${filePath}`)
-  }
-}
-
 const resolveUniquePath = (destPath: string) => {
   if (!fs.existsSync(destPath)) return destPath
 
@@ -65,15 +56,14 @@ const resolveUniquePath = (destPath: string) => {
   return candidate
 }
 
-const moveFile = (sourcePath: string, destPath: string) => {
-  const finalDestPath = resolveUniquePath(destPath)
-  try {
-    fs.renameSync(sourcePath, finalDestPath)
-  } catch (error: any) {
-    if (error?.code !== 'EXDEV') throw error
-    fs.copyFileSync(sourcePath, finalDestPath)
-    fs.unlinkSync(sourcePath)
+const saveBuffer = (fileBuffer: Buffer, destPath: string) => {
+  if (!Buffer.isBuffer(fileBuffer)) {
+    throw new Error('Uploaded file content is missing')
   }
+
+  const finalDestPath = resolveUniquePath(destPath)
+  fs.writeFileSync(finalDestPath, fileBuffer)
+
   return finalDestPath
 }
 
@@ -131,25 +121,6 @@ const findSelectionFileByRequestNumber = (requestNumber: string, candidateFileNa
   return ''
 }
 
-// Service
-
-const resolveUploadedDocumentPath = (filePath: string, fileName?: string) => {
-  const candidateNames = Array.from(new Set([
-    path.basename(String(filePath || '').trim()),
-    path.basename(String(fileName || '').trim()),
-  ].filter(Boolean)))
-
-  for (const candidateName of candidateNames) {
-    const candidatePath = path.resolve(UPLOADS_DIR, candidateName)
-    const relativePath = path.relative(UPLOADS_DIR, candidatePath)
-
-    if (!relativePath || relativePath.startsWith('..') || path.isAbsolute(relativePath)) continue
-    if (fs.existsSync(candidatePath)) return candidatePath
-  }
-
-  return ''
-}
-
 export const SelectionFileService = {
   getBasePath() {
     const basePath = getSelectionFileBasePath()
@@ -166,7 +137,7 @@ export const SelectionFileService = {
     return isManaged
   },
 
-  resolveDownloadPath(filePath: string, fileName?: string, requestNumber?: string, options?: { allowUploadedFallback?: boolean }) {
+  resolveDownloadPath(filePath: string, fileName?: string, requestNumber?: string) {
     const normalizedFilePath = String(filePath || '').trim()
     const normalizedFileName = String(fileName || '').trim()
     const normalizedRequestNumber = String(requestNumber || '').trim()
@@ -183,13 +154,6 @@ export const SelectionFileService = {
       const matchedPath = findSelectionFileByRequestNumber(normalizedRequestNumber, candidateFileName)
       if (matchedPath) {
         return matchedPath
-      }
-    }
-
-    if (options?.allowUploadedFallback) {
-      const uploadedPath = resolveUploadedDocumentPath(normalizedFilePath, normalizedFileName)
-      if (uploadedPath) {
-        return uploadedPath
       }
     }
 
@@ -260,65 +224,23 @@ export const SelectionFileService = {
     return { requestPath, sendingPath, receivingPath, requestDocumentsPath }
   },
 
-  /**
-   * Copy a file from the uploads directory to 00.Sending.
-   *
-   * @param requestNumber - e.g. "RQ-2026-001"
-   * @param uploadedFileName - the filename as stored in uploads/documents (multer output)
-   * @param originalName     - the human-readable original file name
-   * @param year             - CE year, defaults to current year
-   */
-  copyToSending(requestNumber: string, uploadedFileName: string, originalName: string, year?: number) {
-    const folderYear = year || new Date().getFullYear()
-    const basePath = getSelectionFileBasePath()
-    const sendingPath = path.join(basePath, String(folderYear), requestNumber, '00.Sending')
-
-    logFolder('Checking sending folder before upload copy', sendingPath)
-    // Ensure folder exists (in case called independently)
-    fs.mkdirSync(sendingPath, { recursive: true })
-    logFolder('Ensured sending folder', sendingPath)
-
-    const sourcePath = path.join(UPLOADS_DIR, uploadedFileName)
-    const safeOriginalName = sanitizeForFileName(originalName) || path.basename(sourcePath)
-    const destPath = path.join(sendingPath, safeOriginalName)
-
-    ensureFileExists(sourcePath, 'Sending source')
-    fs.copyFileSync(sourcePath, destPath)
-
-    return destPath
-  },
-
-  /**
-   * Move a requester attachment (uploaded at Request time, stored in uploads/documents
-   * and recorded in request_register_file) into 02.Request Documents. The original is
-   * removed from uploads/documents Ã¢â‚¬â€ the network folder becomes the single source of
-   * truth, so the caller must repoint request_register_file.FILE_PATH to the returned path.
-   *
-   * @param requestNumber    - e.g. "Selection-26-N001"
-   * @param uploadedFileName - the multer filename stored in uploads/documents
-   * @param originalName     - the human-readable original file name
-   * @param year             - CE year, defaults to current year
-   */
-  moveToRequestDocuments(requestNumber: string, uploadedFileName: string, originalName: string, year?: number) {
+  saveBufferToRequestDocuments(requestNumber: string, fileBuffer: Buffer, originalName: string, year?: number) {
     const folderYear = year || new Date().getFullYear()
     const basePath = getSelectionFileBasePath()
     const requestDocumentsPath = path.join(basePath, String(folderYear), requestNumber, '02.Request Documents')
 
-    logFolder('Checking request documents folder before move', requestDocumentsPath)
+    logFolder('Checking request documents folder before save', requestDocumentsPath)
     fs.mkdirSync(requestDocumentsPath, { recursive: true })
     logFolder('Ensured request documents folder', requestDocumentsPath)
 
-    const sourcePath = path.join(UPLOADS_DIR, uploadedFileName)
-    const safeOriginalName = sanitizeForFileName(originalName) || path.basename(sourcePath)
+    const safeOriginalName = sanitizeForFileName(originalName) || 'file'
     const destPath = path.join(requestDocumentsPath, safeOriginalName)
-
-    ensureFileExists(sourcePath, 'Request document source')
-    const finalDestPath = moveFile(sourcePath, destPath)
+    const finalDestPath = saveBuffer(fileBuffer, destPath)
 
     return { destPath: finalDestPath, newFileName: path.basename(finalDestPath) }
   },
 
-  saveToSending(requestNumber: string, sourceFilePath: string, originalName: string, year?: number) {
+  saveBufferToSending(requestNumber: string, fileBuffer: Buffer, originalName: string, year?: number) {
     const folderYear = year || new Date().getFullYear()
     const basePath = getSelectionFileBasePath()
     const sendingPath = path.join(basePath, String(folderYear), requestNumber, '00.Sending')
@@ -327,11 +249,9 @@ export const SelectionFileService = {
     fs.mkdirSync(sendingPath, { recursive: true })
     logFolder('Ensured sending folder', sendingPath)
 
-    const safeOriginalName = sanitizeForFileName(originalName) || path.basename(sourceFilePath)
+    const safeOriginalName = sanitizeForFileName(originalName) || 'file'
     const destPath = path.join(sendingPath, safeOriginalName)
-
-    ensureFileExists(sourceFilePath, 'Sending source')
-    const finalDestPath = moveFile(sourceFilePath, destPath)
+    const finalDestPath = saveBuffer(fileBuffer, destPath)
 
     return { destPath: finalDestPath, newFileName: path.basename(finalDestPath) }
   },
@@ -342,15 +262,15 @@ export const SelectionFileService = {
    * Every attachment uses the same criterion prefix; FILE_ORDER is not included in the name.
    *
    * @param requestNumber  - e.g. "RQ-2026-001"
-   * @param sourceFilePath - absolute path to the temp file (from multer)
+   * @param fileBuffer     - uploaded file content from multer memory storage
    * @param criteriaNo     - e.g. "4.1"
    * @param criteriaDetail - e.g. "Compliant of the law"
    * @param originalName   - original uploaded file name
    * @param year           - CE year, defaults to current year
    */
-  saveToReceiving(
+  saveBufferToReceiving(
     requestNumber: string,
-    sourceFilePath: string,
+    fileBuffer: Buffer,
     criteriaNo: string,
     criteriaDetail: string,
     originalName: string,
@@ -365,11 +285,9 @@ export const SelectionFileService = {
     fs.mkdirSync(receivingPath, { recursive: true })
     logFolder('Ensured receiving folder', receivingPath)
 
-    const criteriaFileName = buildCriteriaReceivingFileName(criteriaNo, originalName || path.basename(sourceFilePath))
+    const criteriaFileName = buildCriteriaReceivingFileName(criteriaNo, originalName)
     const destPath = path.join(receivingPath, criteriaFileName)
-
-    ensureFileExists(sourceFilePath, 'Receiving source')
-    const finalDestPath = moveFile(sourceFilePath, destPath)
+    const finalDestPath = saveBuffer(fileBuffer, destPath)
 
     return { destPath: finalDestPath, newFileName: path.basename(finalDestPath) }
   },
@@ -379,11 +297,11 @@ export const SelectionFileService = {
    * 01.Receiving. One GPR B file per request; a re-upload overwrites via unique naming.
    *
    * @param requestNumber  - e.g. "RQ-2026-001"
-   * @param sourceFilePath - absolute path to the temp file (from multer)
+   * @param fileBuffer     - uploaded file content from multer memory storage
    * @param originalName   - original uploaded file name
    * @param year           - CE year, defaults to current year
    */
-  saveGprBToReceiving(requestNumber: string, sourceFilePath: string, originalName: string, year?: number) {
+  saveGprBBufferToReceiving(requestNumber: string, fileBuffer: Buffer, originalName: string, year?: number) {
     const folderYear = year || new Date().getFullYear()
     const basePath = getSelectionFileBasePath()
     const receivingPath = path.join(basePath, String(folderYear), requestNumber, '01.Receiving')
@@ -392,11 +310,9 @@ export const SelectionFileService = {
     fs.mkdirSync(receivingPath, { recursive: true })
     logFolder('Ensured receiving folder', receivingPath)
 
-    const sanitizedOriginalName = sanitizeForFileName(originalName) || path.basename(sourceFilePath)
+    const sanitizedOriginalName = sanitizeForFileName(originalName) || 'file'
     const destPath = path.join(receivingPath, sanitizedOriginalName)
-
-    ensureFileExists(sourceFilePath, 'GPR B source')
-    const finalDestPath = moveFile(sourceFilePath, destPath)
+    const finalDestPath = saveBuffer(fileBuffer, destPath)
 
     return { destPath: finalDestPath, newFileName: path.basename(finalDestPath) }
   },

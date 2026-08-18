@@ -97,11 +97,16 @@ export const prepareApprovalQueueSearchData = (dataItem: any) => {
   const actorFilters: string[] = []
 
   if (dataItem.APPROVER_EMPCODE) {
+    const queueWorkflowStepTypeId = toPositiveInteger(dataItem.QUEUE_WORKFLOW_STEP_TYPE_ID)
+    if (dataItem.QUEUE_WORKFLOW_STEP_TYPE_ID && queueWorkflowStepTypeId === null) {
+      throw new Error('Queue workflow step filter must use WORKFLOW_STEP_TYPE_ID')
+    }
     const queueWorkflowStepMasterId = toPositiveInteger(dataItem.QUEUE_WORKFLOW_STEP_MASTER_ID)
     if (dataItem.QUEUE_WORKFLOW_STEP_MASTER_ID && queueWorkflowStepMasterId === null) {
       throw new Error('Queue workflow step filter must use WORKFLOW_STEP_MASTER_ID')
     }
     const queueStepCondition = ApprovalQueueSearchSQL.queueStepCondition({
+      QUEUE_WORKFLOW_STEP_TYPE_ID: queueWorkflowStepTypeId,
       QUEUE_WORKFLOW_STEP_MASTER_ID: queueWorkflowStepMasterId,
     })
     actorFilters.push(

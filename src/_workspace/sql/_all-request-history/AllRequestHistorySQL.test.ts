@@ -49,6 +49,8 @@ describe('AllRequestHistorySQL', () => {
     expect(sql).toContain('AS PRODUCTS')
     expect(sql).toContain('WORKFLOW_STEP_MASTER_ID')
     expect(sql).toContain('ras.WORKFLOW_STEP_MASTER_ID')
+    expect(sql).toContain('rr.REQUEST_BY_EMPLOYEECODE')
+    expect(sql).toContain('AS REQUEST_BY_EMPLOYEE')
     expect(sql).not.toContain('dataItem.')
   })
 
@@ -58,6 +60,8 @@ describe('AllRequestHistorySQL', () => {
     expect(sql).toContain('rr.REQUEST_REGISTER_VENDOR_ID = 123')
     expect(sql).toContain('WORKFLOW_STEP_MASTER_ID')
     expect(sql).toContain('ras.WORKFLOW_STEP_MASTER_ID')
+    expect(sql).toContain('rr.REQUEST_BY_EMPLOYEECODE')
+    expect(sql).toContain('AS REQUEST_BY_EMPLOYEE')
     expect(sql).not.toContain('dataItem.')
   })
 })
