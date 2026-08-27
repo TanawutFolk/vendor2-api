@@ -1,4 +1,5 @@
 import { resolveRequestNumber } from '../_request-register/RegisterRequestWorkflowHelper'
+import { buildVendorSystemUrl } from '@utils/VendorSystemUrl'
 
 const getSummaryValue = (row: any, ...keys: string[]) => {
   for (const key of keys) {
@@ -20,7 +21,7 @@ export const buildGprCBaseMailData = (summary: any, requestId: number, recipient
     tel: getSummaryValue(summary, 'tel_phone', 'TEL_PHONE') || 'N/A',
     supportProduct: getSummaryValue(summary, 'supportProduct_Process', 'SUPPORTPRODUCT_PROCESS') || 'N/A',
     purchaseFrequency: getSummaryValue(summary, 'purchase_frequency', 'PURCHASE_FREQUENCY') || 'N/A',
-    systemLink: `${process.env.VENDOR_SYSTEM_ORIGIN || 'http://localhost:5173'}/en/approval-gpr-c`,
+    systemLink: buildVendorSystemUrl('en/approval-gpr-c'),
     picName: '',
     picTel: '',
   }

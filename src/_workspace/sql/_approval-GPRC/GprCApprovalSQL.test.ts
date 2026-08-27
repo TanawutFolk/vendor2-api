@@ -60,6 +60,26 @@ describe('GprCApprovalSQL normalized circular members', () => {
     expect(sql).toContain("O''Brien")
     expect(sql).toContain("'PRODUCT_GROUP_CHECKER'")
   })
+  test('reuses the existing flow step when GPR C setup is saved again', () => {
+    const sql = GprCApprovalSQL.insertStep({
+      REQUEST_VENDOR_GPR_C_FLOWS_ID: 1,
+      STEP_ORDER: 1,
+      STEP_CODE: 'REQUESTER_APPROVER',
+      STEP_NAME: 'Requester Approver',
+      APPROVER_EMPCODE: 'S00002',
+      APPROVER_NAME: 'Approver',
+      APPROVER_EMAIL: 'approver@example.com',
+      M_APPROVAL_STEP_STATUS_ID: 2,
+      CREATE_BY: 'S00001',
+      UPDATE_BY: 'S00001',
+    })
+
+    expect(sql).toContain('ON DUPLICATE KEY UPDATE')
+    expect(sql).toContain('M_APPROVAL_STEP_STATUS_ID = VALUES(M_APPROVAL_STEP_STATUS_ID)')
+    expect(sql).toContain('ACTION_BY = NULL')
+    expect(sql).toContain('ACTION_TYPE = NULL')
+    expect(sql).toContain('INUSE = 1')
+  })
   test('keeps request id on the flow and derives it for GPR C child rows', () => {
     const stepInsertSql = GprCApprovalSQL.insertStep({
       REQUEST_VENDOR_GPR_C_FLOWS_ID: 1,

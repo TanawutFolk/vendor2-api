@@ -34,10 +34,9 @@ import {
   resolveRequestNumber,
 } from './RegisterRequestWorkflowHelper'
 import { getWorkflowStepIdentity, type WorkflowStepIdentity } from '../_status-master/StatusIdentityService'
+import { buildVendorSystemUrl } from '@utils/VendorSystemUrl'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-
-const SYSTEM_ORIGIN = process.env.VENDOR_SYSTEM_ORIGIN || 'http://localhost:5173'
 
 // POSIX paths: the c01_qms share is mounted at /mnt/c01_qms on the host. See SelectionFileService.
 const DEFAULT_VENDOR_DOCUMENT_BASE = '/mnt/c01_qms/PM/02_Record/FM-PM-303 Selection Supplier/FM-PM-303 Selection Supplier Test/00.DocumentSet'
@@ -500,7 +499,7 @@ const previewRecipientList = (emails: string[] = []) =>
     .filter(Boolean)
     .slice(0, 10)
 
-const systemLink = (page: 'request-register' | 'request-register-history') => `${SYSTEM_ORIGIN}/en/${page}`
+const systemLink = (page: 'request-register' | 'request-register-history') => buildVendorSystemUrl(`en/${page}`)
 
 // ─── Email send & log ─────────────────────────────────────────────────────────
 

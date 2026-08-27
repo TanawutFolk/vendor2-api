@@ -353,6 +353,19 @@ export const GprCApprovalSQL = {
                 'dataItem.UPDATE_BY',
                 1
             )
+            ON DUPLICATE KEY UPDATE
+                STEP_CODE = VALUES(STEP_CODE)
+              , STEP_NAME = VALUES(STEP_NAME)
+              , APPROVER_EMPCODE = VALUES(APPROVER_EMPCODE)
+              , APPROVER_NAME = VALUES(APPROVER_NAME)
+              , APPROVER_EMAIL = VALUES(APPROVER_EMAIL)
+              , M_APPROVAL_STEP_STATUS_ID = VALUES(M_APPROVAL_STEP_STATUS_ID)
+              , ACTION_BY = NULL
+              , ACTION_TYPE = NULL
+              , DESCRIPTION = VALUES(DESCRIPTION)
+              , UPDATE_BY = VALUES(UPDATE_BY)
+              , UPDATE_DATE = NOW()
+              , INUSE = 1
         `
     sql = sql.replaceAll('dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID', GprCApprovalSQL.num(dataItem.REQUEST_VENDOR_GPR_C_FLOWS_ID).toString())
     sql = sql.replaceAll('dataItem.STEP_ORDER', GprCApprovalSQL.num(dataItem.STEP_ORDER).toString())

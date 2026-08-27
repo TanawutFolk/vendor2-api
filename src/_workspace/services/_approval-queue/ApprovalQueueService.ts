@@ -372,17 +372,40 @@ export const evaluateGprCriteria = (criteriaRows: CriteriaRow[], selection?: Sel
   const hasFile = (criteriaNo: string) =>
     normalizedRows.some((row) => row.no === criteriaNo && !!row.uploaded_file)
   const hasLawDocument = hasFile('4.1') || hasFile('4.11')
-  const needPassed = gpr43Accepted && hasLawDocument && NEED_FILE_CRITERIA.every(hasFile)
+  const missingNeedDocuments = NEED_FILE_CRITERIA.filter((criteriaNo) => !hasFile(criteriaNo))
+  const needPassed = gpr43Accepted && hasLawDocument && missingNeedDocuments.length === 0
 
   const optionalUploaded = optionalRows.filter((row) => !!row.uploaded_file).length
   const optionalPassed = optionalUploaded >= OPTIONAL_REQUIRED_COUNT
+  const optionalShortfall = Math.max(0, OPTIONAL_REQUIRED_COUNT - optionalUploaded)
+  const failureReasons: string[] = []
+
+  if (!gpr43Accepted) {
+    failureReasons.push('Item 4.3 must be marked "Accept".')
+  }
+  if (!hasLawDocument) {
+    failureReasons.push('Missing required document: item 4.1 or substitute item 4.11.')
+  }
+  if (missingNeedDocuments.length > 0) {
+    failureReasons.push(`Missing required document(s): item(s) ${missingNeedDocuments.join(', ')}.`)
+  }
+  if (!optionalPassed) {
+    failureReasons.push(
+      `Optional documents are incomplete: upload documents for ${optionalShortfall} more criterion item(s) from 4.6-4.13 (current ${optionalUploaded}/${OPTIONAL_REQUIRED_COUNT}).`
+    )
+  }
 
   return {
     hasCriteria: normalizedRows.length > 0,
     gpr43Accepted,
+    hasLawDocument,
+    missingNeedDocuments,
     needPassed,
+    optionalUploaded,
+    optionalShortfall,
     optionalPassed,
     passed: needPassed && optionalPassed,
+    failureReasons,
   }
 }
 
@@ -682,10 +705,7 @@ const validateCurrentStep = async (context: WorkflowContext, resolver: WorkflowR
         throw new Error('Approval blocked: Please fill the Selection Form before proceeding.')
       }
       if (!gprEval.passed) {
-        throw new Error(
-          'Approval blocked: Selection Form does not pass criteria ' +
-            '(4.3 must be ACCEPT; 4.1 or its 4.11 substitute, 4.2, 4.4 and 4.5 need files; and optional criteria need at least 3 files).'
-        )
+        throw new Error(`Approval blocked: ${gprEval.failureReasons.join(' ')}`)
       }
     } else if (
       transition.condition_key === 'GPR_B_REQUIRED' ||
