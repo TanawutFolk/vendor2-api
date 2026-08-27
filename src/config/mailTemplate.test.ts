@@ -75,6 +75,8 @@ describe('mail templates', () => {
     expect(html).toContain('padding: 28px 12px 40px 12px')
     expect(html).toContain('background: #ededed')
     expect(html).toContain('border-left: 4px solid #111111')
+    expect(html).toContain('display: inline-block; border-top: 1px solid #8c8c8c;')
+    expect(html).toContain('padding-top: 7px; font-weight: 700; color: #0057b8;')
     expect(html).toContain('Furukawa')
     expect(html).toContain('FITEL')
     expect(html).not.toContain('undefined')
@@ -114,5 +116,21 @@ describe('mail templates', () => {
     expect(emailHtml).not.toContain('<div style="font-weight: 700;">Tanawut.pf@gmail.com</div>')
     expect(empcodeHtml).toContain('<div style="font-weight: 700;">Vendor Registration System</div>')
     expect(emailHtml).toContain('<div style="font-weight: 700;">Vendor Registration System</div>')
+  })
+
+  test('renders the current company address without the obsolete address', () => {
+    const html = email_ToChecker_CheckRequired(sample)
+
+    expect(html).toContain('1/71 Moo 5, Rojana Industrial Park, Rojana Road, Kanharm')
+    expect(html).toContain('U-Thai, Phranakorn Sri Ayutthaya 13210, Thailand')
+    expect(html).not.toContain('1/1 Moo 6, Tambol Khanham')
+  })
+
+  test('does not render a bottom border below the final detail row', () => {
+    const html = email_ToChecker_CheckRequired(sample)
+    const purchaseFrequencyLabel = html.indexOf('Purchase Frequency / Year')
+    const finalEnglishRow = html.slice(html.lastIndexOf('<tr>', purchaseFrequencyLabel), html.indexOf('</tr>', purchaseFrequencyLabel))
+
+    expect(finalEnglishRow).not.toContain('border-bottom')
   })
 })

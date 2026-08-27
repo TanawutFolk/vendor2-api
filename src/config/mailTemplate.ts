@@ -92,15 +92,17 @@ const renderThaiStatus = (status: string, message: string, detail = '') => `
 const renderDetails = (rows: DetailRow[]) => `
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; margin: 0 0 18px 0;">
     ${rows
-      .map(
-        ([label, value]) => `
+      .map(([label, value], index) => {
+        const bottomBorderStyle = index < rows.length - 1 ? 'border-bottom: 1px solid #c9c9c9; ' : ''
+
+        return `
           <tr>
             <td width="42%" valign="top"
-              style="border-bottom: 1px solid #c9c9c9; padding: 7px 8px 7px 0; color: #555555; font-size: 12px; line-height: 1.45;">${escapeHtml(label)}</td>
-            <td valign="top" style="border-bottom: 1px solid #c9c9c9; padding: 7px 0 7px 8px; color: #111111; font-size: 12px; line-height: 1.45;">${text(value)}</td>
+              style="${bottomBorderStyle}padding: 7px 8px 7px 0; color: #555555; font-size: 12px; line-height: 1.45;">${escapeHtml(label)}</td>
+            <td valign="top" style="${bottomBorderStyle}padding: 7px 0 7px 8px; color: #111111; font-size: 12px; line-height: 1.45;">${text(value)}</td>
           </tr>
         `
-      )
+      })
       .join('')}
   </table>
 `
@@ -159,10 +161,12 @@ const renderCompanyFooter = () => `
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse;">
     <tr>
       <td style="padding: 30px 0 0 0; color: #111111; font-size: 10px; line-height: 1.45;">
-        <div style="font-weight: 700; color: #0057b8;">Furukawa <span style="color: #ef1239;">FITEL</span> (Thailand) Co., Ltd.</div>
-        <div>1/1 Moo 6, Tambol Khanham</div>
-        <div>Amphur U-Thai, Phranakhon Sri Ayutthaya</div>
-        <div>13210, Thailand</div>
+        <div>
+          <span style="display: inline-block; border-top: 1px solid #8c8c8c;
+            padding-top: 7px; font-weight: 700; color: #0057b8;">Furukawa <span style="color: #ef1239;">FITEL</span> (Thailand) Co., Ltd.</span>
+        </div>
+        <div>1/71 Moo 5, Rojana Industrial Park, Rojana Road, Kanharm</div>
+        <div>U-Thai, Phranakorn Sri Ayutthaya 13210, Thailand</div>
       </td>
     </tr>
   </table>
