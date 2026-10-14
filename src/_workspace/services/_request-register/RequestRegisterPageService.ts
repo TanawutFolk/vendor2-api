@@ -696,6 +696,10 @@ export const RequestRegisterPageService = {
     return RequestRegisterGprService.saveSelectionForm(dataItem)
   },
 
+  checkVendorCode: async (dataItem: any) => {
+    return RequestRegisterGprService.checkVendorCode(dataItem)
+  },
+
   saveAccountVendorCode: async (dataItem: any) => {
     return RequestRegisterGprService.saveAccountVendorCode(dataItem)
   },

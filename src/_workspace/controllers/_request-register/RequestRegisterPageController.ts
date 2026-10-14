@@ -443,6 +443,38 @@ export const RequestRegisterPageController = {
     }
   },
 
+  checkVendorCode: async (req: Request, res: Response) => {
+    const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
+
+    try {
+      const requestId = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
+      if (!requestId || isNaN(requestId)) {
+        res.status(400).json({
+          Status: false,
+          ResultOnDb: {},
+          TotalCountOnDb: 0,
+          MethodOnDb: 'Check Vendor Code',
+          Message: 'Invalid request_id',
+        } as ResponseI)
+        return
+      }
+
+      const result = await RequestRegisterPageModel.checkVendorCode({
+        REQUEST_REGISTER_VENDOR_ID: requestId,
+        VENDOR_CODE: dataItem.VENDOR_CODE || '',
+      })
+      res.status(200).json(result as ResponseI)
+    } catch (error: any) {
+      res.status(200).json({
+        Status: false,
+        ResultOnDb: {},
+        TotalCountOnDb: 0,
+        MethodOnDb: 'Check Vendor Code',
+        Message: error?.message || 'Failed to verify Vendor Code',
+      } as ResponseI)
+    }
+  },
+
   saveAccountVendorCode: async (req: Request, res: Response) => {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 

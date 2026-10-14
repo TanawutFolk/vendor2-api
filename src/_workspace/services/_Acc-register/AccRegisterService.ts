@@ -2,6 +2,7 @@ import { MySQLExecute } from '@businessData/dbExecute'
 import { AccRegisterSQL } from '../../sql/_Acc-register/AccRegisterSQL'
 import { RowDataPacket } from 'mysql2'
 import { sendMail_ToRequester_RegistrationCompleted } from '../_request-register/RegisterRequestNotificationHelper'
+import { verifyVendorCode } from '../Common/VendorCodeVerification'
 import {
   getApprovalStepStatusIdentity,
   getRequestStateIdentity,
@@ -28,7 +29,8 @@ export const AccRegisterService = {
       if (!vendorCode) {
         throw new Error('Vendor Code is required in the Selection Sheet before completing registration.')
       }
-      dataItem.VENDOR_CODE = vendorCode
+      const verification = await verifyVendorCode({ REQUEST_REGISTER_VENDOR_ID: dataItem.REQUEST_REGISTER_VENDOR_ID, VENDOR_CODE: vendorCode })
+      dataItem.VENDOR_CODE = verification.VENDOR_CODE
       const [stepsSql, contextSql] = await Promise.all([
         AccRegisterSQL.getApprovalSteps(dataItem),
         AccRegisterSQL.getWorkflowContext(dataItem),

@@ -341,11 +341,10 @@ export const MySQLExecute = {
 }
 
 export const OracleExecute = {
-  searchOracle: async (query: string, configDb: string = '') => {
+  searchOracle: async (query: string, configDb: string = '', binds: oracledb.BindParameters = {}) => {
     let conn: oracledb.Connection | null = null
     try {
       conn = await connectionOracle(configDb)
-      const binds = {}
       const options = {
         outFormat: oracledb.OUT_FORMAT_OBJECT,
       }

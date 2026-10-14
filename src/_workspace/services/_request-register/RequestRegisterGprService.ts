@@ -2,7 +2,7 @@ import { MySQLExecute } from '@businessData/dbExecute'
 import { RequestRegisterPageSQL } from '../../sql/_request-register/RequestRegisterPageSQL'
 import { GprCApprovalService } from '../_approval-GPRC/GprCApprovalService'
 import { ResultSetHeader } from 'mysql2'
-import { isVendorCodeComplete } from './RegisterRequestWorkflowHelper'
+import { verifyVendorCode } from '../Common/VendorCodeVerification'
 import { getApprovalStepStatusIdentity, getWorkflowStepIdentity } from '../_status-master/StatusIdentityService'
 
 const getSelectionSheetWorkflowIdentity = async () => {
@@ -326,6 +326,33 @@ export const RequestRegisterGprService = {
     }
   },
 
+  checkVendorCode: async (dataItem: any) => {
+    try {
+      const verification = await verifyVendorCode({
+        REQUEST_REGISTER_VENDOR_ID: dataItem.REQUEST_REGISTER_VENDOR_ID,
+        VENDOR_CODE: dataItem.VENDOR_CODE,
+      })
+
+      return {
+        Status: true,
+        Message: verification.IS_NAME_MATCHED
+          ? 'Vendor Code found in PRONES'
+          : 'Vendor Code found in PRONES, but the vendor name is different. Please confirm it is the same vendor.',
+        ResultOnDb: verification,
+        MethodOnDb: 'Check Vendor Code',
+        TotalCountOnDb: 1,
+      }
+    } catch (error: any) {
+      return {
+        Status: false,
+        Message: error?.message || 'Failed to verify Vendor Code',
+        ResultOnDb: {},
+        MethodOnDb: 'Check Vendor Code',
+        TotalCountOnDb: 0,
+      }
+    }
+  },
+
   saveAccountVendorCode: async (dataItem: any) => {
     try {
       const requestId = Number(dataItem.REQUEST_REGISTER_VENDOR_ID) || 0
@@ -335,17 +362,12 @@ export const RequestRegisterGprService = {
       if (!requestId) throw new Error('Missing request_id')
       if (!updateBy) throw new Error('Missing Account employee code')
 
+      const verification = await verifyVendorCode({ REQUEST_REGISTER_VENDOR_ID: requestId, VENDOR_CODE: vendorCode })
+
       const vendorRegionSql = await RequestRegisterPageSQL.getRequestVendorRegion({
         REQUEST_REGISTER_VENDOR_ID: requestId,
       })
       const vendorRegionRows = (await MySQLExecute.search(vendorRegionSql)) as any[]
-      const vendorRegion = normalizeValue(getValue(vendorRegionRows[0], 'VENDOR_REGION', 'vendor_region'))
-      if (!vendorRegion) throw new Error('Vendor region was not found')
-
-      const isOversea = vendorRegion.toLowerCase() === 'oversea'
-      if (!isVendorCodeComplete(vendorCode, isOversea)) {
-        throw new Error('Vendor Code must include the code after the 20030/20031 prefix.')
-      }
       const [workflowStep, statusIdentity] = await Promise.all([
         getWorkflowStepIdentity(Number(getValue(vendorRegionRows[0], 'WORKFLOW_DEFINITION_ID', 'workflow_definition_id')) || undefined),
         getSelectionSheetWorkflowIdentity(),
@@ -368,6 +390,7 @@ export const RequestRegisterGprService = {
         Status: true,
         Message: 'Vendor Code saved successfully',
         ResultOnDb: {
+          ...verification,
           VENDOR_CODE_SELECTOR: vendorCode,
         },
         MethodOnDb: 'Save Account Vendor Code',

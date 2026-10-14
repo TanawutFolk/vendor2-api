@@ -13,6 +13,7 @@ requestRegisterPageRoutes.post('/createApprovalStep', RequestRegisterPageControl
 requestRegisterPageRoutes.post('/updateApprovalStep', RequestRegisterPageController.updateApprovalStep)
 requestRegisterPageRoutes.post('/updateCcEmails', RequestRegisterPageController.updateCcEmails)
 requestRegisterPageRoutes.post('/saveSelectionForm', RequestRegisterPageController.saveSelectionForm)
+requestRegisterPageRoutes.post('/checkVendorCode', RequestRegisterPageController.checkVendorCode)
 requestRegisterPageRoutes.post('/saveAccountVendorCode', RequestRegisterPageController.saveAccountVendorCode)
 requestRegisterPageRoutes.post('/saveGprCNotification', RequestRegisterPageController.saveGprCNotification)
 requestRegisterPageRoutes.post('/getGprCFlow', RequestRegisterPageController.gprCGetFlow)

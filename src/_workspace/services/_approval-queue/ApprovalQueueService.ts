@@ -23,6 +23,7 @@ import {
   sendMail_NegotiationStageDispatch,
 } from '../_request-register/RegisterRequestNotificationHelper'
 import { SelectionFileService } from '../_request-register/SelectionFileService'
+import { verifyVendorCode } from '../Common/VendorCodeVerification'
 import { GprCApprovalService } from '../_approval-GPRC/GprCApprovalService'
 import { isTaskManagerReassignable } from '../_task-manager/TaskManagerRules'
 import { prepareApprovalQueueSearchData } from './ApprovalQueueSearchData'
@@ -682,6 +683,12 @@ const validateCurrentStep = async (context: WorkflowContext, resolver: WorkflowR
     const extractedVendorCode = String(selectedVendorCode || '').trim()
     if (!isVendorCodeComplete(extractedVendorCode, context.isOversea)) {
       throw new Error('Approval blocked: You must open the Selection Form and specify the "Vendor Code" before approving this step.')
+    }
+    // Re-verify at approval time: the code may have been saved before Account keyed it into PRONES.
+    try {
+      await verifyVendorCode({ REQUEST_REGISTER_VENDOR_ID: dataItem.REQUEST_REGISTER_VENDOR_ID, VENDOR_CODE: extractedVendorCode })
+    } catch (error) {
+      throw new Error('Approval blocked: ' + getErrorMessage(error, 'Vendor Code could not be verified.'))
     }
     dataItem.VENDOR_CODE_EXTRACTED = extractedVendorCode
   }
