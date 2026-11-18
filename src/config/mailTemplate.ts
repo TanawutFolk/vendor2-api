@@ -29,15 +29,55 @@ export type MailTemplateData = {
   note?: string
 }
 
+// Layout rules shared by every vendor-registration email:
+// - email-client safe: table layout, inline styles only, 640px max width
+// - palette limited to black / greys and the company blue; red only in the FITEL wordmark
+// - English and Thai live in separate, labelled sections; only language-neutral values
+//   (status, request number, vendor code) sit in the shared header
+// - internal mails sign with the sender's extension (Ext.); supplier mails never show it
+
 type DetailRow = [label: string, value: unknown]
 
-type MailLayoutOptions = {
-  recipient: unknown
-  content: string
-  signerName?: unknown
-  signerTel?: unknown
-  signerRole?: string
+type SectionOptions = {
+  label: string
+  headline: string
+  greeting: string
+  message: string
+  thai?: boolean
+  reason?: string
+  body?: string
+  rows?: DetailRow[]
+  cta?: string
 }
+
+type LayoutOptions = {
+  preheader: string
+  statusEn: string
+  statusTh: string
+  requestNumber: unknown
+  heroExtra?: string
+  sections: string[]
+  signerName?: unknown
+  signerExt?: unknown
+  signerRole: string
+}
+
+const COLOR = {
+  page: '#F2F2F2',
+  card: '#FFFFFF',
+  line: '#DDDDDD',
+  soft: '#F6F6F6',
+  text: '#111111',
+  muted: '#5C5C5C',
+  rule: '#8C8C8C',
+  brand: '#0057B8',
+  fitel: '#EF1239',
+}
+
+const FONT = "'Segoe UI', 'Leelawadee UI', Tahoma, Arial, sans-serif"
+
+const COMPANY_NAME_TH = 'บริษัท ฟูรูกาวา ไฟเทล (ประเทศไทย) จำกัด'
+const BRAND_NAME = `Furukawa <span style="color: ${COLOR.fitel};">FITEL</span> (Thailand)`
 
 const escapeHtml = (value: unknown) =>
   String(value ?? '')
@@ -65,362 +105,503 @@ const isRoleFallbackName = (value: unknown) => {
 
 const isSignatureFallbackName = (value: unknown) => isRoleFallbackName(value) || isEmployeeCodeLike(value) || isEmailLike(value)
 
-const renderStatus = (status: string, message: string, detail = '') => `
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; margin: 0 0 22px 0;">
-    <tr>
-      <td style="border-left: 4px solid #111111; background: #f7f7f7; padding: 12px 14px; color: #111111;">
-        <div style="font-size: 13px; line-height: 1.45; font-weight: 700;">Status: ${status}</div>
-        <div style="font-size: 13px; line-height: 1.55; margin-top: 3px;">${message}</div>
-        ${detail ? `<div style="font-size: 12px; line-height: 1.55; margin-top: 7px; color: #991b1b;"><strong>${detail}</strong></div>` : ''}
-      </td>
-    </tr>
-  </table>
-`
+// ---------------------------------------------------------------------------
+// Building blocks
+// ---------------------------------------------------------------------------
 
-const renderThaiStatus = (status: string, message: string, detail = '') => `
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; margin: 24px 0 18px 0;">
+const renderStatusLabel = (statusEn: string, statusTh: string) => `
+  <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-collapse: separate;">
     <tr>
-      <td style="border-left: 4px solid #111111; background: #f7f7f7; padding: 12px 14px; color: #111111;">
-        <div style="font-size: 13px; line-height: 1.55; font-weight: 700;">สถานะ: ${status}</div>
-        <div style="font-size: 13px; line-height: 1.65; margin-top: 3px;">${message}</div>
-        ${detail ? `<div style="font-size: 12px; line-height: 1.65; margin-top: 7px; color: #991b1b;"><strong>${detail}</strong></div>` : ''}
+      <td style="background: ${COLOR.soft}; border: 1px solid ${COLOR.line}; color: ${COLOR.text}; font-size: 12px; font-weight: 700; line-height: 1.4;
+        padding: 4px 12px; border-radius: 999px; font-family: ${FONT};">
+        ${statusEn} &nbsp;|&nbsp; ${statusTh}
       </td>
     </tr>
-  </table>
-`
+  </table>`
+
+const renderSectionLabel = (label: string) => `
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse;">
+    <tr>
+      <td style="font-size: 11px; font-weight: 700; letter-spacing: 1.5px; color: ${COLOR.muted}; padding: 0 0 6px 0;
+        border-bottom: 1px solid ${COLOR.line}; font-family: ${FONT};">${label}</td>
+    </tr>
+  </table>`
+
+const renderReasonBox = (title: string, body: string) => `
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; margin: 0 0 16px 0;">
+    <tr>
+      <td style="background: ${COLOR.soft}; border-left: 3px solid ${COLOR.text}; padding: 12px 14px; font-size: 13px; line-height: 1.6;
+        color: ${COLOR.text}; font-family: ${FONT};">
+        <div style="font-weight: 700; margin: 0 0 2px 0;">${title}</div>
+        ${body}
+      </td>
+    </tr>
+  </table>`
+
+const renderNoteBox = (html: string) => `
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; margin: 0 0 14px 0;">
+    <tr>
+      <td style="background: ${COLOR.soft}; border-left: 3px solid ${COLOR.rule}; padding: 12px 14px; font-size: 13px; line-height: 1.6;
+        color: ${COLOR.text}; font-family: ${FONT};">${html}</td>
+    </tr>
+  </table>`
 
 const renderDetails = (rows: DetailRow[]) => `
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; margin: 0 0 18px 0;">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0"
+    style="border-collapse: separate; border: 1px solid ${COLOR.line}; border-radius: 6px; margin: 4px 0 18px 0;">
     ${rows
       .map(([label, value], index) => {
-        const bottomBorderStyle = index < rows.length - 1 ? 'border-bottom: 1px solid #c9c9c9; ' : ''
+        const bottomBorderStyle = index < rows.length - 1 ? `border-bottom: 1px solid ${COLOR.line}; ` : ''
 
         return `
           <tr>
-            <td width="42%" valign="top"
-              style="${bottomBorderStyle}padding: 7px 8px 7px 0; color: #555555; font-size: 12px; line-height: 1.45;">${escapeHtml(label)}</td>
-            <td valign="top" style="${bottomBorderStyle}padding: 7px 0 7px 8px; color: #111111; font-size: 12px; line-height: 1.45;">${text(value)}</td>
-          </tr>
-        `
+            <td width="38%" valign="top"
+              style="${bottomBorderStyle}background: ${COLOR.soft}; padding: 9px 12px; font-size: 13px; line-height: 1.5; color: ${COLOR.muted}; font-family: ${FONT};"
+            >${escapeHtml(label)}</td>
+            <td valign="top" style="${bottomBorderStyle}padding: 9px 12px; font-size: 13px; line-height: 1.5; color: ${COLOR.text}; font-family: ${FONT};">${text(value)}</td>
+          </tr>`
       })
       .join('')}
-  </table>
-`
+  </table>`
 
-const renderVendorDetails = (data: MailTemplateData, thai = false) =>
-  renderDetails(
-    thai
-      ? [
-          ['ชื่อเวนเดอร์', data.vendorName],
-          ['ที่อยู่', data.address],
-          ['ชื่อผู้ติดต่อ', data.contactPic],
-          ['อีเมล', data.email],
-          ['เบอร์ติดต่อ', data.tel],
-          ['สำหรับสนับสนุนผลิตภัณฑ์/กระบวนการ', data.supportProduct],
-          ['ความถี่ในการสั่งซื้อต่อปี', data.purchaseFrequency],
-        ]
-      : [
-          ['Vendor Name', data.vendorName],
-          ['Address', data.address],
-          ['Contact Vendor', data.contactPic],
-          ['Email', data.email],
-          ['Tel', data.tel],
-          ['For support product / process', data.supportProduct],
-          ['Purchase Frequency / Year', data.purchaseFrequency],
-        ]
-  )
+const vendorRows = (data: MailTemplateData, thai: boolean): DetailRow[] =>
+  thai
+    ? [
+        ['ชื่อผู้ขาย', data.vendorName],
+        ['ที่อยู่', data.address],
+        ['ผู้ติดต่อ', data.contactPic],
+        ['อีเมล', data.email],
+        ['เบอร์ติดต่อ', data.tel],
+        ['ผลิตภัณฑ์ / กระบวนการที่สนับสนุน', data.supportProduct],
+        ['ความถี่ในการสั่งซื้อต่อปี', data.purchaseFrequency],
+      ]
+    : [
+        ['Vendor name', data.vendorName],
+        ['Address', data.address],
+        ['Contact person', data.contactPic],
+        ['Email', data.email],
+        ['Tel.', data.tel],
+        ['Supported product / process', data.supportProduct],
+        ['Purchase frequency per year', data.purchaseFrequency],
+      ]
 
-const renderLink = (systemLink?: string) => {
+const renderChecklist = (items: string[]) => `
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; margin: 0 0 14px 0;">
+    ${items
+      .map(
+        (item, index) => `
+        <tr>
+          <td width="30" valign="top" style="padding: 0 0 10px 0;">
+            <div style="width: 22px; height: 22px; border-radius: 11px; background: ${COLOR.soft}; border: 1px solid ${COLOR.line}; color: ${COLOR.text};
+              font-size: 12px; font-weight: 700; line-height: 22px; text-align: center; font-family: ${FONT};">${index + 1}</div>
+          </td>
+          <td valign="top" style="padding: 2px 0 10px 6px; font-size: 14px; line-height: 1.55; color: ${COLOR.text}; font-family: ${FONT};">${item}</td>
+        </tr>`
+      )
+      .join('')}
+  </table>`
+
+const renderButton = (systemLink: string | undefined, label: string, fallbackText: string) => {
   const link = String(systemLink || '').trim()
   if (!link) return ''
   const escapedLink = escapeHtml(link)
   return `
-    <p style="margin: 16px 0 22px 0; color: #333333; font-size: 12px; line-height: 1.55;">
-      You can access the system through this link:
-      <a href="${escapedLink}" style="color: #111111; text-decoration: underline; font-weight: 700;">${escapedLink}</a>
-    </p>
-  `
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-collapse: separate; margin: 4px 0 8px 0;">
+      <tr>
+        <td bgcolor="${COLOR.brand}" style="background: ${COLOR.brand}; border-radius: 4px;">
+          <a href="${escapedLink}"
+            style="display: inline-block; padding: 10px 20px; font-size: 14px; font-weight: 700; color: #FFFFFF; text-decoration: none; font-family: ${FONT};">${label}</a>
+        </td>
+      </tr>
+    </table>
+    <div style="font-size: 12px; line-height: 1.5; color: ${COLOR.muted}; margin: 0 0 8px 0; font-family: ${FONT};">
+      ${fallbackText} <a href="${escapedLink}" style="color: ${COLOR.brand}; word-break: break-all;">${escapedLink}</a>
+    </div>`
 }
 
-const renderSignature = (name: unknown, tel: unknown, role: string) => {
+const buttonEn = (data: MailTemplateData, label = 'Open request') => renderButton(data.systemLink, label, 'Or copy this link:')
+const buttonTh = (data: MailTemplateData, label = 'เปิดคำขอในระบบ') => renderButton(data.systemLink, label, 'หรือคัดลอกลิงก์นี้:')
+
+const renderSection = (options: SectionOptions) => {
+  const lineHeight = options.thai ? '1.75' : '1.6'
+  return `
+    <tr>
+      <td style="padding: 24px 32px 8px 32px; font-family: ${FONT};">
+        ${renderSectionLabel(options.label)}
+        <div style="font-size: 17px; font-weight: 700; line-height: 1.4; color: ${COLOR.text}; margin: 16px 0 10px 0;">${options.headline}</div>
+        <p style="margin: 0 0 8px 0; font-size: 14px; line-height: ${lineHeight}; color: ${COLOR.text};">${options.greeting}</p>
+        <p style="margin: 0 0 16px 0; font-size: 14px; line-height: ${lineHeight}; color: ${COLOR.text};">${options.message}</p>
+        ${options.reason || ''}
+        ${options.body || ''}
+        ${options.rows ? renderDetails(options.rows) : ''}
+        ${options.cta || ''}
+      </td>
+    </tr>`
+}
+
+const englishSection = (options: Omit<SectionOptions, 'label' | 'thai'>) => renderSection({ ...options, label: 'ENGLISH' })
+const thaiSection = (options: Omit<SectionOptions, 'label' | 'thai'>) => renderSection({ ...options, label: 'ภาษาไทย', thai: true })
+
+const renderDivider = () => `
+  <tr>
+    <td style="padding: 8px 32px;">
+      <div style="height: 1px; line-height: 1px; font-size: 1px; background: ${COLOR.line};">&nbsp;</div>
+    </td>
+  </tr>`
+
+const renderHero = (statusEn: string, statusTh: string, requestNumber: unknown, extra = '') => `
+  <tr>
+    <td style="padding: 28px 32px 8px 32px; font-family: ${FONT};">
+      ${renderStatusLabel(statusEn, statusTh)}
+      <div style="margin: 16px 0 0 0; font-size: 12px; color: ${COLOR.muted};">Request No. / เลขที่คำขอ</div>
+      <div style="font-size: 22px; font-weight: 700; line-height: 1.3; color: ${COLOR.text}; letter-spacing: 0.3px;">${text(requestNumber)}</div>
+      ${extra}
+      <div style="margin: 14px 0 0 0; font-size: 12px; color: ${COLOR.muted};">English version first &middot; ฉบับภาษาไทยอยู่ด้านล่าง</div>
+    </td>
+  </tr>`
+
+// signerExt is the sender's internal extension. Supplier templates pass nothing, so the
+// extension never reaches people outside the company.
+const renderSignature = (name: unknown, ext: unknown, role: string) => {
   const normalizedName = String(name || '').trim()
   const safeName = isSignatureFallbackName(normalizedName) ? '' : normalizedName
+  const normalizedExt = String(ext || '').trim()
 
   return `
-    <div style="border-top: 1px solid #c9c9c9; margin-top: 20px; padding-top: 13px; color: #111111; font-size: 12px; line-height: 1.55;">
-      <div style="font-weight: 700;">Thank you &amp; Best regards,</div>
-      <div style="font-weight: 700;">${text(safeName, 'Vendor Registration System')}${
-        String(tel || '').trim() ? ` <span style="font-weight: 400;">(#Tel. ${text(tel)})</span>` : ''
-      }</div>
-      <div>${escapeHtml(role)}</div>
-    </div>
-  `
+    <tr>
+      <td style="padding: 16px 32px 28px 32px; font-family: ${FONT};">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse;">
+          <tr>
+            <td style="border-top: 1px solid ${COLOR.line}; padding: 16px 0 0 0; font-size: 13px; line-height: 1.6; color: ${COLOR.text};">
+              <div style="color: ${COLOR.muted};">Best regards &middot; ขอแสดงความนับถือ</div>
+              <div style="font-weight: 700;">${text(safeName, 'Vendor Registration System')}${
+                normalizedExt ? ` <span style="font-weight: 400; color: ${COLOR.muted};">(Ext. ${text(normalizedExt)})</span>` : ''
+              }</div>
+              <div style="color: ${COLOR.muted};">${escapeHtml(role)}</div>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>`
 }
 
+// Company footer: wording, line breaks and styling are fixed by the business owner.
 const renderCompanyFooter = () => `
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse;">
-    <tr>
-      <td style="padding: 30px 0 0 0; color: #111111; font-size: 10px; line-height: 1.45;">
-        <div>
-          <span style="display: inline-block; border-top: 1px solid #8c8c8c;
-            padding-top: 7px; font-weight: 700; color: #0057b8;">Furukawa <span style="color: #ef1239;">FITEL</span> (Thailand) Co., Ltd.</span>
-        </div>
-        <div>1/71 Moo 5, Rojana Industrial Park, Rojana Road, Kanharm</div>
-        <div>U-Thai, Phranakorn Sri Ayutthaya 13210, Thailand</div>
-      </td>
-    </tr>
-  </table>
-`
+  <tr>
+    <td style="padding: 24px 4px 0 4px; color: #111111; font-size: 10px; line-height: 1.45; font-family: Arial, 'Segoe UI', Tahoma, sans-serif;">
+      <div>
+        <span style="display: inline-block; border-top: 1px solid #8c8c8c; padding-top: 7px; font-weight: 700; color: #0057b8;"
+          >Furukawa <span style="color: #ef1239;">FITEL</span> (Thailand) Co., Ltd.</span
+        >
+      </div>
+      <div>1/71 Moo 5, Rojana Industrial Park, Rojana Road, Kanharm</div>
+      <div>U-Thai, Phranakorn Sri Ayutthaya 13210, Thailand</div>
+    </td>
+  </tr>`
 
-const renderMailLayout = ({ recipient, content, signerName, signerTel, signerRole = 'PO & SCM PIC' }: MailLayoutOptions) => `
-  <!doctype html>
-  <html>
-    <body style="margin: 0; padding: 0; background-color: #ffffff;">
-      <table role="presentation" width="100%" height="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="#ffffff"
-        style="width: 100%; min-height: 100%; border-collapse: collapse; background-color: #ffffff;">
-        <tr>
-          <td align="center" valign="top" style="padding: 28px 12px 40px 12px; background-color: transparent;">
-            <table role="presentation" width="820" cellspacing="0" cellpadding="0" border="0"
-              style="width: 100%; max-width: 820px; border-collapse: collapse; font-family: Arial, 'Segoe UI', Tahoma, sans-serif;">
-              <tr>
-                <td style="padding: 0 16px; background-color: transparent;">
-                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; background: #ededed;">
-                    <tr>
-                      <td style="padding: 42px 52px 36px 52px;">
-                        <div style="text-align: center; color: #000000; font-size: 22px; line-height: 1.25; font-weight: 700;">Vendor Registration Request</div>
-                        <div style="height: 1px; background: #8c8c8c; margin: 20px 0 24px 0;"></div>
-                        <p style="margin: 0 0 18px 0; color: #111111; font-size: 12px; line-height: 1.5;">
-                          Dear&nbsp;&nbsp; <strong>${text(recipient, 'Recipient')}</strong>
-                        </p>
-                        ${content}
-                        ${renderSignature(signerName, signerTel, signerRole)}
-                      </td>
-                    </tr>
-                  </table>
-                  ${renderCompanyFooter()}
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
-    </body>
-  </html>
-`
+const renderMailLayout = (options: LayoutOptions) => `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Vendor Registration System</title>
+  </head>
+  <body style="margin: 0; padding: 0; background: ${COLOR.page};">
+    <div style="display: none; max-height: 0; overflow: hidden; opacity: 0;">${escapeHtml(options.preheader)}</div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" bgcolor="${COLOR.page}" style="background: ${COLOR.page}; border-collapse: collapse;">
+      <tr>
+        <td align="center" style="padding: 24px 12px 32px 12px;">
+          <table role="presentation" width="640" cellspacing="0" cellpadding="0" border="0" style="width: 100%; max-width: 640px; border-collapse: collapse; font-family: ${FONT};">
+            <tr>
+              <td style="padding: 0 4px 12px 4px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse;">
+                  <tr>
+                    <td style="font-size: 14px; font-weight: 700; color: ${COLOR.brand}; font-family: ${FONT};">${BRAND_NAME}</td>
+                    <td align="right" style="font-size: 12px; color: ${COLOR.muted}; font-family: ${FONT};">Vendor Registration System</td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="background: ${COLOR.card}; border: 1px solid ${COLOR.line}; border-radius: 6px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse;">
+                  ${renderHero(options.statusEn, options.statusTh, options.requestNumber, options.heroExtra)}
+                  ${options.sections.join(renderDivider())}
+                  ${renderSignature(options.signerName, options.signerExt, options.signerRole)}
+                </table>
+              </td>
+            </tr>
+            ${renderCompanyFooter()}
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>`
 
-const renderStandardWorkflowMail = (
-  data: MailTemplateData,
-  options: {
-    recipient: unknown
-    status: string
-    message: string
-    thaiStatus: string
-    thaiMessage: string
-    detail?: string
-    thaiDetail?: string
-    extraHtml?: string
-    signerName?: unknown
-    signerTel?: unknown
-    signerRole?: string
-  }
-) =>
-  renderMailLayout({
-    recipient: options.recipient,
-    signerName: options.signerName ?? data.picName,
-    signerTel: options.signerTel ?? data.picTel,
-    signerRole: options.signerRole,
-    content: `
-      ${renderStatus(options.status, options.message, options.detail)}
-      ${renderVendorDetails(data)}
-      ${options.extraHtml || ''}
-      ${renderLink(data.systemLink)}
-      ${renderThaiStatus(options.thaiStatus, options.thaiMessage, options.thaiDetail)}
-      ${renderVendorDetails(data, true)}
-    `,
-  })
+const preheaderText = (message: string, requestNumber: unknown) => `${message} ${String(requestNumber ?? '').trim()}`.trim()
 
-export const email_ToPic_RequestRegisterVendor = (data: MailTemplateData) =>
-  renderStandardWorkflowMail(data, {
-    recipient: data.recipientName,
-    status: 'Under request register vendor',
-    message: `Please register vendor request <strong>"${text(data.requestNumber)}"</strong> in the system within 2 weeks.`,
-    thaiStatus: 'อยู่ระหว่างการดำเนินการลงทะเบียนผู้ขาย',
-    thaiMessage: `โปรดดำเนินการลงทะเบียนผู้ขายตามหมายเลข <strong>"${text(data.requestNumber)}"</strong> ในระบบภายใน 2 สัปดาห์`,
-    signerName: data.userName,
-    signerTel: data.userTel,
-    signerRole: 'Requester',
-  })
+// ---------------------------------------------------------------------------
+// Internal workflow mails (signed with Ext.)
+// ---------------------------------------------------------------------------
 
-export const email_ToSupplier_RequestFormA = (data: MailTemplateData) => {
-  const requestNumber = data.topicRef || data.requestNumber
-  const supplierType = data.isNewSupplier ? 'new supplier registration' : 'supplier re-registration'
-  const englishIntro = data.isNewSupplier
-    ? 'As <strong>Furukawa <span style="color: #ef1239;">FITEL</span> (Thailand) Co., Ltd.</strong> has never contacted or used the service from your company, it is ' +
-      'necessary to <strong>request more information to register a new supplier</strong>. Including informing about company policies such as Environmental Policy, Quality ' +
-      'Policy and Export Control Policy. Therefore, we kindly request the following documents:'
-    : 'As <strong>Furukawa <span style="color: #ef1239;">FITEL</span> (Thailand) Co., Ltd.</strong> needs to update supplier registration information and confirm company ' +
-      'policies such as Environmental Policy, Quality Policy and Export Control Policy, we kindly request the following documents:'
-  const thaiIntro = data.isNewSupplier
-    ? 'เนื่องด้วยทาง <strong>บริษัท ฟูรูกาวา <span style="color: #ef1239;">ไฟเทล</span> (ประเทศไทย) จำกัด</strong> ยังไม่เคยติดต่อใช้บริการร่วมกับบริษัทของคุณ ' +
-      'จึงจำเป็นต้องมีการ<strong>ร้องขอข้อมูลที่จำเป็นเพื่อใช้ในการลงทะเบียนผู้ผลิต / ผู้จัดจำหน่ายใหม่</strong> รวมถึงการแจ้งข้อมูลเกี่ยวกับนโยบายของบริษัท ได้แก่ ' +
-      'นโยบายด้านสิ่งแวดล้อม ด้านคุณภาพ และด้านการควบคุมการส่งออก ดังนั้นทางเราจึงรบกวนขอเอกสารต่าง ๆ ดังนี้'
-    : 'เนื่องด้วยทาง <strong>บริษัท ฟูรูกาวา <span style="color: #ef1239;">ไฟเทล</span> (ประเทศไทย) จำกัด</strong> มีความจำเป็นต้องอัปเดตข้อมูลการลงทะเบียนผู้ผลิต / ' +
-      'ผู้จัดจำหน่าย และยืนยันข้อมูลเกี่ยวกับนโยบายของบริษัท ได้แก่ นโยบายด้านสิ่งแวดล้อม ด้านคุณภาพ และด้านการควบคุมการส่งออก ดังนั้นทางเราจึงรบกวนขอเอกสารต่าง ๆ ดังนี้'
+export const email_ToPic_RequestRegisterVendor = (data: MailTemplateData) => {
+  const requestNumber = text(data.requestNumber)
+  const recipient = text(data.recipientName, 'PO PIC')
 
   return renderMailLayout({
-    recipient: 'Supplier',
-    signerName: data.picName,
-    signerTel: data.picTel,
-    signerRole: 'PO & SCM PIC',
-    content: `
-      ${renderStatus(
-        'Vendor documents required',
-        `Please prepare the documents for <strong>${escapeHtml(supplierType)}</strong>, reference <strong>"${text(requestNumber)}"</strong>, and reply within 7 days.`
-      )}
-      <p style="margin: 0 0 18px 0; font-weight: 700; color: #d32f2f; background: #fff5f5; padding: 8px 12px; display: inline-block;">
-        ** สามารถอ่านภาษาไทยด้านล่างได้ค่ะ **
-      </p>
-      <div style="font-size: 12px; line-height: 1.7; color: #222222;">
-        <p style="margin: 0 0 16px 0;">${englishIntro}</p>
-        <ol style="margin: 0 0 22px 20px; padding: 0;">
-          <li style="margin-bottom: 8px;"><strong>Company certificate</strong> (Limited Company or Public Company Limited) and <strong>Vat License</strong> (Por Por 20)</li>
-          <li style="margin-bottom: 8px;"><strong>Company profile</strong></li>
-          <li style="margin-bottom: 8px;"><strong>Other certifications</strong>, such as ISO9001, ISO14000, catalog main product, etc.</li>
-          <li style="margin-bottom: 8px;"><strong>Copy of Book banking</strong></li>
-          <li style="margin-bottom: 8px;">Reply to <strong>"MFG survey document"</strong> in Excel file format <strong>within 7 days</strong>.</li>
-          <li style="margin-bottom: 8px;">Reply to <strong>"Reply Form document"</strong> in Pdf file format <strong>within 7 days</strong>.</li>
-        </ol>
-        <p style="margin: 0 0 22px 0; background-color: #f7f7f7; padding: 12px 14px; border-left: 3px solid #8c8c8c;">
-          You can see more information in attached file.<br>
-          If you have any comments, please let me know.
-        </p>
-        <p style="margin: 0 0 26px 0; font-size: 11px; color: #666666; line-height: 1.55;">
-          <em>Remark: This message (including any attachments) contains confidential information intended for a specific individual and purpose, and is protected by law. If you
-            are not the intended recipient, you should delete this message.<br>
-          Any disclosure, copying, or distribution of this message, or the taking of any action based on it, is strictly prohibited.</em>
-        </p>
-      </div>
-      <div style="height: 1px; background: #c9c9c9; margin: 24px 0;"></div>
-      <div style="font-size: 12px; line-height: 1.7; color: #222222;">
-        <p style="margin: 0 0 16px 0; font-weight: 700; font-size: 13px; color: #111111;">เรียน ผู้ผลิตและผู้จัดจำหน่าย</p>
-        <p style="margin: 0 0 16px 0;">${thaiIntro}</p>
-        <ol style="margin: 0 0 22px 20px; padding: 0;">
-          <li style="margin-bottom: 8px;"><strong>หนังสือรับรองนิติบุคคล, ภพ.20</strong></li>
-          <li style="margin-bottom: 8px;"><strong>Company profile</strong></li>
-          <li style="margin-bottom: 8px;"><strong>เอกสารรับรองอื่นๆ</strong> เช่น ISO9001, ISO14000, แคตตาล็อค ฯลฯ</li>
-          <li style="margin-bottom: 8px;"><strong>สำเนาหน้า Book banking</strong></li>
-          <li style="margin-bottom: 8px;">ตอบกลับเอกสาร <strong>"MFG survey"</strong> ในรูปแบบไฟล์ Excel <strong>ภายใน 7 วัน</strong></li>
-          <li style="margin-bottom: 8px;">ตอบกลับเอกสาร <strong>"Reply Form"</strong> ในรูปแบบไฟล์ pdf <strong>ภายใน 7 วัน</strong></li>
-        </ol>
-        <p style="margin: 0 0 22px 0; background-color: #f7f7f7; padding: 12px 14px; border-left: 3px solid #8c8c8c;">
-          รบกวนดูรายละเอียดเพิ่มเติมจากไฟล์แนบ<br>
-          หากมีข้อสงสัย โปรดแจ้งกลับมาให้เราทราบค่ะ
-        </p>
-        <p style="margin: 0 0 26px 0; font-size: 11px; color: #666666; line-height: 1.65;">
-          <em>หมายเหตุ: ข้อความนี้ (รวมถึงไฟล์แนบทั้งหมด) มีข้อมูลที่เป็นความลับซึ่งมีไว้สำหรับบุคคลและวัตถุประสงค์ที่เฉพาะเจาะจง และได้รับการคุ้มครองตามกฎหมาย
-            หากท่านไม่ใช่ผู้รับที่ระบุไว้ กรุณาลบข้อความนี้<br>
-          ห้ามเปิดเผย ทำสำเนา หรือเผยแพร่ข้อความนี้ หรือดำเนินการใด ๆ โดยอ้างอิงจากข้อความนี้โดยเด็ดขาด</em>
-        </p>
-      </div>
-    `,
+    preheader: preheaderText('Please register vendor request', data.requestNumber),
+    statusEn: 'Vendor registration requested',
+    statusTh: 'ขอลงทะเบียนผู้ขาย',
+    requestNumber: data.requestNumber,
+    sections: [
+      englishSection({
+        headline: 'A new vendor registration request',
+        greeting: `Dear <strong>${recipient}</strong>,`,
+        message: `Please register vendor request <strong>${requestNumber}</strong> in the system <strong>within 2 weeks</strong>.`,
+        rows: vendorRows(data, false),
+        cta: buttonEn(data),
+      }),
+      thaiSection({
+        headline: 'มีคำขอลงทะเบียนผู้ขายรายใหม่',
+        greeting: `เรียน <strong>${recipient}</strong>`,
+        message: `กรุณาดำเนินการลงทะเบียนผู้ขายตามคำขอเลขที่ <strong>${requestNumber}</strong> ในระบบ<strong>ภายใน 2 สัปดาห์</strong>`,
+        rows: vendorRows(data, true),
+        cta: buttonTh(data),
+      }),
+    ],
+    signerName: data.userName,
+    signerExt: data.userTel,
+    signerRole: 'Requester',
   })
 }
 
-export const email_ToSupplier_RequestFormB = (data: MailTemplateData) =>
-  renderMailLayout({
-    recipient: 'Supplier',
+export const email_ToRequester_GprCSetup = (data: MailTemplateData) => {
+  const requestNumber = text(data.requestNumber)
+  const recipient = text(data.userName || data.recipientName, 'Requester')
+
+  return renderMailLayout({
+    preheader: preheaderText('Please set up GPR C for request', data.requestNumber),
+    statusEn: 'GPR C setup required',
+    statusTh: 'ต้องตั้งค่า GPR C',
+    requestNumber: data.requestNumber,
+    sections: [
+      englishSection({
+        headline: 'Please set up the GPR C approval flow',
+        greeting: `Dear <strong>${recipient}</strong>,`,
+        message: `Please set the Product Checkers, GPR C Approver, PC PIC and Circular List for request <strong>${requestNumber}</strong>.`,
+        rows: vendorRows(data, false),
+        cta: buttonEn(data),
+      }),
+      thaiSection({
+        headline: 'กรุณาตั้งค่าผู้อนุมัติ GPR C',
+        greeting: `เรียน <strong>${recipient}</strong>`,
+        message: `กรุณากำหนด Product Checker, GPR C Approver, PC PIC และ Circular List สำหรับคำขอเลขที่ <strong>${requestNumber}</strong>`,
+        rows: vendorRows(data, true),
+        cta: buttonTh(data),
+      }),
+    ],
     signerName: data.picName,
-    signerTel: data.picTel,
+    signerExt: data.picTel,
     signerRole: 'PO & SCM PIC',
-    content: `
-      ${renderStatus(
-        'Under Submit register vendor',
-        `Since you <strong style="color: #d32f2f; text-decoration: underline;">Not Accept</strong> the General Purchase Specification Form A document.<br>Please submit register
-          vendor follow as <strong>"${text(data.requestNumber)}"</strong>. General Purchase Specification Form B and reply within 7 days.`
-      )}
-      ${renderThaiStatus(
-        'อยู่ระหว่างการดำเนินการลงทะเบียนผู้ขาย',
-        `เนื่องจากทางผู้ขาย <strong style="color: #d32f2f; text-decoration: underline;">ไม่ยอมรับ</strong> ข้อกำหนดตามเอกสาร General Purchase Specification Form
-          A<br>โปรดกรอกข้อมูล ลงทะเบียนผู้ขายตามหมายเลข <strong>"${text(data.requestNumber)}"</strong> สำหรับเอกสาร General Purchase Specification Form B และตอบกลับภายใน 7 วัน`
-      )}
-    `,
   })
+}
 
-export const email_ToRequester_GprCSetup = (data: MailTemplateData) =>
-  renderStandardWorkflowMail(data, {
-    recipient: data.userName || data.recipientName || 'Requester',
-    status: 'GPR C setup required',
-    message: `Please configure the GPR C Approver, PC PIC, and Circular List for request <strong>"${text(data.requestNumber)}"</strong>.`,
-    thaiStatus: 'ต้องกำหนดผู้ดำเนินการ GPR C',
-    thaiMessage: `กรุณากำหนด GPR C Approver, PC PIC และ Circular List สำหรับคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong>`,
-  })
+export const email_ToGprCApprover_FirstStep = (data: MailTemplateData) => {
+  const requestNumber = text(data.requestNumber)
+  const recipient = text(data.userName || data.recipientName, 'Approver')
 
-export const email_ToGprCApprover_FirstStep = (data: MailTemplateData) =>
-  renderStandardWorkflowMail(data, {
-    recipient: data.userName || data.recipientName,
-    status: 'GPR C approval required',
-    message: `Please review and approve request <strong>"${text(data.requestNumber)}"</strong> for General Purchase Specification Form C.`,
-    detail: 'Please review the attached Vendor Form B before approving this step.',
-    thaiStatus: 'รอการตรวจสอบและอนุมัติ GPR C',
-    thaiMessage: `กรุณาตรวจสอบและอนุมัติคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong> สำหรับ General Purchase Specification Form C`,
-    thaiDetail: 'กรุณาตรวจสอบ Vendor Form B ที่แนบมาก่อนอนุมัติขั้นตอนนี้',
+  return renderMailLayout({
+    preheader: preheaderText('GPR C approval required for request', data.requestNumber),
+    statusEn: 'GPR C approval required',
+    statusTh: 'รออนุมัติ GPR C',
+    requestNumber: data.requestNumber,
+    sections: [
+      englishSection({
+        headline: 'A GPR C step is waiting for your approval',
+        greeting: `Dear <strong>${recipient}</strong>,`,
+        message: `Please review and approve request <strong>${requestNumber}</strong> for General Purchase Specification Form C.`,
+        reason: renderNoteBox('Please review the attached Vendor Form B before approving this step.'),
+        rows: vendorRows(data, false),
+        cta: buttonEn(data),
+      }),
+      thaiSection({
+        headline: 'มีขั้นตอน GPR C รอการอนุมัติจากคุณ',
+        greeting: `เรียน <strong>${recipient}</strong>`,
+        message: `กรุณาตรวจสอบและอนุมัติคำขอเลขที่ <strong>${requestNumber}</strong> สำหรับ General Purchase Specification Form C`,
+        reason: renderNoteBox('กรุณาตรวจสอบ Vendor Form B ที่แนบมาก่อนอนุมัติขั้นตอนนี้'),
+        rows: vendorRows(data, true),
+        cta: buttonTh(data),
+      }),
+    ],
+    signerName: data.picName,
+    signerExt: data.picTel,
     signerRole: 'Requester',
   })
+}
 
 export const email_ToGprCApprover_NextStep = (data: MailTemplateData) => email_ToGprCApprover_FirstStep({ ...data, userName: data.picNextStepName })
 
-export const email_ToPic_RejectedByApprover = (data: MailTemplateData) =>
-  renderStandardWorkflowMail(data, {
-    recipient: data.recipientName || 'PO PIC',
-    status: '[REJECT] register vendor',
-    message: `Please recheck register vendor follow as <strong>"${text(data.requestNumber)}"</strong>. General Purchase Specification Form B.`,
-    detail: `Reason: ${text(data.remarkEN)}`,
-    thaiStatus: '[ปฏิเสธการตรวจสอบ] การลงทะเบียนผู้ขาย',
-    thaiMessage: `โปรดตรวจสอบลงทะเบียนผู้ขายตามหมายเลข <strong>"${text(data.requestNumber)}"</strong> เอกสาร General Purchase Specification Form B อีกครั้ง`,
-    thaiDetail: `สาเหตุ: ${text(data.remarkTH || data.remarkEN)}`,
-  })
+export const email_ToPic_RejectedByApprover = (data: MailTemplateData) => {
+  const requestNumber = text(data.requestNumber)
+  const recipient = text(data.recipientName, 'PO PIC')
 
-export const email_ToChecker_CheckRequired = (data: MailTemplateData) =>
-  renderStandardWorkflowMail(data, {
-    recipient: data.recipientName || 'PO CHECKER',
-    status: 'Under checking register vendor',
-    message: `Please check vendor request <strong>"${text(data.requestNumber)}"</strong>.`,
-    thaiStatus: 'อยู่ระหว่างการตรวจสอบการลงทะเบียนผู้ขาย',
-    thaiMessage: `กรุณาตรวจสอบคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong>`,
+  return renderMailLayout({
+    preheader: preheaderText('Vendor request rejected', data.requestNumber),
+    statusEn: 'Rejected',
+    statusTh: 'ไม่อนุมัติ',
+    requestNumber: data.requestNumber,
+    sections: [
+      englishSection({
+        headline: 'This vendor request has been rejected',
+        greeting: `Dear <strong>${recipient}</strong>,`,
+        message: `Vendor request <strong>${requestNumber}</strong> was rejected. The reason is below.`,
+        reason: renderReasonBox('Reason', text(data.remarkEN)),
+        rows: vendorRows(data, false),
+        cta: buttonEn(data),
+      }),
+      thaiSection({
+        headline: 'คำขอลงทะเบียนผู้ขายนี้ไม่ได้รับการอนุมัติ',
+        greeting: `เรียน <strong>${recipient}</strong>`,
+        message: `คำขอเลขที่ <strong>${requestNumber}</strong> ไม่ได้รับการอนุมัติ สาเหตุอยู่ด้านล่าง`,
+        reason: renderReasonBox('สาเหตุ', text(data.remarkTH || data.remarkEN)),
+        rows: vendorRows(data, true),
+        cta: buttonTh(data),
+      }),
+    ],
+    signerName: data.picName,
+    signerExt: data.picTel,
+    signerRole: 'PO & SCM PIC',
   })
+}
 
-export const email_ToPic_RecheckByApprover = (data: MailTemplateData) =>
-  renderStandardWorkflowMail(data, {
-    recipient: data.recipientName || 'PO PIC',
-    status: 'Vendor registration requires recheck',
-    message: `Please recheck vendor request <strong>"${text(data.requestNumber)}"</strong>.`,
-    detail: `Reason: ${text(data.remarkEN)}`,
-    thaiStatus: 'ต้องตรวจสอบการลงทะเบียนผู้ขายอีกครั้ง',
-    thaiMessage: `กรุณาตรวจสอบคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong> อีกครั้ง`,
-    thaiDetail: `สาเหตุ: ${text(data.remarkTH || data.remarkEN)}`,
-  })
+export const email_ToChecker_CheckRequired = (data: MailTemplateData) => {
+  const requestNumber = text(data.requestNumber)
+  const recipient = text(data.recipientName, 'PO Checker')
 
-export const email_ToPic_RecheckByGprCApprover = (data: MailTemplateData) =>
-  renderStandardWorkflowMail(data, {
-    recipient: data.recipientName || 'PO PIC',
-    status: 'GPR C re-check requested',
-    message:
-      `The GPR C approver requested changes for vendor request <strong>"${text(data.requestNumber)}"</strong>. ` +
-      'Please review the information before resubmitting it to the same approver.',
-    detail: `${text(data.stageLabel, 'GPR C Approver')} remark: ${text(data.remarkEN)}`,
-    thaiStatus: 'ผู้อนุมัติ GPR C ขอให้ตรวจสอบอีกครั้ง',
-    thaiMessage: `ผู้อนุมัติ GPR C ขอให้แก้ไขคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong> กรุณาตรวจสอบข้อมูลก่อนส่งกลับให้ผู้อนุมัติคนเดิม`,
-    thaiDetail: `หมายเหตุจาก ${text(data.stageLabel, 'ผู้อนุมัติ GPR C')}: ${text(data.remarkTH || data.remarkEN)}`,
+  return renderMailLayout({
+    preheader: preheaderText('Please check vendor request', data.requestNumber),
+    statusEn: 'Check required',
+    statusTh: 'รอตรวจสอบ',
+    requestNumber: data.requestNumber,
+    sections: [
+      englishSection({
+        headline: 'A vendor request is waiting for your check',
+        greeting: `Dear <strong>${recipient}</strong>,`,
+        message: `Please check vendor request <strong>${requestNumber}</strong>. The vendor details are below.`,
+        rows: vendorRows(data, false),
+        cta: buttonEn(data),
+      }),
+      thaiSection({
+        headline: 'มีคำขอลงทะเบียนผู้ขายรอการตรวจสอบจากคุณ',
+        greeting: `เรียน <strong>${recipient}</strong>`,
+        message: `กรุณาตรวจสอบคำขอเลขที่ <strong>${requestNumber}</strong> รายละเอียดผู้ขายอยู่ด้านล่าง`,
+        rows: vendorRows(data, true),
+        cta: buttonTh(data),
+      }),
+    ],
+    signerName: data.picName,
+    signerExt: data.picTel,
+    signerRole: 'PO & SCM PIC',
   })
+}
 
-export const email_ToPoManager_ApproveRequired = (data: MailTemplateData) =>
-  renderStandardWorkflowMail(data, {
-    recipient: data.recipientName || 'PO Mgr',
-    status: 'Under approval register vendor',
-    message: `Please approve vendor request <strong>"${text(data.requestNumber)}"</strong>.`,
-    thaiStatus: 'อยู่ระหว่างการอนุมัติการลงทะเบียนผู้ขาย',
-    thaiMessage: `กรุณาอนุมัติคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong>`,
+export const email_ToPic_RecheckByApprover = (data: MailTemplateData) => {
+  const requestNumber = text(data.requestNumber)
+  const recipient = text(data.recipientName, 'PO PIC')
+
+  return renderMailLayout({
+    preheader: preheaderText('Recheck required for vendor request', data.requestNumber),
+    statusEn: 'Recheck required',
+    statusTh: 'ต้องตรวจสอบอีกครั้ง',
+    requestNumber: data.requestNumber,
+    sections: [
+      englishSection({
+        headline: 'The approver sent this request back for recheck',
+        greeting: `Dear <strong>${recipient}</strong>,`,
+        message: `Please update vendor request <strong>${requestNumber}</strong> and submit it again.`,
+        reason: renderReasonBox('Reason from approver', text(data.remarkEN)),
+        rows: vendorRows(data, false),
+        cta: buttonEn(data),
+      }),
+      thaiSection({
+        headline: 'ผู้อนุมัติส่งคำขอนี้กลับมาให้ตรวจสอบอีกครั้ง',
+        greeting: `เรียน <strong>${recipient}</strong>`,
+        message: `กรุณาแก้ไขคำขอเลขที่ <strong>${requestNumber}</strong> แล้วส่งกลับเข้าระบบอีกครั้ง`,
+        reason: renderReasonBox('เหตุผลจากผู้อนุมัติ', text(data.remarkTH || data.remarkEN)),
+        rows: vendorRows(data, true),
+        cta: buttonTh(data),
+      }),
+    ],
+    signerName: data.picName,
+    signerExt: data.picTel,
+    signerRole: 'PO & SCM PIC',
   })
+}
+
+export const email_ToPic_RecheckByGprCApprover = (data: MailTemplateData) => {
+  const requestNumber = text(data.requestNumber)
+  const recipient = text(data.recipientName, 'PO PIC')
+
+  return renderMailLayout({
+    preheader: preheaderText('GPR C recheck requested for vendor request', data.requestNumber),
+    statusEn: 'GPR C recheck requested',
+    statusTh: 'GPR C ขอให้ตรวจสอบอีกครั้ง',
+    requestNumber: data.requestNumber,
+    sections: [
+      englishSection({
+        headline: 'The GPR C approver requested changes',
+        greeting: `Dear <strong>${recipient}</strong>,`,
+        message: `Please review vendor request <strong>${requestNumber}</strong> and resubmit it. It will return to the same approver.`,
+        reason: renderReasonBox(`${text(data.stageLabel, 'GPR C Approver')} remark`, text(data.remarkEN)),
+        rows: vendorRows(data, false),
+        cta: buttonEn(data),
+      }),
+      thaiSection({
+        headline: 'ผู้อนุมัติ GPR C ขอให้แก้ไขคำขอ',
+        greeting: `เรียน <strong>${recipient}</strong>`,
+        message: `กรุณาตรวจสอบคำขอเลขที่ <strong>${requestNumber}</strong> แล้วส่งกลับ คำขอจะกลับไปที่ผู้อนุมัติคนเดิม`,
+        reason: renderReasonBox(`หมายเหตุจาก ${text(data.stageLabel, 'ผู้อนุมัติ GPR C')}`, text(data.remarkTH || data.remarkEN)),
+        rows: vendorRows(data, true),
+        cta: buttonTh(data),
+      }),
+    ],
+    signerName: data.picName,
+    signerExt: data.picTel,
+    signerRole: 'PO & SCM PIC',
+  })
+}
+
+export const email_ToPoManager_ApproveRequired = (data: MailTemplateData) => {
+  const requestNumber = text(data.requestNumber)
+  const recipient = text(data.recipientName, 'PO Mgr')
+
+  return renderMailLayout({
+    preheader: preheaderText('Please approve vendor request', data.requestNumber),
+    statusEn: 'Approval required',
+    statusTh: 'รออนุมัติ',
+    requestNumber: data.requestNumber,
+    sections: [
+      englishSection({
+        headline: 'A vendor request is waiting for your approval',
+        greeting: `Dear <strong>${recipient}</strong>,`,
+        message: `Please review and approve vendor request <strong>${requestNumber}</strong>. The vendor details are below.`,
+        rows: vendorRows(data, false),
+        cta: buttonEn(data),
+      }),
+      thaiSection({
+        headline: 'มีคำขอลงทะเบียนผู้ขายรอการอนุมัติจากคุณ',
+        greeting: `เรียน <strong>${recipient}</strong>`,
+        message: `กรุณาตรวจสอบและอนุมัติคำขอลงทะเบียนผู้ขายเลขที่ <strong>${requestNumber}</strong> รายละเอียดผู้ขายอยู่ด้านล่าง`,
+        rows: vendorRows(data, true),
+        cta: buttonTh(data),
+      }),
+    ],
+    signerName: data.picName,
+    signerExt: data.picTel,
+    signerRole: 'PO & SCM PIC',
+  })
+}
 
 export const email_ToPoGm_ApproveRequired = (data: MailTemplateData) => email_ToPoManager_ApproveRequired({ ...data, recipientName: data.recipientName || 'PO GM' })
 
@@ -428,93 +609,267 @@ export const email_ToMd_ApproveRequired = (data: MailTemplateData) => email_ToPo
 
 export const email_ToAccount_RegisterRequired = (data: MailTemplateData) => email_ToPoManager_ApproveRequired({ ...data, recipientName: data.recipientName || 'Account PIC' })
 
-export const email_ToRequester_RegistrationCompleted = (data: MailTemplateData) =>
-  renderStandardWorkflowMail(data, {
-    recipient: data.userName || data.recipientName,
-    status: 'Vendor registration completed',
-    message: `Vendor request <strong>"${text(data.requestNumber)}"</strong> has been completed.`,
-    thaiStatus: 'การลงทะเบียนผู้ขายสำเร็จ',
-    thaiMessage: `คำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong> ดำเนินการเสร็จเรียบร้อยแล้ว`,
-    extraHtml: `
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="border-collapse: collapse; margin: 18px 0 20px 0;">
-        <tr>
-          <td align="center" style="border: 1px solid #bdbdbd; background: #f7f7f7; padding: 14px;">
-            <div style="font-size: 11px; color: #555555;">Vendor Code</div>
-            <div style="font-size: 22px; line-height: 1.4; font-weight: 700; color: #111111; letter-spacing: 1px;">${text(data.vendorCode)}</div>
-          </td>
-        </tr>
-      </table>
-    `,
-  })
+export const email_ToRequester_RegistrationCompleted = (data: MailTemplateData) => {
+  const requestNumber = text(data.requestNumber)
+  const recipient = text(data.userName || data.recipientName, 'Requester')
+  const vendorCodeBox = `
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="border-collapse: separate; margin: 14px 0 0 0;">
+      <tr>
+        <td style="background: ${COLOR.soft}; border: 1px solid ${COLOR.line}; border-radius: 6px; padding: 10px 16px; font-family: ${FONT};">
+          <div style="font-size: 11px; color: ${COLOR.muted};">Vendor Code / รหัสผู้ขาย</div>
+          <div style="font-size: 22px; font-weight: 700; letter-spacing: 1.5px; color: ${COLOR.text}; font-family: Consolas, 'Courier New', monospace;"
+          >${text(data.vendorCode)}</div>
+        </td>
+      </tr>
+    </table>`
 
-export const email_ToRequester_RegistrationIncomplete = (data: MailTemplateData) => {
-  const reasons = (data.reasons || []).map((reason) => `<li style="margin-bottom: 4px;">${text(reason)}</li>`).join('')
-  const reasonHtml = reasons
-    ? `<div style="font-size: 12px; line-height: 1.55; color: #991b1b;"><strong>Reason(s):</strong><ul style="margin: 6px 0 0 18px; padding: 0;">${reasons}</ul></div>`
-    : ''
-
-  return renderStandardWorkflowMail(data, {
-    recipient: data.userName || data.recipientName,
-    status: 'Vendor registration incomplete',
-    message: `Vendor request <strong>"${text(data.requestNumber)}"</strong> could not be completed.`,
-    thaiStatus: 'การลงทะเบียนผู้ขายไม่สำเร็จ',
-    thaiMessage: `คำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong> ยังดำเนินการไม่สำเร็จ`,
-    extraHtml: reasonHtml,
+  return renderMailLayout({
+    preheader: preheaderText('Vendor registration completed for request', data.requestNumber),
+    statusEn: 'Registration completed',
+    statusTh: 'ลงทะเบียนสำเร็จ',
+    requestNumber: data.requestNumber,
+    heroExtra: vendorCodeBox,
+    sections: [
+      englishSection({
+        headline: 'Vendor registration is complete',
+        greeting: `Dear <strong>${recipient}</strong>,`,
+        message: `Vendor request <strong>${requestNumber}</strong> has been completed. The vendor code is shown above.`,
+        rows: vendorRows(data, false),
+        cta: buttonEn(data, 'View request'),
+      }),
+      thaiSection({
+        headline: 'ลงทะเบียนผู้ขายเรียบร้อยแล้ว',
+        greeting: `เรียน <strong>${recipient}</strong>`,
+        message: `คำขอเลขที่ <strong>${requestNumber}</strong> ดำเนินการเสร็จเรียบร้อยแล้ว รหัสผู้ขายแสดงอยู่ด้านบน`,
+        rows: vendorRows(data, true),
+        cta: buttonTh(data, 'ดูคำขอในระบบ'),
+      }),
+    ],
+    signerName: data.picName,
+    signerExt: data.picTel,
+    signerRole: 'PO & SCM PIC',
   })
 }
 
-export const email_ToUser_ActionRequired = (data: MailTemplateData) =>
-  renderMailLayout({
-    recipient: data.recipientName || 'Recipient',
+export const email_ToRequester_RegistrationIncomplete = (data: MailTemplateData) => {
+  const requestNumber = text(data.requestNumber)
+  const recipient = text(data.userName || data.recipientName, 'Requester')
+  const reasonItems = (data.reasons || []).map((reason) => `<li style="margin: 0 0 4px 0;">${text(reason)}</li>`).join('')
+  const reasonList = reasonItems ? `<ul style="margin: 4px 0 0 18px; padding: 0;">${reasonItems}</ul>` : ''
+
+  return renderMailLayout({
+    preheader: preheaderText('Vendor registration incomplete for request', data.requestNumber),
+    statusEn: 'Registration incomplete',
+    statusTh: 'ลงทะเบียนไม่สำเร็จ',
+    requestNumber: data.requestNumber,
+    sections: [
+      englishSection({
+        headline: 'Vendor registration could not be completed',
+        greeting: `Dear <strong>${recipient}</strong>,`,
+        message: `Vendor request <strong>${requestNumber}</strong> could not be completed.`,
+        reason: reasonList ? renderReasonBox('Reason(s)', reasonList) : '',
+        rows: vendorRows(data, false),
+        cta: buttonEn(data, 'View request'),
+      }),
+      thaiSection({
+        headline: 'การลงทะเบียนผู้ขายยังไม่สำเร็จ',
+        greeting: `เรียน <strong>${recipient}</strong>`,
+        message: `คำขอเลขที่ <strong>${requestNumber}</strong> ยังดำเนินการไม่สำเร็จ`,
+        reason: reasonList ? renderReasonBox('สาเหตุ', reasonList) : '',
+        rows: vendorRows(data, true),
+        cta: buttonTh(data, 'ดูคำขอในระบบ'),
+      }),
+    ],
     signerName: data.picName,
-    signerTel: data.picTel,
+    signerExt: data.picTel,
     signerRole: 'PO & SCM PIC',
-    content: `
-      ${renderStatus(
-        'Action Required',
-        `${text(data.stageLabel, 'Current workflow stage')} requires your action for request <strong>"${text(data.requestNumber)}"</strong>.`,
-        data.note ? `Note: ${text(data.note)}` : ''
-      )}
-      ${renderDetails([
-        ['Vendor Name', data.vendorName],
-        ['Support Product / Process', data.supportProduct],
-        ['Stage', data.stageLabel],
-        ['Note', data.note],
-      ])}
-      ${renderLink(data.systemLink)}
-      ${renderThaiStatus(
-        'ต้องดำเนินการเพิ่มเติม',
-        `ขั้นตอน ${text(data.stageLabel, 'ปัจจุบัน')} ต้องการให้คุณดำเนินการสำหรับคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong>`,
-        data.note ? `หมายเหตุ: ${text(data.note)}` : ''
-      )}
-    `,
   })
+}
+
+export const email_ToUser_ActionRequired = (data: MailTemplateData) => {
+  const requestNumber = text(data.requestNumber)
+  const recipient = text(data.recipientName, 'Recipient')
+  const stageEn = text(data.stageLabel, 'The current stage')
+  const stageTh = text(data.stageLabel, 'ขั้นตอนปัจจุบัน')
+
+  return renderMailLayout({
+    preheader: preheaderText('Action required for request', data.requestNumber),
+    statusEn: 'Action required',
+    statusTh: 'ต้องดำเนินการเพิ่มเติม',
+    requestNumber: data.requestNumber,
+    sections: [
+      englishSection({
+        headline: 'Your action is required',
+        greeting: `Dear <strong>${recipient}</strong>,`,
+        message: `<strong>${stageEn}</strong> requires your action for request <strong>${requestNumber}</strong>.`,
+        reason: data.note ? renderReasonBox('Note', text(data.note)) : '',
+        rows: [
+          ['Vendor name', data.vendorName],
+          ['Supported product / process', data.supportProduct],
+          ['Stage', data.stageLabel],
+        ],
+        cta: buttonEn(data),
+      }),
+      thaiSection({
+        headline: 'มีงานที่ต้องให้คุณดำเนินการเพิ่มเติม',
+        greeting: `เรียน <strong>${recipient}</strong>`,
+        message: `<strong>${stageTh}</strong> ต้องการให้คุณดำเนินการสำหรับคำขอเลขที่ <strong>${requestNumber}</strong>`,
+        reason: data.note ? renderReasonBox('หมายเหตุ', text(data.note)) : '',
+        rows: [
+          ['ชื่อผู้ขาย', data.vendorName],
+          ['ผลิตภัณฑ์ / กระบวนการที่สนับสนุน', data.supportProduct],
+          ['ขั้นตอน', data.stageLabel],
+        ],
+        cta: buttonTh(data),
+      }),
+    ],
+    signerName: data.picName,
+    signerExt: data.picTel,
+    signerRole: 'PO & SCM PIC',
+  })
+}
 
 // Sent back to the GPR C approver (the judge who raised the Action Required) once the assigned PIC
 // records their result — closes the "Email result" loop in the GPR C flow.
-export const email_ToUser_ActionResult = (data: MailTemplateData) =>
-  renderMailLayout({
-    recipient: data.recipientName || 'Approver',
+export const email_ToUser_ActionResult = (data: MailTemplateData) => {
+  const requestNumber = text(data.requestNumber)
+  const recipient = text(data.recipientName, 'Approver')
+  const stageEn = text(data.stageLabel, 'the current stage')
+  const stageTh = text(data.stageLabel, 'ขั้นตอนปัจจุบัน')
+
+  return renderMailLayout({
+    preheader: preheaderText('Action Required result recorded for request', data.requestNumber),
+    statusEn: 'Action result recorded',
+    statusTh: 'บันทึกผลการดำเนินการแล้ว',
+    requestNumber: data.requestNumber,
+    sections: [
+      englishSection({
+        headline: 'The PIC has recorded the result',
+        greeting: `Dear <strong>${recipient}</strong>,`,
+        message: `The assigned PIC has recorded the Action Required result for <strong>${stageEn}</strong> of request <strong>${requestNumber}</strong>.`,
+        reason: data.note ? renderReasonBox('Result', text(data.note)) : '',
+        rows: [
+          ['Vendor name', data.vendorName],
+          ['Supported product / process', data.supportProduct],
+          ['Stage', data.stageLabel],
+        ],
+        cta: buttonEn(data),
+      }),
+      thaiSection({
+        headline: 'PIC บันทึกผลการดำเนินการแล้ว',
+        greeting: `เรียน <strong>${recipient}</strong>`,
+        message: `PIC ที่ได้รับมอบหมายบันทึกผล Action Required ของ <strong>${stageTh}</strong> สำหรับคำขอเลขที่ <strong>${requestNumber}</strong> แล้ว`,
+        reason: data.note ? renderReasonBox('ผลลัพธ์', text(data.note)) : '',
+        rows: [
+          ['ชื่อผู้ขาย', data.vendorName],
+          ['ผลิตภัณฑ์ / กระบวนการที่สนับสนุน', data.supportProduct],
+          ['ขั้นตอน', data.stageLabel],
+        ],
+        cta: buttonTh(data),
+      }),
+    ],
     signerName: data.picName,
-    signerTel: data.picTel,
+    signerExt: data.picTel,
     signerRole: 'PO & SCM PIC',
-    content: `
-      ${renderStatus(
-        'Action Required Result Recorded',
-        `The assigned PIC has recorded the Action Required result for ${text(data.stageLabel, 'the current stage')} of request <strong>"${text(data.requestNumber)}"</strong>.`,
-        data.note ? `Result: ${text(data.note)}` : ''
-      )}
-      ${renderDetails([
-        ['Vendor Name', data.vendorName],
-        ['Support Product / Process', data.supportProduct],
-        ['Stage', data.stageLabel],
-        ['Result', data.note],
-      ])}
-      ${renderLink(data.systemLink)}
-      ${renderThaiStatus(
-        'บันทึกผลการดำเนินการแล้ว',
-        `PIC ที่ได้รับมอบหมายได้บันทึกผลการดำเนินการของขั้นตอน ${text(data.stageLabel, 'ปัจจุบัน')} สำหรับคำขอหมายเลข <strong>"${text(data.requestNumber)}"</strong> แล้ว`,
-        data.note ? `ผลลัพธ์: ${text(data.note)}` : ''
-      )}
-    `,
   })
+}
+
+// ---------------------------------------------------------------------------
+// Supplier mails (sent outside the company: never show the internal extension)
+// ---------------------------------------------------------------------------
+
+const renderConfidential = (html: string) => `<p style="margin: 0 0 8px 0; font-size: 11px; line-height: 1.6; color: ${COLOR.muted}; font-family: ${FONT};">${html}</p>`
+
+export const email_ToSupplier_RequestFormA = (data: MailTemplateData) => {
+  const referenceRaw = data.topicRef || data.requestNumber
+  const reference = text(referenceRaw)
+  const isNewSupplier = Boolean(data.isNewSupplier)
+
+  return renderMailLayout({
+    preheader: preheaderText('Documents required for supplier registration', referenceRaw),
+    statusEn: 'Documents required',
+    statusTh: 'ขอเอกสารประกอบ',
+    requestNumber: referenceRaw,
+    sections: [
+      englishSection({
+        headline: isNewSupplier ? 'Documents required for new supplier registration' : 'Documents required for supplier re-registration',
+        greeting: 'Dear <strong>Supplier</strong>,',
+        message: isNewSupplier
+          ? `To register your company as a new supplier of <strong>${BRAND_NAME} Co., Ltd.</strong>, and to share our Environmental, Quality and Export Control policies, ` +
+            `please send the documents below for reference <strong>${reference}</strong> <strong>within 7 days</strong>.`
+          : `To update your supplier registration with <strong>${BRAND_NAME} Co., Ltd.</strong> and confirm our Environmental, Quality and Export Control policies, ` +
+            `please send the documents below for reference <strong>${reference}</strong> <strong>within 7 days</strong>.`,
+        body:
+          renderChecklist([
+            '<strong>Company certificate</strong> (Limited or Public Company Limited) and <strong>VAT registration</strong> (Por Por 20)',
+            '<strong>Company profile</strong>',
+            '<strong>Other certifications</strong>, such as ISO 9001, ISO 14001 and a main product catalog',
+            '<strong>Copy of bank book</strong>',
+            '<strong>MFG survey</strong> reply, in Excel format',
+            '<strong>Reply Form</strong>, in PDF format',
+          ]) +
+          renderNoteBox('Details are in the attached files. If you have any questions, please reply to this email.') +
+          renderConfidential(
+            'This message and its attachments contain confidential information intended only for the named recipient and are protected by law. ' +
+              'If you are not the intended recipient, please delete this message. Any disclosure, copying, distribution or action based on this message is strictly prohibited.'
+          ),
+      }),
+      thaiSection({
+        headline: isNewSupplier ? 'ขอเอกสารเพื่อลงทะเบียนผู้ผลิต / ผู้จัดจำหน่ายรายใหม่' : 'ขอเอกสารเพื่ออัปเดตการลงทะเบียนผู้ผลิต / ผู้จัดจำหน่าย',
+        greeting: 'เรียน <strong>ผู้ผลิตและผู้จัดจำหน่าย</strong>',
+        message: isNewSupplier
+          ? `เพื่อลงทะเบียนบริษัทของท่านเป็นผู้ผลิต / ผู้จัดจำหน่ายรายใหม่ของ <strong>${COMPANY_NAME_TH}</strong> ` +
+            'และแจ้งนโยบายด้านสิ่งแวดล้อม ด้านคุณภาพ และด้านการควบคุมการส่งออก ' +
+            `รบกวนส่งเอกสารด้านล่างสำหรับเลขที่อ้างอิง <strong>${reference}</strong> <strong>ภายใน 7 วัน</strong>`
+          : `เพื่ออัปเดตข้อมูลการลงทะเบียนกับ <strong>${COMPANY_NAME_TH}</strong> ` +
+            'และยืนยันนโยบายด้านสิ่งแวดล้อม ด้านคุณภาพ และด้านการควบคุมการส่งออก ' +
+            `รบกวนส่งเอกสารด้านล่างสำหรับเลขที่อ้างอิง <strong>${reference}</strong> <strong>ภายใน 7 วัน</strong>`,
+        body:
+          renderChecklist([
+            '<strong>หนังสือรับรองนิติบุคคล</strong> และ <strong>ภ.พ.20</strong>',
+            '<strong>Company profile</strong>',
+            '<strong>เอกสารรับรองอื่น ๆ</strong> เช่น ISO 9001, ISO 14001 และแคตตาล็อกสินค้าหลัก',
+            '<strong>สำเนาหน้าสมุดบัญชีธนาคาร</strong>',
+            'ตอบกลับแบบสำรวจ <strong>MFG survey</strong> เป็นไฟล์ Excel',
+            'ตอบกลับ <strong>Reply Form</strong> เป็นไฟล์ PDF',
+          ]) +
+          renderNoteBox('รายละเอียดเพิ่มเติมอยู่ในไฟล์แนบ หากมีข้อสงสัย ตอบกลับอีเมลนี้ได้เลยค่ะ') +
+          renderConfidential(
+            'ข้อความนี้และไฟล์แนบมีข้อมูลที่เป็นความลับ สำหรับผู้รับที่ระบุไว้เท่านั้น และได้รับความคุ้มครองตามกฎหมาย ' +
+              'หากท่านไม่ใช่ผู้รับที่ระบุไว้ กรุณาลบข้อความนี้ ห้ามเปิดเผย ทำสำเนา เผยแพร่ หรือดำเนินการใด ๆ โดยอ้างอิงข้อความนี้'
+          ),
+      }),
+    ],
+    signerName: data.picName,
+    signerRole: 'PO & SCM PIC',
+  })
+}
+
+export const email_ToSupplier_RequestFormB = (data: MailTemplateData) => {
+  const requestNumber = text(data.requestNumber)
+
+  return renderMailLayout({
+    preheader: preheaderText('General Purchase Specification Form B required for', data.requestNumber),
+    statusEn: 'Form B required',
+    statusTh: 'ขอเอกสาร Form B',
+    requestNumber: data.requestNumber,
+    sections: [
+      englishSection({
+        headline: 'Please complete General Purchase Specification Form B',
+        greeting: 'Dear <strong>Supplier</strong>,',
+        message:
+          'Because your company did <strong>not accept</strong> General Purchase Specification Form A, ' +
+          `please complete Form B for reference <strong>${requestNumber}</strong> and reply <strong>within 7 days</strong>.`,
+      }),
+      thaiSection({
+        headline: 'กรุณากรอกเอกสาร General Purchase Specification Form B',
+        greeting: 'เรียน <strong>ผู้ผลิตและผู้จัดจำหน่าย</strong>',
+        message:
+          'เนื่องจากบริษัทของท่าน<strong>ไม่ยอมรับ</strong>ข้อกำหนดตามเอกสาร General Purchase Specification Form A ' +
+          `กรุณากรอกเอกสาร Form B สำหรับเลขที่อ้างอิง <strong>${requestNumber}</strong> และตอบกลับ<strong>ภายใน 7 วัน</strong>`,
+      }),
+    ],
+    signerName: data.picName,
+    signerRole: 'PO & SCM PIC',
+  })
+}
