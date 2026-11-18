@@ -176,9 +176,14 @@ export const ReRegisterUpdateSchema = z.object({
   path: ['VENDOR'],
 })
 
+// The page sends VENDORS_ID (UPPER_SNAKE); vendor_id is kept for older callers. The controller reads both.
 export const ReRegisterDeleteSchema = z.object({
-  vendor_id: z.union([z.number().int().positive('Vendor ID is required'), z.string().regex(/^\d+$/, 'Vendor ID must be numeric')]),
+  vendor_id: z.union([z.number().int().positive('Vendor ID is required'), z.string().regex(/^\d+$/, 'Vendor ID must be numeric')]).optional(),
+  VENDORS_ID: z.union([z.number().int().positive('Vendor ID is required'), z.string().regex(/^\d+$/, 'Vendor ID must be numeric')]).optional(),
   UPDATE_BY: z.string().min(1, 'UPDATE_BY is required'),
+}).refine(data => data.vendor_id !== undefined || data.VENDORS_ID !== undefined, {
+  message: 'Vendor ID is required',
+  path: ['VENDORS_ID'],
 })
 
 // --- Export Schema ---
