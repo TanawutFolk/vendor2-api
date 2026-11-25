@@ -1158,6 +1158,27 @@ const handleNormalApproval = async (
     })
   )
 
+  // Waiting tasks ordered between the finished task and the next one belong to a branch that was not
+  // taken (GPR accepted jumps from PO PIC In Progress to Document Check, past Vendor Disagreed and
+  // Issue GPR B / C). Mark them Skipped now instead of leaving them Waiting until the request ends.
+  // A Re-check to PO PIC resets every later task to Pending, and a Skipped task can still be
+  // activated, so the branch stays available.
+  const bypassedSteps = context.steps.filter(
+    (step) =>
+      step.step_order > currentStep.step_order &&
+      step.step_order < nextStep.step_order &&
+      step.approval_step_status_id === context.statusIdentity.approvalStep.pending
+  )
+  for (const bypassedStep of bypassedSteps) {
+    sqlList.push(
+      await buildApprovalStepUpdateSql(context, {
+        REQUEST_APPROVAL_STEP_ID: bypassedStep.step_id,
+        M_APPROVAL_STEP_STATUS_ID: context.statusIdentity.approvalStep.skipped,
+        UPDATE_BY: dataItem.UPDATE_BY || 'SYSTEM',
+      })
+    )
+  }
+
   if (getStepType(nextStep, context.statusIdentity) === StepType.ISSUE_GPR_B) {
     postCommitTasks.push(async () => {
       await sendMail_NegotiationStageDispatch(dataItem.REQUEST_REGISTER_VENDOR_ID, nextStep.DESCRIPTION)

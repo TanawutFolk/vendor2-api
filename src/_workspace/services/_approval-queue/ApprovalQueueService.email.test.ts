@@ -51,7 +51,7 @@ const requestContext = {
 // Post-commit mail tasks are fire-and-forget (void runPostCommitTasks). Give them a tick to run.
 const flushPostCommit = () => new Promise((resolve) => setTimeout(resolve, 30))
 
-async function setup(steps: any[], context: any, requester = 'S00009', options: { recheckToPic?: boolean } = {}) {
+async function setup(steps: any[], context: any, requester = 'S00009', options: { recheckToPic?: boolean; targetStepCode?: string } = {}) {
   steps = steps.map((step) => ({
     ...step,
     WORKFLOW_STEP_TYPE_ID: step.WORKFLOW_STEP_TYPE_ID || step.WORKFLOW_STEP_MASTER_ID,
@@ -74,7 +74,12 @@ async function setup(steps: any[], context: any, requester = 'S00009', options: 
       const isRecheck = transitionId === 3
       const isReject = transitionId === 2
       const nextStep = steps.find((step) => step.STEP_STATUS === 'pending')
-      const transitionNextStep = isRecheck && options.recheckToPic ? steps.find((step) => step.STEP_CODE === 'PO_PIC_IN_PROGRESS') : nextStep
+      const transitionNextStep =
+        isRecheck && options.recheckToPic
+          ? steps.find((step) => step.STEP_CODE === 'PO_PIC_IN_PROGRESS')
+          : options.targetStepCode
+            ? steps.find((step) => step.STEP_CODE === options.targetStepCode)
+            : nextStep
       return [
         {
           WORKFLOW_TRANSITION_ID: transitionId,
@@ -123,6 +128,8 @@ async function setup(steps: any[], context: any, requester = 'S00009', options: 
       execute: mock(async () => ({ insertId: 1 })),
       searchList: mock(async () => []),
     },
+    // Imported through the PRONES Vendor Code check; none of these tests reach Oracle.
+    OracleExecute: { searchOracle: mock(async () => []) },
   }))
 
   // Full superset of the helper exports ApprovalQueueService imports, so the import never fails.
@@ -349,6 +356,58 @@ describe('ApprovalQueueService.updateStatus email notifications', () => {
 
     expect(spies.nextStep).toHaveBeenCalledTimes(1)
     expect(spies.rejected).not.toHaveBeenCalled()
+  })
+
+  test('APPROVE that jumps past waiting tasks marks only those tasks Skipped', async () => {
+    // Same shape as GPR accepted: PO PIC In Progress (3) -> Document Check (7) passes Vendor Disagreed,
+    // Issue GPR B and Issue GPR C. Here the jump is MD (3) -> PO Mgr (6) past two waiting tasks.
+    const bypassedA = { ...nextApproverStep, REQUEST_APPROVAL_STEP_ID: 21, WORKFLOW_STEP_MASTER_ID: 300, STEP_ORDER: 4, STEP_CODE: 'VENDOR_DISAGREED', DESCRIPTION: 'Vendor Disagreed' }
+    const bypassedB = { ...nextApproverStep, REQUEST_APPROVAL_STEP_ID: 22, WORKFLOW_STEP_MASTER_ID: 301, STEP_ORDER: 5, STEP_CODE: 'ISSUE_GPR_B', DESCRIPTION: 'Issue GPR B' }
+    const target = { ...nextApproverStep, REQUEST_APPROVAL_STEP_ID: 23, STEP_ORDER: 6 }
+    const later = { ...nextApproverStep, REQUEST_APPROVAL_STEP_ID: 24, WORKFLOW_STEP_MASTER_ID: 305, STEP_ORDER: 7, STEP_CODE: 'PO_GM_APPROVAL', DESCRIPTION: 'PO GM Approval' }
+    const { ApprovalQueueService, spies, executeGuardedList } = await setup([approverStep, bypassedA, bypassedB, target, later], requestContext, 'S00009', {
+      targetStepCode: 'PO_MGR_APPROVAL',
+    })
+
+    const result = await ApprovalQueueService.updateStatus({
+      REQUEST_REGISTER_VENDOR_ID: 101,
+      CURRENT_TASK_ID: 10,
+      LOCK_VERSION: 0,
+      WORKFLOW_TRANSITION_ID: 1,
+      APPROVE_BY: 'S00001',
+      UPDATE_BY: 'S00001',
+    } as any)
+
+    expect(result.Status).toBe(true)
+    const sqlList = (executeGuardedList as any).mock.calls[0]?.[1] as string[]
+    const stepUpdate = (stepId: number) =>
+      sqlList.find((statement) => statement.includes('UPDATE request_approval_step SET') && statement.includes(`REQUEST_APPROVAL_STEP_ID = ${stepId};`))
+    expect(stepUpdate(21)).toContain('M_APPROVAL_STEP_STATUS_ID = 5')
+    expect(stepUpdate(22)).toContain('M_APPROVAL_STEP_STATUS_ID = 5')
+    expect(stepUpdate(23)).toContain('M_APPROVAL_STEP_STATUS_ID = 2')
+    expect(stepUpdate(24)).toBeUndefined()
+
+    await flushPostCommit()
+    expect(spies.nextStep).toHaveBeenCalledTimes(1)
+  })
+
+  test('APPROVE to the adjacent task skips nothing', async () => {
+    const later = { ...nextApproverStep, REQUEST_APPROVAL_STEP_ID: 24, WORKFLOW_STEP_MASTER_ID: 305, STEP_ORDER: 5, STEP_CODE: 'PO_GM_APPROVAL', DESCRIPTION: 'PO GM Approval' }
+    const { ApprovalQueueService, executeGuardedList } = await setup([approverStep, nextApproverStep, later], requestContext)
+
+    const result = await ApprovalQueueService.updateStatus({
+      REQUEST_REGISTER_VENDOR_ID: 101,
+      CURRENT_TASK_ID: 10,
+      LOCK_VERSION: 0,
+      WORKFLOW_TRANSITION_ID: 1,
+      APPROVE_BY: 'S00001',
+      UPDATE_BY: 'S00001',
+    } as any)
+
+    expect(result.Status).toBe(true)
+    const sql = ((executeGuardedList as any).mock.calls[0]?.[1] as string[]).join('\n')
+    expect(sql).not.toContain('M_APPROVAL_STEP_STATUS_ID = 5')
+    expect(sql).not.toContain('REQUEST_APPROVAL_STEP_ID = 24;')
   })
 
   test('final-step APPROVE queues the registration-completed email to the requester', async () => {
