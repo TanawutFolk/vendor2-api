@@ -89,9 +89,16 @@ describe('GprCApprovalService approval flow transitions', () => {
         gprCFlow: { draft: 1, requesterSetup: 2, inProgress: 3, approved: 4, rejected: 5, recheckRequired: 6 },
         actionResult: { pending: 1, incomplete: 2, completed: 3 },
       }
+      // The request is pinned to workflow definition 1, but a newer version is published with its own step master ids:
+      // every lookup must use the request's definition, or the Issue GPR C task is not recognised.
+      const latestPublishedWorkflowStep = Object.fromEntries(
+        Object.entries(identity.workflowStep).map(([code, id]) => [code, id + 100])
+      )
 
       return {
-        getWorkflowStepIdentity: mock(async () => identity.workflowStep),
+        getWorkflowStepIdentity: mock(async (workflowDefinitionId?: number) =>
+          workflowDefinitionId === 1 ? identity.workflowStep : latestPublishedWorkflowStep
+        ),
         getWorkflowStepTypeIdentity: mock(async () => identity.workflowStep),
         getApprovalStepStatusIdentity: mock(async () => identity.approvalStep),
         getRequestStateIdentity: mock(async () => identity.requestState),

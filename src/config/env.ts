@@ -9,6 +9,10 @@ export const loadEnvironmentVariables = () => {
     switch (process.env.NODE_ENV) {
       case 'development':
         return './.env.development'
+      case 'sit':
+        return './.env.sit'
+      case 'uat':
+        return './.env.uat'
       case 'production':
         return './.env.production'
       case 'azure':
@@ -22,5 +26,9 @@ export const loadEnvironmentVariables = () => {
     throw new Error(`.env file not found at: ${envFile}`)
   }
 
-  dotenv.config({ path: envFile })
+  // Bun preloads .env.development for NODE_ENV values it does not know (sit/uat), and dotenv
+  // never overwrites existing vars, so sit/uat must override those preloaded values.
+  const override = process.env.NODE_ENV === 'sit' || process.env.NODE_ENV === 'uat'
+
+  dotenv.config({ path: envFile, override })
 }

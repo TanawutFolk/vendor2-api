@@ -5,7 +5,9 @@ import { RowDataPacket, ResultSetHeader } from 'mysql2'
 import {
   formatRequestNumber,
   GROUP_CODE,
+  INACTIVE_VENDOR_RE_REGISTER_MESSAGE,
   inferActorType,
+  isInactiveVendorReRegister,
   requiresVendorReply,
   resolveGroupCodeForStep,
 } from './RegisterRequestWorkflowHelper'
@@ -96,6 +98,10 @@ export const RequestRegisterPageService = {
       const requestType = String(dataItem.REQUEST_TYPE || '').trim().toUpperCase()
       const requestNumberPrefix = String(dataItem.REQUEST_NUMBER_PREFIX || '').trim().toUpperCase()
       const isReRegisterRequest = requestType === 'RE_REGISTER' || requestNumberPrefix === 'R'
+      // The Re-register page disables the button for inactive vendors; enforce it here for direct API calls too.
+      if (isInactiveVendorReRegister(isReRegisterRequest, vendorRow.INUSE ?? vendorRow.inuse)) {
+        throw new Error(INACTIVE_VENDOR_RE_REGISTER_MESSAGE)
+      }
       const selectedVendorContactIds = normalizeVendorContactIds(dataItem)
       if (selectedVendorContactIds.length > 0) {
         dataItem.VENDOR_CONTACTS_ID = selectedVendorContactIds[0]
@@ -698,6 +704,10 @@ export const RequestRegisterPageService = {
 
   checkVendorCode: async (dataItem: any) => {
     return RequestRegisterGprService.checkVendorCode(dataItem)
+  },
+
+  generateVendorCode: async (dataItem: any) => {
+    return RequestRegisterGprService.generateVendorCode(dataItem)
   },
 
   saveAccountVendorCode: async (dataItem: any) => {

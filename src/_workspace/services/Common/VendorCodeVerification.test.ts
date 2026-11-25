@@ -40,33 +40,29 @@ async function setup(options: SetupOptions = {}) {
 }
 
 describe('verifyVendorCode', () => {
-  test('returns the PRONES name and treats legal-form differences as the same company', async () => {
+  test('accepts a code found in PRONES and returns its PRONES name for display', async () => {
     const { verifyVendorCode, searchOracle } = await setup({
       pronesRows: [{ VENDOR_CODE: '20031A0012', VENDOR_NAME: 'ABC CO., LTD.' }],
     })
 
     const result = await verifyVendorCode({ REQUEST_REGISTER_VENDOR_ID: 101, VENDOR_CODE: ' 20031a0012 ' })
 
-    expect(result).toEqual({
-      VENDOR_CODE: '20031A0012',
-      PRONES_VENDOR_NAME: 'ABC CO., LTD.',
-      COMPANY_NAME: 'ABC Company Limited',
-      IS_NAME_MATCHED: true,
-    })
+    expect(result).toEqual({ VENDOR_CODE: '20031A0012', PRONES_VENDOR_NAME: 'ABC CO., LTD.' })
     expect(searchOracle).toHaveBeenCalledTimes(1)
     const [, configDb, binds] = searchOracle.mock.calls[0] as unknown as [string, string, Record<string, string>]
     expect(configDb).toBe('PRONES')
     expect(binds).toEqual({ VENDOR_CODE: '20031A0012', VENDOR_CODE_LIKE: '20031A0012%' })
   })
 
-  test('flags a different PRONES name without blocking', async () => {
+  test('checks only the code: a different PRONES name is not compared and does not block', async () => {
     const { verifyVendorCode } = await setup({
+      companyName: 'ABC Company Limited',
       pronesRows: [{ VENDOR_CODE: '20031A0012', VENDOR_NAME: 'XYZ TRADING CO., LTD.' }],
     })
 
     const result = await verifyVendorCode({ REQUEST_REGISTER_VENDOR_ID: 101, VENDOR_CODE: '20031A0012' })
 
-    expect(result.IS_NAME_MATCHED).toBe(false)
+    expect(result).toEqual({ VENDOR_CODE: '20031A0012', PRONES_VENDOR_NAME: 'XYZ TRADING CO., LTD.' })
   })
 
   test('blocks a code that is not in PRONES', async () => {
@@ -117,16 +113,5 @@ describe('verifyVendorCode', () => {
       'Vendor Code must start with 20030',
     )
     expect(searchOracle).not.toHaveBeenCalled()
-  })
-})
-
-describe('isSameCompanyName', () => {
-  test('ignores legal-form words and punctuation, in English and Thai', async () => {
-    const { isSameCompanyName } = await setup()
-
-    expect(isSameCompanyName('ABC CO.,LTD.', 'ABC Company Limited')).toBe(true)
-    expect(isSameCompanyName('บริษัท เอบีซี จำกัด', 'เอบีซี')).toBe(true)
-    expect(isSameCompanyName('COCA TRADING', 'TRADING HOUSE')).toBe(false)
-    expect(isSameCompanyName('', 'ABC')).toBe(false)
   })
 })

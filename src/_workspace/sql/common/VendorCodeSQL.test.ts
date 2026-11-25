@@ -2,6 +2,14 @@ import { describe, expect, test } from 'bun:test'
 import { VendorCodeSQL } from './VendorCodeSQL'
 
 describe('VendorCodeSQL', () => {
+  test('lists PRONES codes by prefix + first letter through a bind, with the system entry time', () => {
+    const sql = VendorCodeSQL.getPronesCodesByStart()
+
+    expect(sql).toContain('FFT.T_TRADE_MS')
+    expect(sql).toContain('I_DL_CD LIKE :CODE_LIKE')
+    expect(sql).toContain('I_ENTRY_DATE_TIME AS ENTERED_AT')
+  })
+
   test('loads the vendor linked to the request', () => {
     const sql = VendorCodeSQL.getRequestVendor({ REQUEST_REGISTER_VENDOR_ID: 101 })
 

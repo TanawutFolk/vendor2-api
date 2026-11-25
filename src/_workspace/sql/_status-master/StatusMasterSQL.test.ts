@@ -59,6 +59,15 @@ describe('StatusMasterSQL', () => {
     }
   })
 
+  test('labels an inactive Registered vendor as Inactive without changing its status code', () => {
+    const label = VendorStatusSqlSnippets.statusLabelExpr('vendor', 'vendor_status')
+    const code = VendorStatusSqlSnippets.statusCodeExpr('vendor', 'vendor_status')
+
+    expect(label).toContain('WHEN vendor.INUSE = 0 AND')
+    expect(label).toContain("= 'REGISTERED' THEN 'Inactive'")
+    expect(code).not.toContain('Inactive')
+  })
+
   test('rejects unknown runtime status codes before building SQL', () => {
     expect(() => normalizeApprovalStepStatusCode('not-a-real-status')).toThrow('Unknown approval step status')
     expect(() => VendorStatusSqlSnippets.vendorStatusIdExpr('in_progress')).toThrow('Unknown stored vendor status')

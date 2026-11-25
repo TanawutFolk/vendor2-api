@@ -14,6 +14,7 @@ export const RequestRegisterPageModel = {
   updateCcEmails: async (dataItem: any) => RequestRegisterPageService.updateCcEmails(dataItem),
   saveSelectionForm: async (dataItem: any) => RequestRegisterPageService.saveSelectionForm(dataItem),
   checkVendorCode: async (dataItem: any) => RequestRegisterPageService.checkVendorCode(dataItem),
+  generateVendorCode: async (dataItem: any) => RequestRegisterPageService.generateVendorCode(dataItem),
   saveAccountVendorCode: async (dataItem: any) => RequestRegisterPageService.saveAccountVendorCode(dataItem),
   assertSelectionSheetEditable: async (requestId: number) => RequestRegisterPageService.assertSelectionSheetEditable(requestId),
   saveGprCNotification: async (dataItem: any) => RequestRegisterPageService.saveGprCNotification(dataItem),

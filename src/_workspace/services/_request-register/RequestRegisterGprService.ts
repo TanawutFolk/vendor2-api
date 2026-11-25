@@ -3,6 +3,7 @@ import { RequestRegisterPageSQL } from '../../sql/_request-register/RequestRegis
 import { GprCApprovalService } from '../_approval-GPRC/GprCApprovalService'
 import { ResultSetHeader } from 'mysql2'
 import { verifyVendorCode } from '../Common/VendorCodeVerification'
+import { generateVendorCodeForRequest } from '../Common/VendorCodeGenerator'
 import { getApprovalStepStatusIdentity, getWorkflowStepIdentity } from '../_status-master/StatusIdentityService'
 
 const getSelectionSheetWorkflowIdentity = async () => {
@@ -335,9 +336,7 @@ export const RequestRegisterGprService = {
 
       return {
         Status: true,
-        Message: verification.IS_NAME_MATCHED
-          ? 'Vendor Code found in PRONES'
-          : 'Vendor Code found in PRONES, but the vendor name is different. Please confirm it is the same vendor.',
+        Message: 'Vendor Code found in PRONES',
         ResultOnDb: verification,
         MethodOnDb: 'Check Vendor Code',
         TotalCountOnDb: 1,
@@ -348,6 +347,28 @@ export const RequestRegisterGprService = {
         Message: error?.message || 'Failed to verify Vendor Code',
         ResultOnDb: {},
         MethodOnDb: 'Check Vendor Code',
+        TotalCountOnDb: 0,
+      }
+    }
+  },
+
+  generateVendorCode: async (dataItem: any) => {
+    try {
+      const generated = await generateVendorCodeForRequest({ REQUEST_REGISTER_VENDOR_ID: dataItem.REQUEST_REGISTER_VENDOR_ID })
+
+      return {
+        Status: true,
+        Message: 'Vendor Code generated',
+        ResultOnDb: generated,
+        MethodOnDb: 'Generate Vendor Code',
+        TotalCountOnDb: 1,
+      }
+    } catch (error: any) {
+      return {
+        Status: false,
+        Message: error?.message || 'Failed to generate Vendor Code',
+        ResultOnDb: {},
+        MethodOnDb: 'Generate Vendor Code',
         TotalCountOnDb: 0,
       }
     }

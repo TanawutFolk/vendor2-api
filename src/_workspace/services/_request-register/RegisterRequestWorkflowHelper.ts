@@ -50,6 +50,13 @@ export const isVendorCodeComplete = (vendorCode: any, isOversea: boolean) => {
   return normalizedVendorCode.startsWith(expectedPrefix) && normalizedVendorCode.length > expectedPrefix.length && /^[A-Z0-9]+$/.test(normalizedVendorCode)
 }
 
+export const INACTIVE_VENDOR_RE_REGISTER_MESSAGE = 'Inactive vendors cannot be re-registered'
+
+// Re-register is only for active vendors: INUSE = 0 (e.g. PRONES I_DL_TYPE 'XX') is rejected.
+// A new registration request is not affected.
+export const isInactiveVendorReRegister = (isReRegisterRequest: boolean, vendorInuse: unknown) =>
+  isReRegisterRequest && Number(vendorInuse ?? 1) !== 1
+
 export const normalizeText = (value: any) =>
   String(value || '')
     .trim()

@@ -1,6 +1,15 @@
 import { describe, expect, test } from 'bun:test'
 import { RequestRegisterPageSQL } from './RequestRegisterPageSQL'
 
+describe('RequestRegisterPageSQL vendor create context', () => {
+  test('selects vendors.INUSE so Re-register can reject inactive vendors', async () => {
+    const sql = await RequestRegisterPageSQL.getVendorCreateContext({ VENDORS_ID: 7 })
+
+    expect(sql).toContain('v.INUSE')
+    expect(sql).toContain('v.VENDORS_ID = 7')
+  })
+})
+
 describe('RequestRegisterPageSQL approval step identity', () => {
   test('stores workflow step id instead of duplicating master step fields', async () => {
     const sql = await RequestRegisterPageSQL.createApprovalStep({

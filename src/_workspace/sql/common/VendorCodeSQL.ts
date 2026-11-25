@@ -88,4 +88,20 @@ export const VendorCodeSQL = {
 
     return sql
   },
+
+  // PRONES (Oracle): every code that starts with prefix + first letter (e.g. '20030W%'), with the system entry time
+  // so the generator can follow the format Account used last. All trade types are included: their numbers are taken.
+  getPronesCodesByStart: () => {
+    const sql = `
+                            SELECT
+                                       RTRIM(I_DL_CD) AS VENDOR_CODE
+                                     , I_ENTRY_DATE_TIME AS ENTERED_AT
+                            FROM
+                                       FFT.T_TRADE_MS
+                            WHERE
+                                       I_DL_CD LIKE :CODE_LIKE
+        `
+
+    return sql
+  },
 }

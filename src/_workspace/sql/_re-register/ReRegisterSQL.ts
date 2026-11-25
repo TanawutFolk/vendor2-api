@@ -62,6 +62,7 @@ export const ReRegisterSQL = {
                                      , v.CREATE_DATE
                                      , v.UPDATE_DATE
                                      , v.INUSE
+                                     , CASE WHEN v.INUSE = 1 THEN 'Active' ELSE 'Inactive' END AS INUSE_LABEL
 
                                      -- Vendor Status (source of truth: vendors + active request)
                                      , dataItem.VENDOR_STATUS_ID_SQL AS M_VENDOR_STATUS_ID
@@ -143,6 +144,7 @@ export const ReRegisterSQL = {
                                      , DATE_FORMAT(v.CREATE_DATE, '%d-%b-%Y %H:%i:%s') AS CREATE_DATE
                                      , DATE_FORMAT(v.UPDATE_DATE, '%d-%b-%Y %H:%i:%s') AS UPDATE_DATE
                                      , v.INUSE
+                                     , CASE WHEN v.INUSE = 1 THEN 'Active' ELSE 'Inactive' END AS INUSE_LABEL
 
                                      -- Vendor Status (source of truth: vendors + active request)
                                      , dataItem.VENDOR_STATUS_ID_SQL AS M_VENDOR_STATUS_ID
@@ -575,6 +577,7 @@ export const ReRegisterSQL = {
                                      , v.CREATE_DATE
                                      , v.UPDATE_DATE
                                      , v.INUSE
+                                     , CASE WHEN v.INUSE = 1 THEN 'Active' ELSE 'Inactive' END AS INUSE_LABEL
 
                                      -- Vendor Status (source of truth: vendors + active request)
                                      , dataItem.VENDOR_STATUS_ID_SQL AS M_VENDOR_STATUS_ID

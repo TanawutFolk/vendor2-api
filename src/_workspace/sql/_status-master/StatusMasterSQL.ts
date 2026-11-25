@@ -409,17 +409,24 @@ export const VendorStatusSqlSnippets = {
     return sql
   },
 
+  // Display label only: a Registered vendor that is inactive (INUSE = 0) shows "Inactive".
+  // The status id/code stay REGISTERED, so status filters and Re-register rules are unchanged.
   statusLabelExpr: (vendorAlias = 'v', statusAlias = 'mvs') => {
     let sql = `
-      COALESCE((
-        SELECT effective_status.STATUS_LABEL_EN
-        FROM m_vendor_status effective_status
-        WHERE effective_status.M_VENDOR_STATUS_ID = dataItem.EFFECTIVE_STATUS_ID_SQL
-          AND effective_status.INUSE = 1
-        LIMIT 1
-      ), dataItem.STATUS_ALIAS.STATUS_LABEL_EN)
+      CASE
+        WHEN dataItem.VENDOR_ALIAS.INUSE = 0 AND (dataItem.STATUS_CODE_SQL) = 'REGISTERED' THEN 'Inactive'
+        ELSE COALESCE((
+          SELECT effective_status.STATUS_LABEL_EN
+          FROM m_vendor_status effective_status
+          WHERE effective_status.M_VENDOR_STATUS_ID = dataItem.EFFECTIVE_STATUS_ID_SQL
+            AND effective_status.INUSE = 1
+          LIMIT 1
+        ), dataItem.STATUS_ALIAS.STATUS_LABEL_EN)
+      END
     `
 
+    sql = sql.replaceAll('dataItem.STATUS_CODE_SQL', VendorStatusSqlSnippets.statusCodeExpr(vendorAlias, statusAlias))
+    sql = sql.replaceAll('dataItem.VENDOR_ALIAS', vendorAlias)
     sql = sql.replaceAll('dataItem.STATUS_ALIAS', statusAlias)
     sql = sql.replaceAll('dataItem.EFFECTIVE_STATUS_ID_SQL', effectiveVendorStatusIdExpr(vendorAlias))
 

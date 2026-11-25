@@ -3,6 +3,7 @@ import {
   inferActorType,
   inferStepCode,
   getVendorCodePrefix,
+  isInactiveVendorReRegister,
   isVendorCodeComplete,
   requiresVendorReply,
   resolveWorkflowAction,
@@ -73,5 +74,16 @@ describe('RegisterRequestWorkflowHelper', () => {
     expect(isVendorCodeComplete('20031ABC01', true)).toBe(true)
     expect(isVendorCodeComplete('20031ABC01', false)).toBe(false)
     expect(isVendorCodeComplete('20031ABC-01', true)).toBe(false)
+  })
+
+  test('blocks Re-register only for inactive vendors', () => {
+    expect(isInactiveVendorReRegister(true, 0)).toBe(true)
+    expect(isInactiveVendorReRegister(true, '0')).toBe(true)
+    expect(isInactiveVendorReRegister(true, 1)).toBe(false)
+    // a vendor row without INUSE is treated as active, as before
+    expect(isInactiveVendorReRegister(true, undefined)).toBe(false)
+    expect(isInactiveVendorReRegister(true, null)).toBe(false)
+    // a new registration request is not affected by INUSE
+    expect(isInactiveVendorReRegister(false, 0)).toBe(false)
   })
 })

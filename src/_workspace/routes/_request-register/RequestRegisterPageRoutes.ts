@@ -14,6 +14,7 @@ requestRegisterPageRoutes.post('/updateApprovalStep', RequestRegisterPageControl
 requestRegisterPageRoutes.post('/updateCcEmails', RequestRegisterPageController.updateCcEmails)
 requestRegisterPageRoutes.post('/saveSelectionForm', RequestRegisterPageController.saveSelectionForm)
 requestRegisterPageRoutes.post('/checkVendorCode', RequestRegisterPageController.checkVendorCode)
+requestRegisterPageRoutes.post('/generateVendorCode', RequestRegisterPageController.generateVendorCode)
 requestRegisterPageRoutes.post('/saveAccountVendorCode', RequestRegisterPageController.saveAccountVendorCode)
 requestRegisterPageRoutes.post('/saveGprCNotification', RequestRegisterPageController.saveGprCNotification)
 requestRegisterPageRoutes.post('/getGprCFlow', RequestRegisterPageController.gprCGetFlow)

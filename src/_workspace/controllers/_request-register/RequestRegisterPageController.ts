@@ -475,6 +475,35 @@ export const RequestRegisterPageController = {
     }
   },
 
+  generateVendorCode: async (req: Request, res: Response) => {
+    const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
+
+    try {
+      const requestId = parseInt(dataItem.REQUEST_REGISTER_VENDOR_ID as string)
+      if (!requestId || isNaN(requestId)) {
+        res.status(400).json({
+          Status: false,
+          ResultOnDb: {},
+          TotalCountOnDb: 0,
+          MethodOnDb: 'Generate Vendor Code',
+          Message: 'Invalid request_id',
+        } as ResponseI)
+        return
+      }
+
+      const result = await RequestRegisterPageModel.generateVendorCode({ REQUEST_REGISTER_VENDOR_ID: requestId })
+      res.status(200).json(result as ResponseI)
+    } catch (error: any) {
+      res.status(200).json({
+        Status: false,
+        ResultOnDb: {},
+        TotalCountOnDb: 0,
+        MethodOnDb: 'Generate Vendor Code',
+        Message: error?.message || 'Failed to generate Vendor Code',
+      } as ResponseI)
+    }
+  },
+
   saveAccountVendorCode: async (req: Request, res: Response) => {
     const dataItem = !req.body || Object.entries(req.body).length === 0 ? req.query : req.body
 

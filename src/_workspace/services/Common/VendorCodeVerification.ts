@@ -5,29 +5,10 @@ import { getVendorCodePrefix, isVendorCodeComplete } from '../_request-register/
 
 export const PRONES_UNAVAILABLE_MESSAGE = 'Cannot verify Vendor Code with PRONES right now. Please try again later.'
 
+// Only the Vendor Code is checked; the vendor name is not compared. PRONES_VENDOR_NAME is returned for display only.
 export interface VendorCodeVerification {
   VENDOR_CODE: string
   PRONES_VENDOR_NAME: string
-  COMPANY_NAME: string
-  IS_NAME_MATCHED: boolean
-}
-
-// Legal-form words differ between PRONES and our vendor master ("CO., LTD." vs "COMPANY LIMITED"), so they are
-// ignored when comparing names. A mismatch is only a warning for Account to confirm, never a block.
-const COMPANY_NAME_NOISE =
-  /\b(?:THE|COMPANY|CO|LTD|LIMITED|PUBLIC|PCL|PLC|INC|CORP|CORPORATION|LLC|GMBH|PTE|SDN|BHD)\b|บริษัท|จำกัด|มหาชน|ห้างหุ้นส่วน|สามัญ|นิติบุคคล/g
-
-const normalizeCompanyName = (value: unknown) =>
-  String(value ?? '')
-    .toUpperCase()
-    .replace(COMPANY_NAME_NOISE, '')
-    .replace(/[^A-Z0-9฀-๿]+/g, '')
-
-export const isSameCompanyName = (left: unknown, right: unknown) => {
-  const normalizedLeft = normalizeCompanyName(left)
-  const normalizedRight = normalizeCompanyName(right)
-
-  return !!normalizedLeft && !!normalizedRight && (normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft))
 }
 
 const findPronesVendor = async (vendorCode: string) => {
@@ -88,13 +69,8 @@ export const verifyVendorCode = async (dataItem: { REQUEST_REGISTER_VENDOR_ID: u
     throw new Error(`Vendor Code ${vendorCode} was not found in PRONES. Please register the vendor in PRONES first.`)
   }
 
-  const pronesVendorName = String(pronesVendor.VENDOR_NAME ?? '').trim()
-  const companyName = String(requestVendor.COMPANY_NAME ?? '').trim()
-
   return {
     VENDOR_CODE: vendorCode,
-    PRONES_VENDOR_NAME: pronesVendorName,
-    COMPANY_NAME: companyName,
-    IS_NAME_MATCHED: isSameCompanyName(pronesVendorName, companyName),
+    PRONES_VENDOR_NAME: String(pronesVendor.VENDOR_NAME ?? '').trim(),
   }
 }

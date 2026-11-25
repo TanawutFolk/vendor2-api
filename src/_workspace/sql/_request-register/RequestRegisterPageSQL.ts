@@ -37,6 +37,7 @@ export const RequestRegisterPageSQL = {
                                      , v.ADDRESS
                                      , v.VENDOR_REGION
                                      , v.EMAILMAIN
+                                     , v.INUSE
                                      , vc.CONTACT_NAME
                                      , vc.EMAIL
                                      , vc.TEL_PHONE

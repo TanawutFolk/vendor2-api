@@ -869,9 +869,8 @@ const markMainIssueGprCRecheckToPic = async (requestId: number, flowId: number, 
 }
 
 const resumeGprCRecheckFlow = async (requestId: number, flow: any, updateBy: string) => {
-  const [statusIdentity, mainStatusIdentity, contextSql, mainStepsSql] = await Promise.all([
+  const [statusIdentity, contextSql, mainStepsSql] = await Promise.all([
     getGprCStepStatusIdentity(),
-    getGprCMainWorkflowIdentity(),
     GprCApprovalSQL.getRequestStatusContext({ REQUEST_REGISTER_VENDOR_ID: requestId }),
     GprCApprovalSQL.getApprovalSteps({ REQUEST_REGISTER_VENDOR_ID: requestId }),
   ])
@@ -884,6 +883,8 @@ const resumeGprCRecheckFlow = async (requestId: number, flow: any, updateBy: str
     MySQLExecute.search(mainStepsSql) as Promise<RowDataPacket[]>,
   ])
   const context = contextRows[0]
+  // The request keeps the workflow version it started on; a newer published version has other step master ids.
+  const mainStatusIdentity = await getGprCMainWorkflowIdentity(Number(getValue(context, 'WORKFLOW_DEFINITION_ID', 'workflow_definition_id')) || undefined)
   const currentTaskId = Number(getValue(context, 'CURRENT_REQUEST_APPROVAL_STEP_ID', 'current_step_id'))
   const currentMainStep = mainStepRows
     .map(normalizeMainApprovalStep)
